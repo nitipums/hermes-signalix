@@ -688,7 +688,7 @@ def _rsi(close, period=14):
     if al == 0:
         return 100.0
     rs = ag/al
-    return round(100 - 100/(1+rs), 2)
+    return float(round(100 - 100/(1+rs), 2))
 
 def compute_layer2(symbol, df_60m):
     """Classify short-term momentum on 60m bars. Returns signals + group enum."""
@@ -716,7 +716,7 @@ def compute_layer2(symbol, df_60m):
         group = "momentum_down"
     else:
         group = "neutral"
-    return {"signals": {"mini_trend": mini_trend, "macd": macd_state, "rsi": rsi},
+    return {"signals": {"mini_trend": mini_trend, "macd": macd_state, "rsi": float(rsi) if rsi is not None else None},
             "group": group}
 
 def universe_layer2(pg, symbols):
