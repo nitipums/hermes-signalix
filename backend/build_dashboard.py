@@ -269,6 +269,26 @@ MIN_DAILY_TURNOVER_THB = 5_000_000
 BREAKOUT_VOLUME_REQUIREMENT = 1.20
 
 
+def _price_band(close):
+    try:
+        c = float(close)
+    except (TypeError, ValueError):
+        return None
+    if c < 2.0:
+        return "low"
+    if c <= 10.0:
+        return "mid"
+    return "high"
+
+
+def _passes_value(avg_daily_value):
+    try:
+        v = float(avg_daily_value)
+    except (TypeError, ValueError):
+        return False
+    return v >= 5_000_000
+
+
 def number(value, digits=2):
     """JSON-safe numeric value, or None. Keeps chart levels numeric."""
     try:
@@ -428,7 +448,11 @@ def snapshot_items(pg, scan):
     source_groups = scan.get("groups", {})
     rows = [r for values in source_groups.values() for r in values]
     latest = snapshots(pg, [row["symbol"] for row in rows])
-    items = [serialize(key, row, latest.get(row["symbol"], {}))
+    # Standalone rebuild path: no L2/SET50 enrichment unless callers supply it.
+    layer2_map = {}
+    set50_set = set()
+    items = [serialize(key, row, latest.get(row["symbol"], {}), None,
+                      layer2_map.get(row["symbol"]), set50_set)
              for key, values in source_groups.items() for row in values]
     return apply_projection(items)
 
@@ -548,9 +572,11 @@ def plan(group, readiness, trend, snapshot, phase=None):
     return "Setup status", "Awaiting confirmation", "RS", number(trend.get("rs_rating"), 0)
 
 
-def serialize(group, row, snapshot, intraday_state=None):
+def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None):
     readiness, trend = row.get("trade_readiness", {}), row.get("trend_template", {})
     intraday_state = intraday_state or {}
+    l2 = layer2 or {}
+    s50 = set50 or set()
     # A stored overlay belongs only to the Daily base state that created it.
     # Never let yesterday's base-group override a newly rebuilt Daily scan.
     if intraday_state.get("base_group") != group:
@@ -729,6 +755,17 @@ def serialize(group, row, snapshot, intraday_state=None):
         "primaryLabel": a_label, "primaryValue": a_value, "secondaryLabel": b_label, "secondaryValue": b_value,
         **risk,
         "tvUrl": "https://www.tradingview.com/chart/?symbol=SET%3A" + quote(row["symbol"], safe=""),
+        # --- Layer 2 (short-term momentum grouping, 60m) + Independence filter ---
+        "layer1_stage": stage or "S1_basing",
+        "layer2_signals": l2.get("signals", {}),
+        "layer2_group": l2.get("group"),
+        "independence": {
+            "is_set50": row["symbol"] in s50,
+            "avgTradeValue20": number(snapshot.get("avgDailyValue20"), 0),
+            "priceBand": _price_band(snapshot.get("close")),
+            "passesValueFilter": _passes_value(snapshot.get("avgDailyValue20")),
+        },
+        "layer3_qualifiers": {},
     }
 
 
@@ -762,13 +799,23 @@ def build(scanned=None):
         freshness = dashboard_freshness(pg, last_valid_session=last_valid_session)
         from screening import excluded_symbols
         excluded = excluded_symbols(pg, market="TH")
+        from screening import universe_layer2, load_index_membership
+        layer2_map = universe_layer2(pg, [row["symbol"] for row in rows])
+        set50_set = load_index_membership(pg)
     finally:
         pg.close()
     overlays = {}
-    items = [serialize(key, row, latest.get(row["symbol"], {}), overlays.get(row["symbol"]))
+    items = [serialize(key, row, latest.get(row["symbol"], {}), overlays.get(row["symbol"]),
+                      layer2_map.get(row["symbol"]), set50_set)
              for key, values in source_groups.items() for row in values
              if row["symbol"] not in excluded]
     items = apply_projection(items)
+    STAGE_ORDER_L2 = ["S2_uptrend", "S1_basing", "S3_distributing", "S4_down"]
+    L2_PRIORITY = {"momentum_strong": 0, "momentum_up": 1, "neutral": 2, "momentum_down": 3,
+                   "overbought": 4, "oversold": 5, None: 6}
+    items.sort(key=lambda i: (STAGE_ORDER_L2.index(i.get("stage")) if i.get("stage") in STAGE_ORDER_L2 else 99,
+                              L2_PRIORITY.get(i.get("layer2_group"), 6),
+                              -(i.get("rs") or 0)))
     # Stage-first axis (Minervini S1-S4): the PRIMARY organizer for the UI.
     stage_order = ["S2_uptrend", "S1_basing", "S3_distributing", "S4_down"]
     stage_counts = {s: sum(1 for item in items if item.get("stage") == s) for s in stage_order}
