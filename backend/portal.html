@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Signalix — สมัครสมาชิก & ตั้งหุ้นติดตาม</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2333; --line:#283041;
+    --txt:#e6edf3; --mut:#8b949e; --acc:#3fb950; --acc2:#58a6ff;
+    --warn:#f0883e; --bad:#f85149; --gold:#d2a8ff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;padding:16px;max-width:560px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 4px}
+  .sub{color:var(--mut);font-size:13px;margin-bottom:18px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:16px;margin-bottom:14px}
+  label{display:block;font-size:13px;color:var(--mut);margin-bottom:6px}
+  input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);
+    color:var(--txt);border-radius:10px;padding:12px;font-size:15px;outline:none}
+  input[type=text]:focus{border-color:var(--acc2)}
+  button{background:var(--acc);color:#06210f;border:none;border-radius:10px;
+    padding:12px 16px;font-size:15px;font-weight:600;cursor:pointer;width:100%;margin-top:10px}
+  button.ghost{background:transparent;color:var(--acc2);border:1px solid var(--acc2)}
+  .row{display:flex;gap:8px;align-items:center;background:var(--panel2);
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0;
+    justify-content:space-between}
+  .row .sym{font-weight:600;letter-spacing:.5px}
+  .row .del{color:var(--bad);cursor:pointer;font-size:18px;line-height:1;padding:0 4px}
+  .tag{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;
+    background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
+  .tag.owner{color:var(--gold);border-color:var(--gold)}
+  .tag.paid{color:var(--acc2);border-color:var(--acc2)}
+  .tag.free{color:var(--mut)}
+  .bar{height:8px;background:var(--panel2);border-radius:6px;overflow:hidden;margin-top:6px}
+  .bar>i{display:block;height:100%;background:var(--acc)}
+  .bar>i.warn{background:var(--warn)} .bar>i.bad{background:var(--bad)}
+  .metric{font-size:13px;color:var(--mut);margin-top:10px}
+  .metric b{color:var(--txt)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+  th{color:var(--mut);font-weight:500}
+  .ok{color:var(--acc)} .msg{font-size:13px;margin-top:8px;min-height:18px}
+  .ok-msg{color:var(--acc)} .err-msg{color:var(--bad)}
+  .hint{font-size:12px;color:var(--mut);margin-top:6px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+  <h1>📡 Signalix</h1>
+  <div class="sub">ตั้งหุ้นติดตามรับสัญญาณ Minervini แจ้งเตือนเข้า Telegram</div>
+  <a href="/dashboard.html" style="display:inline-block;font-size:13px;color:var(--acc2);margin:-10px 0 14px">↗ ดู Dashboard ตลาดทั้งหมด</a>
+
+  <div class="panel">
+    <label>Telegram Chat ID ของคุณ</label>
+    <input id="chat" type="text" placeholder="เช่น 7295704669" autocomplete="off">
+    <div class="hint">หา chat id ได้จาก @userinfobot บน Telegram</div>
+    <button id="loadBtn">โหลดสถานะของฉัน</button>
+    <div id="loadMsg" class="msg"></div>
+  </div>
+
+  <div id="dash" class="hidden">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>สถานะบัญชี</strong>
+        <span id="tierTag" class="tag free">free</span>
+      </div>
+      <div class="metric">หุ้นที่ติดตาม: <b id="wlCount">0</b> / <b id="wlCap">5</b></div>
+      <div class="bar"><i id="wlBar"></i></div>
+      <div class="metric">แจ้งเตือนวันนี้: <b id="alCount">0</b> / <b id="alCap">10</b></div>
+      <div class="bar"><i id="alBar"></i></div>
+      <div class="metric" id="modeLine"></div>
+    </div>
+
+    <div class="panel">
+      <label>เพิ่มหุ้นติดตาม (ticker SET หุ้นสามัญ/ORD เช่น TRT, KBANK คั่นจุลภาคได้)</label>
+      <input id="addSym" type="text" placeholder="TRT, KBANK, PTT">
+      <div class="hint">พิมพ์ ticker ตัวพิมพ์ใหญ่หรือเล็กก็ได้ ระบบจะตัดรายการซ้ำและตรวจสอบ ticker ก่อนบันทึก · Free ติดตามได้สูงสุด 5 หุ้น</div>
+      <button id="saveBtn">บันทึก Watchlist</button>
+      <div id="saveMsg" class="msg"></div>
+      <div id="wlList" style="margin-top:10px"></div>
+      <button id="allBtn" class="ghost">รับสัญญาณทุกหุ้น (Watch All)</button>
+    </div>
+
+    <div class="panel">
+      <strong>แผนสมาชิก</strong>
+      <table id="tierTable">
+        <thead><tr><th>แพ็กเกจ</th><th>หุ้นติดตาม</th><th>แจ้งเตือน/วัน</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="hint">อัปเกรดแพ็กเกจติดต่อแอดมิน เพื่อปลดล็อก unlimited</div>
+    </div>
+  </div>
+
+<script>
+const API = location.origin.replace(':3001',':8000');  // dashboard:3001 -> backend:8000
+function el(id){return document.getElementById(id)}
+function setBar(barId, n, cap){
+  const bar=el(barId); const pct = cap==='unlimited'?100:(Math.min(n/cap,1)*100);
+  bar.style.width=pct+'%';
+  bar.className = (cap!=='unlimited'&&n>=cap)?'bad':(cap!=='unlimited'&&n/cap>0.8)?'warn':'';
+}
+async function load(){
+  const chat=el('chat').value.trim();
+  if(!chat){el('loadMsg').textContent='กรุณาใส่ Chat ID';el('loadMsg').className='msg err-msg';return}
+  el('loadMsg').textContent='กำลังโหลด...';el('loadMsg').className='msg';
+  try{
+    const [me,tiers]=await Promise.all([
+      fetch(`${API}/me?chat_id=${encodeURIComponent(chat)}`).then(r=>r.json()),
+      fetch(`${API}/tiers`).then(r=>r.json())
+    ]);
+    render(me,tiers);
+    el('dash').classList.remove('hidden');
+    el('loadMsg').textContent='';
+  }catch(e){el('loadMsg').textContent='โหลดไม่ได้: '+e.message;el('loadMsg').className='msg err-msg'}
+}
+function render(me,tiers){
+  const tier=me.tier||'free';
+  const tag=el('tierTag'); tag.textContent=tier;
+  tag.className='tag '+tier;
+  const wlCap = me.watchlist_cap==null?'unlimited':me.watchlist_cap;
+  const alCap = me.alert_cap==null?'unlimited':me.alert_cap;
+  el('wlCount').textContent=me.symbols.length;
+  el('wlCap').textContent=wlCap;
+  el('alCount').textContent=me.alerts_today||0;
+  el('alCap').textContent=alCap;
+  setBar('wlBar',me.symbols.length,wlCap);
+  setBar('alBar',me.alerts_today||0,alCap);
+  el('modeLine').textContent = me.watch_mode==='all'
+    ? 'โหมด: รับสัญญาณทุกหุ้น ✅'
+    : (me.watch_mode==='none'?'โหมด: ยังไม่ตั้งค่า':'โหมด: ติดตามเฉพาะหุ้นที่เลือก');
+  // watchlist
+  const list=el('wlList'); list.innerHTML='';
+  if(me.watch_mode==='all'){
+    list.innerHTML='<div class="hint">กำลังรับสัญญาณทุกหุ้น</div>';
+  } else if(me.symbols.length===0){
+    list.innerHTML='<div class="hint">ยังไม่มีหุ้นใน watchlist</div>';
+  } else {
+    me.symbols.forEach(s=>{
+      const row=document.createElement('div');row.className='row';
+      row.innerHTML=`<span class="sym">${s}</span><span class="del" data-sym="${s}">×</span>`;
+      list.appendChild(row);
+    });
+    list.querySelectorAll('.del').forEach(d=>d.onclick=()=>removeSym(d.dataset.sym));
+  }
+  // tiers
+  const tb=el('tierTable').querySelector('tbody'); tb.innerHTML='';
+  Object.entries(tiers.tiers).forEach(([t,info])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${t}</td><td>${info.watchlist}</td><td>${info.alerts_per_day}</td>`;
+    tb.appendChild(tr);
+  });
+}
+async function save(){
+  const chat=el('chat').value.trim();
+  const raw=el('addSym').value.trim();
+  if(!raw && !confirm('ล้าง watchlist ทั้งหมดและรับสัญญาณทุกหุ้น?')) return;
+  const syms=raw?raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean):[];
+  el('saveMsg').textContent='กำลังบันทึก...';el('saveMsg').className='msg';
+  try{
+    const r=await fetch(`${API}/watch?chat_id=${encodeURIComponent(chat)}&symbols=${encodeURIComponent(syms.join(','))}`,{method:'POST'});
+    const j=await r.json();
+    if(!r.ok){el('saveMsg').textContent='✋ '+j.reason;el('saveMsg').className='msg err-msg';return}
+    el('saveMsg').textContent='✅ บันทึกแล้ว';el('saveMsg').className='msg ok-msg';
+    el('addSym').value='';
+    await refresh();
+  }catch(e){el('saveMsg').textContent='บันทึกไม่ได้: '+e.message;el('saveMsg').className='msg err-msg'}
+}
+async function allMode(){
+  const chat=el('chat').value.trim();
+  await fetch(`${API}/watch?chat_id=${encodeURIComponent(chat)}`,{method:'POST'});
+  await refresh();
+}
+async function removeSym(s){
+  const me=await fetch(`${API}/me?chat_id=${encodeURIComponent(el('chat').value.trim())}`).then(r=>r.json());
+  const left=me.symbols.filter(x=>x!==s);
+  await fetch(`${API}/watch?chat_id=${encodeURIComponent(el('chat').value.trim())}&symbols=${encodeURIComponent(left.join(','))}`,{method:'POST'});
+  await refresh();
+}
+async function refresh(){
+  const chat=el('chat').value.trim();
+  const [me,tiers]=await Promise.all([
+    fetch(`${API}/me?chat_id=${encodeURIComponent(chat)}`).then(r=>r.json()),
+    fetch(`${API}/tiers`).then(r=>r.json())
+  ]);
+  render(me,tiers);
+}
+el('loadBtn').onclick=load;
+el('saveBtn').onclick=save;
+el('allBtn').onclick=allMode;
+el('addSym').addEventListener('keydown',e=>{if(e.key==='Enter')save()});
+</script>
+</body>
+</html>

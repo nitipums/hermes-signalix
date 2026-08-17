@@ -1,0 +1,14 @@
+BEE HANDOFF — promote to Level-3 fact_store (plain artifact)
+
+Date: 2026-08-15 UTC
+Owner: Khim
+
+Signalix last_valid_session defect is live and verified. build_dashboard.py now carries market_session.status/is_open/last_valid_session/timezone/source through dashboard_freshness(). app.py /dashboard/snapshot passes the latest persisted Daily last_date and exposes nested market_session plus top-level last_valid_session. No scan membership/state mutation. Deterministic suite: 10/10 passed. Live contract test passed. /health=200 DB/Redis up; snapshot=200 with 718 items; groups remain 18+33+420+191+56=718.
+
+Browser root cause: agent-browser was missing from /root/hermes-agent/node_modules/.bin. The bare /usr/bin/browser-use was the unrelated npm browser-use 0.8.0 CLI, incompatible with Hermes stdin Python helpers. Correct Hermes-managed install is browser-use/browser-harness 0.1.8 (browser-use package 0.13.7), resolved at /root/.hermes/profiles/lite/bin/browser-use via uv tool install with UV_TOOL_BIN_DIR. Local Chrome is /usr/bin/google-chrome (151.0.7922.137), dedicated CDP at 127.0.0.1:9222 with /tmp/signalix-browser-chrome. Workspace env has BU_CDP_URL=http://127.0.0.1:9222. _build_browser_env() preserves AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome and AGENT_BROWSER_ARGS=--no-sandbox,--disable-dev-shm-usage,--disable-gpu.
+
+Proof: agent-browser 0.34.0 open about:blank + snapshot passed; Signalix open + accessibility snapshot passed; KCE card click opened real detail dialog. Hermes browser_exec passed after BU_CDP_URL workspace config; page_info/title/718 DOM assertion passed; Hermes clicked [data-symbol=KCE] and real role=dialog appeared with KCE detail/chart controls. No visual mobile pass claimed. browser-use doctor cloud API key/cloudflared missing is optional for local mode. agent-browser warns Node 22 vs declared Node >=24; upgrade/pin later.
+
+Recovery: launch dedicated Chrome with /usr/bin/google-chrome --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu --no-first-run --no-default-browser-check --remote-debugging-address=127.0.0.1 --remote-debugging-port=9222 --user-data-dir=/tmp/signalix-browser-chrome about:blank; export HERMES_HOME=/root/.hermes/profiles/lite, AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome, AGENT_BROWSER_ARGS=--no-sandbox,--disable-dev-shm-usage,--disable-gpu, BU_CDP_URL=http://127.0.0.1:9222. If live lite service env must be reloaded, only an external admin shell may run systemctl daemon-reload then systemctl restart hermes-gateway-lite.service; it was not run in-chat.
+
+Level-2 raw state: do not edit manually. Bee may promote these verified facts into Level-3 fact_store.

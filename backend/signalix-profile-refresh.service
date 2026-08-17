@@ -1,0 +1,16 @@
+[Unit]
+Description=Signalix slow company-profile metadata refresh (active ORD only)
+After=postgresql.service docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/refresh_company_profiles.py --limit 20 --sleep 0.5
+StandardOutput=append:/root/signalix/company_profile_refresh.log
+StandardError=append:/root/signalix/company_profile_refresh.log
+TimeoutStartSec=900

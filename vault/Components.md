@@ -1,0 +1,97 @@
+# Components
+
+Every backend module, what it does, and its hard rules.
+
+## `update_data.py` — EOD ingestion
+Incremental, idempotent SET EOD updater. Fetches only trade days **strictly
+after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run.
+
+**Source priority** (`--source` to force):
+1. `local` — CSV drop dirs (`/root/signalix/uploads`, seed dir). Owner pushes via `upload_server.py`. Most reliable.
+2. `drive` — re-list Google Drive archive folder via `gdown`, pull newer files.
+3. `settrade` — Settrade Open API v2 (`settrade-v2`), preferred automated source.
+4. `yfinance` — fallback; unreliable for Thai stocks (>15% gaps, zero-vol bars dropped).
+
+> Per Nitipum.s rule: native Thai EOD zip is AUTHORITATIVE; Settrade preferred
+> automated; Drive = owner backup; yfinance = last resort only.
+
+Triggers a scan + dashboard rebuild after loading (when not `--dry-run`).
+
+## `screening.py` — DB-backed Minervini engine (Phase 2)
+Reads `price_data` from Postgres (NOT yfinance). Benchmark for RS Rating = the
+`SET` index symbol in the same table. Core API:
+- `analyze_symbol_db_ranked(symbol)` — single-symbol pipeline
+- `scan_universe(min_conditions, limit)` — full market
+- `group_scan_results(scanned)` — bins into entry_now / ath_breakout / breakout_extended / monitor / risk
+
+Computes: Trend Template 8/8, VCP contractions, RS Rating, Buy Zone (Fib 0.5/0.618), Stop, Trade Readiness. **Deterministic — no LLM.**
+
+## `scanner.py` — legacy/standalone scanner
+Original pandas scanner (pre-DB rewrite). Kept for reference; `screening.py` is
+the live engine. Imports `scan_universe` must stay at module top in `app.py`.
+
+## `build_dashboard.py` — dashboard HTML
+Professional, **English-only**, dark-theme screening workspace. Reads
+`scan_results.json`, emits `dashboard.html` with per-stock cards + clickable
+chart lightbox (canvas, no chart images). Charts fetched from `/chart/{sym}`.
+
+## `dashboard_server.py` — static server (sidecar)
+Serves `/app/dashboard.html` on :3001. `Access-Control-Allow-Origin: *` so
+Telegram/bot links work. Runs inside the backend container alongside FastAPI.
+
+## `app.py` — FastAPI backend
+Routes:
+- `GET /health` — db+redis ping
+- `POST /webhook` — store + publish (auth-gated, see [[Architecture]])
+- `GET /signals` — list stored signals
+- `GET /screen/{symbol}` — run pipeline for one symbol, publish
+- `GET /chart/{symbol}?timeframe=` — bounded OHLCV (1W/1D/60M/15M), never live
+- `POST /scan` — scan universe, publish candidates, rebuild dashboard, push summary
+
+Imports `push_telegram` + `DASHBOARD_PUBLIC_URL` from `delivery.py`.
+
+## `delivery.py` — push + formatting (shared)
+`push_telegram(text)`, `format_signal(envelope)` (Thai alert), `deliver(envelope)`,
+`run_consumer()`. Used by BOTH `app.py` (batch summary) and `delivery_consumer.py`
+(realtime). **Telegram-only** as of 2026-08-12 (LINE removed). Plain-text sends
+(Markdown parse caused Telegram 400).
+
+## `llm.py` — Phase 3 LLM summarization
+`summarize_signal(result)` calls the Nous portal (`inference-api.nousresearch.com/v1`,
+model `upstage/solar-pro4:free`) and returns a short Thai note. Reads the Nous
+OAuth token at runtime from `/root/.hermes/shared/nous_auth.json` (mounted RO into
+the container); never copied to Signalix `.env`. Safe no-op (returns '') if the LLM
+is unavailable. The LLM NEVER computes numbers — only summarizes.
+
+## `portal.html` — User self-service frontend
+Dark-theme, Thai, mobile-first single-page app. Lets a user register by Telegram
+chat id, view/edit their watchlist, see live quota bars (watchlist size + alerts
+today vs tier cap), and view the tier table. Served at `:3001/portal` by
+`dashboard_server.py` (do_GET rewrites /portal -> /portal.html). Calls backend
+API on `:8000` (`/me`, `/watch`, `/tiers`). Pure static HTML+JS, no build step.
+No payment flow (payment deferred by user).
+DB helpers for subscribers: `init_user_schema()`, `upsert_user(chat_id, tier)`,
+`set_watch(chat_id, symbols)` (empty list = watch ALL), `get_routing_map()` →
+`({symbol:[chat_id]}, [watch_all_chats])`. Routing is cached 30s in the consumer.
+**Quota:** `TIER_LIMITS={free:5, paid:None, owner:None}` — explicit watchlists over
+the free cap are rejected (HTTP 400) at `/watch`; watch-ALL always allowed.
+`_ensure_user()` (no tier reset) is used by set_watch so editing a watchlist never
+downgrades a paid user.
+
+## `delivery_consumer.py` — Redis subscriber
+Entrypoint for the `signalix_delivery` container. Subscribes `signals`, calls
+`deliver()` forever. Blocks; systemd-like restart via compose `restart: always`.
+
+## `classify_check.py` — ingest guard
+Dry-run keep/cut rule before re-ingesting: CUT if ticker ends with -O/-F/-M/-P
+or starts with ! or $.
+
+## `set_market_day_guard.py` — holiday guard
+Exits non-zero on SET market holidays so systemd `ExecCondition` skips jobs.
+
+## `ingest.py` / `ingest_demo.py` — seed loaders
+Parse `set-history_EOD_*.csv` into `price_data`. `ingest_demo.py` is the first
+stage of the demo pipeline.
+
+## `upload_server.py` — owner CSV drop
+HTTP receiver so the owner can push EOD CSV files into the drop dirs.

@@ -1,0 +1,17 @@
+# Run the Signalix Monitor bucket hourly during actual SET continuous sessions.
+[Unit]
+Description=Run Signalix Monitor 60m refresh hourly during SET hours
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 10:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 11:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 12:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 14:45:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 15:45:00 Asia/Bangkok
+# Morning: 10:15, 11:15, 12:15. Afternoon: 14:45, 15:45 Bangkok.
+# Do not use /1:00 here: systemd interprets that expression as every minute.
+Persistent=true
+Unit=signalix-monitor.service
+
+[Install]
+WantedBy=timers.target

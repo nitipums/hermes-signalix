@@ -1,0 +1,194 @@
+{
+  "total_classified": 767,
+  "stage_distribution": {
+    "Stage 2 · Uptrend": 289,
+    "Stage 4 · Down": 207,
+    "Stage 3 · Distributing": 165,
+    "Stage 1 · Basing": 106
+  },
+  "stage_counts_raw": {
+    "S2_uptrend": 289,
+    "S3_distributing": 165,
+    "S1_basing": 106,
+    "S4_down": 207
+  },
+  "phase_breakdown": {
+    "Stage 4 · Down/Declining": 207,
+    "Stage 2 · Uptrend/Waiting breakout": 171,
+    "Stage 3 · Distributing/Topping": 165,
+    "Stage 2 · Uptrend/Uptrend pullback": 108,
+    "Stage 1 · Basing/Base early": 93,
+    "Stage 1 · Basing/Base tight (VCP)": 13,
+    "Stage 2 · Uptrend/Breakout new": 10
+  },
+  "examples": {
+    "Stage 2 · Uptrend": [
+      {
+        "symbol": "INOX",
+        "rs": 100.0,
+        "phase": "Waiting breakout"
+      },
+      {
+        "symbol": "BJCHI",
+        "rs": 99.9,
+        "phase": "Waiting breakout"
+      },
+      {
+        "symbol": "BANPU",
+        "rs": 99.7,
+        "phase": "Uptrend pullback"
+      },
+      {
+        "symbol": "SMT",
+        "rs": 99.5,
+        "phase": "Uptrend pullback"
+      },
+      {
+        "symbol": "MGC",
+        "rs": 99.4,
+        "phase": "Uptrend pullback"
+      },
+      {
+        "symbol": "GUNKUL",
+        "rs": 99.3,
+        "phase": "Waiting breakout"
+      },
+      {
+        "symbol": "EASTW",
+        "rs": 99.2,
+        "phase": "Waiting breakout"
+      },
+      {
+        "symbol": "INSET",
+        "rs": 99.0,
+        "phase": "Uptrend pullback"
+      }
+    ],
+    "Stage 3 · Distributing": [
+      {
+        "symbol": "SRICHA",
+        "rs": 97.8,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "BIOTEC",
+        "rs": 93.9,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "STGT",
+        "rs": 91.3,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "SGP",
+        "rs": 81.1,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "STA",
+        "rs": 80.8,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "TRUE",
+        "rs": 80.4,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "UBOT",
+        "rs": 69.3,
+        "phase": "Topping"
+      },
+      {
+        "symbol": "AMC",
+        "rs": 61.9,
+        "phase": "Topping"
+      }
+    ],
+    "Stage 1 · Basing": [
+      {
+        "symbol": "PTTGC",
+        "rs": 93.3,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "WAVE",
+        "rs": 82.6,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "SE",
+        "rs": 80.7,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "TMT",
+        "rs": 80.6,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "TPAC",
+        "rs": 80.4,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "KLINIQ",
+        "rs": 67.8,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "RPC",
+        "rs": 65.6,
+        "phase": "Base early"
+      },
+      {
+        "symbol": "PTTEP",
+        "rs": 65.0,
+        "phase": "Base tight (VCP)"
+      }
+    ],
+    "Stage 4 · Down": [
+      {
+        "symbol": "GLD",
+        "rs": 81.3,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "IROYAL",
+        "rs": 87.8,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "FLOYD",
+        "rs": 79.6,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "KWC",
+        "rs": 61.0,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "UEC",
+        "rs": 55.1,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "CPT",
+        "rs": 53.9,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "NER",
+        "rs": 51.7,
+        "phase": "Declining"
+      },
+      {
+        "symbol": "SIMAT",
+        "rs": 75.5,
+        "phase": "Declining"
+      }
+    ]
+  }
+}

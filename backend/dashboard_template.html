@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signalix — Stage Screener</title>
+<style>
+:root{
+  --bg:#0a0e17; --panel:#111a28; --panel2:#162132; --line:#27364b;
+  --text:#edf3fb; --muted:#92a2b7; --blue:#79adff;
+  --green:#43df9e; --amber:#ffc45d; --red:#ff7a7a; --slate:#8aa0bd;
+  --s1:#6f8bba; --s2:#43df9e; --s3:#ffc45d; --s4:#ff7a7a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body.loading .app{visibility:hidden}
+body.loading #liveLoading{display:flex}
+#liveLoading{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
+  background:var(--bg);color:var(--muted);font-size:14px}
+button,input{font:inherit} button{color:inherit;cursor:pointer}
+.app{max-width:1280px;margin:auto;padding:0 18px 42px}
+.topbar{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.brand{font-size:21px;font-weight:850;letter-spacing:-.04em}
+.brand span{color:var(--blue)}
+.fresh{color:var(--muted);font-size:12px;display:flex;gap:8px;align-items:center}
+.fresh i{width:8px;height:8px;border-radius:50%;background:#8294ac;box-shadow:0 0 0 4px #1b2737}
+.nav{display:flex;gap:5px;position:sticky;top:0;z-index:10;background:#0a0e17ee;backdrop-filter:blur(12px);
+  padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.nav button{border:0;background:transparent;border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
+.nav button.active,.nav button:hover{background:var(--panel2);color:var(--text)}
+.hero{padding:20px 0 14px;display:flex;justify-content:space-between;gap:14px;align-items:start;flex-wrap:wrap}
+h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
+.hero p{margin:0;color:var(--muted)}
+.coverage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color:var(--muted);font-size:12px;white-space:nowrap}
+.coverage b{font-size:16px;color:var(--text)}
+
+/* Stage summary bar */
+.stage-summary{display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap}
+.stage-pill{flex:1;min-width:140px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel)}
+.stage-pill h3{margin:0 0 4px;font-size:13px}
+.stage-pill .cnt{font-size:26px;font-weight:850;letter-spacing:-.04em}
+.stage-pill.s2{border-color:#2c6b58}.stage-pill.s2 .cnt{color:var(--s2)}
+.stage-pill.s1{border-color:#33475f}.stage-pill.s1 .cnt{color:var(--s1)}
+.stage-pill.s3{border-color:#6b5a2c}.stage-pill.s3 .cnt{color:var(--s3)}
+.stage-pill.s4{border-color:#6b3030}.stage-pill.s4 .cnt{color:var(--s4)}
+.stage-pill.active{outline:2px solid var(--blue);outline-offset:2px}
+
+.liquidity-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
+.chip.active{background:var(--panel2);color:var(--text)}
+.search{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:11px 14px;color:var(--text);margin-bottom:16px}
+.stage-section{margin-bottom:26px}
+.stage-head{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+.stage-head h2{margin:0;font-size:18px;letter-spacing:-.03em}
+.stage-head .badge{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px}
+.stage-head.s2 .badge{background:#14362e;color:var(--s2);border:1px solid #2c6b58}
+.stage-head.s1 .badge{background:#16223a;color:var(--s1);border:1px solid #33475f}
+.stage-head.s3 .badge{background:#332e18;color:var(--s3);border:1px solid #6b5a2c}
+.stage-head.s4 .badge{background:#3a1f1f;color:var(--s4);border:1px solid #6b3030}
+.stage-head .desc{color:var(--muted);font-size:12px}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
+.signal-card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 14px;position:relative;overflow:hidden}
+.signal-card.stage-S2_uptrend{border-left:4px solid var(--s2)}
+.signal-card.stage-S1_basing{border-left:4px solid var(--s1)}
+.signal-card.stage-S3_distributing{border-left:4px solid var(--s3)}
+.signal-card.stage-S4_down{border-left:4px solid var(--s4)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.ticker{font-size:19px;font-weight:850;letter-spacing:-.03em}
+.stage-badge{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px;vertical-align:middle}
+.stage-badge.positive{background:#14362e;color:var(--s2)}
+.stage-badge.neutral{background:#16223a;color:var(--s1)}
+.stage-badge.warning{background:#332e18;color:var(--s3)}
+.stage-badge.danger{background:#3a1f1f;color:var(--s4)}
+.phase-tag{display:inline-block;font-size:10px;color:var(--muted);margin-left:6px;vertical-align:middle}
+.star{background:none;border:0;font-size:18px;color:var(--muted)}
+.star.saved{color:var(--amber)}
+.price{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+.price b{font-size:21px;font-weight:850}
+.price small{color:var(--muted);font-size:11px;margin-left:5px}
+.gain{color:var(--green)} .loss{color:var(--red)}
+.basic-strip{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:8px}
+.basic-strip b{color:var(--text)}
+.setup-evidence{font-size:11px;color:var(--blue);margin-bottom:6px}
+.setup-evidence.surge{color:var(--amber)}
+.quality-strip{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+.quality-strip .q{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.quality-strip .q.warn{color:var(--amber);border-color:#6b5a2c}
+.action-line{font-size:11px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.action-line b{color:var(--text)}
+.empty{color:var(--muted);padding:30px;text-align:center}
+
+@media(max-width:620px){
+  .stage-pill{min-width:calc(50% - 5px)}
+  .cards{grid-template-columns:1fr}
+}
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.72);
+  align-items:center;justify-content:center;padding:18px}
+.modal-bg.open{display:flex}
+.modal{width:min(560px,100%);max-height:86vh;overflow:auto;background:var(--panel);
+  border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.tf-tools{display:flex;gap:6px;margin:6px 0}
+.tf-tools .chip{padding:6px 10px;font-size:11px}
+.tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
+.modal .chip{margin-top:14px}
+</style>
+</head>
+<body>
+<div id="liveLoading">Loading live snapshot…</div>
+<main class="app">
+  <header class="topbar">
+    <div class="brand">Signal<span>ix</span></div>
+    <div class="fresh"><i id="liveDot"></i><span id="liveState">Loading…</span>
+      <button id="languageToggle" class="chip" style="margin-left:8px">EN</button></div>
+  </header>
+  <nav class="nav">
+    <button class="chip active" data-page="screener">คัดหุ้น (Stage)</button>
+    <button class="chip" data-page="watchlist">หุ้นติดตาม</button>
+    <button class="chip" data-page="market">ตลาด</button>
+  </nav>
+  <section class="page active" id="screener">
+    <div class="hero">
+      <div><h1>Stage-first Screener</h1><p>จัดกลุ่มตามโครงสร้างกราฟ (Minervini Stage 1–4) — ไม่ใช้ volume/liquidity กรองตอนแรก</p></div>
+      <div class="coverage"><span id="covCount">—</span> หุ้นไทย ORD สแกน</div>
+    </div>
+    <div class="stage-summary" id="stageSummary"></div>
+    <div class="liquidity-tools">
+      <button class="chip active" id="liquidOnly" data-liquidity="liquid">ซ่อน low value (&lt;฿10M/วัน)</button>
+      <button class="chip" id="showLowValue" data-liquidity="all">โชว์ทั้งหมด</button>
+    </div>
+    <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
+    <div id="results"></div>
+    <div id="empty" class="empty" hidden>ไม่มีหุ้นตรงเงื่อนไข</div>
+  </section>
+  <section class="page" id="watchlist">
+    <div class="hero"><div><h1>หุ้นติดตาม</h1><p id="watchState">บันทึกในอุปกรณ์นี้</p></div></div>
+    <div id="watchResults"></div>
+    <div id="watchEmpty" class="empty">ยังไม่มีหุ้นใน watchlist — กดดาวบนการ์ดเพื่อเพิ่ม</div>
+  </section>
+  <section class="page" id="market">
+    <div class="hero"><div><h1>สถานะตลาด</h1><p>Breadth จาก Stage ล่าสุด</p></div></div>
+    <div class="market-grid" id="marketGrid"></div>
+  </section>
+</main>
+<div class="modal-bg" id="modalBg" aria-hidden="true"><section class="modal" role="dialog" aria-modal="true" aria-label="Detail"><div id="modalContent"></div></section></div>
+
+<script>
+const STAGE_ORDER=["S2_uptrend","S1_basing","S3_distributing","S4_down"];
+const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
+const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
+const STAGE_DESC={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"สร้างฐาน — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"กำลังจ่าย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
+let items=__ITEMS__;
+let stageMeta=__STAGE_META__;
+const copy={th:{navScreener:"คัดหุ้น",navWatchlist:"หุ้นติดตาม",navMarket:"ตลาด"}};
+let language=localStorage.getItem("signalix-language")||"th";
+const esc=v=>String(v??"—").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+const num=(v,d=2)=>v===null||v===undefined?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=v=>v===null||v===undefined?"—":`${v>=0?"+":""}${Number(v).toFixed(2)}%`;
+const compact=v=>{v=Number(v);if(!Number.isFinite(v))return "—";let a=Math.abs(v);return a>=1e9?(v/1e9).toFixed(2)+"B":a>=1e6?(v/1e6).toFixed(2)+"M":a>=1e3?(v/1e3).toFixed(1)+"K":num(v,0);};
+let bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
+const apiBase=`${location.protocol}//${location.hostname}:8000`;
+const savedKey="signalix-watchlist-v2";
+let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
+let liquidity="liquid",detailItem=null,stageFilter="all";
+
+function card(i){
+  const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
+  const tone=STAGE_TONE[i.stage]||"neutral";
+  return `<article class="signal-card stage-${i.stage}" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="Review ${esc(i.symbol)}">
+    <div class="card-top"><div>
+      <span class="ticker">${esc(i.symbol)}</span>
+      <span class="stage-badge ${tone}">${esc(i.stage_label)}</span>
+      <span class="phase-tag">${esc(i.phase_label)}</span>
+    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist">${saved.has(i.symbol)?"★":"☆"}</button></div>
+    <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
+    <div class="basic-strip"><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span><span>Chg <b class="${gain?"gain":"loss"}">${num(i.changeAmount)} · ${pct(i.changePct)}</b></span></div>
+    ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
+    ${i.volumeSurge?`<div class="setup-evidence surge">VOLUME SURGE ${num(i.volumeSurgeRatio,1)}×</div>`:""}
+    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${(i.quality&&i.quality.flags||[]).map(f=>`<span class="q warn">${esc(f)}</span>`).join("")}</div>
+    ${i.action?`<div class="action-line"><b>${esc(i.action)}</b> · ${esc(i.actionReason)}</div>`:""}
+  </article>`;
+}
+function current(){
+  const q=document.getElementById("search").value.trim().toLowerCase();
+  return items.filter(i=>(liquidity==="all"||!i.lowValue)&&(stageFilter==="all"||i.stage===stageFilter)&&(!q||`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q)));
+}
+function render(){
+  document.getElementById("covCount").textContent=items.length;
+  // stage summary pills (clickable filter)
+  const sum=document.getElementById("stageSummary");
+  sum.innerHTML=STAGE_ORDER.map(s=>{
+    const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
+    const cls=s.split("_")[0];
+    return `<div class="stage-pill ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" style="cursor:pointer"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div></div>`;
+  }).join("");
+  // sections by stage
+  const vals=current();
+  const results=document.getElementById("results");
+  results.innerHTML=STAGE_ORDER.map(s=>{
+    if(stageFilter!=="all"&&stageFilter!==s)return "";
+    const list=vals.filter(i=>i.stage===s);
+    if(!list.length)return "";
+    const m=stageMeta[s]||{count:list.length};
+    return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
+      <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
+      <span class="desc">${esc(STAGE_DESC[s])}</span></div>
+      <div class="cards">${list.map(card).join("")}</div></section>`;
+  }).join("");
+  document.getElementById("empty").hidden=!!vals.length;
+  renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
+}
+function renderMarket(){
+  const grid=document.getElementById("marketGrid");
+  const total=items.length||1;
+  grid.innerHTML=STAGE_ORDER.map(s=>{
+    const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
+    const pctv=(c/total*100).toFixed(1);
+    const cls=s.split("_")[0];
+    return `<article class="stage-pill ${cls}"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div style="color:var(--muted);font-size:11px">${pctv}% ของตลาด</div></article>`;
+  }).join("");
+}
+function renderWatch(){
+  const vals=items.filter(i=>saved.has(i.symbol));
+  document.getElementById("watchResults").innerHTML=vals.length?`<div class="cards">${vals.map(card).join("")}</div>`:"";
+  document.getElementById("watchEmpty").hidden=!!vals.length;
+  document.getElementById("watchCount")&&(document.getElementById("watchCount").textContent=saved.size);
+}
+function persist(){try{localStorage.setItem(savedKey,JSON.stringify([...saved]));}catch(e){}renderWatch();
+  document.querySelectorAll("[data-star]").forEach(b=>{const yes=saved.has(b.dataset.star);b.textContent=yes?"★":"☆";b.classList.toggle("saved",yes);});}
+function bind(root=document){
+  (root.querySelectorAll?root.querySelectorAll(".signal-card"):[]).forEach(el=>{
+    el.onclick=e=>{if(e.target.closest("[data-star]"))return;openDetail(bySymbol[el.dataset.symbol]);};
+    el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail(bySymbol[el.dataset.symbol]);}};
+  });
+}
+function openDetail(i){
+  detailItem=i;
+  const bg=document.getElementById("modalBg");bg.classList.add("open");bg.setAttribute("aria-hidden","false");
+  const q=(i.quality&&i.quality.flags||[]).join(" · ");
+  document.getElementById("modalContent").innerHTML=`<div style="padding:20px">
+    <h2>${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
+    <div class="tf-tools">
+      <button class="chip tf" data-tf="60M">60m · 1M</button>
+      <button class="chip tf active" data-tf="1D">Day · 6M</button>
+      <button class="chip tf" data-tf="1W">Week · 1Y</button>
+      <button class="chip tf" data-tf="1M">Month · All</button>
+    </div>
+    <canvas id="detailChart" height="200" style="width:100%;margin:10px 0;border-radius:10px;background:#0a0e17"></canvas>
+    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
+    <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
+    ${i.action?`<div class="action-line"><b>${esc(i.action)}</b><br>${esc(i.actionReason)}</div>`:""}
+    <p style="color:var(--muted);font-size:12px">Stage เป็นโครงสร้างกราฟ (Layer 1) — quality (MACD/RSI/volume) เป็น Layer 2 สำหรับประเมิน take-action</p>
+    <button class="chip" onclick="document.getElementById('modalBg').classList.remove('open')">ปิด</button>
+  </div>`;
+  // Load chart on-demand (keeps the page light).
+  loadChart(i.symbol, "1D");
+  document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    loadChart(i.symbol, b.dataset.tf);
+  });
+  bind();
+}
+const TF_LIMIT={ "60M":120, "1D":63, "1W":52, "1M":500 };
+function loadChart(symbol, tf){
+  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${TF_LIMIT[tf]||180}`)
+    .then(r=>r.json()).then(d=>{ if(d&&d.bars)drawChart(d.bars); }).catch(()=>{});
+}
+function drawChart(bars){
+  const cv=document.getElementById("detailChart");if(!cv||!bars||!bars.length)return;
+  const ctx=cv.getContext("2d");
+  const W=cv.width=cv.clientWidth||520, H=cv.height=200;
+  const hi=Math.max(...bars.map(b=>b.high)), lo=Math.min(...bars.map(b=>b.low)), rng=(hi-lo)||1;
+  const n=bars.length, cw=W/n;
+  ctx.clearRect(0,0,W,H);
+  bars.forEach((b,idx)=>{
+    const x=idx*cw+cw/2;
+    const yH=H-((b.high-lo)/rng)*(H-16)-8, yL=H-((b.low-lo)/rng)*(H-16)-8;
+    const yC=H-((b.close-lo)/rng)*(H-16)-8, yO=H-((b.open-lo)/rng)*(H-16)-8;
+    const up=b.close>=b.open;
+    ctx.strokeStyle=up?"#43df9e":"#ff7a7a";ctx.fillStyle=ctx.strokeStyle;
+    ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();      // wick
+    const bw=Math.max(1,cw*0.6);
+    ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);          // body
+  });
+}
+document.addEventListener("click",e=>{
+  const page=e.target.closest("[data-page]");if(page){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===page.dataset.page));document.querySelectorAll("[data-page]").forEach(p=>p.classList.toggle("active",p.dataset.page===page.dataset.page));window.scrollTo(0,0);}
+  const liq=e.target.closest("[data-liquidity]");if(liq){liquidity=liq.dataset.liquidity;document.getElementById("liquidOnly").classList.toggle("active",liquidity==="liquid");document.getElementById("showLowValue").classList.toggle("active",liquidity==="all");render();}
+  const sp=e.target.closest("[data-stage]");if(sp){stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();}
+  const star=e.target.closest("[data-star]");if(star){saved.has(star.dataset.star)?saved.delete(star.dataset.star):saved.add(star.dataset.star);persist();}
+  if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
+});
+document.getElementById("search").addEventListener("input",render);
+document.addEventListener("keydown",e=>{if(e.key==="Escape")document.getElementById("modalBg").classList.remove("open");});
+const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
+render();
+</script>
+</body>
+</html>

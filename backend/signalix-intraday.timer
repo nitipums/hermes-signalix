@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh Signalix tiered 60m candles every 15 minutes during SET hours
+
+[Timer]
+# Service applies the exact continuous-session guard (10:15–12:30, 14:45–16:30 BKK).
+OnCalendar=Mon..Fri *-*-* *:00/15 Asia/Bangkok
+Persistent=true
+Unit=signalix-intraday.service
+
+[Install]
+WantedBy=timers.target

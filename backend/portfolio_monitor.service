@@ -1,0 +1,33 @@
+# Signalix portfolio freshness monitor — systemd service unit
+# Lightweight owner co-pilot check: flags when the latest portfolio snapshot
+# is aging (>24h) or stale (>72h). Deterministic, no agent.
+#
+# INSTALL (as root):
+#   cp /root/signalix/backend/portfolio_monitor.service /etc/systemd/system/signalix-portfolio.service
+#   cp /root/signalix/backend/portfolio_monitor.timer   /etc/systemd/system/signalix-portfolio.timer
+#   systemctl daemon-reload
+#   systemctl enable --now signalix-portfolio.timer
+#   systemctl start signalix-portfolio.service   # manual run
+
+[Unit]
+Description=Signalix portfolio snapshot freshness monitor
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+# Reuse the same venv that already has psycopg2-binary.
+# The watchdog reports problems via its log (non-zero exit) but the monitor
+# job itself must always be considered "succeeded" so the timer keeps firing;
+# alerting is delivered by the Hermes cron that reads this log, not by systemd.
+ExecStart=/bin/bash -lc 'cd /root/.hermes/profiles/lite/scripts && /root/.venv_img/bin/python -c "import signalix_watchdog as w; w.main()" || true'
+SuccessExitStatus=0 1
+StandardOutput=append:/root/signalix/portfolio_monitor_log.txt
+StandardError=append:/root/signalix/portfolio_monitor_log.txt
+TimeoutStartSec=120

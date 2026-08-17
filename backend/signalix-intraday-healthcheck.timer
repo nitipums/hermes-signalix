@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Signalix intraday health every 5 minutes during market days
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* *:02/5 Asia/Bangkok
+Persistent=true
+Unit=signalix-intraday-healthcheck.service
+
+[Install]
+WantedBy=timers.target

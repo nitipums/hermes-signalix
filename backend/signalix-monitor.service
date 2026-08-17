@@ -1,0 +1,20 @@
+# Signalix Monitor bucket: recovery_watch + base_building, 60m candles.
+[Unit]
+Description=Signalix Tier 3 shortlist hourly 60m refresh (Settrade, no agent)
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+EnvironmentFile=/root/signalix/settradeupdated.env
+# Service-side guard: only continuous SET sessions in Bangkok time.
+ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if { [ "$t" -ge 1015 ] && [ "$t" -le 1230 ]; } || { [ "$t" -ge 1445 ] && [ "$t" -le 1630 ]; }; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode tier3 --intraday-interval 60m --intraday-limit 2 --no-scan; else echo "signalix tier3: outside SET continuous session ($t Bangkok), skip"; fi'
+StandardOutput=append:/root/signalix/monitor_update_log.txt
+StandardError=append:/root/signalix/monitor_update_log.txt
+TimeoutStartSec=900

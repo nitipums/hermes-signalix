@@ -1,0 +1,15 @@
+# Signalix daily EOD updater — systemd timer
+# Install: see header of update_data.service
+# Fires every weekday at 18:30 Asia/Bangkok (SET closes 16:30 + settlement buffer).
+
+[Unit]
+Description=Run Signalix SET EOD update daily
+
+[Timer]
+OnCalendar=Mon..Fri 18:30 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=300
+Unit=signalix-update.service
+
+[Install]
+WantedBy=timers.target

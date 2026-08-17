@@ -1,0 +1,13 @@
+[Unit]
+Description=Signalix dashboard static server (port 3001)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/app
+ExecStart=/usr/local/bin/python /app/dashboard_server.py
+Restart=unless-stopped
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

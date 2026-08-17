@@ -1,0 +1,17 @@
+[Unit]
+Description=Signalix Daily EOD freshness and scan watchdog
+After=docker.service network-online.target signalix-update.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecCondition=/root/.venv_img/bin/python /root/signalix/backend/set_market_day_guard.py
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/eod_healthcheck.py
+StandardOutput=append:/root/signalix/eod_healthcheck_log.jsonl
+StandardError=append:/root/signalix/eod_healthcheck_log.jsonl
+TimeoutStartSec=120

@@ -1,0 +1,7 @@
+{"alerts": [{"age_minutes": 30.3, "code": "price_data_stale", "dataset": "price_data", "latest_at": "2026-08-14T05:00:00+00:00", "max_age_minutes": 30.0}], "checked_at": "2026-08-14T05:30:15.453588+00:00", "component": "signalix_intraday", "level": "ALERT", "operator_hint": "Inspect journalctl for Settrade U-102/source-session failure; the evaluator is configured as ExecStopPost and should still run on stored candles.", "service": "signalix-intraday.service"}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}
+{level:HEALTHY,component:signalix_intraday,status:outside_session_skipped}

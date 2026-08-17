@@ -1,0 +1,86 @@
+current MAX(date) in price_data : 2026-08-11
+fetching trade days strictly after: 2026-08-06
+  ! skip CSP: Settrade first close 0.44 vs DB last 0.52 (gap 15.4% > 15%)
+  ! skip DEXON: Settrade first close 0.70 vs DB last 0.86 (gap 18.6% > 15%)
+  ! skip EMC: Settrade first close 0.03 vs DB last 0.02 (gap 50.0% > 15%)
+  ! skip EMPIRE: Settrade first close 0.18 vs DB last 0.24 (gap 25.0% > 15%)
+  ! skip KC: Settrade first close 0.02 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip MGC: Settrade first close 9.80 vs DB last 8.10 (gap 21.0% > 15%)
+  ! skip MGT: Settrade first close 1.91 vs DB last 2.26 (gap 15.5% > 15%)
+  ! skip MORE: Settrade first close 0.05 vs DB last 0.06 (gap 16.7% > 15%)
+  ! skip SNC: Settrade first close 8.75 vs DB last 7.50 (gap 16.7% > 15%)
+  ! skip SPACK: Settrade first close 1.35 vs DB last 1.93 (gap 30.1% > 15%)
+  ! skip TPAC: Settrade first close 8.50 vs DB last 10.40 (gap 18.3% > 15%)
+  ! skip TPCH: Settrade first close 1.41 vs DB last 1.19 (gap 18.5% > 15%)
+  ! skip TSI: Settrade first close 0.06 vs DB last 0.05 (gap 20.0% > 15%)
+  ! skip TWZ: Settrade first close 0.01 vs DB last 0.02 (gap 50.0% > 15%)
+  ! skip WAVE: Settrade first close 0.05 vs DB last 0.04 (gap 25.0% > 15%)
+---- UPDATE SUMMARY ----
+  dry_run       : False
+  source        : settrade
+  files fetched : 0
+  rows kept     : 2557
+  rows offered  : 2557 (ON CONFLICT DO NOTHING)
+  dropped       : 0
+  bad rows      : 0
+  stt failed    : 0 symbols
+  stt skipped   : 15 (price gap >15% vs DB)
+  stt zero-vol  : 0 bars dropped
+  new MAX(date) : 2026-08-11
+  scan triggered: HTTP 200
+  intraday     : 17 shortlist symbols, 7900 rows offered, 0 failed
+Signalix market-job skip: 2026-08-12 — SET market holiday (Her Majesty Queen Sirikit The Queen Mother's Birthday)
+current MAX(date) in price_data : 2026-08-11
+fetching trade days strictly after: 2026-08-10
+  ! skip AIE: Settrade first close 1.73 vs DB last 1.29 (gap 34.1% > 15%)
+  ! skip B: Settrade first close 0.03 vs DB last 0.04 (gap 25.0% > 15%)
+  ! skip BIOTEC: Settrade first close 0.28 vs DB last 0.23 (gap 21.7% > 15%)
+  ! skip CPH: Settrade first close 10.50 vs DB last 8.20 (gap 28.0% > 15%)
+  ! skip CPL: Settrade first close 0.79 vs DB last 0.68 (gap 16.2% > 15%)
+  ! skip KC: Settrade first close 0.02 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip MORE: Settrade first close 0.07 vs DB last 0.06 (gap 16.7% > 15%)
+  ! skip PAP: Settrade first close 3.58 vs DB last 2.98 (gap 20.1% > 15%)
+  ! skip QDC: Settrade first close 0.07 vs DB last 0.06 (gap 16.7% > 15%)
+  ! skip SDC: Settrade first close 0.03 vs DB last 0.02 (gap 50.0% > 15%)
+  ! skip STOWER: Settrade first close 0.04 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip TRITN: Settrade first close 0.02 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip TWZ: Settrade first close 0.01 vs DB last 0.02 (gap 50.0% > 15%)
+---- UPDATE SUMMARY ----
+  dry_run       : False
+  source        : settrade
+  files fetched : 0
+  rows kept     : 865
+  rows offered  : 865 (ON CONFLICT DO NOTHING)
+  dropped       : 0
+  bad rows      : 0
+  stt failed    : 0 symbols
+  stt skipped   : 13 (price gap >15% vs DB)
+  stt zero-vol  : 0 bars dropped
+  new MAX(date) : 2026-08-13
+  scan triggered: HTTP 200
+  intraday     : 452 shortlist symbols, 3616 rows offered, 0 failed
+timestamp=2026-08-14T11:33:10.317875+00:00 run_id=intraday-20260814T113310Z-99f7c714 event=run_started
+current MAX(date) in price_data : 2026-08-14
+fetching trade days strictly after: 2026-08-13
+  ! skip AIE: Settrade first close 1.70 vs DB last 1.29 (gap 31.8% > 15%)
+  ! skip BIOTEC: Settrade first close 0.28 vs DB last 0.23 (gap 21.7% > 15%)
+  ! skip KC: Settrade first close 0.02 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip PF: Settrade first close 0.04 vs DB last 0.05 (gap 20.0% > 15%)
+  ! skip STOWER: Settrade first close 0.04 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip TRITN: Settrade first close 0.02 vs DB last 0.03 (gap 33.3% > 15%)
+  ! skip TSI: Settrade first close 0.06 vs DB last 0.05 (gap 20.0% > 15%)
+  ! skip TWZ: Settrade first close 0.01 vs DB last 0.02 (gap 50.0% > 15%)
+---- UPDATE SUMMARY ----
+  dry_run       : False
+  source        : settrade
+  files fetched : 0
+  rows kept     : 852
+  rows offered  : 852 (ON CONFLICT DO NOTHING)
+  dropped       : 0
+  bad rows      : 0
+  stt failed    : 0 symbols
+  stt skipped   : 8 (price gap >15% vs DB)
+  stt zero-vol  : 0 bars dropped
+  new MAX(date) : 2026-08-14
+  scan triggered: HTTP 200
+INTRADAY_RUN_SUMMARY {"batches": [{"batch_id": "32df870186014d1b8d9f23134f3bd0a1:1", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:50:48.024548+00:00", "fetch_started_at": "2026-08-14T11:50:36.818568+00:00", "retry_count": 0, "rows_inserted": 15, "rows_updated": 65, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:2", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:51:00.150146+00:00", "fetch_started_at": "2026-08-14T11:50:49.080083+00:00", "retry_count": 0, "rows_inserted": 50, "rows_updated": 30, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:3", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:51:12.396305+00:00", "fetch_started_at": "2026-08-14T11:51:01.342183+00:00", "retry_count": 0, "rows_inserted": 59, "rows_updated": 21, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:4", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:51:24.711599+00:00", "fetch_started_at": "2026-08-14T11:51:13.563354+00:00", "retry_count": 0, "rows_inserted": 42, "rows_updated": 38, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:5", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:51:36.936023+00:00", "fetch_started_at": "2026-08-14T11:51:25.811994+00:00", "retry_count": 0, "rows_inserted": 45, "rows_updated": 35, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:6", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:51:49.293216+00:00", "fetch_started_at": "2026-08-14T11:51:38.117729+00:00", "retry_count": 0, "rows_inserted": 73, "rows_updated": 7, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:7", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:01.449896+00:00", "fetch_started_at": "2026-08-14T11:51:50.341435+00:00", "retry_count": 0, "rows_inserted": 53, "rows_updated": 27, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:8", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:13.833241+00:00", "fetch_started_at": "2026-08-14T11:52:02.676298+00:00", "retry_count": 0, "rows_inserted": 58, "rows_updated": 22, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:9", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:25.926067+00:00", "fetch_started_at": "2026-08-14T11:52:14.857587+00:00", "retry_count": 0, "rows_inserted": 76, "rows_updated": 4, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:10", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:38.043631+00:00", "fetch_started_at": "2026-08-14T11:52:26.953167+00:00", "retry_count": 0, "rows_inserted": 80, "rows_updated": 0, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}, {"batch_id": "32df870186014d1b8d9f23134f3bd0a1:11", "db_upsert_result": 80, "errors": [], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:50.272074+00:00", "fetch_started_at": "2026-08-14T11:52:39.137229+00:00", "retry_count": 0, "rows_inserted": 78, "rows_updated": 2, "symbols_attempted": 10, "symbols_failed": 0, "symbols_succeeded": 10}], "failed_symbols": [], "fetch_completed_at": "2026-08-14T11:52:50.272148+00:00", "fetch_started_at": "2026-08-14T11:50:34.025194+00:00", "retry_count": 0, "rows_inserted": 629, "rows_offered": 880, "rows_updated": 251, "run_id": "32df870186014d1b8d9f23134f3bd0a1", "status": "full_success", "symbols_attempted": 110, "symbols_failed": 0, "symbols_succeeded": 110}

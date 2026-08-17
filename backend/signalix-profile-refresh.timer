@@ -1,0 +1,12 @@
+[Unit]
+Description=Signalix company-profile metadata refresh twice daily on weekdays
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 02:20 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 14:20 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=10m
+Unit=signalix-profile-refresh.service
+
+[Install]
+WantedBy=timers.target

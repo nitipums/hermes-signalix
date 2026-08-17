@@ -1,0 +1,460 @@
+{
+  "total_symbols_classified": 660,
+  "group_distribution": {
+    "breakout_new": 11,
+    "uptrend_pullback": 116,
+    "waiting_breakout": 189,
+    "base": 94,
+    "down_or_broken": 250,
+    "benchmark": 0
+  },
+  "samples": {
+    "breakout_new": {
+      "count": 11,
+      "stage_phase_breakdown": {
+        "S2_uptrend/breakout_new": 11
+      },
+      "top_by_rs": [
+        {
+          "symbol": "KCE",
+          "rs": 96.5,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "AMATA",
+          "rs": 95.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "AIE",
+          "rs": 83.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "RCL",
+          "rs": 83.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "TSTH",
+          "rs": 79.7,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "TMT",
+          "rs": 78.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "GGC",
+          "rs": 71.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        },
+        {
+          "symbol": "KSL",
+          "rs": 67.7,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Breakout new",
+          "group_reason": "Stage 2 · Uptrend · Breakout new"
+        }
+      ]
+    },
+    "uptrend_pullback": {
+      "count": 116,
+      "stage_phase_breakdown": {
+        "S2_uptrend/uptrend_pullback": 116
+      },
+      "top_by_rs": [
+        {
+          "symbol": "TRT",
+          "rs": 99.7,
+          "met": 7,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "BANPU",
+          "rs": 99.6,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "SMT",
+          "rs": 99.4,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "MGC",
+          "rs": 99.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "INSET",
+          "rs": 98.7,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "STECON",
+          "rs": 98.6,
+          "met": 7,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "TAE",
+          "rs": 98.5,
+          "met": 7,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        },
+        {
+          "symbol": "TITLE",
+          "rs": 98.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Uptrend pullback",
+          "group_reason": "Stage 2 · Uptrend · Uptrend pullback"
+        }
+      ]
+    },
+    "waiting_breakout": {
+      "count": 189,
+      "stage_phase_breakdown": {
+        "S2_uptrend/waiting_breakout": 189
+      },
+      "top_by_rs": [
+        {
+          "symbol": "INOX",
+          "rs": 100.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "BJCHI",
+          "rs": 99.9,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "GUNKUL",
+          "rs": 99.2,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "EASTW",
+          "rs": 99.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "CTW",
+          "rs": 97.8,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "ADB",
+          "rs": 97.6,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "KTB",
+          "rs": 96.9,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        },
+        {
+          "symbol": "SPRC",
+          "rs": 96.8,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout",
+          "stage_label": "Stage 2 · Uptrend",
+          "phase_label": "Waiting breakout",
+          "group_reason": "Stage 2 · Uptrend · Waiting breakout"
+        }
+      ]
+    },
+    "base": {
+      "count": 94,
+      "stage_phase_breakdown": {
+        "S1_basing/base_early": 83,
+        "S1_basing/base_tight": 11
+      },
+      "top_by_rs": [
+        {
+          "symbol": "KCC",
+          "rs": 91.9,
+          "met": 5,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "NUT",
+          "rs": 76.7,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "MPJ",
+          "rs": 75.2,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "SJWD",
+          "rs": 72.8,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "GLORY",
+          "rs": 70.8,
+          "met": 5,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "UBOT",
+          "rs": 65.5,
+          "met": 8,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "KLINIQ",
+          "rs": 63.6,
+          "met": 8,
+          "stage": "S1_basing",
+          "phase": "base_early",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base early",
+          "group_reason": "Stage 1 · Basing · Base early"
+        },
+        {
+          "symbol": "PCC",
+          "rs": 62.8,
+          "met": 6,
+          "stage": "S1_basing",
+          "phase": "base_tight",
+          "stage_label": "Stage 1 · Basing",
+          "phase_label": "Base tight (VCP)",
+          "group_reason": "Stage 1 · Basing · Base tight (VCP)"
+        }
+      ]
+    },
+    "down_or_broken": {
+      "count": 250,
+      "stage_phase_breakdown": {
+        "S4_down/declining": 166,
+        "S3_distributing/topping": 84
+      },
+      "top_by_rs": [
+        {
+          "symbol": "THAI",
+          "rs": 98.9,
+          "met": 2,
+          "stage": "S4_down",
+          "phase": "declining",
+          "stage_label": "Stage 4 · Down",
+          "phase_label": "Declining",
+          "group_reason": "Stage 4 · Down · Declining"
+        },
+        {
+          "symbol": "ZAA",
+          "rs": 92.6,
+          "met": 2,
+          "stage": "S4_down",
+          "phase": "declining",
+          "stage_label": "Stage 4 · Down",
+          "phase_label": "Declining",
+          "group_reason": "Stage 4 · Down · Declining"
+        },
+        {
+          "symbol": "DEMCO",
+          "rs": 88.2,
+          "met": 4,
+          "stage": "S3_distributing",
+          "phase": "topping",
+          "stage_label": "Stage 3 · Distributing",
+          "phase_label": "Topping",
+          "group_reason": "Stage 3 · Distributing · Topping"
+        },
+        {
+          "symbol": "IROYAL",
+          "rs": 85.9,
+          "met": 5,
+          "stage": "S4_down",
+          "phase": "declining",
+          "stage_label": "Stage 4 · Down",
+          "phase_label": "Declining",
+          "group_reason": "Stage 4 · Down · Declining"
+        },
+        {
+          "symbol": "CPH",
+          "rs": 85.7,
+          "met": 5,
+          "stage": "S3_distributing",
+          "phase": "topping",
+          "stage_label": "Stage 3 · Distributing",
+          "phase_label": "Topping",
+          "group_reason": "Stage 3 · Distributing · Topping"
+        },
+        {
+          "symbol": "KK",
+          "rs": 84.7,
+          "met": 4,
+          "stage": "S3_distributing",
+          "phase": "topping",
+          "stage_label": "Stage 3 · Distributing",
+          "phase_label": "Topping",
+          "group_reason": "Stage 3 · Distributing · Topping"
+        },
+        {
+          "symbol": "DUSIT",
+          "rs": 82.9,
+          "met": 7,
+          "stage": "S3_distributing",
+          "phase": "topping",
+          "stage_label": "Stage 3 · Distributing",
+          "phase_label": "Topping",
+          "group_reason": "Stage 3 · Distributing · Topping"
+        },
+        {
+          "symbol": "LOXLEY",
+          "rs": 82.0,
+          "met": 6,
+          "stage": "S3_distributing",
+          "phase": "topping",
+          "stage_label": "Stage 3 · Distributing",
+          "phase_label": "Topping",
+          "group_reason": "Stage 3 · Distributing · Topping"
+        }
+      ]
+    },
+    "benchmark": {
+      "count": 0,
+      "stage_phase_breakdown": {},
+      "top_by_rs": []
+    }
+  }
+}

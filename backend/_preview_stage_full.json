@@ -1,0 +1,270 @@
+{
+  "total_symbols_classified": 767,
+  "group_distribution": {
+    "breakout_new": 10,
+    "uptrend_pullback": 110,
+    "waiting_breakout": 169,
+    "base": 106,
+    "down_or_broken": 372,
+    "benchmark": 0
+  },
+  "samples": {
+    "breakout_new": {
+      "count": 10,
+      "stage_phase_breakdown": {
+        "S2_uptrend/breakout_new": 10
+      },
+      "top_by_rs": [
+        {
+          "symbol": "KCE",
+          "rs": 97.1,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        },
+        {
+          "symbol": "AMATA",
+          "rs": 96.1,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        },
+        {
+          "symbol": "AIE",
+          "rs": 85.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        },
+        {
+          "symbol": "RCL",
+          "rs": 85.1,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        },
+        {
+          "symbol": "TSTH",
+          "rs": 81.9,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        },
+        {
+          "symbol": "GGC",
+          "rs": 74.6,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "breakout_new"
+        }
+      ]
+    },
+    "uptrend_pullback": {
+      "count": 110,
+      "stage_phase_breakdown": {
+        "S2_uptrend/uptrend_pullback": 110
+      },
+      "top_by_rs": [
+        {
+          "symbol": "TRT",
+          "rs": 99.8,
+          "met": 7,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        },
+        {
+          "symbol": "BANPU",
+          "rs": 99.7,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        },
+        {
+          "symbol": "SMT",
+          "rs": 99.5,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        },
+        {
+          "symbol": "MGC",
+          "rs": 99.4,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        },
+        {
+          "symbol": "INSET",
+          "rs": 99.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        },
+        {
+          "symbol": "STECON",
+          "rs": 98.8,
+          "met": 7,
+          "stage": "S2_uptrend",
+          "phase": "uptrend_pullback"
+        }
+      ]
+    },
+    "waiting_breakout": {
+      "count": 169,
+      "stage_phase_breakdown": {
+        "S2_uptrend/waiting_breakout": 169
+      },
+      "top_by_rs": [
+        {
+          "symbol": "INOX",
+          "rs": 100.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        },
+        {
+          "symbol": "BJCHI",
+          "rs": 99.9,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        },
+        {
+          "symbol": "GUNKUL",
+          "rs": 99.3,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        },
+        {
+          "symbol": "EASTW",
+          "rs": 99.2,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        },
+        {
+          "symbol": "CTW",
+          "rs": 98.2,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        },
+        {
+          "symbol": "ADB",
+          "rs": 98.0,
+          "met": 8,
+          "stage": "S2_uptrend",
+          "phase": "waiting_breakout"
+        }
+      ]
+    },
+    "base": {
+      "count": 106,
+      "stage_phase_breakdown": {
+        "S1_basing/base_early": 93,
+        "S1_basing/base_tight": 13
+      },
+      "top_by_rs": [
+        {
+          "symbol": "APO",
+          "rs": 93.5,
+          "met": 6,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        },
+        {
+          "symbol": "PTTGC",
+          "rs": 93.3,
+          "met": 8,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        },
+        {
+          "symbol": "KCC",
+          "rs": 93.1,
+          "met": 5,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        },
+        {
+          "symbol": "SPACK",
+          "rs": 90.3,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        },
+        {
+          "symbol": "BGRIM",
+          "rs": 89.6,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        },
+        {
+          "symbol": "ITD",
+          "rs": 89.0,
+          "met": 7,
+          "stage": "S1_basing",
+          "phase": "base_early"
+        }
+      ]
+    },
+    "down_or_broken": {
+      "count": 372,
+      "stage_phase_breakdown": {
+        "S4_down/declining": 207,
+        "S3_distributing/topping": 165
+      },
+      "top_by_rs": [
+        {
+          "symbol": "THAI",
+          "rs": 99.1,
+          "met": 2,
+          "stage": "S4_down",
+          "phase": "declining"
+        },
+        {
+          "symbol": "SRICHA",
+          "rs": 97.8,
+          "met": 8,
+          "stage": "S3_distributing",
+          "phase": "topping"
+        },
+        {
+          "symbol": "TFG",
+          "rs": 96.5,
+          "met": 7,
+          "stage": "S3_distributing",
+          "phase": "topping"
+        },
+        {
+          "symbol": "DELTA",
+          "rs": 95.7,
+          "met": 5,
+          "stage": "S3_distributing",
+          "phase": "topping"
+        },
+        {
+          "symbol": "BIOTEC",
+          "rs": 93.9,
+          "met": 8,
+          "stage": "S3_distributing",
+          "phase": "topping"
+        },
+        {
+          "symbol": "ZAA",
+          "rs": 93.6,
+          "met": 2,
+          "stage": "S4_down",
+          "phase": "declining"
+        }
+      ]
+    },
+    "benchmark": {
+      "count": 0,
+      "stage_phase_breakdown": {},
+      "top_by_rs": []
+    }
+  }
+}

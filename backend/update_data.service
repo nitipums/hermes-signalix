@@ -1,0 +1,47 @@
+# Signalix daily EOD updater — systemd service unit
+#
+# NOTE: runs on the HOST (not via docker exec) because the CSV drop dirs
+# (/root/signalix/uploads, /root/signalix/seed_data/set-archive_EOD) are NOT
+# mounted into signalix_backend (only /root/signalix/backend -> /app is).
+# Host venv with psycopg2-binary + settrade-v2: /root/.venv_img
+#
+# Settrade source needs these keys in /root/signalix/.env or service env:
+#   SETTRADE_APP_ID, SETTRADE_APP_SECRET, SETTRADE_BROKER_ID, SETTRADE_APP_CODE
+#   Optional: SETTRADE_AUTO_QUEUE=false, SETTRADE_INTERVAL=1d,
+#             SETTRADE_NORMALIZED=true, SETTRADE_SLEEP_SECONDS=0.25
+#
+# INSTALL (as root):
+#   cp /root/signalix/backend/update_data.service /etc/systemd/system/signalix-update.service
+#   cp /root/signalix/backend/update_data.timer   /etc/systemd/system/signalix-update.timer
+#   systemctl daemon-reload
+#   systemctl enable --now signalix-update.timer
+#   systemctl list-timers signalix-update.timer
+#   systemctl start signalix-update.service    # manual one-shot run
+#   journalctl -u signalix-update.service -n 100 --no-pager
+#
+# CRONTAB EQUIVALENT (root crontab -e) — weekdays 18:30 Asia/Bangkok:
+#   30 18 * * 1-5 cd /root/signalix && set -a && . ./settradeupdated.env && set +a && cd backend && POSTGRES_HOST=127.0.0.1 /root/.venv_img/bin/python update_data.py --source settrade --scan >> /root/signalix/update_log.txt 2>&1
+
+[Unit]
+Description=Signalix incremental SET EOD data update
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+EnvironmentFile=/root/signalix/settradeupdated.env
+Environment=SETTRADE_DAILY_WORKERS=30
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --scan --intraday-shortlist --flush-batch 100
+ExecStartPost=/root/.venv_img/bin/python /root/signalix/backend/verify_scan_dashboard.py
+StandardOutput=append:/root/signalix/update_log.txt
+StandardError=append:/root/signalix/update_log.txt
+TimeoutStartSec=3600
+
+[Install]
+WantedBy=multi-user.target

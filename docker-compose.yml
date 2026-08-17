@@ -1,0 +1,113 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: signalix_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-signalix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-signalix_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-signalix}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-signalix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: signalix_redis
+    restart: unless-stopped
+    # No ports mapping: reachable only inside the private Compose network.
+    # Password authentication is also enabled for defense in depth.
+    command: ["sh", "-c", "exec redis-server --protected-mode yes --bind 0.0.0.0 --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: signalix_backend
+    restart: unless-stopped
+    env_file: .env
+    # Keep readiness responsive while a complete 718-card snapshot is being
+    # serialized/compressed or transferred. Both workers serve identical state.
+    command: ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      # Probe dependencies only; never download the multi-megabyte dashboard
+      # snapshot as a container readiness check.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/readiness', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dashboard:
+    build: ./backend
+    container_name: signalix_dashboard
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-u", "dashboard_server.py"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/dashboard.html', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Real-time delivery consumer: subscribes to the Redis `signals` channel
+  # and fans out every envelope to Telegram + LINE. Shares the backend image
+  # (redis + requests already installed) and runs in the same docker network,
+  # so REDIS_URL=redis://redis:6379 resolves natively — no host hacks.
+  delivery:
+    build: ./backend
+    container_name: signalix_delivery
+    restart: unless-stopped
+    env_file: .env
+    command: ["python", "-u", "delivery_consumer.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Phase 3 LLM: which Nous-hosted model to use for the Thai summary.
+      # Default is a free, non-reasoning, Thai-capable model. `tencent/hy3:free`
+      # also works but spends its budget on CoT, so content can be truncated.
+      SIGNALIX_LLM_MODEL: ${SIGNALIX_LLM_MODEL:-upstage/solar-pro4:free}
+      # Token file is mounted read-only at /app/nous_auth.json (see volumes).
+      NOUS_AUTH_JSON: /app/nous_auth.json
+    volumes:
+      - ./backend:/app
+      # Read-only mount of the Hermes Nous OAuth token (llm.py reads it at runtime;
+      # we deliberately do NOT copy the secret into Signalix .env).
+      - /root/.hermes/shared/nous_auth.json:/app/nous_auth.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

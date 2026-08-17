@@ -1,0 +1,14 @@
+# Signalix portfolio freshness monitor — systemd timer
+# Runs daily at 07:00 and 20:00 Asia/Bangkok so an aging/stale snapshot is
+# caught before and after the trading session.
+
+[Unit]
+Description=Run Signalix portfolio freshness monitor twice daily
+
+[Timer]
+OnCalendar=Mon..Sun 07:00,20:00 Asia/Bangkok
+Persistent=true
+Unit=portfolio_monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Signalix Daily EOD freshness after close
+
+[Timer]
+OnCalendar=Mon..Fri 20:00 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=300
+Unit=signalix-eod-healthcheck.service
+
+[Install]
+WantedBy=timers.target

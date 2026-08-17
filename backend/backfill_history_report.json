@@ -1,0 +1,1505 @@
+{
+  "mode": "commit",
+  "scanner_version": "signalix/daily-state-v2-backfill",
+  "requested_sessions": 100,
+  "session_count": 100,
+  "active_ord_symbols": 718,
+  "sessions": [
+    {
+      "date": "2026-03-13",
+      "status": "committed",
+      "evaluated": 698,
+      "groups": {
+        "breakout_new": 10,
+        "uptrend_pullback": 35,
+        "waiting_breakout": 186,
+        "base": 41,
+        "down_or_broken": 426
+      },
+      "run_id": "d73dcd2e-2c5d-4c45-8934-76a9c82b49fb",
+      "events_created": 10,
+      "observations_appended": 10
+    },
+    {
+      "date": "2026-03-16",
+      "status": "committed",
+      "evaluated": 699,
+      "groups": {
+        "breakout_new": 20,
+        "uptrend_pullback": 38,
+        "waiting_breakout": 172,
+        "base": 52,
+        "down_or_broken": 417
+      },
+      "run_id": "50075d92-0155-44dc-b66a-61a184b88144",
+      "events_created": 12,
+      "observations_appended": 12
+    },
+    {
+      "date": "2026-03-17",
+      "status": "committed",
+      "evaluated": 700,
+      "groups": {
+        "breakout_new": 20,
+        "uptrend_pullback": 32,
+        "waiting_breakout": 177,
+        "base": 47,
+        "down_or_broken": 424
+      },
+      "run_id": "7a88b74b-a14f-404c-9ad0-3411436f2317",
+      "events_created": 10,
+      "observations_appended": 10
+    },
+    {
+      "date": "2026-03-18",
+      "status": "committed",
+      "evaluated": 699,
+      "groups": {
+        "breakout_new": 29,
+        "uptrend_pullback": 34,
+        "waiting_breakout": 178,
+        "base": 49,
+        "down_or_broken": 409
+      },
+      "run_id": "d1de270b-bcd5-456b-bf5b-348614622036",
+      "events_created": 16,
+      "observations_appended": 16
+    },
+    {
+      "date": "2026-03-19",
+      "status": "committed",
+      "evaluated": 698,
+      "groups": {
+        "breakout_new": 29,
+        "uptrend_pullback": 28,
+        "waiting_breakout": 150,
+        "base": 62,
+        "down_or_broken": 429
+      },
+      "run_id": "07b0c616-7afa-4e1f-a8de-450c9e015f2b",
+      "events_created": 15,
+      "observations_appended": 15
+    },
+    {
+      "date": "2026-03-20",
+      "status": "committed",
+      "evaluated": 700,
+      "groups": {
+        "breakout_new": 34,
+        "uptrend_pullback": 29,
+        "waiting_breakout": 154,
+        "base": 57,
+        "down_or_broken": 426
+      },
+      "run_id": "99bbedfe-a918-4fb6-b6d1-82df344b0ad3",
+      "events_created": 18,
+      "observations_appended": 18
+    },
+    {
+      "date": "2026-03-23",
+      "status": "committed",
+      "evaluated": 697,
+      "groups": {
+        "breakout_new": 36,
+        "uptrend_pullback": 33,
+        "waiting_breakout": 129,
+        "base": 71,
+        "down_or_broken": 428
+      },
+      "run_id": "4c1dbe64-4a87-442e-ad16-3e7fc7e4a183",
+      "events_created": 17,
+      "observations_appended": 17
+    },
+    {
+      "date": "2026-03-24",
+      "status": "committed",
+      "evaluated": 698,
+      "groups": {
+        "breakout_new": 36,
+        "uptrend_pullback": 35,
+        "waiting_breakout": 133,
+        "base": 73,
+        "down_or_broken": 421
+      },
+      "run_id": "d589b525-9f07-47bc-91eb-93c3313f6f62",
+      "events_created": 19,
+      "observations_appended": 19
+    },
+    {
+      "date": "2026-03-25",
+      "status": "committed",
+      "evaluated": 699,
+      "groups": {
+        "breakout_new": 33,
+        "uptrend_pullback": 33,
+        "waiting_breakout": 164,
+        "base": 57,
+        "down_or_broken": 412
+      },
+      "run_id": "860acd93-b432-4ade-b069-b23c95e0d26b",
+      "events_created": 13,
+      "observations_appended": 13
+    },
+    {
+      "date": "2026-03-26",
+      "status": "committed",
+      "evaluated": 699,
+      "groups": {
+        "breakout_new": 36,
+        "uptrend_pullback": 30,
+        "waiting_breakout": 158,
+        "base": 64,
+        "down_or_broken": 411
+      },
+      "run_id": "5be6d3b5-34cc-4975-ab25-2b74718493fe",
+      "events_created": 17,
+      "observations_appended": 17
+    },
+    {
+      "date": "2026-03-30",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 42,
+        "uptrend_pullback": 30,
+        "waiting_breakout": 195,
+        "base": 93,
+        "down_or_broken": 342
+      },
+      "run_id": "5572ff96-5132-4057-a4c5-ffba605c4971",
+      "events_created": 8,
+      "observations_appended": 8
+    },
+    {
+      "date": "2026-03-31",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 44,
+        "uptrend_pullback": 20,
+        "waiting_breakout": 242,
+        "base": 126,
+        "down_or_broken": 270
+      },
+      "run_id": "2444e083-50d9-41ca-8241-bad6121d008e",
+      "events_created": 9,
+      "observations_appended": 9
+    },
+    {
+      "date": "2026-04-01",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 51,
+        "uptrend_pullback": 13,
+        "waiting_breakout": 340,
+        "base": 82,
+        "down_or_broken": 216
+      },
+      "run_id": "efa8887d-052d-4c34-a3a6-74ef36edc254",
+      "events_created": 19,
+      "observations_appended": 19
+    },
+    {
+      "date": "2026-04-02",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 55,
+        "uptrend_pullback": 10,
+        "waiting_breakout": 328,
+        "base": 92,
+        "down_or_broken": 218
+      },
+      "run_id": "5694806b-1651-4bf3-bbf4-1e78baf05b34",
+      "events_created": 21,
+      "observations_appended": 21
+    },
+    {
+      "date": "2026-04-03",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 49,
+        "uptrend_pullback": 13,
+        "waiting_breakout": 315,
+        "base": 95,
+        "down_or_broken": 230
+      },
+      "run_id": "61027b51-0387-42d2-8fc5-a3b7a54e70d3",
+      "events_created": 17,
+      "observations_appended": 17
+    },
+    {
+      "date": "2026-04-07",
+      "status": "committed",
+      "evaluated": 701,
+      "groups": {
+        "breakout_new": 50,
+        "uptrend_pullback": 14,
+        "waiting_breakout": 313,
+        "base": 107,
+        "down_or_broken": 217
+      },
+      "run_id": "fc19b19f-3863-482c-937b-378d7471a6c6",
+      "events_created": 19,
+      "observations_appended": 19
+    },
+    {
+      "date": "2026-04-08",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 62,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 351,
+        "base": 93,
+        "down_or_broken": 191
+      },
+      "run_id": "58f68c6f-d736-49bb-b6f1-9ff57bda8bd8",
+      "events_created": 26,
+      "observations_appended": 27
+    },
+    {
+      "date": "2026-04-09",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 61,
+        "uptrend_pullback": 10,
+        "waiting_breakout": 331,
+        "base": 106,
+        "down_or_broken": 195
+      },
+      "run_id": "69ec2750-0618-43bc-b34b-6b6c9d21d0f5",
+      "events_created": 24,
+      "observations_appended": 24
+    },
+    {
+      "date": "2026-04-10",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 69,
+        "uptrend_pullback": 9,
+        "waiting_breakout": 340,
+        "base": 106,
+        "down_or_broken": 179
+      },
+      "run_id": "fafb7fac-2b07-4a20-848f-858abe5a1ddc",
+      "events_created": 27,
+      "observations_appended": 28
+    },
+    {
+      "date": "2026-04-16",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 74,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 355,
+        "base": 93,
+        "down_or_broken": 178
+      },
+      "run_id": "648be6a9-d112-4abc-bbe7-9b708937c60e",
+      "events_created": 29,
+      "observations_appended": 30
+    },
+    {
+      "date": "2026-04-17",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 78,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 351,
+        "base": 95,
+        "down_or_broken": 176
+      },
+      "run_id": "81f4458e-e402-449e-8eed-5943b25411a1",
+      "events_created": 34,
+      "observations_appended": 34
+    },
+    {
+      "date": "2026-04-20",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 75,
+        "uptrend_pullback": 8,
+        "waiting_breakout": 345,
+        "base": 95,
+        "down_or_broken": 180
+      },
+      "run_id": "33164f26-0635-46e2-8e2b-23696479f4b6",
+      "events_created": 35,
+      "observations_appended": 35
+    },
+    {
+      "date": "2026-04-21",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 86,
+        "uptrend_pullback": 9,
+        "waiting_breakout": 353,
+        "base": 94,
+        "down_or_broken": 161
+      },
+      "run_id": "197d2f03-6608-488d-a022-a9400491b132",
+      "events_created": 46,
+      "observations_appended": 46
+    },
+    {
+      "date": "2026-04-22",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 88,
+        "uptrend_pullback": 8,
+        "waiting_breakout": 366,
+        "base": 92,
+        "down_or_broken": 149
+      },
+      "run_id": "5aa3fa78-5cc5-4817-98f9-19c031ab5ca2",
+      "events_created": 38,
+      "observations_appended": 38
+    },
+    {
+      "date": "2026-04-23",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 88,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 350,
+        "base": 105,
+        "down_or_broken": 153
+      },
+      "run_id": "73673143-d757-4640-82ad-2d8098df22e2",
+      "events_created": 41,
+      "observations_appended": 41
+    },
+    {
+      "date": "2026-04-24",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 94,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 351,
+        "base": 102,
+        "down_or_broken": 152
+      },
+      "run_id": "fd26729c-288c-4a7f-a845-874f19b412f1",
+      "events_created": 43,
+      "observations_appended": 43
+    },
+    {
+      "date": "2026-04-27",
+      "status": "committed",
+      "evaluated": 701,
+      "groups": {
+        "breakout_new": 88,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 340,
+        "base": 104,
+        "down_or_broken": 164
+      },
+      "run_id": "bac97851-3357-446d-9b51-d6472bc5371d",
+      "events_created": 41,
+      "observations_appended": 41
+    },
+    {
+      "date": "2026-04-28",
+      "status": "committed",
+      "evaluated": 700,
+      "groups": {
+        "breakout_new": 94,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 322,
+        "base": 116,
+        "down_or_broken": 164
+      },
+      "run_id": "40656583-960c-4926-8d28-e806dae91bf0",
+      "events_created": 46,
+      "observations_appended": 46
+    },
+    {
+      "date": "2026-04-29",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 105,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 351,
+        "base": 89,
+        "down_or_broken": 154
+      },
+      "run_id": "027baf72-8e47-472d-8875-5e2925c96f83",
+      "events_created": 48,
+      "observations_appended": 48
+    },
+    {
+      "date": "2026-04-30",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 106,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 332,
+        "base": 105,
+        "down_or_broken": 155
+      },
+      "run_id": "1cb8adb3-1ece-4c61-aaa4-9f0271cab453",
+      "events_created": 43,
+      "observations_appended": 43
+    },
+    {
+      "date": "2026-05-05",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 111,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 308,
+        "base": 102,
+        "down_or_broken": 177
+      },
+      "run_id": "c10944c7-c001-44a3-afe6-b99f7d1f09b4",
+      "events_created": 51,
+      "observations_appended": 52
+    },
+    {
+      "date": "2026-05-06",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 133,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 300,
+        "base": 101,
+        "down_or_broken": 164
+      },
+      "run_id": "ed14cff9-f926-4750-9364-605ebffad578",
+      "events_created": 62,
+      "observations_appended": 63
+    },
+    {
+      "date": "2026-05-07",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 141,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 280,
+        "base": 108,
+        "down_or_broken": 171
+      },
+      "run_id": "65f959eb-b181-456b-a00c-89e8a9ad1611",
+      "events_created": 68,
+      "observations_appended": 68
+    },
+    {
+      "date": "2026-05-08",
+      "status": "committed",
+      "evaluated": 705,
+      "groups": {
+        "breakout_new": 147,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 278,
+        "base": 101,
+        "down_or_broken": 176
+      },
+      "run_id": "a598d951-8c0e-4e19-8a12-552a4927b21a",
+      "events_created": 69,
+      "observations_appended": 69
+    },
+    {
+      "date": "2026-05-11",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 154,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 254,
+        "base": 111,
+        "down_or_broken": 184
+      },
+      "run_id": "3e198469-fb71-46e6-a39c-05829e346661",
+      "events_created": 75,
+      "observations_appended": 75
+    },
+    {
+      "date": "2026-05-12",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 149,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 248,
+        "base": 107,
+        "down_or_broken": 194
+      },
+      "run_id": "ad7f32e7-b941-4641-9b54-21eb7807c7ed",
+      "events_created": 71,
+      "observations_appended": 71
+    },
+    {
+      "date": "2026-05-13",
+      "status": "committed",
+      "evaluated": 703,
+      "groups": {
+        "breakout_new": 154,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 248,
+        "base": 111,
+        "down_or_broken": 187
+      },
+      "run_id": "fe18fdc0-f383-40cf-9279-aac3edc12d19",
+      "events_created": 69,
+      "observations_appended": 71
+    },
+    {
+      "date": "2026-05-14",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 167,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 250,
+        "base": 94,
+        "down_or_broken": 186
+      },
+      "run_id": "e2142525-08e8-4ab6-9739-62492de6c57b",
+      "events_created": 75,
+      "observations_appended": 75
+    },
+    {
+      "date": "2026-05-15",
+      "status": "committed",
+      "evaluated": 705,
+      "groups": {
+        "breakout_new": 163,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 246,
+        "base": 88,
+        "down_or_broken": 203
+      },
+      "run_id": "24baf067-21a7-4d67-83c6-b16c1678ee35",
+      "events_created": 67,
+      "observations_appended": 68
+    },
+    {
+      "date": "2026-05-18",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 156,
+        "uptrend_pullback": 8,
+        "waiting_breakout": 231,
+        "base": 99,
+        "down_or_broken": 210
+      },
+      "run_id": "046fa005-5e1c-490a-b18b-8be779a9f92b",
+      "events_created": 62,
+      "observations_appended": 62
+    },
+    {
+      "date": "2026-05-19",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 165,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 238,
+        "base": 88,
+        "down_or_broken": 206
+      },
+      "run_id": "a09665f3-8a70-42e9-a745-8cda496b6113",
+      "events_created": 56,
+      "observations_appended": 57
+    },
+    {
+      "date": "2026-05-20",
+      "status": "committed",
+      "evaluated": 702,
+      "groups": {
+        "breakout_new": 166,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 233,
+        "base": 86,
+        "down_or_broken": 211
+      },
+      "run_id": "c45738dc-e312-4c83-a50d-1403ebba4796",
+      "events_created": 59,
+      "observations_appended": 59
+    },
+    {
+      "date": "2026-05-21",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 172,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 249,
+        "base": 80,
+        "down_or_broken": 197
+      },
+      "run_id": "7721356c-ae1a-4244-91bb-0457cbd58086",
+      "events_created": 53,
+      "observations_appended": 55
+    },
+    {
+      "date": "2026-05-22",
+      "status": "committed",
+      "evaluated": 704,
+      "groups": {
+        "breakout_new": 177,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 253,
+        "base": 82,
+        "down_or_broken": 188
+      },
+      "run_id": "1d04daaa-c6be-4026-b0a4-387eb612406e",
+      "events_created": 54,
+      "observations_appended": 55
+    },
+    {
+      "date": "2026-05-25",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 201,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 259,
+        "base": 74,
+        "down_or_broken": 173
+      },
+      "run_id": "238929db-39c3-46c2-af36-a4e411414abe",
+      "events_created": 65,
+      "observations_appended": 66
+    },
+    {
+      "date": "2026-05-26",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 196,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 255,
+        "base": 68,
+        "down_or_broken": 182
+      },
+      "run_id": "b6c1b782-3c4d-44dd-bfb3-352dbfac41f7",
+      "events_created": 58,
+      "observations_appended": 58
+    },
+    {
+      "date": "2026-05-27",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 213,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 252,
+        "base": 68,
+        "down_or_broken": 168
+      },
+      "run_id": "d313746b-ae3a-47c0-a3c7-1edb6344dabc",
+      "events_created": 64,
+      "observations_appended": 64
+    },
+    {
+      "date": "2026-05-28",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 221,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 250,
+        "base": 66,
+        "down_or_broken": 166
+      },
+      "run_id": "052e9b73-84a9-4def-8352-fb198413e560",
+      "events_created": 67,
+      "observations_appended": 67
+    },
+    {
+      "date": "2026-05-29",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 218,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 241,
+        "base": 71,
+        "down_or_broken": 174
+      },
+      "run_id": "b41e255c-e2ae-4e6d-8f17-ce8c3be5ca77",
+      "events_created": 71,
+      "observations_appended": 71
+    },
+    {
+      "date": "2026-06-02",
+      "status": "committed",
+      "evaluated": 705,
+      "groups": {
+        "breakout_new": 238,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 237,
+        "base": 67,
+        "down_or_broken": 158
+      },
+      "run_id": "8b9da182-9fbb-465e-a679-f7c7938df52d",
+      "events_created": 77,
+      "observations_appended": 77
+    },
+    {
+      "date": "2026-06-04",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 244,
+        "uptrend_pullback": 9,
+        "waiting_breakout": 237,
+        "base": 70,
+        "down_or_broken": 147
+      },
+      "run_id": "c06e3b0d-abfb-4cda-a289-0bf057a06f2c",
+      "events_created": 74,
+      "observations_appended": 74
+    },
+    {
+      "date": "2026-06-05",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 245,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 235,
+        "base": 71,
+        "down_or_broken": 151
+      },
+      "run_id": "662b6fd6-d9f7-4cb2-bd7c-17e90c535ca1",
+      "events_created": 82,
+      "observations_appended": 82
+    },
+    {
+      "date": "2026-06-08",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 223,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 222,
+        "base": 81,
+        "down_or_broken": 177
+      },
+      "run_id": "16e743c5-aafd-463e-baba-0c1ff5d150ec",
+      "events_created": 71,
+      "observations_appended": 71
+    },
+    {
+      "date": "2026-06-09",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 232,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 235,
+        "base": 79,
+        "down_or_broken": 155
+      },
+      "run_id": "401e9d07-df2c-49dd-be49-3c9d23691116",
+      "events_created": 64,
+      "observations_appended": 64
+    },
+    {
+      "date": "2026-06-10",
+      "status": "committed",
+      "evaluated": 707,
+      "groups": {
+        "breakout_new": 205,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 210,
+        "base": 97,
+        "down_or_broken": 188
+      },
+      "run_id": "9b3105d0-348c-4313-8a46-75176806bc16",
+      "events_created": 58,
+      "observations_appended": 59
+    },
+    {
+      "date": "2026-06-11",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 204,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 230,
+        "base": 87,
+        "down_or_broken": 182
+      },
+      "run_id": "0be8d7ad-9642-4aef-a71d-265e6b757df3",
+      "events_created": 56,
+      "observations_appended": 56
+    },
+    {
+      "date": "2026-06-12",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 221,
+        "uptrend_pullback": 7,
+        "waiting_breakout": 241,
+        "base": 74,
+        "down_or_broken": 166
+      },
+      "run_id": "152d22e0-494a-4ce9-b354-f2b188451c71",
+      "events_created": 63,
+      "observations_appended": 63
+    },
+    {
+      "date": "2026-06-15",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 223,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 259,
+        "base": 63,
+        "down_or_broken": 157
+      },
+      "run_id": "11861750-7c5c-41cf-8a5d-2d881c122b69",
+      "events_created": 0,
+      "observations_appended": 61
+    },
+    {
+      "date": "2026-06-16",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 232,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 264,
+        "base": 66,
+        "down_or_broken": 142
+      },
+      "run_id": "48bbc361-cfb3-44c1-80d7-3e6d749d3de3",
+      "events_created": 61,
+      "observations_appended": 62
+    },
+    {
+      "date": "2026-06-17",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 253,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 271,
+        "base": 43,
+        "down_or_broken": 137
+      },
+      "run_id": "314161b5-5dca-44fb-8f2f-6d5f99f8dfae",
+      "events_created": 75,
+      "observations_appended": 75
+    },
+    {
+      "date": "2026-06-18",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 246,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 259,
+        "base": 50,
+        "down_or_broken": 149
+      },
+      "run_id": "6328e385-4524-4fed-a888-16f2d8819fda",
+      "events_created": 74,
+      "observations_appended": 75
+    },
+    {
+      "date": "2026-06-19",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 254,
+        "uptrend_pullback": 4,
+        "waiting_breakout": 251,
+        "base": 58,
+        "down_or_broken": 142
+      },
+      "run_id": "1cbc0356-6f8a-414e-abe7-565d057d97f8",
+      "events_created": 70,
+      "observations_appended": 70
+    },
+    {
+      "date": "2026-06-22",
+      "status": "committed",
+      "evaluated": 710,
+      "groups": {
+        "breakout_new": 256,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 248,
+        "base": 56,
+        "down_or_broken": 148
+      },
+      "run_id": "dacc0165-8108-422b-8bc4-ee8676ced6e1",
+      "events_created": 76,
+      "observations_appended": 76
+    },
+    {
+      "date": "2026-06-23",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 232,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 230,
+        "base": 73,
+        "down_or_broken": 168
+      },
+      "run_id": "1bee0a12-cfd9-4246-baeb-6ad059fa974c",
+      "events_created": 63,
+      "observations_appended": 63
+    },
+    {
+      "date": "2026-06-24",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 253,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 242,
+        "base": 60,
+        "down_or_broken": 148
+      },
+      "run_id": "46fb9f19-38b9-44ed-a126-2b37837e7648",
+      "events_created": 61,
+      "observations_appended": 62
+    },
+    {
+      "date": "2026-06-25",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 256,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 243,
+        "base": 57,
+        "down_or_broken": 146
+      },
+      "run_id": "f5005500-b9ea-4e21-b156-92786330c94d",
+      "events_created": 59,
+      "observations_appended": 60
+    },
+    {
+      "date": "2026-06-26",
+      "status": "committed",
+      "evaluated": 708,
+      "groups": {
+        "breakout_new": 265,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 237,
+        "base": 57,
+        "down_or_broken": 146
+      },
+      "run_id": "491809dc-027c-4c6e-9ff3-271c148c430a",
+      "events_created": 66,
+      "observations_appended": 66
+    },
+    {
+      "date": "2026-06-29",
+      "status": "committed",
+      "evaluated": 709,
+      "groups": {
+        "breakout_new": 267,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 250,
+        "base": 44,
+        "down_or_broken": 145
+      },
+      "run_id": "4c0b3832-1e7c-4175-82fb-475da71b8966",
+      "events_created": 67,
+      "observations_appended": 68
+    },
+    {
+      "date": "2026-06-30",
+      "status": "committed",
+      "evaluated": 711,
+      "groups": {
+        "breakout_new": 278,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 249,
+        "base": 40,
+        "down_or_broken": 142
+      },
+      "run_id": "4c0a7250-0cbe-46cb-929e-226fa98ebb23",
+      "events_created": 74,
+      "observations_appended": 74
+    },
+    {
+      "date": "2026-07-01",
+      "status": "committed",
+      "evaluated": 711,
+      "groups": {
+        "breakout_new": 290,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 239,
+        "base": 40,
+        "down_or_broken": 140
+      },
+      "run_id": "2fd19fd2-75f7-44e9-9374-a2c3b2ca9786",
+      "events_created": 80,
+      "observations_appended": 81
+    },
+    {
+      "date": "2026-07-02",
+      "status": "committed",
+      "evaluated": 710,
+      "groups": {
+        "breakout_new": 314,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 227,
+        "base": 39,
+        "down_or_broken": 127
+      },
+      "run_id": "5660998a-4f5e-4e8c-a30e-834571a4bad2",
+      "events_created": 85,
+      "observations_appended": 85
+    },
+    {
+      "date": "2026-07-03",
+      "status": "committed",
+      "evaluated": 710,
+      "groups": {
+        "breakout_new": 326,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 228,
+        "base": 33,
+        "down_or_broken": 122
+      },
+      "run_id": "145dc811-91cf-4c5f-9593-8304153ec700",
+      "events_created": 87,
+      "observations_appended": 87
+    },
+    {
+      "date": "2026-07-06",
+      "status": "committed",
+      "evaluated": 710,
+      "groups": {
+        "breakout_new": 338,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 230,
+        "base": 25,
+        "down_or_broken": 115
+      },
+      "run_id": "6c2613c5-f024-49e8-8df2-38f27a6cba1d",
+      "events_created": 87,
+      "observations_appended": 88
+    },
+    {
+      "date": "2026-07-07",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 338,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 229,
+        "base": 28,
+        "down_or_broken": 116
+      },
+      "run_id": "c1dcedb1-1a2b-44fe-a61c-0aebccf79b81",
+      "events_created": 95,
+      "observations_appended": 95
+    },
+    {
+      "date": "2026-07-08",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 310,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 209,
+        "base": 37,
+        "down_or_broken": 154
+      },
+      "run_id": "836c220c-2456-4d14-a9a2-2e1185dcc7f0",
+      "events_created": 87,
+      "observations_appended": 87
+    },
+    {
+      "date": "2026-07-09",
+      "status": "committed",
+      "evaluated": 712,
+      "groups": {
+        "breakout_new": 335,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 226,
+        "base": 30,
+        "down_or_broken": 120
+      },
+      "run_id": "d1630724-e2c9-4954-901e-21bd7808eb9e",
+      "events_created": 87,
+      "observations_appended": 87
+    },
+    {
+      "date": "2026-07-10",
+      "status": "committed",
+      "evaluated": 712,
+      "groups": {
+        "breakout_new": 363,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 226,
+        "base": 23,
+        "down_or_broken": 99
+      },
+      "run_id": "475cba4f-27c1-4d11-a2c7-1e9009db3161",
+      "events_created": 101,
+      "observations_appended": 101
+    },
+    {
+      "date": "2026-07-13",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 383,
+        "uptrend_pullback": 0,
+        "waiting_breakout": 204,
+        "base": 26,
+        "down_or_broken": 100
+      },
+      "run_id": "409f6cee-e5b7-4136-80d5-2406a1e6c4af",
+      "events_created": 101,
+      "observations_appended": 101
+    },
+    {
+      "date": "2026-07-14",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 376,
+        "uptrend_pullback": 0,
+        "waiting_breakout": 209,
+        "base": 24,
+        "down_or_broken": 104
+      },
+      "run_id": "9f8f80a4-7d7c-4ab9-9c93-1dd736cc3d00",
+      "events_created": 96,
+      "observations_appended": 96
+    },
+    {
+      "date": "2026-07-15",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 379,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 211,
+        "base": 27,
+        "down_or_broken": 96
+      },
+      "run_id": "e60d49c9-1944-46d3-adf3-139f0ae7ffc0",
+      "events_created": 93,
+      "observations_appended": 93
+    },
+    {
+      "date": "2026-07-16",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 402,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 202,
+        "base": 21,
+        "down_or_broken": 88
+      },
+      "run_id": "4e39d09c-74e1-46e0-ad33-a0a57368e3a6",
+      "events_created": 0,
+      "observations_appended": 93
+    },
+    {
+      "date": "2026-07-17",
+      "status": "committed",
+      "evaluated": 712,
+      "groups": {
+        "breakout_new": 404,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 197,
+        "base": 18,
+        "down_or_broken": 91
+      },
+      "run_id": "a34171cf-345b-4568-8e9c-4d1752668718",
+      "events_created": 0,
+      "observations_appended": 97
+    },
+    {
+      "date": "2026-07-20",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 392,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 203,
+        "base": 20,
+        "down_or_broken": 97
+      },
+      "run_id": "e8a4b801-fa63-4efb-a58e-02019069d73f",
+      "events_created": 0,
+      "observations_appended": 85
+    },
+    {
+      "date": "2026-07-21",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 402,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 204,
+        "base": 17,
+        "down_or_broken": 90
+      },
+      "run_id": "d119bd88-7977-4454-92b6-926412a84212",
+      "events_created": 0,
+      "observations_appended": 84
+    },
+    {
+      "date": "2026-07-22",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 367,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 196,
+        "base": 32,
+        "down_or_broken": 116
+      },
+      "run_id": "dd1ea469-7f30-4a5e-8a10-ea6545133b0e",
+      "events_created": 0,
+      "observations_appended": 82
+    },
+    {
+      "date": "2026-07-23",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 362,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 187,
+        "base": 35,
+        "down_or_broken": 128
+      },
+      "run_id": "75140c9e-1958-4ca8-a3f2-75c2391ae2f9",
+      "events_created": 0,
+      "observations_appended": 78
+    },
+    {
+      "date": "2026-07-24",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 358,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 187,
+        "base": 37,
+        "down_or_broken": 128
+      },
+      "run_id": "8a96bbbf-2804-4030-bb6a-2e314b1b2e32",
+      "events_created": 0,
+      "observations_appended": 70
+    },
+    {
+      "date": "2026-07-27",
+      "status": "committed",
+      "evaluated": 713,
+      "groups": {
+        "breakout_new": 367,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 185,
+        "base": 32,
+        "down_or_broken": 127
+      },
+      "run_id": "2f08173f-4365-4b4b-8e74-f3cd60f48cb6",
+      "events_created": 0,
+      "observations_appended": 67
+    },
+    {
+      "date": "2026-07-30",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 359,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 195,
+        "base": 31,
+        "down_or_broken": 126
+      },
+      "run_id": "50ad6b51-edac-4ad6-af9c-cd02c3853620",
+      "events_created": 64,
+      "observations_appended": 65
+    },
+    {
+      "date": "2026-07-31",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 375,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 200,
+        "base": 20,
+        "down_or_broken": 118
+      },
+      "run_id": "68923911-c947-447a-84a9-9328607e5313",
+      "events_created": 68,
+      "observations_appended": 68
+    },
+    {
+      "date": "2026-08-03",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 383,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 195,
+        "base": 25,
+        "down_or_broken": 110
+      },
+      "run_id": "b1390c94-690d-4dc4-abfd-9d30aeeb0529",
+      "events_created": 70,
+      "observations_appended": 70
+    },
+    {
+      "date": "2026-08-04",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 382,
+        "uptrend_pullback": 1,
+        "waiting_breakout": 188,
+        "base": 28,
+        "down_or_broken": 115
+      },
+      "run_id": "3551ff1e-a95d-4d7b-a23b-50b84feeb979",
+      "events_created": 69,
+      "observations_appended": 70
+    },
+    {
+      "date": "2026-08-05",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 378,
+        "uptrend_pullback": 0,
+        "waiting_breakout": 178,
+        "base": 33,
+        "down_or_broken": 125
+      },
+      "run_id": "f80eb1e4-5e68-4993-9c51-93a265f8c485",
+      "events_created": 65,
+      "observations_appended": 65
+    },
+    {
+      "date": "2026-08-06",
+      "status": "committed",
+      "evaluated": 714,
+      "groups": {
+        "breakout_new": 385,
+        "uptrend_pullback": 3,
+        "waiting_breakout": 172,
+        "base": 32,
+        "down_or_broken": 122
+      },
+      "run_id": "337a3991-0a0c-4fdb-9bd9-e8a9bea776c4",
+      "events_created": 67,
+      "observations_appended": 67
+    },
+    {
+      "date": "2026-08-07",
+      "status": "committed",
+      "evaluated": 715,
+      "groups": {
+        "breakout_new": 396,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 170,
+        "base": 30,
+        "down_or_broken": 117
+      },
+      "run_id": "9d114061-cdb4-4909-a24c-1d188ed411f9",
+      "events_created": 0,
+      "observations_appended": 64
+    },
+    {
+      "date": "2026-08-10",
+      "status": "committed",
+      "evaluated": 716,
+      "groups": {
+        "breakout_new": 379,
+        "uptrend_pullback": 2,
+        "waiting_breakout": 173,
+        "base": 33,
+        "down_or_broken": 129
+      },
+      "run_id": "3aad2535-7f1b-49cd-ac56-e94d8b87085d",
+      "events_created": 65,
+      "observations_appended": 65
+    },
+    {
+      "date": "2026-08-11",
+      "status": "committed",
+      "evaluated": 717,
+      "groups": {
+        "breakout_new": 371,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 165,
+        "base": 40,
+        "down_or_broken": 136
+      },
+      "run_id": "526dc881-8f67-4745-a56f-bacb388ad807",
+      "events_created": 60,
+      "observations_appended": 60
+    },
+    {
+      "date": "2026-08-13",
+      "status": "committed",
+      "evaluated": 718,
+      "groups": {
+        "breakout_new": 383,
+        "uptrend_pullback": 6,
+        "waiting_breakout": 148,
+        "base": 40,
+        "down_or_broken": 141
+      },
+      "run_id": "02f43df3-cba5-4d51-9ddf-01b1f9f9208e",
+      "events_created": 61,
+      "observations_appended": 61
+    },
+    {
+      "date": "2026-08-14",
+      "status": "committed",
+      "evaluated": 718,
+      "groups": {
+        "breakout_new": 356,
+        "uptrend_pullback": 5,
+        "waiting_breakout": 141,
+        "base": 38,
+        "down_or_broken": 178
+      },
+      "run_id": "02fccb74-ab4d-4ed7-808d-9e21ed2e6f49",
+      "events_created": 24,
+      "observations_appended": 24
+    }
+  ],
+  "errors": [
+    {
+      "date": "2026-03-27",
+      "error": "DeadlockDetected('deadlock detected\\nDETAIL:  Process 21974 waits for RowShareLock on relation 16737 of database 16384; blocked by process 22188.\\nProcess 22188 waits for ShareLock on relation 16778 of database 16384; blocked by process 21974.\\nHINT:  See server log for query details.\\n')"
+    }
+  ],
+  "elapsed_seconds": 2324.53,
+  "coverage": {
+    "dates_with_rows": 99,
+    "total_observations": 69992
+  }
+}
