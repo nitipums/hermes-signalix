@@ -1803,3 +1803,5 @@ intraday-only mode=tiered interval=60m shortlist : 0 symbols
 INTRADAY_RUN_SUMMARY {"batches": [], "failed_symbols": [], "fetch_completed_at": "2026-08-17T09:30:01.443350+00:00", "fetch_started_at": "2026-08-17T09:30:01.443319+00:00", "retry_count": 0, "rows_inserted": 0, "rows_offered": 0, "rows_updated": 0, "run_id": "405abf9f8a8e4c6aacb37282490131c5", "status": "failure", "symbols_attempted": 0, "symbols_failed": 0, "symbols_succeeded": 0}
 timestamp=2026-08-17T09:30:01.457110+00:00 run_id=405abf9f8a8e4c6aacb37282490131c5 intraday interval=60m symbols=0 offered=0 0 inserted / 0 updated failed=0
 {"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
+signalix tiered 60m: outside SET continuous session (1645 Bangkok), skip
+{"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
