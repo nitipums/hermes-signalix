@@ -207,7 +207,7 @@ function current(){
     if(indep.set50&&!(i.independence&&i.independence.is_set50))return false;
     if(indep.value>0&&!(i.independence&&i.independence.avgTradeValue20>=(indep.value*1e6)))return false;
     if(indep.band!=="all"&&!(i.independence&&i.independence.priceBand===indep.band))return false;
-    const lf=l2Filter[stageFilter];
+    const lf=l2Filter[i.stage];
     if(lf&&lf!=="all"&&i.layer2_group!==lf)return false;
     if(q&&!`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q))return false;
     return true;
