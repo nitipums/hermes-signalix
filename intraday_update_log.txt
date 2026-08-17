@@ -1805,3 +1805,7 @@ timestamp=2026-08-17T09:30:01.457110+00:00 run_id=405abf9f8a8e4c6aacb37282490131
 {"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
 signalix tiered 60m: outside SET continuous session (1645 Bangkok), skip
 {"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
+signalix tiered 60m: outside SET continuous session (1700 Bangkok), skip
+{"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
+signalix tiered 60m: outside SET continuous session (1715 Bangkok), skip
+{"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
