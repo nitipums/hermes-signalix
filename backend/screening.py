@@ -636,3 +636,107 @@ if __name__ == "__main__":
               f"TT={tt['conditions_met']}/8  VCP={r['vcp']['is_vcp']}  "
               f"stop={r['suggested_stop']}")
     print(f"\nResults written to {out_path}")
+
+
+# --- Layer 2: short-term momentum grouping on 60m bars (no scoring) ---
+def _ema(series, n):
+    if len(series) < n or n <= 0:
+        return None
+    alpha, x = 2/(n+1), float(series.iloc[0])
+    for v in series.iloc[1:]:
+        x = float(v)*alpha + x*(1-alpha)
+    return x
+
+def _macd_state(close):
+    if len(close) < 35:
+        return "cross", 0.0
+    vals = close.astype(float).tolist()
+    a12, a26, a9 = 2/13, 2/27, 2/10
+    e12, e26 = vals[0], vals[0]
+    macd_line = []
+    for v in vals:
+        e12 = v*a12 + e12*(1-a12); e26 = v*a26 + e26*(1-a26)
+        macd_line.append(e12 - e26)
+    ms = macd_line[0]
+    for m in macd_line[1:]:
+        ms = m*a9 + ms*(1-a9)
+    signal = ms
+    macd_now = macd_line[-1]
+    macd_prev = macd_line[-2] if len(macd_line) > 1 else macd_now
+    diff_now = macd_now - signal
+    diff_prev = macd_prev - signal
+    if diff_now > 0 and macd_now > 0:
+        state = "bullish"
+    elif diff_now < 0 and macd_now < 0:
+        state = "bearish"
+    else:
+        state = "cross"
+    if (diff_now > 0) != (diff_prev > 0):
+        state = "cross"
+    return state, round(macd_now, 4)
+
+def _rsi(close, period=14):
+    if len(close) < period+1:
+        return 50.0
+    delta = close.diff().dropna()
+    if len(delta) < period:
+        return 50.0
+    gains = delta.clip(lower=0)
+    losses = -delta.clip(upper=0)
+    ag = gains.rolling(period).mean().iloc[-1]
+    al = losses.rolling(period).mean().iloc[-1]
+    if al == 0:
+        return 100.0
+    rs = ag/al
+    return round(100 - 100/(1+rs), 2)
+
+def compute_layer2(symbol, df_60m):
+    """Classify short-term momentum on 60m bars. Returns signals + group enum."""
+    if df_60m is None or len(df_60m) < 30:
+        return {"signals": {"mini_trend": "flat", "macd": "cross", "rsi": None}, "group": "neutral"}
+    close = df_60m["Close"].astype(float)
+    ma50 = close.rolling(50).mean()
+    ma50_now = ma50.iloc[-1] if len(close) >= 50 else close.mean()
+    ma50_prev = ma50.iloc[-5] if len(close) >= 54 else ma50_now
+    slope = (ma50_now - ma50_prev) if ma50_prev else 0.0
+    price = float(close.iloc[-1])
+    mini_trend = "up" if (price > ma50_now and slope > 0) else \
+                 "down" if (price < ma50_now and slope < 0) else "flat"
+    macd_state, _ = _macd_state(close)
+    rsi = _rsi(close, 14)
+    if rsi >= 70:
+        group = "overbought"
+    elif rsi <= 30:
+        group = "oversold"
+    elif mini_trend == "up" and macd_state == "bullish":
+        group = "momentum_strong"
+    elif mini_trend == "up":
+        group = "momentum_up"
+    elif mini_trend == "down":
+        group = "momentum_down"
+    else:
+        group = "neutral"
+    return {"signals": {"mini_trend": mini_trend, "macd": macd_state, "rsi": rsi},
+            "group": group}
+
+def universe_layer2(pg, symbols):
+    out = {}
+    for sym in symbols:
+        df = load_symbol_intraday(sym, pg=pg, interval="60m", lookback=400)
+        if df is None or len(df) < 30:
+            continue
+        try:
+            out[sym] = compute_layer2(sym, df)
+        except Exception:
+            continue
+    return out
+
+def load_index_membership(pg):
+    cur = pg.cursor()
+    cur.execute("SELECT to_regclass('public.index_membership')")
+    if not cur.fetchone()[0]:
+        cur.close(); return set()
+    cur.execute("SELECT symbol FROM index_membership WHERE is_set50 = TRUE")
+    rows = {r[0] for r in cur.fetchall()}
+    cur.close()
+    return rows
