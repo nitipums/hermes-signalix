@@ -220,7 +220,7 @@ function render(){
   sum.innerHTML=STAGE_ORDER.map(s=>{
     const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
     const cls=s.split("_")[0];
-    return `<div class="stage-pill ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" style="cursor:pointer"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div></div>`;
+    return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" style="cursor:pointer"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div></div>`;
   }).join("");
   // sections by stage
   const vals=current();
@@ -320,7 +320,7 @@ function drawChart(bars){
 document.addEventListener("click",e=>{
   const page=e.target.closest("[data-page]");if(page){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===page.dataset.page));document.querySelectorAll("[data-page]").forEach(p=>p.classList.toggle("active",p.dataset.page===page.dataset.page));window.scrollTo(0,0);}
   const liq=e.target.closest("[data-liquidity]");if(liq){liquidity=liq.dataset.liquidity;document.getElementById("liquidOnly").classList.toggle("active",liquidity==="liquid");document.getElementById("showLowValue").classList.toggle("active",liquidity==="all");render();}
-  const sp=e.target.closest("[data-stage]");if(sp){stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();}
+  const sp=e.target.closest(".js-stage");if(sp){stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();}
   const set50=e.target.closest("#set50Only"); if(set50){indep.set50=!indep.set50;set50.classList.toggle("active",indep.set50);render();}
   const vf=e.target.closest("#valueFilter"); if(vf){indep.value=parseFloat(vf.value)||0;render();}
   const pb=e.target.closest("#priceBand"); if(pb){indep.band=pb.value;render();}

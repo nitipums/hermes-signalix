@@ -1809,3 +1809,5 @@ signalix tiered 60m: outside SET continuous session (1700 Bangkok), skip
 {"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
 signalix tiered 60m: outside SET continuous session (1715 Bangkok), skip
 {"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
+signalix tiered 60m: outside SET continuous session (1730 Bangkok), skip
+{"mode": "active", "interval": "60m", "evaluated": 0, "priced": 0, "changes": []}
