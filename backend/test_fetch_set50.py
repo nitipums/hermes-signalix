@@ -13,8 +13,21 @@ def test_seed_is_idempotent():
     seed_index_membership(syms, source="test")  # re-run
     pg = psycopg2.connect(host="127.0.0.1", port=5432, user="signalix",
                           password="signalix_pass", dbname="signalix")
-    cur = pg.cursor()
-    cur.execute("SELECT COUNT(*) FROM index_membership WHERE is_set50=TRUE")
-    assert cur.fetchone()[0] == 4
-    cur.execute("DELETE FROM index_membership")
-    pg.commit(); pg.close()
+    try:
+        cur = pg.cursor()
+        # Idempotency check: the 4 test symbols must total exactly 4 rows
+        # (double-seeding must NOT create duplicates). Scoped to the test
+        # symbols so the real SET50 rows are never part of this assertion.
+        cur.execute(
+            "SELECT COUNT(*) FROM index_membership "
+            "WHERE symbol IN ('AOT','BBL','PTT','KBANK') AND is_set50=TRUE")
+        assert cur.fetchone()[0] == 4
+    finally:
+        # Scoped cleanup: remove ONLY the 4 test symbols so a re-run (or an
+        # assertion failure above) can never wipe the real SET50 rows.
+        cur = pg.cursor()
+        cur.execute(
+            "DELETE FROM index_membership "
+            "WHERE symbol IN ('AOT','BBL','PTT','KBANK')")
+        pg.commit()
+        pg.close()
