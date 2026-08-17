@@ -110,18 +110,30 @@ Seeded by a **one-shot** script (see 3.5). No daily cron.
 
 ### 3.4 UI Redesign (additive, stage-first preserved)
 
-`dashboard_template.html` changes:
-1. **Filter bar** (top, above stage sections): three controls, all client-side
-   over the already-loaded `ITEMS__` JSON:
-   - **SET50 toggle**: show SET50 only.
-   - **Value filter**: dropdown `All / >=5M / >=10M / >=20M` on `avgTradeValue20`.
-   - **Price band**: `All / low(<2) / mid(2-10) / high(>10)`.
-   - Filtering recomputes visible cards without a server round-trip.
-2. **L2 badge** on each card: colored pill showing `layer2_group`
-   (green=momentum_strong/up, grey=neutral, red=momentum_down/oversold,
-   orange=overbought). Badge hidden when `layer2_group` is null.
-3. **Card sub-line**: `S2 · L2: momentum_strong` reuses the existing
-   `stage_phase` label area; no new layout columns.
+`dashboard_template.html` changes — **L2 is a drill-down subgroup, NOT a card badge.**
+
+**Two-level navigation (L1 → L2):**
+1. **L1 stage sections** remain the primary axis (S1_basing / S2_uptrend /
+   S3_distributing / S4_down). Each section lists its symbols.
+2. **Inside each L1 section, a L2 subgroup filter** lets the user narrow that
+   stage's symbols by `layer2_group` *after* choosing the stage. Implemented as
+   sub-tabs / pill row above the section's card list: `All / momentum_strong /
+   momentum_up / neutral / momentum_down / overbought / oversold`. Clicking a
+   sub-tab shows only symbols in that stage whose `layer2_group` matches.
+   - This is a client-side filter over the already-loaded `ITEMS__` JSON (no
+     server round-trip). Each sub-tab shows a count.
+   - L2 group is therefore a **drill-down axis**, never a colored badge on the
+     card face.
+
+**Independence filter bar** (global, top of dashboard, client-side):
+- **SET50 toggle**: show SET50 only.
+- **Value filter**: dropdown `All / >=5M / >=10M / >=20M` on `avgTradeValue20`.
+- **Price band**: `All / low(<2) / mid(2-10) / high(>10)`.
+- These apply across all L1 sections + L2 subgroups (AND-combined).
+
+**Card content:** the existing `stage_phase` label stays; `layer2_group` may
+appear as a small neutral text line on the card for reference, but it is NOT a
+colored filter badge (the filter lives in the L2 subgroup bar).
 
 No modal/chart changes (those are stable per signalix-stage-first-dashboard).
 
