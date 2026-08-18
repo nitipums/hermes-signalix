@@ -118,6 +118,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .tf-tools .chip{padding:6px 10px;font-size:11px}
 .tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
 .modal .chip{margin-top:14px}
+.tv-link{background:var(--panel2);border:1px solid var(--line);color:var(--blue);font-weight:700}
+.tv-link:hover{background:#1c2a3d}
 .nav-arrow,.modal-close{font-weight:800;font-size:15px;line-height:1}
 .nav-arrow{padding:0 12px}
 .modal-close{padding:0 14px;color:var(--red)}
@@ -282,7 +284,10 @@ function bind(root=document){
 }
 const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
 const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
+let detailGen=0;
+let chartAbort=null;
 function openDetail(i){
+  const myGen=++detailGen;
   detailList=current().map(x=>x.symbol);
   detailItem=i;
   const bg=document.getElementById("modalBg");bg.classList.add("open");bg.setAttribute("aria-hidden","false");
@@ -303,6 +308,7 @@ function openDetail(i){
     </div>
     <canvas id="detailChart" height="220" style="width:100%;margin:10px 0 4px;border-radius:10px;background:#0a0e17"></canvas>
     <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <a class="chip tv-link" id="tvLink" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;text-decoration:none">TradingView ↗</a>
     <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
     <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b><br>${esc(i.actionReason)}</div>`:""}
@@ -310,15 +316,18 @@ function openDetail(i){
   document.getElementById("prevStock").onclick=()=>stepStock(-1);
   document.getElementById("nextStock").onclick=()=>stepStock(1);
   document.getElementById("closeModal").onclick=()=>closeModal();
+  document.getElementById("tvLink").href=`https://www.tradingview.com/chart/?symbol=SET:${encodeURIComponent(i.symbol)}`;
   document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
+    if(myGen!==detailGen)return;
     document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");
-    loadChart(i.symbol, TF_API[b.dataset.tf]);
+    loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
   });
   // Auto-pick timeframe by listing age, then load.
   pickTimeframe(i.symbol).then(tf=>{
+    if(myGen!==detailGen)return;
     document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf));
-    loadChart(i.symbol, TF_API[tf]);
+    loadChart(i.symbol, TF_API[tf], myGen);
   });
   bind();
 }
@@ -333,14 +342,17 @@ function pickTimeframe(symbol){
       return "1D";
     }).catch(()=> "1D");
 }
-function loadChart(symbol, tf){
+function loadChart(symbol, tf, gen){
+  if(gen!==undefined && gen!==detailGen)return;
   currentTf=tf;
+  if(chartAbort)chartAbort.abort();
+  const ac=chartAbort=new AbortController();
   const fetchLimit=(tf==="1M")?500:200;
-  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${fetchLimit}`)
-    .then(r=>r.json()).then(d=>{ if(d&&d.bars&&d.bars.length){ drawChart(d.bars, tf); } else { fallback(symbol,tf); } })
-    .catch(()=>fallback(symbol,tf));
+  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${fetchLimit}`,{signal:ac.signal})
+    .then(r=>r.json()).then(d=>{ if(gen!==detailGen)return; if(d&&d.bars&&d.bars.length){ drawChart(d.bars, tf); } else { fallback(symbol,tf,gen); } })
+    .catch(()=>{ if(gen===detailGen)fallback(symbol,tf,gen); });
 }
-function fallback(symbol,tf){ const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ setActiveTf(nx); loadChart(symbol,nx); } }
+function fallback(symbol,tf,gen){ if(gen!==detailGen)return; const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ setActiveTf(nx); loadChart(symbol,nx,gen); } }
 function drawChart(bars, tf){
   const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;
   const ctx=cv.getContext("2d");
@@ -371,7 +383,7 @@ function drawChart(bars, tf){
   const lg=document.getElementById("chartLegend"); if(lg)lg.innerHTML=legend.join(" ");
 }
 let detailList=[];
-function closeModal(){ const bg=document.getElementById("modalBg"); bg.classList.remove("open"); bg.setAttribute("aria-hidden","true"); }
+function closeModal(){ detailGen++; const bg=document.getElementById("modalBg"); bg.classList.remove("open"); bg.setAttribute("aria-hidden","true"); }
 function stepStock(dir){
   if(!detailList.length)return;
   let idx=detailList.indexOf(detailItem?detailItem.symbol:null); if(idx<0)idx=0;
