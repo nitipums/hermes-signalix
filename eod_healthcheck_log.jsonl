@@ -1,0 +1,1 @@
+{"alerts": [{"code": "service_failed", "exec_main_status": 1, "result": "exit-code"}], "checked_at": "2026-08-17T13:02:57.984140+00:00", "component": "signalix_eod", "eod_latest_date": "2026-08-17", "expected_market_date": "2026-08-17", "level": "ALERT", "scan_latest_date": "2026-08-17", "service": "signalix-update.service"}

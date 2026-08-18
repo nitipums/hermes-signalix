@@ -19,6 +19,8 @@ body.loading #liveLoading{display:flex}
 #liveLoading{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
   background:var(--bg);color:var(--muted);font-size:14px}
 button,input{font:inherit} button{color:inherit;cursor:pointer}
+*{ -webkit-tap-highlight-color:transparent }
+button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}
 .app{max-width:1280px;margin:auto;padding:0 18px 42px}
 .topbar{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .brand{font-size:21px;font-weight:850;letter-spacing:-.04em}
@@ -97,6 +99,15 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 @media(max-width:620px){
   .stage-pill{min-width:calc(50% - 5px)}
   .cards{grid-template-columns:1fr}
+  .app{padding:0 12px 32px}
+  .nav{position:sticky;top:0;gap:6px;padding:8px 0}
+  .nav button{padding:10px 12px;font-size:13px}
+  .l2-bar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px;-webkit-overflow-scrolling:touch}
+  .l2-bar .chip{flex:0 0 auto;padding:10px 12px}
+  .tf-tools .chip{padding:10px 14px;font-size:12px}
+  .liquidity-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px}
+  .liquidity-tools .chip,.liquidity-tools select{flex:0 0 auto;padding:10px 12px}
+  .search{padding:13px 14px;font-size:16px}
 }
 .modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.72);
   align-items:center;justify-content:center;padding:18px}
@@ -107,6 +118,9 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .tf-tools .chip{padding:6px 10px;font-size:11px}
 .tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
 .modal .chip{margin-top:14px}
+.nav-arrow,.modal-close{font-weight:800;font-size:15px;line-height:1}
+.nav-arrow{padding:0 12px}
+.modal-close{padding:0 14px;color:var(--red)}
 </style>
 </head>
 <body>
@@ -266,56 +280,103 @@ function bind(root=document){
     el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail(bySymbol[el.dataset.symbol]);}};
   });
 }
+const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
+const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
 function openDetail(i){
+  detailList=current().map(x=>x.symbol);
   detailItem=i;
   const bg=document.getElementById("modalBg");bg.classList.add("open");bg.setAttribute("aria-hidden","false");
   const q=(i.quality&&i.quality.flags||[]).join(" · ");
-  document.getElementById("modalContent").innerHTML=`<div style="padding:20px">
-    <h2>${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
-    <div class="tf-tools">
-      <button class="chip tf" data-tf="60M">60m · 1M</button>
-      <button class="chip tf active" data-tf="1D">Day · 6M</button>
-      <button class="chip tf" data-tf="1W">Week · 1Y</button>
-      <button class="chip tf" data-tf="1M">Month · All</button>
+  const idx=(detailList||[]).indexOf(i.symbol);
+  document.getElementById("modalContent").innerHTML=`<div style="padding:20px 20px 24px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <button class="chip nav-arrow" id="prevStock" aria-label="หุ้นก่อนหน้า">◀</button>
+      <h2 style="margin:0;flex:1">${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
+      <button class="chip nav-arrow" id="nextStock" aria-label="หุ้นถัดไป">▶</button>
+      <button class="chip modal-close" id="closeModal" aria-label="ปิด">✕</button>
     </div>
-    <canvas id="detailChart" height="200" style="width:100%;margin:10px 0;border-radius:10px;background:#0a0e17"></canvas>
+    <div class="tf-tools">
+      <button class="chip tf" data-tf="1h">1h</button>
+      <button class="chip tf active" data-tf="1D">1D</button>
+      <button class="chip tf" data-tf="1W">1W</button>
+      <button class="chip tf" data-tf="1M">1M</button>
+    </div>
+    <canvas id="detailChart" height="220" style="width:100%;margin:10px 0 4px;border-radius:10px;background:#0a0e17"></canvas>
+    <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
     <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
     <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b><br>${esc(i.actionReason)}</div>`:""}
-    <p style="color:var(--muted);font-size:12px">Stage เป็นโครงสร้างกราฟ (Layer 1) — quality (MACD/RSI/volume) เป็น Layer 2 สำหรับประเมิน take-action</p>
-    <button class="chip" onclick="document.getElementById('modalBg').classList.remove('open')">ปิด</button>
   </div>`;
-  // Load chart on-demand (keeps the page light).
-  loadChart(i.symbol, "1D");
+  document.getElementById("prevStock").onclick=()=>stepStock(-1);
+  document.getElementById("nextStock").onclick=()=>stepStock(1);
+  document.getElementById("closeModal").onclick=()=>closeModal();
   document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
     document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.remove("active"));
     b.classList.add("active");
-    loadChart(i.symbol, b.dataset.tf);
+    loadChart(i.symbol, TF_API[b.dataset.tf]);
+  });
+  // Auto-pick timeframe by listing age, then load.
+  pickTimeframe(i.symbol).then(tf=>{
+    document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf));
+    loadChart(i.symbol, TF_API[tf]);
   });
   bind();
 }
-const TF_LIMIT={ "60M":120, "1D":63, "1W":52, "1M":500 };
-function loadChart(symbol, tf){
-  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${TF_LIMIT[tf]||180}`)
-    .then(r=>r.json()).then(d=>{ if(d&&d.bars)drawChart(d.bars); }).catch(()=>{});
+let currentTf="1D";
+function setActiveTf(tf){ currentTf=tf; document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf)); }
+function pickTimeframe(symbol){
+  return fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=1M&limit=500`)
+    .then(r=>r.json()).then(d=>{
+      const months=d&&d.bars?d.bars.length:0;
+      if(months<=3)return "1h";
+      if(months>60)return "1M";
+      return "1D";
+    }).catch(()=> "1D");
 }
-function drawChart(bars){
-  const cv=document.getElementById("detailChart");if(!cv||!bars||!bars.length)return;
+function loadChart(symbol, tf){
+  currentTf=tf;
+  const fetchLimit=(tf==="1M")?500:200;
+  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${fetchLimit}`)
+    .then(r=>r.json()).then(d=>{ if(d&&d.bars&&d.bars.length){ drawChart(d.bars, tf); } else { fallback(symbol,tf); } })
+    .catch(()=>fallback(symbol,tf));
+}
+function fallback(symbol,tf){ const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ setActiveTf(nx); loadChart(symbol,nx); } }
+function drawChart(bars, tf){
+  const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;
   const ctx=cv.getContext("2d");
-  const W=cv.width=cv.clientWidth||520, H=cv.height=200;
-  const hi=Math.max(...bars.map(b=>b.high)), lo=Math.min(...bars.map(b=>b.low)), rng=(hi-lo)||1;
-  const n=bars.length, cw=W/n;
+  const W=cv.width=cv.clientWidth||520, H=cv.height=220;
+  const drawN=(tf==="1M")?bars.length:Math.min(60,bars.length);
+  const slice=bars.slice(-drawN); const n=slice.length; if(!n)return;
+  const lo=Math.min(...slice.map(b=>b.low)), hi=Math.max(...slice.map(b=>b.high)), rng=(hi-lo)||1;
+  const pad=10, top=10, plotH=H-2*pad, cw=W/n;
   ctx.clearRect(0,0,W,H);
-  bars.forEach((b,idx)=>{
-    const x=idx*cw+cw/2;
-    const yH=H-((b.high-lo)/rng)*(H-16)-8, yL=H-((b.low-lo)/rng)*(H-16)-8;
-    const yC=H-((b.close-lo)/rng)*(H-16)-8, yO=H-((b.open-lo)/rng)*(H-16)-8;
+  slice.forEach((b,k)=>{
+    const x=k*cw+cw/2;
+    const yH=top+(1-(b.high-lo)/rng)*plotH, yL=top+(1-(b.low-lo)/rng)*plotH;
+    const yC=top+(1-(b.close-lo)/rng)*plotH, yO=top+(1-(b.open-lo)/rng)*plotH;
     const up=b.close>=b.open;
-    ctx.strokeStyle=up?"#43df9e":"#ff7a7a";ctx.fillStyle=ctx.strokeStyle;
-    ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();      // wick
+    ctx.strokeStyle=up?"#43df9e":"#ff7a7a"; ctx.fillStyle=ctx.strokeStyle;
+    ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();
     const bw=Math.max(1,cw*0.6);
-    ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);          // body
+    ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);
   });
+  const closes=bars.map(b=>b.close), startIdx=bars.length-drawN;
+  const maDefs=[{n:20,c:"#ffc45d",label:"MA20"},{n:50,c:"#79adff",label:"MA50"},{n:200,c:"#c08bff",label:"MA200"}];
+  const legend=[];
+  maDefs.forEach(m=>{
+    ctx.strokeStyle=m.c; ctx.lineWidth=1.5; ctx.beginPath(); let started=false, drew=false;
+    for(let k=0;k<n;k++){ const abs=startIdx+k; if(abs>=m.n-1){ let s=0; for(let j=abs-m.n+1;j<=abs;j++)s+=closes[j]; const val=s/m.n; const x=k*cw+cw/2; const y=top+(1-(val-lo)/rng)*plotH; if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y); drew=true; } }
+    ctx.stroke(); if(drew)legend.push(`<span style="color:${m.c}">● ${m.label}</span>`);
+  });
+  const lg=document.getElementById("chartLegend"); if(lg)lg.innerHTML=legend.join(" ");
+}
+let detailList=[];
+function closeModal(){ const bg=document.getElementById("modalBg"); bg.classList.remove("open"); bg.setAttribute("aria-hidden","true"); }
+function stepStock(dir){
+  if(!detailList.length)return;
+  let idx=detailList.indexOf(detailItem?detailItem.symbol:null); if(idx<0)idx=0;
+  idx=(idx+dir+detailList.length)%detailList.length;
+  const sym=detailList[idx]; if(sym&&bySymbol[sym])openDetail(bySymbol[sym]);
 }
 document.addEventListener("click",e=>{
   const page=e.target.closest("[data-page]");if(page){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===page.dataset.page));document.querySelectorAll("[data-page]").forEach(p=>p.classList.toggle("active",p.dataset.page===page.dataset.page));window.scrollTo(0,0);}
@@ -329,7 +390,15 @@ document.addEventListener("click",e=>{
   if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
 });
 document.getElementById("search").addEventListener("input",render);
-document.addEventListener("keydown",e=>{if(e.key==="Escape")document.getElementById("modalBg").classList.remove("open");});
+document.addEventListener("keydown",e=>{
+  if(!document.getElementById("modalBg").classList.contains("open"))return;
+  if(e.key==="Escape")closeModal();
+  else if(e.key==="ArrowLeft")stepStock(-1);
+  else if(e.key==="ArrowRight")stepStock(1);
+});
+let _swX=null; const _mb=document.getElementById("modalBg");
+_mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[0].clientX:null; },{passive:true});
+_mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
 const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
 render();
 </script>

@@ -75,3 +75,19 @@
 💼 portfolio: snapshot ล่าสุด 2026-08-12 16:41 +07 → 🔴 ล้าสมัย (111 ชม.ที่แล้ว)
 ⚠️ EOD update ยังไมรันวันนี้ (ล็อกแก้ไขล่าสุด 2026-08-14)
 ⚠️ portfolio snapshot เกิน 72 ชม. — ควรอัปเดต/รีคำนวณมูลค่า
+🔴 Signalix watchdog — มีจุดต้องเช็ค (2026-08-18)
+
+⏱️ signalix-intraday.timer: active (รันถัดไป ?)
+⏱️ signalix-update.timer: active (รันถัดไป Tue 2026-08-18 11:30:38 UTC)
+✅ Intraday วิ่งระหว่างเทรด (40 บรรทัดผลลัพธ์)
+💼 portfolio: snapshot ล่าสุด 2026-08-12 16:41 +07 → 🔴 ล้าสมัย (134 ชม.ที่แล้ว)
+⚠️ EOD update ยังไมรันวันนี้ (ล็อกแก้ไขล่าสุด 2026-08-17)
+⚠️ portfolio snapshot เกิน 72 ชม. — ควรอัปเดต/รีคำนวณมูลค่า
+🔴 Signalix watchdog — มีจุดต้องเช็ค (2026-08-18)
+
+⏱️ signalix-intraday.timer: active (รันถัดไป Tue 2026-08-18 00:30:00 UTC)
+⏱️ signalix-update.timer: active (รันถัดไป Tue 2026-08-18 11:30:38 UTC)
+✅ Intraday วิ่งระหว่างเทรด (40 บรรทัดผลลัพธ์)
+💼 portfolio: snapshot ล่าสุด 2026-08-12 16:41 +07 → 🔴 ล้าสมัย (135 ชม.ที่แล้ว)
+⚠️ EOD update ยังไมรันวันนี้ (ล็อกแก้ไขล่าสุด 2026-08-17)
+⚠️ portfolio snapshot เกิน 72 ชม. — ควรอัปเดต/รีคำนวณมูลค่า
