@@ -4,3 +4,7 @@ __pycache__/
 settradeupdated.env
 *.log
 venv/
+# ephemeral intraday healthcheck/update logs (rotated at runtime)
+backend/intraday_*_log.jsonl
+backend/intraday_*_log.txt
+backend/intraday_update_log.txt
