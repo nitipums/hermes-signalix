@@ -13,7 +13,11 @@ if os.getenv("POSTGRES_HOST") is None:
 if os.getenv("POSTGRES_PASSWORD") is None:
     os.environ["POSTGRES_PASSWORD"] = "signalix_pass"
 
+import pytest
 from screening import analyze_symbol_db, scan_universe, load_symbol, load_market
+
+
+pytestmark = pytest.mark.integration
 
 
 def test_load_symbol():

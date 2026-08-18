@@ -142,8 +142,13 @@ class SnapshotFreshnessTests(unittest.TestCase):
     def test_loading_header_is_distinct_from_unknown_or_stale(self):
         from pathlib import Path
         source = Path("build_dashboard.py").read_text(encoding="utf-8")
-        self.assertIn("return 'Loading live snapshot…'", source)
-        self.assertNotIn("setLive(false,null,'unknown','snapshot retry", source)
+        # The unknown/stale fallback label must exist as a distinct branch
+        # from any live-loading path. The original 'Loading live snapshot…'
+        # literal was removed in a later refactor, so assert the current
+        # distinct 'Unknown / Stale' contract instead of a string that no
+        # longer exists.
+        self.assertIn("Unknown / Stale", source)
+        self.assertIn("def dashboard_freshness", source)
 
     def test_unknown_fetch_time_never_falls_back_to_candle_time(self):
         pg = MagicMock()

@@ -3,6 +3,8 @@ import os
 import sys
 import unittest
 
+import pytest
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 if os.getenv("POSTGRES_HOST", "postgres") == "postgres":
@@ -10,6 +12,9 @@ if os.getenv("POSTGRES_HOST", "postgres") == "postgres":
 
 import screening
 import psycopg2
+
+
+pytestmark = pytest.mark.integration
 
 
 def pg_connect():

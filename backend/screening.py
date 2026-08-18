@@ -71,7 +71,7 @@ MIN_SCAN_PRICE = 0.60
 
 
 def scan_exclusion_reason(df, min_price=MIN_SCAN_PRICE,
-                          min_today_trade_value=None):
+                          min_today_trade_value=MIN_TODAY_TRADE_VALUE):
     """Return a policy-driven pre-scan exclusion reason, or None.
 
     Thresholds are explicit market policy, rather than an accidental inheritance
