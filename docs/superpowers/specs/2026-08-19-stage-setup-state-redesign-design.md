@@ -5,7 +5,7 @@ Status: **Approved in chat** (Arm, 2026-08-19) — design spec pending review.
 ## 1. Problem
 
 - Current L2 axes (structural `up_leg/pullback/tight_base/down_leg/bounce` + momentum `strong/up/down/ob/os/neu`) are labels, not decisions. Arm: *"L2 เดิมไม่ sacred ถ้าไม่ actionable ให้ redesign จากศูนย์"*.
-- Goal: **ใช้ S1/S2 หา actionable SET high-probability setups** — ทุกหุ้น S1/S2 ได้ label setup state ที่บอก "คุณภาพ" และ "จังหวะเข้า" และมี board สั้นๆ ที่คัดหุ้นพร้อมเล่น.
+- Goal: **ใช้ S1/S2 หา actionable setup** — ทุกหุ้น S1/S2 ได้ label setup state ที่บอก "คุณภาพ" และ "จังหวะเข้า" และมี Setup Radar (board สั้นๆ) ที่คัดหุ้นจับตาใกล้เข้า.
 
 ## 2. Design decisions (locked with Arm 2026-08-19)
 
@@ -14,7 +14,7 @@ Status: **Approved in chat** (Arm, 2026-08-19) — design spec pending review.
 | D1 | **สองชั้น**: `setup_quality` (gate) → `setup_proximity` (timing). Label ทุกตัว + board คัด top picks. |
 | D2 | **Quality gate รอบแรก = VCP/tightness** (range 20d แคบ + volume contraction + ไม่ extended). RS / liquidity / SET50 / price band **ยังเป็น filter bar เดิม** — ไม่เอาเข้ากลไก quality. |
 | D3 | **Proximity states (enum)**: `forming` / `near_trigger` / `action` / `extended` |
-| D4 | **SET HP board** = quality pass AND proximity ∈ {`near_trigger`, `action`} (READY=`action`, WATCH=`near_trigger` — แยกด้วย proximity เอง ไม่มี tag เพิ่ม) |
+| D4 | **Setup Radar** = quality pass AND proximity ∈ {`near_trigger`, `action`} (READY=`action`, WATCH=`near_trigger` — แยกด้วย proximity เอง ไม่มี tag เพิ่ม) |
 | D5 | **S3/S4 ไม่มี actionable state** — เป็น risk bucket แสดงตามเดิม (S3 = ระวัง distribution, S4 = หลีกเลี่ยง) |
 | D6 | **แยก field**: `setup_quality` + `setup_proximity` เก็บแยก (ไม่ merge string) |
 | D7 | **Stage-first เดิม**: S2 → S1 → S3 → S4 section ตามเดิม; L2 structural/momentum เดิมถูกแทนที่จาก UI (เก็บ code ได้ ไม่แสดง) |
@@ -81,8 +81,8 @@ VCP / tightness gate — ทุกสัญญาณจาก data ที่ม�
 
 ## 5. UI
 
-- **SET HP board** section บนสุดของ dashboard (ก่อน stage sections):
-  - หัวข้อ "SET HP · High Probability" + count
+- **Setup Radar** section บนสุดของ dashboard (ก่อน stage sections):
+  - หัวข้อ "Setup Radar" + count
   - การ์ดเฉพาะ quality pass + near_trigger/action
   - Badge: `READY` (action) / `WATCH` (near_trigger)
 - Stage sections เดิมยังอยู่ (S2 → S1 → S3 → S4)
