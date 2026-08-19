@@ -63,7 +63,7 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
             return len(rows)
 
         insert_rows.side_effect = account
-        summary = update_data.ingest_shortlist_intraday(
+        summary = update_data.ingest_intraday(
             MagicMock(), {}, symbols=["AAA", "BBB"], batch_size=1,
             batch_delay=0, batch_jitter=0, per_symbol_delay=0,
             session_retries=0, market_factory=MagicMock(return_value=market),
@@ -81,7 +81,7 @@ class SystemdResilienceContractTests(unittest.TestCase):
         unit = Path(__file__).with_name("signalix-intraday.service").read_text()
 
         self.assertIn("ExecStopPost=", unit)
-        self.assertIn("run_intraday_evaluation.py", unit)
+        self.assertIn("-m backend.run_intraday_evaluation", unit)
         self.assertNotIn("ExecStartPost=", unit)
 
 

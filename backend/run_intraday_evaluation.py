@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
-from intraday_evaluator import evaluate
+from .intraday_evaluator import evaluate
 
 p=argparse.ArgumentParser()
 p.add_argument('--mode', choices=('active','act_prepare','monitor'), required=True)

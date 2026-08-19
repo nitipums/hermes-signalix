@@ -1,5 +1,5 @@
 [Unit]
-Description=Signalix tiered shortlist 60m refresh (Settrade, no agent)
+Description=Signalix full ORD universe 60m refresh (Settrade, no agent)
 After=docker.service network-online.target
 Requires=docker.service
 
@@ -13,10 +13,10 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 EnvironmentFile=/root/signalix/settradeupdated.env
 # Current/open 60m candle is retained and refreshed during continuous SET sessions.
-ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if { [ "$t" -ge 1015 ] && [ "$t" -le 1230 ]; } || { [ "$t" -ge 1445 ] && [ "$t" -le 1630 ]; }; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode tiered --intraday-interval 60m --intraday-limit 2 --no-scan; else echo "signalix tiered 60m: outside SET continuous session ($t Bangkok), skip"; fi'
+ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if { [ "$t" -ge 1015 ] && [ "$t" -le 1230 ]; } || { [ "$t" -ge 1445 ] && [ "$t" -le 1630 ]; }; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode full --intraday-interval 60m --intraday-limit 10 --intraday-workers 938 --intraday-batch-size 938 --intraday-batch-delay 0 --intraday-batch-jitter 0 --no-scan; else echo "signalix full ORD 60m: outside SET continuous session ($t Bangkok), skip"; fi'
 StandardOutput=append:/root/signalix/intraday_update_log.txt
 StandardError=append:/root/signalix/intraday_update_log.txt
-TimeoutStartSec=900
+TimeoutStartSec=1800
 # ExecStopPost runs after both successful and failed fetches, so stored candles are
 # still evaluated when Settrade/session acquisition fails.
-ExecStopPost=/bin/bash -lc 'POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5432 POSTGRES_USER=signalix POSTGRES_PASSWORD=signalix_pass POSTGRES_DB=signalix /root/.venv_img/bin/python /root/signalix/backend/run_intraday_evaluation.py --mode active --interval 60m'
+ExecStopPost=/bin/bash -lc 'cd /root/signalix && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5432 POSTGRES_USER=signalix POSTGRES_PASSWORD=signalix_pass POSTGRES_DB=signalix /root/.venv_img/bin/python -m backend.run_intraday_evaluation --mode active --interval 60m'

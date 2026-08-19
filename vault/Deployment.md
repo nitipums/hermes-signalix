@@ -15,7 +15,7 @@ changed — never needed for pure `.py`/`.env` edits since the image copies `./b
 ## Environment (`/root/signalix/.env`)
 | Var | Purpose |
 |-----|---------|
-| `POSTGRES_*` | DB creds (password `signalix_pass`) |
+| `POSTGRES_*` | DB credentials (values kept in host/service environment; never store here) |
 | `REDIS_URL` | `redis://redis:6379/0` (docker net name) |
 | `REDIS_CHANNEL` | `signals` |
 | `TELEGRAM_BOT_TOKEN` | from `/root/.hermes/.env` (reuse, don't regenerate) |
@@ -28,7 +28,7 @@ changed — never needed for pure `.py`/`.env` edits since the image copies `./b
 ## systemd timers (host, not docker)
 - `signalix-update.timer` — weekday EOD ingestion + Daily scan at 18:30 Bangkok. Its canonical source is `backend/update_data.service`; the deployed unit must be byte-identical. `ExecStartPost` runs `verify_scan_dashboard.py` and fails the service if DB scan, `scan_results.json`, and embedded dashboard items/groups diverge.
 - `signalix-eod-healthcheck.timer` — weekday EOD freshness watchdog at 20:00 Bangkok. It checks the latest `price_data` date, latest Daily scan date, service result, and writes durable JSONL/state evidence to `/root/signalix/eod_healthcheck_log.jsonl` and `/root/signalix/eod_healthcheck_observations.json`.
-- `signalix-intraday.timer` — every 15 minutes in Bangkok weekday time blocks; exact continuous-session guard (10:15–12:30 and 14:45–16:30) is in `signalix-intraday.service`, which fetches/evaluates **active 60m only**. Validate `OnCalendar` with `systemd-analyze calendar` after any syntax edit; prior syntax accidentally scheduled every minute.
+- `signalix-intraday.timer` — every 15 minutes in Bangkok weekday time blocks; exact continuous-session guard (10:15–12:30 and 14:45–16:30) is in `signalix-intraday.service`, which fetches/evaluates **active 60m only**. The fetch is full active ORD; `--intraday-limit` means bars per symbol, not symbol count. `ExecStopPost` must run `cd /root/signalix && python -m backend.run_intraday_evaluation` so package-relative imports work after both success and fetch failure. Validate `OnCalendar` with `systemd-analyze calendar` after any syntax edit; prior syntax accidentally scheduled every minute.
 - `signalix-profile-refresh.timer` — low-frequency weekday metadata cache refresh; `refresh_company_profiles.py` is constrained to active `ORD` rows and records failures/backoff in PostgreSQL. It is context-only and must not feed signal calculations.
 - `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
 
@@ -43,6 +43,7 @@ docker exec -t signalix_delivery python -c "import os,requests;r=requests.post(f
 ## Pitfalls
 - **Host consumer fails** (no `redis` in host venv; `redis://redis` unresolvable off docker net).
 - **Block-buffered logs** — use `python -u` in the delivery command.
+- **Intraday evaluator import** — do not execute `backend/run_intraday_evaluation.py` as a standalone script; `intraday_evaluator.py` uses package-relative imports. Use the module form from `/root/signalix`.
 - **LINE** — `notify-api.line.me` is DNS-blocked on this VPS; dropped per user.
 - Plain `restart` leaves stale env/code running — always `force-recreate`.
 
