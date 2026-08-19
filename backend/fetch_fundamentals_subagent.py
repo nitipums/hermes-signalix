@@ -131,10 +131,10 @@ def scrape(symbols: Iterable[str], output: Path, sleep: float = 1.0, timeout: fl
 
 
 def symbols_from_db(cur: Any) -> list[str]:
-    """Prefer the canonical symbol_master ORD universe, with safe legacy fallback."""
+    """Prefer the canonical active ORD universe, with safe legacy fallback."""
     cur.execute("SELECT to_regclass('public.symbol_master')")
     if cur.fetchone()[0]:
-        cur.execute("SELECT DISTINCT symbol FROM symbol_master WHERE instrument_type IN ('ORD','COMMON') AND (status IS NULL OR status = 'active') ORDER BY symbol")
+        cur.execute("SELECT DISTINCT symbol FROM symbol_master WHERE instrument_type = 'ORD' AND (status IS NULL OR status = 'active') ORDER BY symbol")
     else:
         cur.execute("SELECT DISTINCT symbol FROM price_data WHERE instrument_type = 'ORD' ORDER BY symbol")
     return [row[0] for row in cur.fetchall()]
@@ -166,11 +166,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     symbols = [s.upper() for s in args.symbols]
     connection = None
-    if not symbols:
+    if not args.no_upsert:
         import psycopg2
         connection = psycopg2.connect(host=os.getenv("POSTGRES_HOST", "127.0.0.1"), port=os.getenv("POSTGRES_PORT", "5432"), user=os.getenv("POSTGRES_USER", "signalix"), password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"), dbname=os.getenv("POSTGRES_DB", "signalix"))
         cur = connection.cursor()
-        symbols = symbols_from_db(cur)
+        if not symbols:
+            symbols = symbols_from_db(cur)
+    elif not symbols:
+        raise SystemExit("explicit symbols are required with --no-upsert")
     if args.limit:
         symbols = symbols[:args.limit]
     report = scrape(symbols, args.output, sleep=args.sleep, refresh=args.refresh)
