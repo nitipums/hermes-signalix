@@ -1,7 +1,8 @@
 import psycopg2
 import pytest
 
-from build_dashboard import dashboard_sort_key, serialize, snapshots
+import build_dashboard
+from build_dashboard import dashboard_sort_key, serialize, snapshot_items, snapshots
 
 
 pytestmark = pytest.mark.integration
@@ -70,6 +71,32 @@ def test_dashboard_sort_key_is_stage_structural_l3_momentum_rs():
     assert [item["symbol"] for item in sorted(items, key=dashboard_sort_key)] == [
         "L3", "MOM", "RS", "STRUCT", "STAGE"
     ]
+
+
+def test_snapshot_items_applies_canonical_sort_after_projection(monkeypatch):
+    rows = [
+        {"symbol": "LATE", "trade_readiness": {}, "trend_template": {}},
+        {"symbol": "FIRST", "trade_readiness": {}, "trend_template": {}},
+    ]
+    items = {
+        "LATE": {"symbol": "LATE", "stage": "S1_basing", "rs": 99,
+                 "layer2_structural": {"group": "up_leg"},
+                 "layer2_momentum": {"group": "strong"},
+                 "layer3_qualifier": {"score": 3}},
+        "FIRST": {"symbol": "FIRST", "stage": "S2_uptrend", "rs": 1,
+                  "layer2_structural": {"group": "up_leg"},
+                  "layer2_momentum": {"group": "strong"},
+                  "layer3_qualifier": {"score": 3}},
+    }
+    monkeypatch.setattr(build_dashboard, "snapshots", lambda pg, symbols: {symbol: {} for symbol in symbols})
+    monkeypatch.setattr(build_dashboard, "serialize", lambda key, row, snapshot, *args, **kwargs: items[row["symbol"]])
+    monkeypatch.setattr("screening.universe_layer2", lambda pg, symbols: {})
+    monkeypatch.setattr("screening.universe_layer3", lambda pg, symbols: {})
+    monkeypatch.setattr("screening.load_index_membership", lambda pg: set())
+
+    result = snapshot_items(object(), {"groups": {"base": rows}})
+
+    assert [item["symbol"] for item in result] == ["FIRST", "LATE"]
 
 
 def pg_connect():

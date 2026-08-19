@@ -124,7 +124,8 @@ def snapshots(pg, symbols):
     if not symbols:
         return {}
     cur = pg.cursor()
-    cur.execute("""SELECT q.symbol,q.date,q.close,q.volume,q.rn,cp.sector,cp.industry
+    cur.execute("""SELECT q.symbol,q.date,q.close,q.volume,q.rn,cp.sector,cp.industry,
+                          cp.market_cap,cp.free_float_pct,cp.foreign_limit_pct
                    FROM (
                      SELECT symbol,date,close,volume,
                             ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
@@ -139,13 +140,18 @@ def snapshots(pg, symbols):
         symbol, date, close, volume, rn = row[:5]
         sector = row[5] if len(row) > 5 else None
         industry = row[6] if len(row) > 6 else None
+        market_cap = row[7] if len(row) > 7 else None
+        free_float_pct = row[8] if len(row) > 8 else None
+        foreign_limit_pct = row[9] if len(row) > 9 else None
         value = out.setdefault(symbol, {})
         if rn == 1:
             value.update({"date": str(date), "close": float(close), "volume": float(volume or 0),
                           "turnover": float(close) * float(volume or 0),
                           "daily_date": str(date), "daily_close": float(close),
                           "daily_turnover": float(close) * float(volume or 0),
-                          "sector": sector, "industry": industry})
+                          "sector": sector, "industry": industry,
+                          "market_cap": market_cap, "free_float_pct": free_float_pct,
+                          "foreign_limit_pct": foreign_limit_pct})
         else:
             value["previous_close"] = float(close)
             value["daily_previous_close"] = float(close)
@@ -200,11 +206,14 @@ def snapshots(pg, symbols):
     # Non-price identity metadata is cached asynchronously. It is intentionally
     # not a price/decision input and may be absent while the cache is filling.
     cur = pg.cursor()
-    cur.execute("""SELECT symbol,company_name,sector,industry,business_summary,source,fetched_at
+    cur.execute("""SELECT symbol,company_name,sector,industry,business_summary,source,fetched_at,
+                          market_cap,free_float_pct,foreign_limit_pct
                    FROM company_profiles WHERE symbol=ANY(%s)""", (symbols,))
-    for symbol, name, sector, industry, summary, source, fetched_at in cur.fetchall():
+    for symbol, name, sector, industry, summary, source, fetched_at, market_cap, free_float_pct, foreign_limit_pct in cur.fetchall():
         out.setdefault(symbol, {}).update({"companyName": name, "sector": sector, "industry": industry,
-            "businessSummary": summary, "profileSource": source, "profileFetchedAt": str(fetched_at)})
+            "businessSummary": summary, "profileSource": source, "profileFetchedAt": str(fetched_at),
+            "market_cap": market_cap, "free_float_pct": free_float_pct,
+            "foreign_limit_pct": foreign_limit_pct})
     cur.close()
     # Overlay the newest stored intraday close when available. This is a DB-only
     # freshness choice: it never implies streaming/real-time market data.
@@ -471,7 +480,9 @@ def snapshot_items(pg, scan):
         free_float_pct=latest.get(row["symbol"], {}).get("free_float_pct"),
         foreign_limit_pct=latest.get(row["symbol"], {}).get("foreign_limit_pct"),
     ) for key, values in source_groups.items() for row in values]
-    return apply_projection(items)
+    items = apply_projection(items)
+    items.sort(key=dashboard_sort_key)
+    return items
 
 
 def freshness_info(snapshot):

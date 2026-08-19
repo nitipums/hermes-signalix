@@ -64,13 +64,14 @@ class SnapshotFreshnessTests(unittest.TestCase):
         cursors = []
         rows = [
             # latest two Daily rows
-            [("TFG", "2026-08-11", 10.0, 1_000_000, 1), ("TFG", "2026-08-08", 9.6, 900_000, 2)],
+            [("TFG", "2026-08-11", 10.0, 1_000_000, 1, "Food", "Agriculture", 123_000_000, 45.5, 49.0),
+             ("TFG", "2026-08-08", 9.6, 900_000, 2, "Food", "Agriculture", 123_000_000, 45.5, 49.0)],
             # Daily history (date, close, high, low, volume)
             [("TFG", "2026-08-08", 9.6, 9.8, 9.4, 900_000), ("TFG", "2026-08-11", 10.0, 10.2, 9.7, 1_000_000)],
             # full archive ATH
             [("TFG", 10.2, 1.0)],
             # optional company profile
-            [],
+            [("TFG", "Thai Foods Group", "Food", "Agriculture", "Food", "test", "2026-08-11", 123_000_000, 45.5, 49.0)],
             # newest stored 60m quote
             [("TFG", "60m", "2026-08-11 09:30:00+00:00", 9.9, 1000)],
             # same-time cumulative volume query
@@ -84,6 +85,9 @@ class SnapshotFreshnessTests(unittest.TestCase):
         self.assertEqual(value["daily_close"], 10.0)
         self.assertEqual(value["price_source"], "60m")
         self.assertAlmostEqual(value["change"], 3.125, places=5)
+        self.assertEqual(value["market_cap"], 123_000_000)
+        self.assertEqual(value["free_float_pct"], 45.5)
+        self.assertEqual(value["foreign_limit_pct"], 49.0)
 
     def test_card_separates_stale_intraday_from_daily_decision_source(self):
         row = {"symbol": "TITLE", "trade_readiness": {}, "trend_template": {}}
