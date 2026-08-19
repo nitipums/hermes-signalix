@@ -128,3 +128,52 @@ def test_all_outputs_json_safe():
     out = compute_setup_state("S2_uptrend", _ev(stage="S2_uptrend", close=52.0,
                                                 buy_zones={"50": 54.0, "62": 50.0}, swing_high=60.0))
     json.dumps(out)  # must not raise (no numpy scalars)
+
+
+# --- Integration: group_scan_results attaches setup state ---
+def _row(close=50.0, stage_hint=None):
+    return {
+        "symbol": "TEST",
+        "close": close,
+        "last_date": "2026-08-19",
+        "trend_template": {
+            "ma": {"ma50": 49.0, "ma150": 45.0, "ma200": 40.0},
+            "conditions_met": 8, "rs_rating": 80.0, "rs_threshold": 70.0,
+        },
+        "trade_readiness": {
+            "above_ma50": True, "above_ma150": True, "above_ma200": True,
+            "ma50_slope_20d_pct": 1.5, "ma150_slope_20d_pct": 1.0, "ma200_slope_20d_pct": 0.8,
+            "rsi_daily": 60.0, "macd": 0.1, "volume_ratio_50": 0.6,
+            "breakout_level_20d": 52.0, "range_20d_pct": 8.0, "status": "BUY",
+            "buy_zones_90d": {"50": 54.0, "62": 50.0}, "swing_high_90d": 60.0,
+        },
+        "vcp": {"is_vcp": True},
+        "trend_source": "daily",
+    }
+
+
+def test_group_scan_attaches_setup_fields(monkeypatch):
+    from screening import group_scan_results
+    rows = [_row(close=51.5)]  # S2 uptrend, near_trigger
+    groups = group_scan_results(rows, events={})
+    flat = [r for values in groups.values() for r in values]
+    assert len(flat) == 1
+    ds = flat[0]["daily_state"]
+    assert "setup_quality" in ds and "setup_proximity" in ds
+    assert ds["setup_quality"]["pass"] is True
+    assert ds["setup_proximity"]["state"] in ("near_trigger", "action", "forming", "extended")
+
+
+def test_group_scan_s4_proximity_null(monkeypatch):
+    from screening import group_scan_results
+    row = _row(close=30.0)
+    row["trade_readiness"].update({"above_ma50": False, "above_ma150": False, "above_ma200": False,
+                                   "ma200_slope_20d_pct": -1.5,
+                                   # Broken structure: wide range + expanding vol => quality fail.
+                                   "range_20d_pct": 25.0, "volume_ratio_50": 2.5})
+    groups = group_scan_results([row], events={})
+    flat = [r for values in groups.values() for r in values]
+    ds = flat[0]["daily_state"]
+    assert ds["stage"] == "S4_down"
+    assert ds["setup_proximity"]["state"] is None
+    assert ds["setup_quality"]["pass"] is False  # quality still computed (never omitted)
