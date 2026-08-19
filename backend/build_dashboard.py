@@ -24,14 +24,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCAN_JSON = os.path.join(HERE, "scan_results.json")
 OUT_HTML = os.path.join(HERE, "dashboard.html")
 SNAPSHOT_JSON = os.path.join(HERE, "dashboard_snapshot.json")
-GROUPS = (
-    ("breakout_new", "เบรกใหม่", "opportunity", "positive", "Daily breakout cycle ยังทำงานอยู่; ดู stage และรอ 1H confirmation"),
-    ("uptrend_pullback", "ย่อในขาขึ้น", "opportunity", "positive", "ย่อเข้าสู่ Fib/MA support ใน trend ที่ยังไม่เสีย; รอแรงรับยืนยัน"),
-    ("waiting_breakout", "รอเบรก", "prepare", "accent", "trend หรือฐานยังไม่หลุด; รอ trigger/volume ยืนยัน"),
-    ("base", "สร้างฐาน", "monitor", "neutral", "กำลังสะสมตัว; รอ trigger ชัดเจน"),
-    ("down_or_broken", "ขาลง / หลุด", "risk", "danger", "โครงสร้างอ่อนหรือหลุด; ไม่เปิด long ใหม่"),
-)
-GROUP_BY_KEY = {g[0]: g for g in GROUPS}
+# Stage-first is the SOLE organizer. The legacy 5-group GROUPS tuple was retired:
+# intent/status/tone are now derived directly from the Minervini phase (Q5/Q10),
+# so there is a single source of truth instead of two parallel label systems.
+def phase_intent(phase):
+    """Map a Minervini phase to (intent, status_label, tone) for the card."""
+    return {
+        "breakout_new":       ("opportunity", "Breakout",        "positive"),
+        "breakout_extended":  ("opportunity", "Extended Breakout", "warning"),
+        "uptrend_pullback":   ("opportunity", "Uptrend Pullback", "positive"),
+        "waiting_breakout":   ("prepare",     "Pre-Breakout",    "accent"),
+        "base_early":         ("monitor",     "Base Forming",    "neutral"),
+        "base_tight":         ("monitor",     "Base Tight",      "neutral"),
+        "declining":          ("risk",        "Declining",       "danger"),
+        "broken":             ("risk",        "Broken Structure", "danger"),
+    }.get(phase, ("monitor", "Unclassified", "neutral"))
 
 
 def get_pg():
@@ -580,10 +587,13 @@ def plan(group, readiness, trend, snapshot, phase=None):
     return "Setup status", "Awaiting confirmation", "RS", number(trend.get("rs_rating"), 0)
 
 
-def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None):
+def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None,
+              layer3=None, sector=None, industry=None, market_cap=None,
+              free_float_pct=None, foreign_limit_pct=None):
     readiness, trend = row.get("trade_readiness", {}), row.get("trend_template", {})
     intraday_state = intraday_state or {}
     l2 = layer2 or {}
+    l3 = layer3 or {}
     s50 = set50 or set()
     # A stored overlay belongs only to the Daily base state that created it.
     # Never let yesterday's base-group override a newly rebuilt Daily scan.
@@ -672,10 +682,10 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
                 if group in {"waiting_breakout", "breakout_new"} or phase in {"waiting_breakout", "breakout_new", "breakout_extended"}
                 else None)
     pullback = pullback_reference_status(row, decision_snapshot) if phase == "uptrend_pullback" or group == "uptrend_pullback" else None
+    intent, status_label, tone = phase_intent(phase)
     return {
         "symbol": row["symbol"], "group": effective_group, "baseGroup": group,
-        "intent": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[2], "status": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[1],
-                    "tone": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[3],
+        "intent": intent, "status": status_label, "tone": tone,
         "intradayChanged": effective_group != group,
         "intradayEvaluatedAt": str(intraday_state.get("evaluated_at") or ""),
         "close": decision_snapshot.get("close", row.get("close")), "change": decision_snapshot.get("change"),
@@ -767,36 +777,44 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "layer1_stage": stage or "S1_basing",
         "layer2_signals": l2.get("signals", {}),
         "layer2_group": l2.get("group"),
+        "layer2_structural": {
+            "signals": (l2.get("structural") or {}).get("signals", {}),
+            "group": (l2.get("structural") or {}).get("group"),
+        },
+        "layer2_momentum": {
+            "signals": (l2.get("momentum") or {}).get("signals", {}),
+            "group": (l2.get("momentum") or {}).get("group"),
+        },
         "independence": {
             "is_set50": row["symbol"] in s50,
             "avgTradeValue20": number(snapshot.get("avgDailyValue20"), 0),
             "priceBand": _price_band(snapshot.get("close")),
             "passesValueFilter": _passes_value(snapshot.get("avgDailyValue20")),
+            "sector": sector,
+            "industry": industry,
+            "market_cap": market_cap,
+            "free_float_pct": free_float_pct,
+            "foreign_limit_pct": foreign_limit_pct,
         },
-        "layer3_qualifiers": {},
+        "layer3_qualifier": l3,
+        # Retain the plural legacy key for existing dashboard consumers.
+        "layer3_qualifiers": l3,
     }
 
 
-def build(scanned=None):
-    """Build the stage-first dashboard.
+def build(scanned):
+    """Build the stage-first dashboard from the freshly scanned universe.
 
-    If ``scanned`` (list of row dicts) is provided it is used directly — this is
-    the path the /scan endpoint uses so the dashboard always reflects the exact
-    universe just scanned (no stale-file round-trip). Otherwise we fall back to
-    reading scan_results.json for standalone rebuilds.
+    ``scanned`` (list of row dicts) is REQUIRED — it is the exact universe the
+    /scan endpoint just evaluated, so the dashboard never reflects a stale file.
+    The old scan_results.json fallback path was removed (Q6): a missing scan is
+    a caller bug, not a silent-stale rebuild, which previously produced the
+    718-symbol truncation.
     """
-    if scanned is None:
-        with open(SCAN_JSON) as file:
-            scan = json.load(file)
-        source_groups = scan.get("groups", {})
-        rows = [r for values in source_groups.values() for r in values]
-    else:
-        # Re-derive the same group structure the scanner produced, so serialize
-        # (which expects a `scan_group` key) stays happy.
-        from screening import group_scan_results
-        grouped = group_scan_results(scanned, events={})
-        source_groups = grouped
-        rows = [r for values in source_groups.values() for r in values]
+    from screening import group_scan_results
+    grouped = group_scan_results(scanned, events={})
+    source_groups = grouped
+    rows = [r for values in source_groups.values() for r in values]
     # Enrich all cards with one batched DB read. This is not a per-symbol
     # connection/query fan-out: snapshots() performs set-based lateral queries
     # for the complete universe, so EOD keeps the technical fields visible.
@@ -819,8 +837,8 @@ def build(scanned=None):
              if row["symbol"] not in excluded]
     items = apply_projection(items)
     STAGE_ORDER_L2 = ["S2_uptrend", "S1_basing", "S3_distributing", "S4_down"]
-    L2_PRIORITY = {"momentum_strong": 0, "momentum_up": 1, "neutral": 2, "momentum_down": 3,
-                   "overbought": 4, "oversold": 5, None: 6}
+    L2_PRIORITY = {"up_leg": 0, "pullback": 1, "tight_base": 2, "bounce": 3,
+                   "down_leg": 4, None: 5}
     items.sort(key=lambda i: (STAGE_ORDER_L2.index(i.get("stage")) if i.get("stage") in STAGE_ORDER_L2 else 99,
                               L2_PRIORITY.get(i.get("layer2_group"), 6),
                               -(i.get("rs") or 0)))
@@ -841,7 +859,15 @@ def build(scanned=None):
     with open(SNAPSHOT_JSON, "w") as file:
         json.dump({"scan_time": scan_time, "market": "TH",
                    "refresh": "progressive_cards", "items": items,
-                   "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
+                   "stage_meta": stage_meta, "stage_counts": stage_counts,
+                   "data_fetched_at": freshness.get("data_fetched_at"),
+                   "data_freshness_source": freshness.get("source"),
+                   "data_freshness_status": freshness.get("status"),
+                   "data_intraday_status": freshness.get("intraday_status"),
+                   "data_global_status": freshness.get("global_status"),
+                   "market_session": freshness.get("market_session"),
+                   "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
+                   "data_freshness_age_hours": freshness.get("age_hours")}, file,
                   separators=(",", ":"))
     counts = {key: sum(1 for item in items if item["primary_group"] == key) for key, *_ in PRIMARY_GROUPS}
     meta = {key: {"title": v["label"], "action": v["action"], "intent": "presentation", "tone": "neutral", "description": v["action"], "count": counts[key]}
@@ -875,9 +901,12 @@ def build(scanned=None):
     template_path = os.path.join(HERE, "dashboard_template.html")
     with open(template_path, encoding="utf-8") as tf:
         template = tf.read()
+    # Keep the static HTML small.  The browser loads the bounded overview/cards
+    # APIs after boot; dashboard_snapshot.json remains the compatibility/cache
+    # artifact for API clients and offline diagnostics.
     page = (template
-            .replace("__ITEMS__", json.dumps(items, separators=(",", ":")))
-            .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":"))))
+            .replace("__ITEMS__", "[]")
+            .replace("__STAGE_META__", "{}"))
     with open(OUT_HTML, "w") as file:
         file.write(page)
     return {"securities": len(items), "groups": counts, "out": OUT_HTML}

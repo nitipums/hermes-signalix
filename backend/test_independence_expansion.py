@@ -1,10 +1,46 @@
 import psycopg2
 import pytest
 
-from build_dashboard import snapshots
+from build_dashboard import serialize, snapshots
 
 
 pytestmark = pytest.mark.integration
+
+
+def test_serialize_includes_all_new_fields():
+    row = {
+        "symbol": "TEST",
+        "trade_readiness": {},
+        "trend_template": {},
+        "daily_state": {"stage": "S2_uptrend", "phase": "uptrend_pullback"},
+    }
+    snapshot = {
+        "avgDailyValue20": 10_000_000,
+        "close": 10,
+        "high52": 12,
+        "athHigh": 15,
+        "volume": 1_000_000,
+    }
+    layer2 = {
+        "structural": {"signals": {}, "group": "up_leg"},
+        "momentum": {"signals": {}, "group": "strong"},
+    }
+    layer3 = {"score": 3, "flags": {"vol": True, "wk52": True, "ath": True}}
+    item = serialize(
+        "breakout_new", row, snapshot, {}, layer2, {"TEST"},
+        layer3=layer3, sector="Technology", industry="Software",
+        market_cap=1_000_000_000, free_float_pct=45.5,
+        foreign_limit_pct=49.0,
+    )
+
+    assert item["layer2_structural"]["group"] == "up_leg"
+    assert item["layer2_momentum"]["group"] == "strong"
+    assert item["layer3_qualifier"]["score"] == 3
+    assert item["independence"]["sector"] == "Technology"
+    assert item["independence"]["industry"] == "Software"
+    assert item["independence"]["market_cap"] == 1_000_000_000
+    assert item["independence"]["free_float_pct"] == 45.5
+    assert item["independence"]["foreign_limit_pct"] == 49.0
 
 
 def pg_connect():
