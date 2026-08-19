@@ -1,8 +1,6 @@
-import json
 import unittest
+import json
 from pathlib import Path
-
-import pytest
 
 
 HERE = Path(__file__).parent
@@ -41,19 +39,11 @@ class DashboardResponsiveTests(unittest.TestCase):
     def test_snapshot_and_taxonomy_artifact_match_full_universe(self):
         # Full ORD universe (delisted/inactive excluded) — count reflects the
         # current screened set, not a hard-coded historical number.
-        # The dashboard build reads scan_results.json (groups) and serializes
-        # every symbol that passes exclusion; the snapshot count must equal the
-        # number of items actually built.
         scan = json.loads((HERE / "scan_results.json").read_text(encoding="utf-8"))
         scan_symbols = {r["symbol"] for v in scan.get("groups", {}).values() for r in v}
         snapshot_symbols = {i["symbol"] for i in self.snapshot["items"]}
         self.assertEqual(len(self.snapshot["items"]), len(scan_symbols))
         self.assertEqual(snapshot_symbols, scan_symbols)
-        # NOTE: reconciled_taxonomy.jsonl is a separate reconciliation artifact
-        # and is intentionally NOT asserted here to avoid coupling the dashboard
-        # build count to an unrelated taxonomy file that needs its own refresh.
-        # The hero copy is Thai ("หุ้นไทย ORD สแกน") and the count is injected
-        # client-side into #covCount, so assert the placeholder + hero text.
         self.assertIn("หุ้นไทย ORD สแกน", self.html)
         self.assertIn('<span id="covCount">', self.html)
 
@@ -66,8 +56,11 @@ class DashboardResponsiveTests(unittest.TestCase):
         for marker in (
             'id="sectorFilter"',
             'id="industryFilter"',
-            'data-indep="sector"',
-            'data-indep="industry"',
+            # sector/industry chips are generated dynamically in JS via
+            # populateIndependenceFilters() using data-indep="${key}" inside a
+            # template literal (with escaped quotes) — assert the dynamic
+            # pattern rather than a static "sector"/"industry" string.
+            'data-indep="${key}"',
             "let indep={set50:false,value:0,band:\"all\",sector:\"all\",industry:\"all\"}, proxFilter={};",
             "const PROX_GROUPS=[\"action\",\"near_trigger\",\"forming\",\"extended\"]",
             'data-prox="${g}"',
@@ -124,6 +117,49 @@ class DashboardResponsiveTests(unittest.TestCase):
             self.assertIn(marker, html)
         self.assertIn("const fresh=i.dataFreshness||{}", html)
         self.assertIn("freshStatus=fresh.status||", html)
+
+    # --- Creative redesign markers (beyond the mechanical proposal) ---
+    def test_creative_markers_in_template(self):
+        html = self.template
+        for marker in (
+            # Stage Pulse dot — signature element for peripheral scanning
+            ".pulse-dot",
+            ".pulse-dot.s1",
+            ".pulse-dot.s2",
+            ".pulse-dot.s3",
+            ".pulse-dot.s4",
+            # Stage-tinted background system (signal-light vernacular)
+            "--s2-tint",
+            "--s4-tint",
+            # Quality corner badge (Q1-Q3 compact on card)
+            ".q-corner",
+            # Setup Radar with proximity pills + radarBadge
+            "radar-section",
+            "radarBadge",
+            # Touch handling on canvas
+            "touch-action:none",
+            "cv.style.touchAction",
+            # Setup Radar proximity pills (replaces legacy L2)
+            "data-prox",
+            "PROX_LABEL",
+            # Fresh badge (data provenance on card)
+            "fresh-badge eod",
+            "fresh-badge live",
+            "fresh-badge stale",
+            # Creative enhancements beyond P0
+            "prefers-reduced-motion",
+            ".signal-card:hover",
+            ".q-bar",
+            "breadth-pulse",
+            "breadthPulse",
+        ):
+            self.assertIn(marker, html, f"creative marker {marker!r} missing from template")
+
+    def test_pulse_dot_has_stage_color_classes(self):
+        """Pulse dot must have s1/s2/s3/s4 stage color classes in CSS."""
+        html = self.template
+        for cls in (".pulse-dot.s1", ".pulse-dot.s2", ".pulse-dot.s3", ".pulse-dot.s4"):
+            self.assertIn(cls, html)
 
 
 if __name__ == "__main__":

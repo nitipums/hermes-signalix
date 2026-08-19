@@ -7,9 +7,14 @@
 <style>
 :root{
   --bg:#0a0e17; --panel:#111a28; --panel2:#162132; --line:#27364b;
-  --text:#edf3fb; --muted:#92a2b7; --blue:#79adff;
+  --text:#e8ecf2; --muted:#8a99ad; --blue:#79adff;
   --green:#43df9e; --amber:#ffc45d; --red:#ff7a7a; --slate:#8aa0bd;
   --s1:#6f8bba; --s2:#43df9e; --s3:#ffc45d; --s4:#ff7a7a;
+  /* Signalix stage tint system — soft solids behind stage surfaces so
+     bullish/bearish reads in peripheral vision without straining the eyes.
+     Tints ground the palette in instrument-panel "signal light" vernacular. */
+  --s1-tint:#16223a; --s2-tint:#14362e; --s3-tint:#2b2514; --s4-tint:#3a1f1f;
+  --ready:#3cd88f; --watch:#ffc44d;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);
@@ -37,55 +42,84 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .coverage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color:var(--muted);font-size:12px;white-space:nowrap}
 .coverage b{font-size:16px;color:var(--text)}
 
-/* Stage summary bar */
+/* Stage summary — stage tinted signal-light pills.
+   Creative thesis: each pill is an instrument-panel signal light: stage-tint
+   background + solid count + ambient glow. bullish/bearish resolves in 1s. */
 .stage-summary{display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap}
-.stage-pill{flex:1;min-width:140px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--panel)}
-.stage-pill h3{margin:0 0 4px;font-size:13px}
+.stage-pill{flex:1;min-width:140px;border:1px solid var(--line);border-radius:12px;padding:14px 14px;
+  background:var(--panel);cursor:pointer;transition:box-shadow .15s ease,transform .05s}
+.stage-pill:active{transform:translateY(1px)}
+.stage-pill h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
 .stage-pill .cnt{font-size:26px;font-weight:850;letter-spacing:-.04em}
-.stage-pill.s2{border-color:#2c6b58}.stage-pill.s2 .cnt{color:var(--s2)}
-.stage-pill.s1{border-color:#33475f}.stage-pill.s1 .cnt{color:var(--s1)}
-.stage-pill.s3{border-color:#6b5a2c}.stage-pill.s3 .cnt{color:var(--s3)}
-.stage-pill.s4{border-color:#6b3030}.stage-pill.s4 .cnt{color:var(--s4)}
-.stage-pill.active{outline:2px solid var(--blue);outline-offset:2px}
+.stage-pill.s1{background:var(--s1-tint);border-color:var(--s1)}.stage-pill.s1 .cnt{color:var(--s1)}
+.stage-pill.s2{background:var(--s2-tint);border-color:var(--s2)}.stage-pill.s2 .cnt{color:var(--s2)}
+.stage-pill.s3{background:var(--s3-tint);border-color:var(--s3)}.stage-pill.s3 .cnt{color:var(--s3)}
+.stage-pill.s4{background:var(--s4-tint);border-color:var(--s4)}.stage-pill.s4 .cnt{color:var(--s4)}
+.stage-pill .desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.3}
+.stage-pill.active{outline:2px solid var(--blue);outline-offset:2px;
+  box-shadow:0 0 0 3px rgba(121,173,255,.22)}
 
+/* Filter controls — 2-row mobile layout (P0).
+   Row 1 = liquidity/value/band toggles (flex-wrap short chips).
+   Row 2 = sector+industry independence chips in a HORIZONTAL scroll container
+   (NOT flex-wrap — prevents the "Healthcare cut off" truncation the vision found). */
 .liquidity-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
-.chip.active{background:var(--panel2);color:var(--text)}
+.chip.active,.chip:active{background:var(--panel2);color:var(--text)}
+.indep-row{display:flex;gap:8px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px;margin-bottom:10px;scrollbar-width:thin}
+.indep-row .chip{flex:0 0 auto}
+.indep-row .chip.active{background:var(--panel2);color:var(--text)}
+.indep-row .chip.indep-sep{border-left:2px solid var(--s3);border-right:2px solid var(--line)}
 .search{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:11px 14px;color:var(--text);margin-bottom:16px}
 .stage-section{margin-bottom:26px}
 .stage-head{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
 .stage-head h2{margin:0;font-size:18px;letter-spacing:-.03em}
 .stage-head .badge{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px}
-.stage-head.s2 .badge{background:#14362e;color:var(--s2);border:1px solid #2c6b58}
-.stage-head.s1 .badge{background:#16223a;color:var(--s1);border:1px solid #33475f}
-.stage-head.s3 .badge{background:#332e18;color:var(--s3);border:1px solid #6b5a2c}
-.stage-head.s4 .badge{background:#3a1f1f;color:var(--s4);border:1px solid #6b3030}
+.stage-head.s2 .badge{background:var(--s2-tint);color:var(--s2);border:1px solid var(--s2)}
+.stage-head.s1 .badge{background:var(--s1-tint);color:var(--s1);border:1px solid var(--s1)}
+.stage-head.s3 .badge{background:var(--s3-tint);color:var(--s3);border:1px solid var(--s3)}
+.stage-head.s4 .badge{background:var(--s4-tint);color:var(--s4);border:1px solid var(--s4)}
 .stage-head .desc{color:var(--muted);font-size:12px}
 .l2-bar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .l2-bar .chip{padding:5px 10px;font-size:11px}
 .l2-bar .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
 .l2-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel2);border:1px dashed var(--line);border-radius:10px;margin-top:10px}
 
+/* Cards — reduced density (P0). One bezel + pulse dot + price spike.
+   The basic strip now shows only VOL + Value; RS/RSI/MACD moved to the modal. */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.signal-card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 14px;position:relative;overflow:hidden}
+.signal-card{ border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 14px;position:relative;
+  transition:transform .12s ease,box-shadow .12s ease; }
+.signal-card:hover{ box-shadow:0 0 0 3px rgba(121,173,255,.18); }
+@media(prefers-reduced-motion:reduce){
+  .signal-card{ transition:none; }
+  .stage-pill{ transition:none; }
+}
 .signal-card.stage-S2_uptrend{border-left:4px solid var(--s2)}
 .signal-card.stage-S1_basing{border-left:4px solid var(--s1)}
 .signal-card.stage-S3_distributing{border-left:4px solid var(--s3)}
 .signal-card.stage-S4_down{border-left:4px solid var(--s4)}
+.pulse-dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto;margin-right:8px;
+  box-shadow:0 0 0 3px rgba(var(--blue-rgb,121,173,255),.14)}
+.pulse-dot.s1{background:var(--s1);box-shadow:0 0 5px 2px rgba(111,139,186,.34)}
+.pulse-dot.s2{background:var(--s2);box-shadow:0 0 5px 2px rgba(61,216,143,.34)}
+.pulse-dot.s3{background:var(--s3);box-shadow:0 0 5px 2px rgba(255,196,77,.34)}
+.pulse-dot.s4{background:var(--s4);box-shadow:0 0 5px 2px rgba(255,122,122,.34)}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-top .head{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
 .ticker{font-size:19px;font-weight:850;letter-spacing:-.03em}
-.stage-badge{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;margin-left:8px;vertical-align:middle}
-.stage-badge.positive{background:#14362e;color:var(--s2)}
-.stage-badge.neutral{background:#16223a;color:var(--s1)}
-.stage-badge.warning{background:#332e18;color:var(--s3)}
-.stage-badge.danger{background:#3a1f1f;color:var(--s4)}
+.stage-badge{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px}
+.stage-badge.positive{background:var(--s2-tint);color:var(--s2)}
+.stage-badge.neutral{background:var(--s1-tint);color:var(--s1)}
+.stage-badge.warning{background:var(--s3-tint);color:var(--s3)}
+.stage-badge.danger{background:var(--s4-tint);color:var(--s4)}
 .phase-tag{display:inline-block;font-size:10px;color:var(--muted);margin-left:6px;vertical-align:middle}
 .fresh-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
-.fresh-badge.eod{background:#16223a;color:var(--blue)}
-.fresh-badge.live{background:#14362e;color:var(--s2)}
-.fresh-badge.stale{background:#3a1f1f;color:var(--s4)}
+.fresh-badge.eod{background:var(--s1-tint);color:var(--blue)}
+.fresh-badge.live{background:var(--s2-tint);color:var(--s2)}
+.fresh-badge.stale{background:var(--s4-tint);color:var(--s4)}
 .fresh-badge.unknown{background:#222;color:var(--muted)}
-.star{background:none;border:0;font-size:18px;color:var(--muted)}
+.star{background:none;border:0;font-size:18px;color:var(--muted);min-width:40px;text-align:right}
 .star.saved{color:var(--amber)}
 .price{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
 .price b{font-size:21px;font-weight:850}
@@ -95,30 +129,49 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .basic-strip b{color:var(--text)}
 .setup-evidence{font-size:11px;color:var(--blue);margin-bottom:6px}
 .setup-evidence.surge{color:var(--amber)}
-.quality-strip{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px}
-.quality-strip .q{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
-.quality-strip .q.warn{color:var(--amber);border-color:#6b5a2c}
+.q-corner{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.q-corner.q3{background:var(--s3-tint);color:var(--s3);border:1px solid var(--s3)}
+.q-corner.q2{background:var(--s2-tint);color:var(--s2);border:1px solid var(--s2)}
+.q-corner.q1{background:var(--s1-tint);color:var(--s1);border:1px solid var(--s1)}
+.q-corner.q0{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
 .action-line{font-size:11px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.action-line b{color:var(--text)}
+/* Quality bar — thin progress bar under the card strip for at-a-glance strength */
+.q-bar{width:100%;height:3px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.q-bar span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
+.q-bar .q1{width:33%}
+.q-bar .q2{width:66%}
+.q-bar .q3{width:100%}
 .detail-badges{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
 .detail-badges .db-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:3px 0;border-bottom:1px solid var(--line)}
 .detail-badges .db-row:last-child{border-bottom:0}
 .detail-badges .db-k{color:var(--muted)}
 .detail-badges .db-v{color:var(--text);font-weight:700}
-.action-line b{color:var(--text)}
 .empty{color:var(--muted);padding:30px;text-align:center}
 
+/* Market breadth pulse — single-line A/D ratio bar */
+.breadth-pulse{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:12px}
+.breadth-pulse .ratio{font-size:12px;font-weight:700}
+.breadth-pulse .bar{flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.breadth-pulse .bar > span{display:block;height:100%;background:var(--s2);transition:width .3s}
+.breadth-pulse .bar > span.bear{background:var(--s4)}
+
 @media(max-width:620px){
-  .stage-pill{min-width:calc(50% - 5px)}
-  .cards{grid-template-columns:1fr}
   .app{padding:0 12px 32px}
   .nav{position:sticky;top:0;gap:6px;padding:8px 0}
   .nav button{padding:10px 12px;font-size:13px}
-  .l2-bar{flex-wrap:wrap;padding-bottom:6px}
+  .stage-pill{min-width:calc(50% - 5px);font-size:14px}
+  .stage-pill .cnt{font-size:24px}
+  .ticker{font-size:16px;font-weight:700}
+  .price b{font-size:17px}
+  .gain,.loss{font-size:13px;font-weight:700}
+  .basic-strip{font-size:10px}
+  .cards{grid-template-columns:1fr}
   .l2-bar .chip{padding:10px 12px}
   .tf-tools .chip{padding:10px 14px;font-size:12px}
-  .liquidity-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px}
-  .liquidity-tools .chip,.liquidity-tools select{flex:0 0 auto;padding:10px 12px}
   .search{padding:13px 14px;font-size:16px}
+  .nav-arrow,.modal-close{min-width:44px;min-height:44px;padding:11px 14px;font-size:16px}
+  #chartPanLeft,#chartPanRight{min-width:44px;min-height:44px;padding:11px 14px;font-size:15px}
 }
 .modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.72);
   align-items:center;justify-content:center;padding:18px}
@@ -135,6 +188,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .nav-arrow{padding:0 12px}
 .modal-close{padding:0 14px;color:var(--red)}
 .chart-status{min-height:18px;color:var(--muted);font-size:11px;margin:2px 0 6px}
+.chart-canvas{width:100%;height:min(260px,30vh);touch-action:none;border-radius:10px;background:#0a0e17}
 </style>
 </head>
 <body>
@@ -143,29 +197,30 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   <header class="topbar">
     <div class="brand">Signal<span>ix</span></div>
     <div class="fresh">
-      <i id="liveDot"></i>
-      <span id="liveState">Loading…</span>
+      <i id="liveDot" aria-hidden="true"></i>
+      <span id="liveState" aria-live="polite">Loading…</span>
       <span id="provenance" style="margin-left:12px;font-size:11px;color:var(--muted)">
         <span id="provFetched">Latest data fetched: —</span> ·
         <span id="provSession">Market session: —</span> ·
         <span id="provValid">last valid: —</span>
       </span>
-      <button id="languageToggle" class="chip" style="margin-left:8px">EN</button>
     </div>
   </header>
-  <nav class="nav">
-    <button class="chip active" data-page="screener">คัดหุ้น (Stage)</button>
-    <button class="chip" data-page="watchlist">หุ้นติดตาม</button>
-    <button class="chip" data-page="market">ตลาด</button>
+  <nav class="nav" role="menubar">
+    <button class="chip active" data-page="screener" aria-label="คัดหุ้น (Stage)" role="menuitem">คัดหุ้น (Stage)</button>
+    <button class="chip" data-page="watchlist" aria-label="หุ้นติดตาม" role="menuitem">หุ้นติดตาม</button>
+    <button class="chip" data-page="market" aria-label="ตลาด" role="menuitem">ตลาด</button>
+    <button class="chip" id="languageToggle" style="margin-left:auto" aria-label="Toggle language">EN</button>
   </nav>
   <section class="page active" id="screener">
     <div class="hero">
       <div><h1>Stage-first Screener</h1><p>จัดกลุ่มตามโครงสร้างกราฟ (Minervini Stage 1–4) — ไม่ใช้ volume/liquidity กรองตอนแรก</p></div>
       <div class="coverage"><span id="covCount">—</span> หุ้นไทย ORD สแกน</div>
     </div>
-    <div class="stage-summary" id="stageSummary"></div>
+    <div class="stage-summary" id="stageSummary" role="group" aria-label="Stage summary"></div>
+    <!-- Row 1: liquidity / SET50 / value / price-band toggles -->
     <div class="liquidity-tools" id="indepBar">
-      <button class="chip" id="set50Only" data-indep="set50">SET50 เท่านั้น</button>
+      <button class="chip" id="set50Only" data-indep="set50" aria-pressed="false">SET50 เท่านั้น</button>
       <select id="valueFilter" class="chip" aria-label="Value filter">
         <option value="all">มูลค่าตลาด: ทั้งหมด</option>
         <option value="5">≥ ฿5M/วัน</option>
@@ -178,16 +233,13 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
         <option value="mid">กลาง (฿2–10)</option>
         <option value="high">สูง (&gt;฿10)</option>
       </select>
-      <div id="sectorFilter" class="chip" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:11px;color:var(--muted)">Sector:</span>
-        <button class="chip active" data-indep="sector" data-value="all">All</button>
-      </div>
-      <div id="industryFilter" class="chip" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:11px;color:var(--muted)">Industry:</span>
-        <button class="chip active" data-indep="industry" data-value="all">All</button>
-      </div>
-      <button class="chip active" id="liquidOnly" data-liquidity="liquid">ซ่อน low value (&lt;฿10M/วัน)</button>
-      <button class="chip" id="showLowValue" data-liquidity="all">โชว์ทั้งหมด</button>
+      <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true">ซ่อน low value (&lt;฿10M/วัน)</button>
+      <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false">โชว์ทั้งหมด</button>
+    </div>
+    <!-- Row 2: sector + industry in a horizontal scroll container (mobile-safe) -->
+    <div class="indep-row" id="indepRow" role="group" aria-label="Sector and industry filter">
+      <div id="sectorFilter" class="chip indep-sep" role="group" aria-label="Sector"></div>
+      <div id="industryFilter" class="chip indep-sep" role="group" aria-label="Industry"></div>
     </div>
     <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
     <div id="results"></div>
@@ -200,6 +252,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   </section>
   <section class="page" id="market">
     <div class="hero"><div><h1>สถานะตลาด</h1><p>Breadth จาก Stage ล่าสุด</p></div></div>
+    <div id="breadthPulse" class="breadth-pulse" role="group" aria-label="Market breadth pulse"></div>
     <div class="market-grid" id="marketGrid"></div>
   </section>
 </main>
@@ -210,12 +263,13 @@ const STAGE_ORDER=["S2_uptrend","S1_basing","S3_distributing","S4_down"];
 const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
 const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
 const STAGE_DESC={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"สร้างฐาน — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"กำลังจ่าย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
-const STAGE_L2_LABEL={up_leg:"Up Leg",pullback:"Pullback",tight_base:"Tight Base",bounce:"Bounce",down_leg:"Down Leg"};
+const STAGE_SHORT={S1_basing:"กำลังสะสมฐาน",S2_uptrend:"ขาขึ้นใหม่",S3_distributing:"กำลังจ่าย",S4_down:"ขาลง"};
+const STAGE_TINT_BG={"s1":"var(--s1-tint)","s2":"var(--s2-tint)","s3":"var(--s3-tint)","s4":"var(--s4-tint)"};
 let items=__ITEMS__;
 let stageMeta=__STAGE_META__;
 const copy={th:{navScreener:"คัดหุ้น",navWatchlist:"หุ้นติดตาม",navMarket:"ตลาด"}};
 let language=localStorage.getItem("signalix-language")||"th";
-const esc=v=>String(v??"—").replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+const esc=v=>String(v??"—").replace(/[&<>'\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
 const num=(v,d=2)=>v===null||v===undefined?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=v=>v===null||v===undefined?"—":`${v>=0?"+":""}${Number(v).toFixed(2)}%`;
 const compact=v=>{v=Number(v);if(!Number.isFinite(v))return "—";let a=Math.abs(v);return a>=1e9?(v/1e9).toFixed(2)+"B":a>=1e6?(v/1e6).toFixed(2)+"M":a>=1e3?(v/1e3).toFixed(1)+"K":num(v,0);};
@@ -224,12 +278,13 @@ const apiBase=`${location.protocol}//${location.hostname}:8000`;
 const savedKey="signalix-watchlist-v2";
 let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
 let liquidity="liquid",detailItem=null,stageFilter="all";
-let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, l2Filter={}, l2MomFilter={};
-const structuralGroup=i=>i.layer2_structural?.group??i.layer2_group;
-const normalizeMomentumGroup=v=>({ob:"overbought",os:"oversold",neu:"neutral"}[v]||v);
-// Legacy snapshots have layer2_group for structure only. Never use it as momentum.
-const momentumGroup=i=>normalizeMomentumGroup(i.layer2_momentum?.group??i.layer2_momentum_group??i.momentum_group??i.layer2_signals?.momentum);
+let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={};
+const PROX_GROUPS=["action","near_trigger","forming","extended"];
+const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
+const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null;
+const inRadar=i=>!!i.radar;
 const profileValue=(i,key)=>i[key]??i.independence?.[key];
+const qCornerClass=(s)=>{const c={3:"q3",2:"q2",1:"q1",0:"q0"}[s];return c?`q-corner ${c}`:""};
 
 function freshBadge(i){
   // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
@@ -241,25 +296,27 @@ function freshBadge(i){
 function card(i){
   const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
   const tone=STAGE_TONE[i.stage]||"neutral";
-  const l2=STAGE_L2_LABEL[structuralGroup(i)]||structuralGroup(i);
   const l3=i.layer3_qualifier??i.layer3_qualifiers;
-  const l3Colors={3:"var(--green)",2:"var(--amber)",1:"var(--slate)",0:"var(--muted)"};
-  const l3Badge=l3&&l3.score!==undefined?`<span class="chip" style="background:${l3Colors[l3.score]||"var(--muted)"}22;color:${l3Colors[l3.score]||"var(--muted)"};border-color:${l3Colors[l3.score]||"var(--muted)"};font-size:10px;padding:2px 8px;margin-left:6px">Q${l3.score}</span>`:"";
+  const l3Badge=l3&&l3.score!==undefined?`<span class="q-corner ${qCornerClass(l3.score)}" title="Quality Q${l3.score}">Q${l3.score}</span>`:"";
   const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
+  const stageCls=i.stage?.split("_")[0]||"s1";
   return `<article class="signal-card stage-${i.stage}" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="Review ${esc(i.symbol)}">
-    <div class="card-top"><div>
+    <div class="card-top"><div class="head">
+      <span class="pulse-dot ${stageCls}" aria-hidden="true"></span>
       <span class="ticker">${esc(i.symbol)}</span>
       <span class="stage-badge ${tone}">${esc(i.stage_label)}</span>
       ${i.phase_label?`<span class="phase-tag">${esc(i.phase_label)}</span>`:""}
-      ${structuralGroup(i)?`<span class="phase-tag" style="color:var(--slate)">L2: ${esc(l2)}</span>`:""}
+      ${proximityState(i)?`<span class="phase-tag" style="color:var(--slate)">${esc(PROX_LABEL[proximityState(i)]||proximityState(i))}</span>`:""}
+      ${i.radarBadge?`<span class="chip" style="background:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"}22;color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};border-color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};font-size:10px;padding:2px 8px;margin-left:6px">${i.radarBadge}</span>`:""}
+      ${l3Badge}
       ${freshBadge(i)}
-    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist">${saved.has(i.symbol)?"★":"☆"}</button></div>
+    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
     <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
-    <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span><span>Chg <b class="${gain?"gain":"loss"}">${num(i.changeAmount)} · ${pct(i.changePct)}</b></span></div>
+    <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
+    ${l3&&l3.score!==undefined?`<div class="q-bar"><span class="q${Math.min(l3.score,3)}" style="width:${Math.max(10,Math.min(l3.score,3)/3*100)}%"></span></div>`:""}
     ${company}
     ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
     ${i.volumeSurge?`<div class="setup-evidence surge">VOLUME SURGE ${num(i.volumeSurgeRatio,1)}×</div>`:""}
-    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${(i.quality&&i.quality.flags||[]).map(f=>`<span class="q warn">${esc(f)}</span>`).join("")}${l3Badge}</div>
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b> · ${esc(i.actionReason)}</div>`:""}
   </article>`;
 }
@@ -269,7 +326,7 @@ function populateIndependenceFilters(){
     const list=key==="industry"?values.slice(0,20):values;
     const root=document.getElementById(`${key}Filter`); if(!root)return;
     root.innerHTML=`<span style="font-size:11px;color:var(--muted)">${key[0].toUpperCase()+key.slice(1)}:</span>`+
-      ["all",...list].map(v=>`<button class="chip ${indep[key]===v?"active":""}" data-indep="${key}" data-value="${esc(v)}">${v==="all"?"All":esc(v)}</button>`).join("");
+      ["all",...list].map(v=>`<button class="chip ${indep[key]===v?"active":""}" data-indep="${key}" data-value="${esc(v)}" aria-pressed="${indep[key]===v}">${v==="all"?"All":esc(v)}</button>`).join("");
   });
 }
 function current(){
@@ -282,10 +339,8 @@ function current(){
     if(indep.band!=="all"&&!(i.independence&&i.independence.priceBand===indep.band))return false;
     if(indep.sector!=="all"&&profileValue(i,"sector")!==indep.sector)return false;
     if(indep.industry!=="all"&&profileValue(i,"industry")!==indep.industry)return false;
-    const lf=l2Filter[i.stage];
-    if(lf&&lf!=="all"&&structuralGroup(i)!==lf)return false;
-    const lmf=l2MomFilter[i.stage];
-    if(lmf&&lmf!=="all"&&momentumGroup(i)!==lmf)return false;
+    const pf=proxFilter[i.stage];
+    if(pf&&pf!=="all"&&proximityState(i)!==pf)return false;
     if(q&&!`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q))return false;
     return true;
   });
@@ -293,37 +348,35 @@ function current(){
 function render(){
   document.getElementById("covCount").textContent=items.length;
   populateIndependenceFilters();
-  // stage summary pills (clickable filter)
+  // stage summary pills (clickable filter) — stage tint + solid count + descriptor
   const sum=document.getElementById("stageSummary");
   sum.innerHTML=STAGE_ORDER.map(s=>{
     const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
     const cls=s.split("_")[0];
-    return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" style="cursor:pointer"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div></div>`;
+    const short=STAGE_SHORT[s]||"";
+    return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" aria-pressed="${stageFilter===s}" role="button" tabindex="0"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div class="desc">${esc(short)}</div></div>`;
   }).join("");
   // sections by stage
   const vals=current();
   const results=document.getElementById("results");
-  results.innerHTML=STAGE_ORDER.map(s=>{
+  const radar=vals.filter(inRadar);
+  const radarHTML=radar.length?`<section class="stage-section radar-section"><div class="stage-head radar">
+  <h2>Setup Radar</h2><span class="badge">${radar.length}</span>
+  <span class="desc">คุณภาพผ่าน + ใกล้/ถึงจุดเข้า</span></div>
+  <div class="cards">${radar.map(card).join("")}</div></section>`:"";
+  results.innerHTML=radarHTML+STAGE_ORDER.map(s=>{
     if(stageFilter!=="all"&&stageFilter!==s)return "";
     const list=vals.filter(i=>i.stage===s);
     if(!list.length)return "";
     const m=stageMeta[s]||{count:list.length};
-    const L2GROUPS=["up_leg","pullback","tight_base","bounce","down_leg"];
-    const L2_LABEL={up_leg:"Up Leg",pullback:"Pullback",tight_base:"Tight Base",bounce:"Bounce",down_leg:"Down Leg"};
-    const counts={}; L2GROUPS.forEach(g=>counts[g]=list.filter(i=>structuralGroup(i)===g).length);
-    const subpills=L2GROUPS.map(g=>`<button class="chip l2sub ${l2Filter[s]===g?"active":""}" data-stage="${s}" data-l2="${g}">${L2_LABEL[g]} <b>${counts[g]}</b></button>`).join("");
-    const L2MOM_GROUPS=["strong","up","neutral","down","overbought","oversold"];
-    const L2MOM_LABEL={strong:"Strong",up:"Up",neutral:"Neu",down:"Down",overbought:"OB",oversold:"OS"};
-    const momCounts={}; L2MOM_GROUPS.forEach(g=>momCounts[g]=list.filter(i=>momentumGroup(i)===g).length);
-    const momPills=L2MOM_GROUPS.map(g=>`<button class="chip l2mom ${l2MomFilter[s]===g?"active":""}" data-stage="${s}" data-l2mom="${g}">${L2MOM_LABEL[g]} <b>${momCounts[g]}</b></button>`).join("");
-    const structuralEmpty=l2Filter[s]&&l2Filter[s]!=="all"&&!list.some(i=>structuralGroup(i)===l2Filter[s]);
-    const momentumEmpty=l2MomFilter[s]&&l2MomFilter[s]!=="all"&&!list.some(i=>momentumGroup(i)===l2MomFilter[s]);
+    const counts={}; PROX_GROUPS.forEach(g=>counts[g]=list.filter(i=>proximityState(i)===g).length);
+    const subpills=PROX_GROUPS.map(g=>`<button class="chip l2sub ${proxFilter[s]===g?"active":""}" data-stage="${s}" data-prox="${g}" aria-pressed="${proxFilter[s]===g}">${PROX_LABEL[g]} <b>${counts[g]}</b></button>`).join("");
+    const proxEmpty=proxFilter[s]&&proxFilter[s]!=="all"&&!list.some(i=>proximityState(i)===proxFilter[s]);
     return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
-      <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
-      <span class="desc">${esc(STAGE_DESC[s])}</span></div>
-      <div class="l2-bar">${subpills}<button class="chip l2sub ${!l2Filter[s]?"active":""}" data-stage="${s}" data-l2="all">All <b>${list.length}</b></button></div>
-      <div class="l2-bar l2-momentum-bar"><span class="phase-tag" style="margin-left:0">Momentum</span>${momPills}<button class="chip l2mom ${!l2MomFilter[s]?"active":""}" data-stage="${s}" data-l2mom="all">All <b>${list.length}</b></button></div>
-      <div class="cards">${list.map(card).join("")}</div>${structuralEmpty||momentumEmpty?`<div class="l2-empty">No symbols in this subgroup</div>`:""}</section>`;
+  <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
+  <span class="desc">${esc(STAGE_DESC[s])}</span></div>
+  <div class="l2-bar">${subpills}<button class="chip l2sub ${!proxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!proxFilter[s]}">All <b>${list.length}</b></button></div>
+  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup</div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
   renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
@@ -335,8 +388,16 @@ function renderMarket(){
     const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
     const pctv=(c/total*100).toFixed(1);
     const cls=s.split("_")[0];
-    return `<article class="stage-pill ${cls}"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div style="color:var(--muted);font-size:11px">${pctv}% ของตลาด</div></article>`;
+    return `<article class="stage-pill ${cls}" aria-label="${esc(STAGE_LABEL[s])}"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div style="color:var(--muted);font-size:11px">${pctv}% ของตลาด</div></article>`;
   }).join("");
+  // Breadth pulse — advance/decline ratio from stage counts
+  const adv = (stageMeta["S2_uptrend"]?.count || items.filter(i=>i.stage==="S2_uptrend").length) +
+              (stageMeta["S1_basing"]?.count || items.filter(i=>i.stage==="S1_basing").length);
+  const dec = (stageMeta["S4_down"]?.count || items.filter(i=>i.stage==="S4_down").length) +
+              (stageMeta["S3_distributing"]?.count || items.filter(i=>i.stage==="S3_distributing").length);
+  const breadthPct = total ? Math.round(adv/total*100) : 0;
+  const pulse=document.getElementById("breadthPulse");
+  if(pulse) pulse.innerHTML=`<span class="ratio">${breadthPct}% ขึ้น</span><div class="bar"><span style="width:${breadthPct}%"></span></div>`;
 }
 function renderWatch(){
   const vals=items.filter(i=>saved.has(i.symbol));
@@ -345,7 +406,7 @@ function renderWatch(){
   document.getElementById("watchCount")&&(document.getElementById("watchCount").textContent=saved.size);
 }
 function persist(){try{localStorage.setItem(savedKey,JSON.stringify([...saved]));}catch(e){}renderWatch();
-  document.querySelectorAll("[data-star]").forEach(b=>{const yes=saved.has(b.dataset.star);b.textContent=yes?"★":"☆";b.classList.toggle("saved",yes);});}
+  document.querySelectorAll("[data-star]").forEach(b=>{const yes=saved.has(b.dataset.star);b.textContent=yes?"★":"☆";b.classList.toggle("saved",yes);b.setAttribute("aria-pressed",yes);});}
 function bind(root=document){
   (root.querySelectorAll?root.querySelectorAll(".signal-card"):[]).forEach(el=>{
     el.onclick=e=>{if(e.target.closest("[data-star]"))return;openDetail(bySymbol[el.dataset.symbol]);};
@@ -391,24 +452,24 @@ function openDetail(i){
   const idx=(detailList||[]).indexOf(i.symbol);
   document.getElementById("modalContent").innerHTML=`<div style="padding:20px 20px 24px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-      <button class="chip nav-arrow" id="prevStock" aria-label="หุ้นก่อนหน้า">◀</button>
+      <button class="chip nav-arrow" id="prevStock" aria-label="หุ้นก่อนหน้า" aria-pressed="false">◀</button>
       <h2 style="margin:0;flex:1">${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
-      <button class="chip nav-arrow" id="nextStock" aria-label="หุ้นถัดไป">▶</button>
-      <button class="chip modal-close" id="closeModal" aria-label="ปิด">✕</button>
+      <button class="chip nav-arrow" id="nextStock" aria-label="หุ้นถัดไป" aria-pressed="false">▶</button>
+      <button class="chip modal-close" id="closeModal" aria-label="ปิด" aria-pressed="false">✕</button>
     </div>
     <div class="tf-tools">
-      <button class="chip tf" data-tf="1h">1h</button>
-      <button class="chip tf active" data-tf="1D">1D</button>
-      <button class="chip tf" data-tf="1W">1W</button>
-      <button class="chip tf" data-tf="1M">1M</button>
+      <button class="chip tf" data-tf="1h" aria-pressed="false">1h</button>
+      <button class="chip tf active" data-tf="1D" aria-pressed="true">1D</button>
+      <button class="chip tf" data-tf="1W" aria-pressed="false">1W</button>
+      <button class="chip tf" data-tf="1M" aria-pressed="false">1M</button>
     </div>
-    <canvas id="detailChart" height="220" style="width:100%;margin:10px 0 4px;border-radius:10px;background:#0a0e17" data-timeframe="60m"></canvas>
+    <canvas id="detailChart" class="chart-canvas" data-timeframe="60m"></canvas>
     <div id="chartStatus" class="chart-status" role="status" aria-live="polite"></div>
     <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"><span>Moving averages</span></div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
       <button class="chip" id="chartPanLeft" aria-label="เลื่อนย้อน">◀◀</button>
       <button class="chip" id="chartPanRight" aria-label="เลื่อนไปหน้า">▶▶</button>
-      <div id="chartPanHint" style="font-size:11px;color:var(--slate)">ลาก/สกrolล์เลื่อนแกนเวลา</div>
+      <div id="chartPanHint" style="font-size:11px;color:var(--slate)">ลาก/สกปร์เลื่อนแกนเวลา</div>
     </div>
     <a class="chip tv-link" id="tvLink" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;text-decoration:none">TradingView ↗</a>
     <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
@@ -424,7 +485,6 @@ function openDetail(i){
     if(myGen!==detailGen)return;
     chartViewOffset=0; setActiveTf(b.dataset.tf); loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
   });
-  // Auto-pick timeframe by listing age, then load.
   pickTimeframe(i.symbol).then(tf=>{
     if(myGen!==detailGen)return;
     document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf));
@@ -460,14 +520,13 @@ let chartViewOffset=0; // how many bars scrolled back from the right edge (pan)
 function drawChart(bars, tf){
   const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;
   const ctx=cv.getContext("2d");
-  const W=cv.width=cv.clientWidth||520, H=cv.height=220;
+  const W=cv.width=cv.clientWidth||520, H=cv.height=cv.clientHeight||220;
   const drawN=(tf==="1M")?bars.length:Math.min(60,bars.length);
-  // Clamp pan offset so we never scroll past either edge.
   const maxOffset=Math.max(0, bars.length-drawN);
   if(chartViewOffset>maxOffset)chartViewOffset=maxOffset;
   if(chartViewOffset<0)chartViewOffset=0;
   const sliceStart=Math.max(0, bars.length-drawN-chartViewOffset);
-  const slice=bars.slice(sliceStart, sliceStart+drawN); const n=slice.length; if(!n)return;
+  const slice=bars.slice(sliceStart, sliceStart+drawN), n=slice.length; if(!n)return;
   const lo=Math.min(...slice.map(b=>b.low)), hi=Math.max(...slice.map(b=>b.high)), rng=(hi-lo)||1;
   const pad=10, top=10, plotH=H-2*pad, cw=W/n;
   ctx.clearRect(0,0,W,H);
@@ -476,7 +535,7 @@ function drawChart(bars, tf){
     const yH=top+(1-(b.high-lo)/rng)*plotH, yL=top+(1-(b.low-lo)/rng)*plotH;
     const yC=top+(1-(b.close-lo)/rng)*plotH, yO=top+(1-(b.open-lo)/rng)*plotH;
     const up=b.close>=b.open;
-    ctx.strokeStyle=up?"#43df9e":"#ff7a7a"; ctx.fillStyle=ctx.strokeStyle;
+    ctx.strokeStyle=up?"var(--green)":"var(--red)"; ctx.fillStyle=ctx.strokeStyle;
     ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();
     const bw=Math.max(1,cw*0.6);
     ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);
@@ -490,22 +549,21 @@ function drawChart(bars, tf){
     ctx.stroke(); if(drew)legend.push(`<span style="color:${m.c}">● ${m.label}</span>`);
   });
   const lg=document.getElementById("chartLegend"); if(lg)lg.innerHTML=legend.join(" ");
-  // pan hint
-  const hint=document.getElementById("chartPanHint"); if(hint)hint.textContent=(chartViewOffset>0?`← เลื่อนกลับ ${chartViewOffset} แท่ง`:"ลาก/สกrolล์เลื่อนแกนเวลา");
+  const hint=document.getElementById("chartPanHint"); if(hint)hint.textContent=(chartViewOffset>0?`← เลื่อนกลับ ${chartViewOffset} แท่ง`:"ลาก/สกปร์เลื่อนแกนเวลา");
 }
 let lastBars=null;
-function panChart(dir){ // dir: -1 older (left), +1 newer (right)
+function panChart(dir){
   chartViewOffset = Math.max(0, (chartViewOffset||0) + (dir<0?6:-6));
   if(lastBars)drawChart(lastBars, currentTf);
 }
-// --- Chart pan: buttons + wheel + drag on canvas ---
+// --- Chart pan: buttons + wheel + drag on canvas; touch-action none prevents scroll hijack ---
 let _panBound=false;
 function bindChartPan(){
   const cv=document.getElementById("detailChart"); if(!cv||_panBound)return; _panBound=true;
+  cv.style.touchAction="none";
   const L=document.getElementById("chartPanLeft"), R=document.getElementById("chartPanRight");
   if(L)L.onclick=()=>panChart(-1);
   if(R)R.onclick=()=>panChart(1);
-  cv.style.cursor="grab";
   cv.addEventListener("wheel",e=>{
     const d=(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY);
     if(!d)return;
@@ -540,8 +598,7 @@ document.addEventListener("click",e=>{
   const vf=e.target.closest("#valueFilter"); if(vf){indep.value=parseFloat(vf.value)||0;render();}
   const pb=e.target.closest("#priceBand"); if(pb){indep.band=pb.value;render();}
   const indepBtn=e.target.closest("[data-indep]"); if(indepBtn&&["sector","industry"].includes(indepBtn.dataset.indep)){indep[indepBtn.dataset.indep]=indepBtn.dataset.value;render();}
-  const l2=e.target.closest(".l2sub"); if(l2){const st=l2.dataset.stage,g=l2.dataset.l2; l2Filter[st]=(l2Filter[st]===g?undefined:g); render();}
-  const l2mom=e.target.closest(".l2mom"); if(l2mom){const st=l2mom.dataset.stage,g=l2mom.dataset.l2mom; l2MomFilter[st]=(l2MomFilter[st]===g?undefined:g); render();}
+  const l2=e.target.closest(".l2sub"); if(l2){const st=l2.dataset.stage,g=l2.dataset.prox; proxFilter[st]=(proxFilter[st]===g?undefined:g); render();}
   const star=e.target.closest("[data-star]");if(star){saved.has(star.dataset.star)?saved.delete(star.dataset.star):saved.add(star.dataset.star);persist();}
   if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
 });
