@@ -1,7 +1,7 @@
 import psycopg2
 import pytest
 
-from build_dashboard import serialize, snapshots
+from build_dashboard import dashboard_sort_key, serialize, snapshots
 
 
 pytestmark = pytest.mark.integration
@@ -41,6 +41,35 @@ def test_serialize_includes_all_new_fields():
     assert item["independence"]["market_cap"] == 1_000_000_000
     assert item["independence"]["free_float_pct"] == 45.5
     assert item["independence"]["foreign_limit_pct"] == 49.0
+
+
+def test_dashboard_sort_key_is_stage_structural_l3_momentum_rs():
+    items = [
+        {"symbol": "RS", "stage": "S2_uptrend", "rs": 99,
+         "layer2_structural": {"group": "up_leg"},
+         "layer2_momentum": {"group": "neutral"},
+         "layer3_qualifier": {"score": 1}},
+        {"symbol": "L3", "stage": "S2_uptrend", "rs": 1,
+         "layer2_structural": {"group": "up_leg"},
+         "layer2_momentum": {"group": "neutral"},
+         "layer3_qualifier": {"score": 3}},
+        {"symbol": "MOM", "stage": "S2_uptrend", "rs": 1,
+         "layer2_structural": {"group": "up_leg"},
+         "layer2_momentum": {"group": "strong"},
+         "layer3_qualifier": {"score": 1}},
+        {"symbol": "STRUCT", "stage": "S2_uptrend", "rs": 100,
+         "layer2_structural": {"group": "pullback"},
+         "layer2_momentum": {"group": "strong"},
+         "layer3_qualifier": {"score": 3}},
+        {"symbol": "STAGE", "stage": "S1_basing", "rs": 100,
+         "layer2_structural": {"group": "up_leg"},
+         "layer2_momentum": {"group": "strong"},
+         "layer3_qualifier": {"score": 3}},
+    ]
+
+    assert [item["symbol"] for item in sorted(items, key=dashboard_sort_key)] == [
+        "L3", "MOM", "RS", "STRUCT", "STAGE"
+    ]
 
 
 def pg_connect():

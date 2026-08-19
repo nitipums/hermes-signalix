@@ -455,13 +455,22 @@ def snapshot_items(pg, scan):
     """Build the same complete progressive payload used by the static dashboard."""
     source_groups = scan.get("groups", {})
     rows = [r for values in source_groups.values() for r in values]
-    latest = snapshots(pg, [row["symbol"] for row in rows])
-    # Standalone rebuild path: no L2/SET50 enrichment unless callers supply it.
-    layer2_map = {}
-    set50_set = set()
-    items = [serialize(key, row, latest.get(row["symbol"], {}), None,
-                      layer2_map.get(row["symbol"]), set50_set)
-             for key, values in source_groups.items() for row in values]
+    symbols = [row["symbol"] for row in rows]
+    latest = snapshots(pg, symbols)
+    from screening import load_index_membership, universe_layer2, universe_layer3
+    layer2_map = universe_layer2(pg, symbols)
+    layer3_map = universe_layer3(pg, symbols)
+    set50_set = load_index_membership(pg)
+    items = [serialize(
+        key, row, latest.get(row["symbol"], {}), None,
+        layer2_map.get(row["symbol"]), set50_set,
+        layer3=layer3_map.get(row["symbol"]),
+        sector=latest.get(row["symbol"], {}).get("sector"),
+        industry=latest.get(row["symbol"], {}).get("industry"),
+        market_cap=latest.get(row["symbol"], {}).get("market_cap"),
+        free_float_pct=latest.get(row["symbol"], {}).get("free_float_pct"),
+        foreign_limit_pct=latest.get(row["symbol"], {}).get("foreign_limit_pct"),
+    ) for key, values in source_groups.items() for row in values]
     return apply_projection(items)
 
 
@@ -795,6 +804,25 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
     }
 
 
+def dashboard_sort_key(item):
+    """Return the canonical stage/L2/L3/RS ordering key for dashboard cards."""
+    stage_order = {stage: index for index, stage in enumerate(
+        ("S2_uptrend", "S1_basing", "S3_distributing", "S4_down"))}
+    structural_priority = {"up_leg": 0, "pullback": 1, "tight_base": 2,
+                           "bounce": 3, "down_leg": 4, None: 5}
+    momentum_priority = {"strong": 0, "up": 1, "neutral": 2, "down": 3,
+                         "overbought": 4, "oversold": 4, None: 5}
+    structural = (item.get("layer2_structural") or {}).get("group")
+    momentum = (item.get("layer2_momentum") or {}).get("group")
+    l3_score = (item.get("layer3_qualifier") or {}).get("score", 0) or 0
+    rs = item.get("rs") or 0
+    return (stage_order.get(item.get("stage"), 99),
+            structural_priority.get(structural, 5),
+            -l3_score,
+            momentum_priority.get(momentum, 5),
+            -rs)
+
+
 def build(scanned=None):
     """Build the stage-first dashboard.
 
@@ -823,25 +851,28 @@ def build(scanned=None):
         latest = snapshots(pg, [row["symbol"] for row in rows])
         last_valid_session = max((row.get("last_date") for row in rows if row.get("last_date")), default=None)
         freshness = dashboard_freshness(pg, last_valid_session=last_valid_session)
-        from screening import excluded_symbols
+        from screening import excluded_symbols, universe_layer2, universe_layer3, load_index_membership
+        symbols = [row["symbol"] for row in rows]
         excluded = excluded_symbols(pg, market="TH")
-        from screening import universe_layer2, load_index_membership
-        layer2_map = universe_layer2(pg, [row["symbol"] for row in rows])
+        layer2_map = universe_layer2(pg, symbols)
+        layer3_map = universe_layer3(pg, symbols)
         set50_set = load_index_membership(pg)
     finally:
         pg.close()
     overlays = {}
-    items = [serialize(key, row, latest.get(row["symbol"], {}), overlays.get(row["symbol"]),
-                      layer2_map.get(row["symbol"]), set50_set)
-             for key, values in source_groups.items() for row in values
-             if row["symbol"] not in excluded]
+    items = [serialize(
+        key, row, latest.get(row["symbol"], {}), overlays.get(row["symbol"]),
+        layer2_map.get(row["symbol"]), set50_set,
+        layer3=layer3_map.get(row["symbol"]),
+        sector=latest.get(row["symbol"], {}).get("sector"),
+        industry=latest.get(row["symbol"], {}).get("industry"),
+        market_cap=latest.get(row["symbol"], {}).get("market_cap"),
+        free_float_pct=latest.get(row["symbol"], {}).get("free_float_pct"),
+        foreign_limit_pct=latest.get(row["symbol"], {}).get("foreign_limit_pct"),
+    ) for key, values in source_groups.items() for row in values
+      if row["symbol"] not in excluded]
     items = apply_projection(items)
-    STAGE_ORDER_L2 = ["S2_uptrend", "S1_basing", "S3_distributing", "S4_down"]
-    L2_PRIORITY = {"momentum_strong": 0, "momentum_up": 1, "neutral": 2, "momentum_down": 3,
-                   "overbought": 4, "oversold": 5, None: 6}
-    items.sort(key=lambda i: (STAGE_ORDER_L2.index(i.get("stage")) if i.get("stage") in STAGE_ORDER_L2 else 99,
-                              L2_PRIORITY.get(i.get("layer2_group"), 6),
-                              -(i.get("rs") or 0)))
+    items.sort(key=dashboard_sort_key)
     # Stage-first axis (Minervini S1-S4): the PRIMARY organizer for the UI.
     stage_order = ["S2_uptrend", "S1_basing", "S3_distributing", "S4_down"]
     stage_counts = {s: sum(1 for item in items if item.get("stage") == s) for s in stage_order}
