@@ -469,6 +469,7 @@ def screen_symbol(symbol: str):
     """Run the Minervini pipeline for a single symbol from the DB archive.
 
     Uses the SAME rank-based universe RS as /scan so TT/RS is consistent.
+    Returns the enriched daily_state (stage + 2-layer actionable setup state).
     """
     try:
         result = analyze_symbol_db_ranked(symbol.upper())
@@ -478,7 +479,10 @@ def screen_symbol(symbol: str):
         raise HTTPException(status_code=404,
                             detail=f"{symbol} not found or insufficient history")
     _publish_screen(result, result["trend_template"]["conditions_met"])
-    return result
+    # Two-layer actionable setup state (quality gate + proximity timing).
+    # group_scan_results attaches daily_state.{stage,phase,setup_quality,setup_proximity,radio}.
+    grouped = group_scan_results([result])[0]
+    return grouped
 
 
 def dashboard_overview_payload(scan_path):
