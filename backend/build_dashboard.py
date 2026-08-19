@@ -638,6 +638,13 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
     daily_state = row.get("daily_state") or {}
     stage = daily_state.get("stage")
     phase = daily_state.get("phase")
+    # Two-layer actionable setup state (quality gate + proximity timing).
+    setup_q = daily_state.get("setup_quality") or {}
+    setup_p = daily_state.get("setup_proximity") or {}
+    radar_state = setup_p.get("state")
+    radar = bool(setup_q.get("pass") and radar_state in ("near_trigger", "action"))
+    radar_badge = ("READY" if radar_state == "action"
+                   else "WATCH" if radar_state == "near_trigger" else None)
     lifecycle = {
         "state": phase or "unclassified",
         "stage": stage or "none",
@@ -759,6 +766,10 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "phase": phase or "base_early",
         "phase_label": PHASE_LABELS.get(phase, phase) or PHASE_LABELS["base_early"],
         "stage_phase": f"{(STAGE_LABELS.get(stage, stage))} · {(PHASE_LABELS.get(phase, phase))}",
+        "setup_quality": setup_q,
+        "setup_proximity": setup_p,
+        "radar": radar,
+        "radarBadge": radar_badge,
         "quality": (row.get("daily_state") or {}).get("quality") or {},
         "liquidity": {"source": "Daily EOD", "turnover": number(snapshot.get("daily_turnover", snapshot.get("turnover")), 0),
                       "volumeRatio50": number(readiness.get("volume_ratio_50")),
@@ -816,21 +827,14 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
 
 
 def dashboard_sort_key(item):
-    """Return the canonical stage/L2/L3/RS ordering key for dashboard cards."""
+    """Stage-first; within stage, actionable proximity first; rs last tiebreak."""
     stage_order = {stage: index for index, stage in enumerate(
         ("S2_uptrend", "S1_basing", "S3_distributing", "S4_down"))}
-    structural_priority = {"up_leg": 0, "pullback": 1, "tight_base": 2,
-                           "bounce": 3, "down_leg": 4, None: 5}
-    momentum_priority = {"strong": 0, "up": 1, "neutral": 2, "down": 3,
-                         "overbought": 4, "oversold": 4, None: 5}
-    structural = (item.get("layer2_structural") or {}).get("group")
-    momentum = (item.get("layer2_momentum") or {}).get("group")
-    l3_score = (item.get("layer3_qualifier") or {}).get("score", 0) or 0
+    proximity_order = {"action": 0, "near_trigger": 1, "forming": 2, "extended": 3}
+    proximity = (item.get("setup_proximity") or {}).get("state")
     rs = item.get("rs") or 0
     return (stage_order.get(item.get("stage"), 99),
-            structural_priority.get(structural, 5),
-            -l3_score,
-            momentum_priority.get(momentum, 5),
+            proximity_order.get(proximity, 5),
             -rs)
 
 
