@@ -483,8 +483,10 @@ def screen_symbol(symbol: str):
     # Mirrors group_scan_results' daily_state attachment for a single symbol.
     from daily_setup_state import classify_daily_state
     from setup_state import compute_setup_state
-    events = active_breakout_events(get_pg(), [symbol.upper()]) if False else {}
-    state = classify_daily_state(result, events.get(symbol.upper()))
+    from scan_history import active_breakout_events
+    pg = get_pg()
+    events = active_breakout_events(pg, [symbol.upper()])
+    state = classify_daily_state(result, events.get(symbol.upper(), {}))
     _setup = compute_setup_state(state["stage"], result)
     state["setup_quality"] = _setup["quality"]
     state["setup_proximity"] = _setup["proximity"]
