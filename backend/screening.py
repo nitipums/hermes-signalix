@@ -808,15 +808,99 @@ def compute_layer3_qualifier(symbol, df_daily, df_60m, snapshot):
 
 
 def universe_layer2(pg, symbols):
-    """Classify every symbol. compute_layer2 falls back to 'tight_base' for
-    missing/short 60m data, so we ALWAYS emit a group (no None) — see Q18."""
+    """Classify every symbol on both the structural and momentum axes.
+
+    Missing/short 60m data is handled by the compute helpers, while an
+    individual symbol failure gets a complete, schema-safe default.
+    """
+    structural_default = {
+        "signals": {
+            "structure": "flat",
+            "long_slope": 0.0,
+            "short_slope": 0.0,
+            "swing": "error",
+        },
+        "group": "tight_base",
+    }
+    momentum_default = {
+        "signals": {"macd": "cross", "rsi": 50.0},
+        "group": "neutral",
+    }
     out = {}
     for sym in symbols:
         try:
             df = load_symbol_intraday(sym, pg=pg, interval="60m", lookback=400)
-            out[sym] = compute_layer2(sym, df)
+            out[sym] = {
+                "structural": compute_layer2(sym, df),
+                "momentum": compute_layer2_momentum(sym, df),
+            }
         except Exception:
-            out[sym] = {"signals": {"structure": "flat", "swing": "error"}, "group": "tight_base"}
+            out[sym] = {
+                "structural": structural_default.copy(),
+                "momentum": momentum_default.copy(),
+            }
+    return out
+
+
+def universe_layer3(pg, symbols):
+    """Batch the daily breakout-quality qualifier for *symbols*.
+
+    Daily bars come from ``load_symbol`` and intraday bars from the existing
+    60m loader.  Snapshot data is read from the daily scan history tables;
+    there is intentionally no dependency on a ``latest_snapshots`` table.
+    """
+    default = {"score": 0, "flags": {"vol": False, "wk52": False, "ath": False}}
+    out = {}
+    for sym in symbols:
+        try:
+            df_daily = load_symbol(sym, pg=pg, lookback=250)
+            df_60m = load_symbol_intraday(sym, pg=pg, interval="60m", lookback=400)
+            cur = pg.cursor()
+            try:
+                cur.execute("""
+                    SELECT s.close, s.volume, s.max_52w, s.trade_value,
+                           s.volume_ratio_50, s.metrics,
+                           a.all_time_high
+                    FROM daily_analysis_snapshots AS s
+                    LEFT JOIN daily_symbol_ath_cache AS a
+                      ON a.market = s.market AND a.symbol = s.symbol
+                    WHERE s.market = 'TH' AND s.symbol = %s
+                    ORDER BY s.analysis_date DESC, s.created_at DESC
+                    LIMIT 1
+                """, (sym,))
+                row = cur.fetchone()
+            finally:
+                cur.close()
+
+            snapshot = {}
+            if row:
+                close, volume, high52, trade_value, volume_ratio, metrics, ath = row
+                metrics = metrics or {}
+                if isinstance(metrics, str):
+                    import json
+                    metrics = json.loads(metrics)
+                avg_value = next(
+                    (metrics.get(key) for key in (
+                        "avgDailyValue20", "avg_daily_value_20",
+                        "avgTradeValue20", "avg_trade_value_20",
+                    ) if metrics.get(key) is not None),
+                    None,
+                )
+                if avg_value is None and trade_value is not None and volume_ratio:
+                    avg_value = float(trade_value) / float(volume_ratio)
+                snapshot = {
+                    "avgDailyValue20": avg_value,
+                    "high52": high52,
+                    "athHigh": ath,
+                    "close": close,
+                    "volume": volume,
+                }
+            out[sym] = compute_layer3_qualifier(sym, df_daily, df_60m, snapshot)
+        except Exception:
+            out[sym] = {
+                "score": default["score"],
+                "flags": default["flags"].copy(),
+            }
     return out
 
 def load_index_membership(pg):

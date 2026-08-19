@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from screening import compute_layer2_momentum, compute_layer3_qualifier
+from screening import compute_layer2_momentum, compute_layer3_qualifier, universe_layer2, universe_layer3
 
 MOMENTUM_VALID = {"strong", "up", "down", "overbought", "oversold", "neutral"}
 
@@ -98,3 +98,40 @@ def test_compute_layer3_qualifier_missing_data():
     r = compute_layer3_qualifier("TEST", None, None, {})
     assert r["score"] == 0
     assert r["flags"] == {"vol": False, "wk52": False, "ath": False}
+
+
+# --- universe_layer2 (dual) tests ---
+
+import psycopg2
+
+
+def test_universe_layer2_returns_both():
+    pg = psycopg2.connect(host="127.0.0.1", port=5432, user="signalix", password="signalix_pass", dbname="signalix")
+    cur = pg.cursor()
+    cur.execute("SELECT DISTINCT symbol FROM intraday_price_data WHERE interval='60m' LIMIT 3")
+    symbols = [r[0] for r in cur.fetchall()]
+    cur.close()
+    out = universe_layer2(pg, symbols)
+    pg.close()
+    assert len(out) == len(symbols)
+    for sym, data in out.items():
+        assert "structural" in data and "momentum" in data
+        assert data["structural"]["group"] in {"up_leg", "pullback", "tight_base", "down_leg", "bounce"}
+        assert data["momentum"]["group"] in {"strong", "up", "down", "overbought", "oversold", "neutral"}
+
+
+# --- universe_layer3 tests ---
+
+
+def test_universe_layer3_returns_scores():
+    pg = psycopg2.connect(host="127.0.0.1", port=5432, user="signalix", password="signalix_pass", dbname="signalix")
+    cur = pg.cursor()
+    cur.execute("SELECT DISTINCT symbol FROM price_data WHERE instrument_type = ANY(ARRAY['ORD','COMMON']) LIMIT 3")
+    symbols = [r[0] for r in cur.fetchall()]
+    cur.close()
+    out = universe_layer3(pg, symbols)
+    pg.close()
+    assert len(out) == len(symbols)
+    for sym, data in out.items():
+        assert "score" in data and 0 <= data["score"] <= 3
+        assert "flags" in data and set(data["flags"].keys()) == {"vol", "wk52", "ath"}
