@@ -124,20 +124,28 @@ def snapshots(pg, symbols):
     if not symbols:
         return {}
     cur = pg.cursor()
-    cur.execute("""SELECT symbol,date,close,volume,rn FROM (
-          SELECT symbol,date,close,volume,
-                 ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
-          FROM price_data
-          WHERE market='TH' AND symbol=ANY(%s)
-        ) q WHERE rn <= 2 ORDER BY symbol,rn""", (symbols,))
+    cur.execute("""SELECT q.symbol,q.date,q.close,q.volume,q.rn,cp.sector,cp.industry
+                   FROM (
+                     SELECT symbol,date,close,volume,
+                            ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+                     FROM price_data
+                     WHERE market='TH' AND symbol=ANY(%s)
+                   ) q
+                   LEFT JOIN company_profiles cp ON q.symbol = cp.symbol
+                   WHERE q.rn <= 2
+                   ORDER BY q.symbol,q.rn""", (symbols,))
     out = {}
-    for symbol, date, close, volume, rn in cur.fetchall():
+    for row in cur.fetchall():
+        symbol, date, close, volume, rn = row[:5]
+        sector = row[5] if len(row) > 5 else None
+        industry = row[6] if len(row) > 6 else None
         value = out.setdefault(symbol, {})
         if rn == 1:
             value.update({"date": str(date), "close": float(close), "volume": float(volume or 0),
                           "turnover": float(close) * float(volume or 0),
                           "daily_date": str(date), "daily_close": float(close),
-                          "daily_turnover": float(close) * float(volume or 0)})
+                          "daily_turnover": float(close) * float(volume or 0),
+                          "sector": sector, "industry": industry})
         else:
             value["previous_close"] = float(close)
             value["daily_previous_close"] = float(close)
