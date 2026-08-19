@@ -480,9 +480,16 @@ def screen_symbol(symbol: str):
                             detail=f"{symbol} not found or insufficient history")
     _publish_screen(result, result["trend_template"]["conditions_met"])
     # Two-layer actionable setup state (quality gate + proximity timing).
-    # group_scan_results attaches daily_state.{stage,phase,setup_quality,setup_proximity,radio}.
-    grouped = group_scan_results([result])[0]
-    return grouped
+    # Mirrors group_scan_results' daily_state attachment for a single symbol.
+    from daily_setup_state import classify_daily_state
+    from setup_state import compute_setup_state
+    events = active_breakout_events(get_pg(), [symbol.upper()]) if False else {}
+    state = classify_daily_state(result, events.get(symbol.upper()))
+    _setup = compute_setup_state(state["stage"], result)
+    state["setup_quality"] = _setup["quality"]
+    state["setup_proximity"] = _setup["proximity"]
+    result["daily_state"] = state
+    return result
 
 
 def dashboard_overview_payload(scan_path):
