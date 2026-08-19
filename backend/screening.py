@@ -638,97 +638,161 @@ if __name__ == "__main__":
     print(f"\nResults written to {out_path}")
 
 
-# --- Layer 2: short-term momentum grouping on 60m bars (no scoring) ---
-def _ema(series, n):
-    if len(series) < n or n <= 0:
-        return None
-    alpha, x = 2/(n+1), float(series.iloc[0])
-    for v in series.iloc[1:]:
-        x = float(v)*alpha + x*(1-alpha)
-    return x
+# --- Layer 2: short-term MINOR-TREND (structural) grouping on 60m bars (no scoring) ---
+# Replaces the old oscillator read (RSI/MACD). Classifies the *structure* of the
+# short-term swing, not momentum extremes. Five groups (Q14):
+#   up_leg     - higher highs + higher lows (minor uptrend)
+#   pullback   - dip inside an uptrend (higher lows but short-term slope down)
+#   tight_base - narrow sideways consolidation
+#   down_leg   - lower highs + lower lows (minor downtrend)
+#   bounce     - short rebound inside a downtrend (lower lows but slope turning up)
+def _ma_slope(close, n=20):
+    if len(close) < n + 5:
+        return 0.0
+    ma = close.rolling(n).mean()
+    now = float(ma.iloc[-1])
+    prev = float(ma.iloc[-5])
+    return (now - prev) / now if now else 0.0
 
-def _macd_state(close):
-    if len(close) < 35:
-        return "cross", 0.0
-    vals = close.astype(float).tolist()
-    a12, a26, a9 = 2/13, 2/27, 2/10
-    e12, e26 = vals[0], vals[0]
-    macd_line = []
-    for v in vals:
-        e12 = v*a12 + e12*(1-a12); e26 = v*a26 + e26*(1-a26)
-        macd_line.append(e12 - e26)
-    ms = macd_line[0]
-    for m in macd_line[1:]:
-        ms = m*a9 + ms*(1-a9)
-    signal = ms
-    macd_now = macd_line[-1]
-    macd_prev = macd_line[-2] if len(macd_line) > 1 else macd_now
-    diff_now = macd_now - signal
-    diff_prev = macd_prev - signal
-    if diff_now > 0 and macd_now > 0:
-        state = "bullish"
-    elif diff_now < 0 and macd_now < 0:
-        state = "bearish"
-    else:
-        state = "cross"
-    if (diff_now > 0) != (diff_prev > 0):
-        state = "cross"
-    return state, round(macd_now, 4)
-
-def _rsi(close, period=14):
-    if len(close) < period+1:
-        return 50.0
-    delta = close.diff().dropna()
-    if len(delta) < period:
-        return 50.0
-    gains = delta.clip(lower=0)
-    losses = -delta.clip(upper=0)
-    ag = gains.rolling(period).mean().iloc[-1]
-    al = losses.rolling(period).mean().iloc[-1]
-    if al == 0:
-        return 100.0
-    rs = ag/al
-    return float(round(100 - 100/(1+rs), 2))
+def _swing_points(close, window=2):
+    """Return list of (idx, price, kind) pivots; kind in {'H','L'}."""
+    n = len(close)
+    pivots = []
+    if n < 2 * window + 1:
+        return pivots
+    for i in range(window, n - window):
+        price = float(close.iloc[i])
+        seg = [float(close.iloc[j]) for j in range(i - window, i + window + 1) if j != i]
+        if all(price > s for s in seg):
+            pivots.append((i, price, 'H'))
+        elif all(price < s for s in seg):
+            pivots.append((i, price, 'L'))
+    return pivots
 
 def compute_layer2(symbol, df_60m):
-    """Classify short-term momentum on 60m bars. Returns signals + group enum."""
+    """Classify the minor (short-term) trend STRUCTURE on 60m bars — the L2 axis
+    is a *structural* minor-trend read, NOT a momentum/oscillator read (Q9b).
+
+    Five groups (Q14):
+      up_leg     - uptrend, minor leg also advancing (HH/HL)
+      pullback   - uptrend, minor leg dipping but higher-low structure intact
+      tight_base - narrow consolidation (negligible recent range)
+      down_leg   - downtrend, minor leg also declining (LH/LL)
+      bounce     - downtrend, minor leg lifting but lower-high structure intact
+
+    Structure (swing highs/lows) decides pullback vs up_leg and bounce vs
+    down_leg; a short dip that still holds higher lows is a pullback, not a
+    trend break. Never returns None: missing/short 60m data falls back to
+    tight_base so every symbol is classified (Q18).
+    """
+    default = {"signals": {"structure": "flat", "swing": "none", "long_slope": 0.0, "short_slope": 0.0}, "group": "tight_base"}
     if df_60m is None or len(df_60m) < 30:
-        return {"signals": {"mini_trend": "flat", "macd": "cross", "rsi": None}, "group": "neutral"}
+        return default
     close = df_60m["Close"].astype(float)
-    ma50 = close.rolling(50).mean()
-    ma50_now = ma50.iloc[-1] if len(close) >= 50 else close.mean()
-    ma50_prev = ma50.iloc[-5] if len(close) >= 54 else ma50_now
-    slope = (ma50_now - ma50_prev) if ma50_prev else 0.0
-    price = float(close.iloc[-1])
-    mini_trend = "up" if (price > ma50_now and slope > 0) else \
-                 "down" if (price < ma50_now and slope < 0) else "flat"
-    macd_state, _ = _macd_state(close)
-    rsi = _rsi(close, 14)
-    if rsi >= 70:
+    long_slope = _ma_slope(close, 50)
+    short_slope = _ma_slope(close, 10)
+    pivots = _swing_points(close, window=2)
+    recent = close.iloc[-20:]
+    amp = (float(recent.max()) - float(recent.min())) / float(recent.mean()) if len(recent) else 0.0
+    signals = {"structure": "mixed", "long_slope": round(long_slope, 4), "short_slope": round(short_slope, 4)}
+    if len(pivots) < 3:
+        # Not enough swing structure: fall back to primary-trend slope.
+        if amp < 0.015:
+            group = "tight_base"
+        elif long_slope > 0:
+            group = "up_leg"
+        elif long_slope < 0:
+            group = "down_leg"
+        else:
+            group = "tight_base"
+        signals["structure"] = group
+        return {"signals": signals, "group": group}
+    last = pivots[-4:]
+    highs = [p[1] for p in last if p[2] == 'H']
+    lows = [p[1] for p in last if p[2] == 'L']
+    hh = len(highs) >= 2 and highs[-1] > highs[0]
+    hl = len(lows) >= 2 and lows[-1] > lows[0]
+    lh = len(highs) >= 2 and highs[-1] < highs[0]
+    ll = len(lows) >= 2 and lows[-1] < lows[0]
+    swing_label = "HH/HL" if (hh and hl) else "LH/LL" if (lh and ll) else "mixed"
+    signals["swing"] = swing_label
+    if amp < 0.015:
+        group = "tight_base"
+    elif hl and not ll:
+        group = "pullback"           # higher lows intact -> dip in uptrend
+    elif ll and not hl:
+        group = "bounce"            # lower highs intact -> rebound in downtrend
+    elif hh and hl:
+        group = "up_leg"
+    elif lh and ll:
+        group = "down_leg"
+    elif long_slope > 0:
+        group = "up_leg"
+    elif long_slope < 0:
+        group = "down_leg"
+    else:
+        group = "tight_base"
+    signals["structure"] = group
+    return {"signals": signals, "group": group}
+
+
+def compute_layer2_momentum(symbol, df_60m):
+    """MACD(12,26,9) + RSI(14) on 60m close. Returns signals + group."""
+    default = {"signals": {"macd": "cross", "rsi": 50.0}, "group": "neutral"}
+    if df_60m is None or len(df_60m) < 30:
+        return default
+    close = df_60m["Close"].astype(float)
+    # MACD
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    hist = macd_line - signal_line
+    macd_now = float(macd_line.iloc[-1])
+    signal_now = float(signal_line.iloc[-1])
+    hist_now = float(hist.iloc[-1])
+    hist_prev = float(hist.iloc[-2]) if len(hist) > 1 else 0.0
+    if macd_now > signal_now and macd_now > 0:
+        macd_state = "bullish"
+    elif macd_now < signal_now and macd_now < 0:
+        macd_state = "bearish"
+    else:
+        macd_state = "cross"
+    # RSI(14)
+    delta = close.diff()
+    gain = delta.where(delta > 0, 0).rolling(14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
+    rs = gain / loss
+    rsi_series = 100 - (100 / (1 + rs))
+    rsi_now = float(rsi_series.iloc[-1]) if not np.isnan(rsi_series.iloc[-1]) else 50.0
+    # Group
+    if rsi_now >= 70:
         group = "overbought"
-    elif rsi <= 30:
+    elif rsi_now <= 30:
         group = "oversold"
-    elif mini_trend == "up" and macd_state == "bullish":
-        group = "momentum_strong"
-    elif mini_trend == "up":
-        group = "momentum_up"
-    elif mini_trend == "down":
-        group = "momentum_down"
+    elif macd_state == "bullish" and 50 <= rsi_now < 70:
+        group = "strong"
+    elif macd_state == "bullish":
+        group = "up"
+    elif macd_state == "bearish":
+        group = "down"
     else:
         group = "neutral"
-    return {"signals": {"mini_trend": mini_trend, "macd": macd_state, "rsi": float(rsi) if rsi is not None else None},
-            "group": group}
+    return {
+        "signals": {"macd": macd_state, "rsi": round(rsi_now, 2)},
+        "group": group
+    }
 
 def universe_layer2(pg, symbols):
+    """Classify every symbol. compute_layer2 falls back to 'tight_base' for
+    missing/short 60m data, so we ALWAYS emit a group (no None) — see Q18."""
     out = {}
     for sym in symbols:
-        df = load_symbol_intraday(sym, pg=pg, interval="60m", lookback=400)
-        if df is None or len(df) < 30:
-            continue
         try:
+            df = load_symbol_intraday(sym, pg=pg, interval="60m", lookback=400)
             out[sym] = compute_layer2(sym, df)
         except Exception:
-            continue
+            out[sym] = {"signals": {"structure": "flat", "swing": "error"}, "group": "tight_base"}
     return out
 
 def load_index_membership(pg):
