@@ -70,12 +70,19 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertIn("flex-wrap:wrap", html)
         self.assertNotIn(".l2-bar{overflow-x:auto;flex-wrap:nowrap", html)
 
-    def test_template_renders_l3_qualifier_badge_contract(self):
+    def test_template_compatibility_helpers_cover_new_and_legacy_items(self):
         html = self.template
-        self.assertIn("const l3=i.layer3_qualifier", html)
-        self.assertIn("Q${l3.score}", html)
-        self.assertIn("l3Colors", html)
-        self.assertIn("layer3_qualifier", html)
+        for marker in (
+            "const structuralGroup=i=>i.layer2_structural?.group??i.layer2_group",
+            "const momentumGroup=i=>normalizeMomentumGroup(i.layer2_momentum?.group??i.layer2_momentum_group??i.momentum_group??i.layer2_signals?.momentum)",
+            "const l3=i.layer3_qualifier??i.layer3_qualifiers",
+            "const l3Badge=l3&&l3.score!==undefined",
+            "Q${l3.score}",
+        ):
+            self.assertIn(marker, html)
+        # A legacy structural group must not silently become a momentum count.
+        momentum_helper = html.split("const momentumGroup=", 1)[1].split(";", 1)[0]
+        self.assertNotIn("i.layer2_group", momentum_helper)
 
     # --- Contracts intentionally NOT yet built (tracked, not silently passing) ---
     def test_detail_modal_renders_badges_and_stale_provenance_contract(self):

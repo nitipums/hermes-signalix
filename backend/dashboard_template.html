@@ -225,8 +225,10 @@ const savedKey="signalix-watchlist-v2";
 let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
 let liquidity="liquid",detailItem=null,stageFilter="all";
 let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, l2Filter={}, l2MomFilter={};
-const structuralGroup=i=>i.layer2_structural?.group||i.layer2_group;
-const momentumGroup=i=>({ob:"overbought",os:"oversold",neu:"neutral"}[i.layer2_momentum?.group]||i.layer2_momentum?.group);
+const structuralGroup=i=>i.layer2_structural?.group??i.layer2_group;
+const normalizeMomentumGroup=v=>({ob:"overbought",os:"oversold",neu:"neutral"}[v]||v);
+// Legacy snapshots have layer2_group for structure only. Never use it as momentum.
+const momentumGroup=i=>normalizeMomentumGroup(i.layer2_momentum?.group??i.layer2_momentum_group??i.momentum_group??i.layer2_signals?.momentum);
 const profileValue=(i,key)=>i[key]??i.independence?.[key];
 
 function freshBadge(i){
@@ -240,7 +242,7 @@ function card(i){
   const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
   const tone=STAGE_TONE[i.stage]||"neutral";
   const l2=STAGE_L2_LABEL[structuralGroup(i)]||structuralGroup(i);
-  const l3=i.layer3_qualifier;
+  const l3=i.layer3_qualifier??i.layer3_qualifiers;
   const l3Colors={3:"var(--green)",2:"var(--amber)",1:"var(--slate)",0:"var(--muted)"};
   const l3Badge=l3&&l3.score!==undefined?`<span class="chip" style="background:${l3Colors[l3.score]||"var(--muted)"}22;color:${l3Colors[l3.score]||"var(--muted)"};border-color:${l3Colors[l3.score]||"var(--muted)"};font-size:10px;padding:2px 8px;margin-left:6px">Q${l3.score}</span>`:"";
   const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
