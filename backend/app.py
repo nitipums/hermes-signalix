@@ -485,7 +485,7 @@ def screen_symbol(symbol: str):
     from setup_state import compute_setup_state
     from scan_history import active_breakout_events
     pg = get_pg()
-    events = active_breakout_events(pg, [symbol.upper()])
+    events = active_breakout_events(pg)
     state = classify_daily_state(result, events.get(symbol.upper(), {}))
     _setup = compute_setup_state(state["stage"], result)
     state["setup_quality"] = _setup["quality"]
