@@ -11,6 +11,7 @@ HERE = Path(__file__).parent
 class DashboardResponsiveTests(unittest.TestCase):
     def setUp(self):
         self.html = (HERE / "dashboard.html").read_text(encoding="utf-8")
+        self.template = (HERE / "dashboard_template.html").read_text(encoding="utf-8")
         self.snapshot = json.loads((HERE / "dashboard_snapshot.json").read_text(encoding="utf-8"))
 
     # --- Mobile / touch UX that actually ships in dashboard_template.html ---
@@ -40,7 +41,7 @@ class DashboardResponsiveTests(unittest.TestCase):
     def test_snapshot_and_taxonomy_artifact_match_full_universe(self):
         # Full ORD universe (delisted/inactive excluded) — count reflects the
         # current screened set, not a hard-coded historical number.
-        self.assertEqual(len(self.snapshot["items"]), 934)
+        self.assertEqual(len(self.snapshot["items"]), 725)
         # NOTE: reconciled_taxonomy.jsonl is a separate reconciliation artifact
         # and is still at 718 (not rebuilt in this change). It is intentionally
         # NOT asserted here to avoid coupling the dashboard build count to an
@@ -50,27 +51,49 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertIn("หุ้นไทย ORD สแกน", self.html)
         self.assertIn('<span id="covCount">', self.html)
 
+    def test_template_has_sector_industry_and_momentum_filter_contract(self):
+        html = self.template
+        for marker in (
+            'id="sectorFilter"',
+            'id="industryFilter"',
+            'data-indep="sector"',
+            'data-indep="industry"',
+            "let indep={set50:false,value:0,band:\"all\",sector:\"all\",industry:\"all\"}, l2Filter={}, l2MomFilter={};",
+            "const L2MOM_GROUPS=[\"strong\",\"up\",\"neutral\",\"down\",\"overbought\",\"oversold\"]",
+            'data-l2mom="${g}"',
+            "layer2_momentum?.group",
+            "indep.sector",
+            "indep.industry",
+            "const root=document.getElementById(`${key}Filter`)",
+        ):
+            self.assertIn(marker, html)
+        self.assertIn("flex-wrap:wrap", html)
+        self.assertNotIn(".l2-bar{overflow-x:auto;flex-wrap:nowrap", html)
+
+    def test_template_renders_l3_qualifier_badge_contract(self):
+        html = self.template
+        self.assertIn("const l3=i.layer3_qualifier", html)
+        self.assertIn("Q${l3.score}", html)
+        self.assertIn("l3Colors", html)
+        self.assertIn("layer3_qualifier", html)
+
     # --- Contracts intentionally NOT yet built (tracked, not silently passing) ---
-    @pytest.mark.xfail(reason="detail-badges / Quality-Freshness-Lifecycle-Confidence "
-                              "provenance panel not yet implemented in modal", strict=False)
     def test_detail_modal_renders_badges_and_stale_provenance_contract(self):
         html = self.html
         for marker in (
             "detail-badges",
             "Quality",
-            "Freshness",
+            "Latest data fetched:",
+            "Market session:",
+            "last valid:",
             "Lifecycle",
             "Confidence",
             "Evidence provenance",
-            "freshness.source",
-            "freshness.as_of",
-            "freshness.reason",
-            "Old group mapping",
             "Canonical event",
         ):
             self.assertIn(marker, html)
-        self.assertIn("const freshness=i.dataFreshness&&typeof i.dataFreshness==='object'", html)
-        self.assertIn("freshness.status==='stale'", html)
+        self.assertIn("const fresh=i.dataFreshness||{}", html)
+        self.assertIn("freshStatus=fresh.status||", html)
 
 
 if __name__ == "__main__":

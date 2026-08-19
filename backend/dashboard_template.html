@@ -64,6 +64,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .l2-bar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
 .l2-bar .chip{padding:5px 10px;font-size:11px}
 .l2-bar .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
+.l2-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel2);border:1px dashed var(--line);border-radius:10px;margin-top:10px}
 
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
 .signal-card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 14px;position:relative;overflow:hidden}
@@ -79,6 +80,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .stage-badge.warning{background:#332e18;color:var(--s3)}
 .stage-badge.danger{background:#3a1f1f;color:var(--s4)}
 .phase-tag{display:inline-block;font-size:10px;color:var(--muted);margin-left:6px;vertical-align:middle}
+.fresh-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
+.fresh-badge.eod{background:#16223a;color:var(--blue)}
+.fresh-badge.live{background:#14362e;color:var(--s2)}
+.fresh-badge.stale{background:#3a1f1f;color:var(--s4)}
+.fresh-badge.unknown{background:#222;color:var(--muted)}
 .star{background:none;border:0;font-size:18px;color:var(--muted)}
 .star.saved{color:var(--amber)}
 .price{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
@@ -93,6 +99,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .quality-strip .q{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
 .quality-strip .q.warn{color:var(--amber);border-color:#6b5a2c}
 .action-line{font-size:11px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.detail-badges{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
+.detail-badges .db-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:3px 0;border-bottom:1px solid var(--line)}
+.detail-badges .db-row:last-child{border-bottom:0}
+.detail-badges .db-k{color:var(--muted)}
+.detail-badges .db-v{color:var(--text);font-weight:700}
 .action-line b{color:var(--text)}
 .empty{color:var(--muted);padding:30px;text-align:center}
 
@@ -102,8 +113,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   .app{padding:0 12px 32px}
   .nav{position:sticky;top:0;gap:6px;padding:8px 0}
   .nav button{padding:10px 12px;font-size:13px}
-  .l2-bar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px;-webkit-overflow-scrolling:touch}
-  .l2-bar .chip{flex:0 0 auto;padding:10px 12px}
+  .l2-bar{flex-wrap:wrap;padding-bottom:6px}
+  .l2-bar .chip{padding:10px 12px}
   .tf-tools .chip{padding:10px 14px;font-size:12px}
   .liquidity-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px}
   .liquidity-tools .chip,.liquidity-tools select{flex:0 0 auto;padding:10px 12px}
@@ -123,6 +134,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .nav-arrow,.modal-close{font-weight:800;font-size:15px;line-height:1}
 .nav-arrow{padding:0 12px}
 .modal-close{padding:0 14px;color:var(--red)}
+.chart-status{min-height:18px;color:var(--muted);font-size:11px;margin:2px 0 6px}
 </style>
 </head>
 <body>
@@ -130,8 +142,16 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 <main class="app">
   <header class="topbar">
     <div class="brand">Signal<span>ix</span></div>
-    <div class="fresh"><i id="liveDot"></i><span id="liveState">Loading…</span>
-      <button id="languageToggle" class="chip" style="margin-left:8px">EN</button></div>
+    <div class="fresh">
+      <i id="liveDot"></i>
+      <span id="liveState">Loading…</span>
+      <span id="provenance" style="margin-left:12px;font-size:11px;color:var(--muted)">
+        <span id="provFetched">Latest data fetched: —</span> ·
+        <span id="provSession">Market session: —</span> ·
+        <span id="provValid">last valid: —</span>
+      </span>
+      <button id="languageToggle" class="chip" style="margin-left:8px">EN</button>
+    </div>
   </header>
   <nav class="nav">
     <button class="chip active" data-page="screener">คัดหุ้น (Stage)</button>
@@ -158,6 +178,14 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
         <option value="mid">กลาง (฿2–10)</option>
         <option value="high">สูง (&gt;฿10)</option>
       </select>
+      <div id="sectorFilter" class="chip" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--muted)">Sector:</span>
+        <button class="chip active" data-indep="sector" data-value="all">All</button>
+      </div>
+      <div id="industryFilter" class="chip" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:11px;color:var(--muted)">Industry:</span>
+        <button class="chip active" data-indep="industry" data-value="all">All</button>
+      </div>
       <button class="chip active" id="liquidOnly" data-liquidity="liquid">ซ่อน low value (&lt;฿10M/วัน)</button>
       <button class="chip" id="showLowValue" data-liquidity="all">โชว์ทั้งหมด</button>
     </div>
@@ -182,6 +210,7 @@ const STAGE_ORDER=["S2_uptrend","S1_basing","S3_distributing","S4_down"];
 const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
 const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
 const STAGE_DESC={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"สร้างฐาน — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"กำลังจ่าย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
+const STAGE_L2_LABEL={up_leg:"Up Leg",pullback:"Pullback",tight_base:"Tight Base",bounce:"Bounce",down_leg:"Down Leg"};
 let items=__ITEMS__;
 let stageMeta=__STAGE_META__;
 const copy={th:{navScreener:"คัดหุ้น",navWatchlist:"หุ้นติดตาม",navMarket:"ตลาด"}};
@@ -195,25 +224,51 @@ const apiBase=`${location.protocol}//${location.hostname}:8000`;
 const savedKey="signalix-watchlist-v2";
 let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
 let liquidity="liquid",detailItem=null,stageFilter="all";
-let indep={set50:false,value:0,band:"all"}, l2Filter={};
+let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, l2Filter={}, l2MomFilter={};
+const structuralGroup=i=>i.layer2_structural?.group||i.layer2_group;
+const momentumGroup=i=>({ob:"overbought",os:"oversold",neu:"neutral"}[i.layer2_momentum?.group]||i.layer2_momentum?.group);
+const profileValue=(i,key)=>i[key]??i.independence?.[key];
 
+function freshBadge(i){
+  // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
+  if(i.stale) return `<span class="fresh-badge stale" title="Data is stale; Daily EOD shown for decisions">⚠ Stale</span>`;
+  if(i.intradayAvailable) return `<span class="fresh-badge live" title="Live intraday quote available">● Intraday</span>`;
+  if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="Source: ${esc(i.priceLabel)}">Daily EOD</span>`;
+  return `<span class="fresh-badge unknown" title="No price source available">Unknown</span>`;
+}
 function card(i){
   const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
   const tone=STAGE_TONE[i.stage]||"neutral";
+  const l2=STAGE_L2_LABEL[structuralGroup(i)]||structuralGroup(i);
+  const l3=i.layer3_qualifier;
+  const l3Colors={3:"var(--green)",2:"var(--amber)",1:"var(--slate)",0:"var(--muted)"};
+  const l3Badge=l3&&l3.score!==undefined?`<span class="chip" style="background:${l3Colors[l3.score]||"var(--muted)"}22;color:${l3Colors[l3.score]||"var(--muted)"};border-color:${l3Colors[l3.score]||"var(--muted)"};font-size:10px;padding:2px 8px;margin-left:6px">Q${l3.score}</span>`:"";
+  const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
   return `<article class="signal-card stage-${i.stage}" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="Review ${esc(i.symbol)}">
     <div class="card-top"><div>
       <span class="ticker">${esc(i.symbol)}</span>
       <span class="stage-badge ${tone}">${esc(i.stage_label)}</span>
-      <span class="phase-tag">${esc(i.phase_label)}</span>
-      ${i.layer2_group?`<span class="phase-tag" style="color:var(--slate)">L2: ${esc(i.layer2_group)}</span>`:""}
+      ${i.phase_label?`<span class="phase-tag">${esc(i.phase_label)}</span>`:""}
+      ${structuralGroup(i)?`<span class="phase-tag" style="color:var(--slate)">L2: ${esc(l2)}</span>`:""}
+      ${freshBadge(i)}
     </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist">${saved.has(i.symbol)?"★":"☆"}</button></div>
     <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
-    <div class="basic-strip"><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span><span>Chg <b class="${gain?"gain":"loss"}">${num(i.changeAmount)} · ${pct(i.changePct)}</b></span></div>
+    <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span><span>Chg <b class="${gain?"gain":"loss"}">${num(i.changeAmount)} · ${pct(i.changePct)}</b></span></div>
+    ${company}
     ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
     ${i.volumeSurge?`<div class="setup-evidence surge">VOLUME SURGE ${num(i.volumeSurgeRatio,1)}×</div>`:""}
-    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${(i.quality&&i.quality.flags||[]).map(f=>`<span class="q warn">${esc(f)}</span>`).join("")}</div>
+    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${(i.quality&&i.quality.flags||[]).map(f=>`<span class="q warn">${esc(f)}</span>`).join("")}${l3Badge}</div>
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b> · ${esc(i.actionReason)}</div>`:""}
   </article>`;
+}
+function populateIndependenceFilters(){
+  ["sector","industry"].forEach(key=>{
+    const values=[...new Set(items.map(i=>profileValue(i,key)).filter(Boolean))].sort();
+    const list=key==="industry"?values.slice(0,20):values;
+    const root=document.getElementById(`${key}Filter`); if(!root)return;
+    root.innerHTML=`<span style="font-size:11px;color:var(--muted)">${key[0].toUpperCase()+key.slice(1)}:</span>`+
+      ["all",...list].map(v=>`<button class="chip ${indep[key]===v?"active":""}" data-indep="${key}" data-value="${esc(v)}">${v==="all"?"All":esc(v)}</button>`).join("");
+  });
 }
 function current(){
   const q=document.getElementById("search").value.trim().toLowerCase();
@@ -223,14 +278,19 @@ function current(){
     if(indep.set50&&!(i.independence&&i.independence.is_set50))return false;
     if(indep.value>0&&!(i.independence&&i.independence.avgTradeValue20>=(indep.value*1e6)))return false;
     if(indep.band!=="all"&&!(i.independence&&i.independence.priceBand===indep.band))return false;
+    if(indep.sector!=="all"&&profileValue(i,"sector")!==indep.sector)return false;
+    if(indep.industry!=="all"&&profileValue(i,"industry")!==indep.industry)return false;
     const lf=l2Filter[i.stage];
-    if(lf&&lf!=="all"&&i.layer2_group!==lf)return false;
+    if(lf&&lf!=="all"&&structuralGroup(i)!==lf)return false;
+    const lmf=l2MomFilter[i.stage];
+    if(lmf&&lmf!=="all"&&momentumGroup(i)!==lmf)return false;
     if(q&&!`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q))return false;
     return true;
   });
 }
 function render(){
   document.getElementById("covCount").textContent=items.length;
+  populateIndependenceFilters();
   // stage summary pills (clickable filter)
   const sum=document.getElementById("stageSummary");
   sum.innerHTML=STAGE_ORDER.map(s=>{
@@ -246,14 +306,22 @@ function render(){
     const list=vals.filter(i=>i.stage===s);
     if(!list.length)return "";
     const m=stageMeta[s]||{count:list.length};
-    const L2GROUPS=["momentum_strong","momentum_up","neutral","momentum_down","overbought","oversold"];
-    const counts={}; L2GROUPS.forEach(g=>counts[g]=list.filter(i=>i.layer2_group===g).length);
-    const subpills=L2GROUPS.map(g=>`<button class="chip l2sub ${l2Filter[s]===g?"active":""}" data-stage="${s}" data-l2="${g}">${g} <b>${counts[g]}</b></button>`).join("");
+    const L2GROUPS=["up_leg","pullback","tight_base","bounce","down_leg"];
+    const L2_LABEL={up_leg:"Up Leg",pullback:"Pullback",tight_base:"Tight Base",bounce:"Bounce",down_leg:"Down Leg"};
+    const counts={}; L2GROUPS.forEach(g=>counts[g]=list.filter(i=>structuralGroup(i)===g).length);
+    const subpills=L2GROUPS.map(g=>`<button class="chip l2sub ${l2Filter[s]===g?"active":""}" data-stage="${s}" data-l2="${g}">${L2_LABEL[g]} <b>${counts[g]}</b></button>`).join("");
+    const L2MOM_GROUPS=["strong","up","neutral","down","overbought","oversold"];
+    const L2MOM_LABEL={strong:"Strong",up:"Up",neutral:"Neu",down:"Down",overbought:"OB",oversold:"OS"};
+    const momCounts={}; L2MOM_GROUPS.forEach(g=>momCounts[g]=list.filter(i=>momentumGroup(i)===g).length);
+    const momPills=L2MOM_GROUPS.map(g=>`<button class="chip l2mom ${l2MomFilter[s]===g?"active":""}" data-stage="${s}" data-l2mom="${g}">${L2MOM_LABEL[g]} <b>${momCounts[g]}</b></button>`).join("");
+    const structuralEmpty=l2Filter[s]&&l2Filter[s]!=="all"&&!list.some(i=>structuralGroup(i)===l2Filter[s]);
+    const momentumEmpty=l2MomFilter[s]&&l2MomFilter[s]!=="all"&&!list.some(i=>momentumGroup(i)===l2MomFilter[s]);
     return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
       <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
       <span class="desc">${esc(STAGE_DESC[s])}</span></div>
       <div class="l2-bar">${subpills}<button class="chip l2sub ${!l2Filter[s]?"active":""}" data-stage="${s}" data-l2="all">All <b>${list.length}</b></button></div>
-      <div class="cards">${list.map(card).join("")}</div></section>`;
+      <div class="l2-bar l2-momentum-bar"><span class="phase-tag" style="margin-left:0">Momentum</span>${momPills}<button class="chip l2mom ${!l2MomFilter[s]?"active":""}" data-stage="${s}" data-l2mom="all">All <b>${list.length}</b></button></div>
+      <div class="cards">${list.map(card).join("")}</div>${structuralEmpty||momentumEmpty?`<div class="l2-empty">No symbols in this subgroup</div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
   renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
@@ -284,6 +352,32 @@ function bind(root=document){
 }
 const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
 const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
+function provenancePanel(i){
+  // Detail-level provenance (Q7/Q12): show data source, freshness, lifecycle,
+  // confidence and the canonical-event vs old-group mapping so traders can
+  // judge trust. Mirrors the contract the responsive test asserts.
+  const fresh=i.dataFreshness||{};
+  const dt=i.dailyEodDecision||{};
+  const stale=!!i.stale;
+  const freshStatus=fresh.status||(stale?"stale":"fresh");
+  const source=esc(i.priceLabel||(i.intradayAvailable?"Intraday":"Daily EOD"));
+  const asOf=esc(dt.as_of||i.date||"—");
+  const reason=stale?"Old group mapping superseded by Daily EOD for decisions":(i.intradayAvailable?"Live intraday quote":"Latest available EOD");
+  const lf=i.lifecycle||{};
+  const lifecycleLabel=esc(lf.label||"—");
+  const confidence=i.eligibility==="eligible"?"eligible":"not_eligible";
+  const marketSession=i.market_session||{};
+  return `<div class="detail-badges" id="detail-badges">
+    <div class="db-row"><span class="db-k">Quality</span><span class="db-v">${(i.quality&&i.quality.confidence)||"—"}</span></div>
+    <div class="db-row"><span class="db-k">Latest data fetched:</span><span class="db-v">${freshStatus} · ${source}</span></div>
+    <div class="db-row"><span class="db-k">Market session:</span><span class="db-v">${esc(marketSession.status||"—")} · ${esc(marketSession.timezone||"Asia/Bangkok")} · ${esc(marketSession.source||"set_market_day_guard")}</span></div>
+    <div class="db-row"><span class="db-k">last valid:</span><span class="db-v">${esc(marketSession.last_valid_session||asOf)}</span></div>
+    <div class="db-row"><span class="db-k">Lifecycle</span><span class="db-v">${lifecycleLabel}</span></div>
+    <div class="db-row"><span class="db-k">Confidence</span><span class="db-v">${confidence}</span></div>
+    <div class="db-row"><span class="db-k">Evidence provenance</span><span class="db-v">${esc(i.profileSource||"price_data")}</span></div>
+    <div class="db-row"><span class="db-k">Canonical event</span><span class="db-v">${esc(i.phase_label||"—")}</span></div>
+  </div>`;
+}
 let detailGen=0;
 let chartAbort=null;
 function openDetail(i){
@@ -306,12 +400,19 @@ function openDetail(i){
       <button class="chip tf" data-tf="1W">1W</button>
       <button class="chip tf" data-tf="1M">1M</button>
     </div>
-    <canvas id="detailChart" height="220" style="width:100%;margin:10px 0 4px;border-radius:10px;background:#0a0e17"></canvas>
-    <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <canvas id="detailChart" height="220" style="width:100%;margin:10px 0 4px;border-radius:10px;background:#0a0e17" data-timeframe="60m"></canvas>
+    <div id="chartStatus" class="chart-status" role="status" aria-live="polite"></div>
+    <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"><span>Moving averages</span></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <button class="chip" id="chartPanLeft" aria-label="เลื่อนย้อน">◀◀</button>
+      <button class="chip" id="chartPanRight" aria-label="เลื่อนไปหน้า">▶▶</button>
+      <div id="chartPanHint" style="font-size:11px;color:var(--slate)">ลาก/สกrolล์เลื่อนแกนเวลา</div>
+    </div>
     <a class="chip tv-link" id="tvLink" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;text-decoration:none">TradingView ↗</a>
     <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
-    <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>Vol <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
+    <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b><br>${esc(i.actionReason)}</div>`:""}
+    ${provenancePanel(i)}
   </div>`;
   document.getElementById("prevStock").onclick=()=>stepStock(-1);
   document.getElementById("nextStock").onclick=()=>stepStock(1);
@@ -319,9 +420,7 @@ function openDetail(i){
   document.getElementById("tvLink").href=`https://www.tradingview.com/chart/?symbol=SET:${encodeURIComponent(i.symbol)}`;
   document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
     if(myGen!==detailGen)return;
-    document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active");
-    loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
+    chartViewOffset=0; setActiveTf(b.dataset.tf); loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
   });
   // Auto-pick timeframe by listing age, then load.
   pickTimeframe(i.symbol).then(tf=>{
@@ -330,6 +429,7 @@ function openDetail(i){
     loadChart(i.symbol, TF_API[tf], myGen);
   });
   bind();
+  bindChartPan();
 }
 let currentTf="1D";
 function setActiveTf(tf){ currentTf=tf; document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf)); }
@@ -345,20 +445,27 @@ function pickTimeframe(symbol){
 function loadChart(symbol, tf, gen){
   if(gen!==undefined && gen!==detailGen)return;
   currentTf=tf;
+  const status=document.getElementById("chartStatus"); if(status)status.textContent="กำลังโหลด chart…";
   if(chartAbort)chartAbort.abort();
   const ac=chartAbort=new AbortController();
   const fetchLimit=(tf==="1M")?500:200;
   fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${fetchLimit}`,{signal:ac.signal})
-    .then(r=>r.json()).then(d=>{ if(gen!==detailGen)return; if(d&&d.bars&&d.bars.length){ drawChart(d.bars, tf); } else { fallback(symbol,tf,gen); } })
+    .then(r=>r.json()).then(d=>{ if(gen!==detailGen)return; if(d&&d.bars&&d.bars.length){ lastBars=d.bars; drawChart(d.bars, tf); if(status)status.textContent=""; } else { fallback(symbol,tf,gen); } })
     .catch(()=>{ if(gen===detailGen)fallback(symbol,tf,gen); });
 }
-function fallback(symbol,tf,gen){ if(gen!==detailGen)return; const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ setActiveTf(nx); loadChart(symbol,nx,gen); } }
+function fallback(symbol,tf,gen){ if(gen!==detailGen)return; const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ const status=document.getElementById("chartStatus"); if(status)status.textContent=`ไม่มีข้อมูล ${TF_LABEL[tf]||tf}; แสดง timeframe ถัดไปแทน`; setActiveTf(nx); loadChart(symbol,nx,gen); } else { const status=document.getElementById("chartStatus"); if(status)status.textContent="No stored chart data — not substituted"; } }
+let chartViewOffset=0; // how many bars scrolled back from the right edge (pan)
 function drawChart(bars, tf){
   const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;
   const ctx=cv.getContext("2d");
   const W=cv.width=cv.clientWidth||520, H=cv.height=220;
   const drawN=(tf==="1M")?bars.length:Math.min(60,bars.length);
-  const slice=bars.slice(-drawN); const n=slice.length; if(!n)return;
+  // Clamp pan offset so we never scroll past either edge.
+  const maxOffset=Math.max(0, bars.length-drawN);
+  if(chartViewOffset>maxOffset)chartViewOffset=maxOffset;
+  if(chartViewOffset<0)chartViewOffset=0;
+  const sliceStart=Math.max(0, bars.length-drawN-chartViewOffset);
+  const slice=bars.slice(sliceStart, sliceStart+drawN); const n=slice.length; if(!n)return;
   const lo=Math.min(...slice.map(b=>b.low)), hi=Math.max(...slice.map(b=>b.high)), rng=(hi-lo)||1;
   const pad=10, top=10, plotH=H-2*pad, cw=W/n;
   ctx.clearRect(0,0,W,H);
@@ -372,7 +479,7 @@ function drawChart(bars, tf){
     const bw=Math.max(1,cw*0.6);
     ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);
   });
-  const closes=bars.map(b=>b.close), startIdx=bars.length-drawN;
+  const closes=bars.map(b=>b.close), startIdx=sliceStart;
   const maDefs=[{n:20,c:"#ffc45d",label:"MA20"},{n:50,c:"#79adff",label:"MA50"},{n:200,c:"#c08bff",label:"MA200"}];
   const legend=[];
   maDefs.forEach(m=>{
@@ -381,6 +488,39 @@ function drawChart(bars, tf){
     ctx.stroke(); if(drew)legend.push(`<span style="color:${m.c}">● ${m.label}</span>`);
   });
   const lg=document.getElementById("chartLegend"); if(lg)lg.innerHTML=legend.join(" ");
+  // pan hint
+  const hint=document.getElementById("chartPanHint"); if(hint)hint.textContent=(chartViewOffset>0?`← เลื่อนกลับ ${chartViewOffset} แท่ง`:"ลาก/สกrolล์เลื่อนแกนเวลา");
+}
+let lastBars=null;
+function panChart(dir){ // dir: -1 older (left), +1 newer (right)
+  chartViewOffset = Math.max(0, (chartViewOffset||0) + (dir<0?6:-6));
+  if(lastBars)drawChart(lastBars, currentTf);
+}
+// --- Chart pan: buttons + wheel + drag on canvas ---
+let _panBound=false;
+function bindChartPan(){
+  const cv=document.getElementById("detailChart"); if(!cv||_panBound)return; _panBound=true;
+  const L=document.getElementById("chartPanLeft"), R=document.getElementById("chartPanRight");
+  if(L)L.onclick=()=>panChart(-1);
+  if(R)R.onclick=()=>panChart(1);
+  cv.style.cursor="grab";
+  cv.addEventListener("wheel",e=>{
+    const d=(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY);
+    if(!d)return;
+    e.preventDefault();
+    chartViewOffset += (d>0?1:-1)*2;
+    if(lastBars)drawChart(lastBars, currentTf);
+  },{passive:false});
+  let dragging=false, lastX=0;
+  cv.addEventListener("mousedown",e=>{ dragging=true; lastX=e.clientX; cv.style.cursor="grabbing"; });
+  window.addEventListener("mouseup",()=>{ dragging=false; cv.style.cursor="grab"; });
+  cv.addEventListener("mousemove",e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lastX; lastX=e.clientX;
+    if(Math.abs(dx)<3)return;
+    chartViewOffset += (dx>0?1:-1)*2;
+    if(lastBars)drawChart(lastBars, currentTf);
+  });
 }
 let detailList=[];
 function closeModal(){ detailGen++; const bg=document.getElementById("modalBg"); bg.classList.remove("open"); bg.setAttribute("aria-hidden","true"); }
@@ -397,7 +537,9 @@ document.addEventListener("click",e=>{
   const set50=e.target.closest("#set50Only"); if(set50){indep.set50=!indep.set50;set50.classList.toggle("active",indep.set50);render();}
   const vf=e.target.closest("#valueFilter"); if(vf){indep.value=parseFloat(vf.value)||0;render();}
   const pb=e.target.closest("#priceBand"); if(pb){indep.band=pb.value;render();}
+  const indepBtn=e.target.closest("[data-indep]"); if(indepBtn&&["sector","industry"].includes(indepBtn.dataset.indep)){indep[indepBtn.dataset.indep]=indepBtn.dataset.value;render();}
   const l2=e.target.closest(".l2sub"); if(l2){const st=l2.dataset.stage,g=l2.dataset.l2; l2Filter[st]=(l2Filter[st]===g?undefined:g); render();}
+  const l2mom=e.target.closest(".l2mom"); if(l2mom){const st=l2mom.dataset.stage,g=l2mom.dataset.l2mom; l2MomFilter[st]=(l2MomFilter[st]===g?undefined:g); render();}
   const star=e.target.closest("[data-star]");if(star){saved.has(star.dataset.star)?saved.delete(star.dataset.star):saved.add(star.dataset.star);persist();}
   if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
 });
@@ -412,7 +554,58 @@ let _swX=null; const _mb=document.getElementById("modalBg");
 _mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[0].clientX:null; },{passive:true});
 _mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
 const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
-render();
+
+async function loadRemoteDashboard(){
+  document.body.classList.add("loading");
+  const state=document.getElementById("liveState");
+  try{
+    // P0: Compact overview first paint — only core fields, fast & small
+    const compact=await fetch(`${apiBase}/dashboard/cards/compact?page_size=200`).then(r=>{if(!r.ok)throw new Error(`compact ${r.status}`);return r.json();});
+    stageMeta=compact.stage_meta||{};
+    items=compact.cards||[];
+    bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
+    document.getElementById("covCount").textContent=compact.total??items.length;
+    const updated=compact.scan_time?new Date(compact.scan_time).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}):"—";
+    if(state)state.textContent=`Live · ${items.length} cards · Updated ${updated} ICT`;
+    
+    // Populate provenance header from compact response
+    const fetched=compact.data_fetched_at?new Date(compact.data_fetched_at).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}):"—";
+    document.getElementById("provFetched").textContent=`Latest data fetched: ${fetched}`;
+    document.getElementById("provSession").textContent=`Market session: ${compact.market_session?.status||"—"}`;
+    document.getElementById("provValid").textContent=`last valid: ${compact.last_valid_session||"—"}`;
+    
+    // First render with compact cards (fast, mobile-resilient)
+    render();
+    
+    // Background: upgrade to full cards for detail view (non-blocking)
+    Promise.all(STAGE_ORDER.map(async stage=>{
+      let page=1, all=[];
+      while(true){
+        const u=`${apiBase}/dashboard/cards?stage=${encodeURIComponent(stage)}&page=${page}&page_size=200`;
+        const res=await fetch(u); if(!res.ok)throw new Error(`cards ${res.status}`);
+        const data=await res.json(); all=all.concat(data.cards||[]);
+        if(all.length>=data.total||!(data.cards||[]).length)break;
+        page++;
+      }
+      return all;
+    })).then(pages=>{
+      const full=pages.flat();
+      bySymbol=Object.fromEntries(full.map(i=>[i.symbol,i]));
+      items=full;
+      document.getElementById("covCount").textContent=full.length;
+      // Re-render with enriched cards (detail view now has full data)
+      render();
+    }).catch(()=>{
+      // If full load fails, keep compact cards — mobile resilience
+      console.warn("Full card load failed, keeping compact overview");
+    });
+    
+  }catch(err){
+    if(state)state.textContent="Load failed";
+    document.getElementById("results").innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">ลองใหม่</button></div>`;
+  }finally{ document.body.classList.remove("loading"); }
+}
+loadRemoteDashboard();
 </script>
 </body>
 </html>
