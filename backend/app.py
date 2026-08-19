@@ -381,7 +381,7 @@ def list_excluded_symbols():
 
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results  # noqa: E402
-from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle  # noqa: E402
+from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
 # All senders + formatters live in delivery.py so the batch scan (here) and the
 # standalone Redis consumer format + push identically.
 from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
@@ -392,12 +392,12 @@ from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 
-def build_and_push_summary(cands, near, scan_time):
+def build_and_push_summary(cands, near, scan_time, scanned):
     """Build the dashboard HTML, then push a summary + link to Telegram."""
     # build dashboard (runs build_dashboard.build in-process)
     try:
         import build_dashboard
-        info = build_dashboard.build()
+        info = build_dashboard.build(scanned)
         vcp_n = info["vcp"]
     except Exception as e:
         print(f"  ! dashboard build failed: {repr(e)[:120]}")
@@ -498,6 +498,179 @@ def us_watchlist_overview_payload(scan_path):
                       for row in payload.get("results", [])]}
 
 
+def _load_dashboard_cache() -> dict:
+    """Load the persisted dashboard artifact without DB joins or rescanning."""
+    cache_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
+    try:
+        with open(cache_path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail=f"dashboard cache unavailable: {exc}")
+    if not isinstance(payload.get("items"), list):
+        raise HTTPException(status_code=503, detail="dashboard cache has no items list")
+    return payload
+
+
+@app.get("/dashboard/overview")
+def dashboard_overview():
+    """Small dashboard metadata response for fast initial page load."""
+    payload = _load_dashboard_cache()
+    coverage = {}
+    coverage_path = os.path.join(os.path.dirname(__file__), "coverage_report.json")
+    try:
+        with open(coverage_path, encoding="utf-8") as handle:
+            report = json.load(handle)
+        coverage = {
+            "architecture_declared_universe_count": report.get("architecture_declared_universe_count"),
+            "database": report.get("database", {}),
+            "scan_count": report.get("scan", {}).get("count"),
+            "dashboard_count": report.get("dashboard", {}).get("count"),
+            "legacy_taxonomy_count": report.get("legacy_taxonomy", {}).get("count"),
+            "scan_not_in_dashboard_count": len(report.get("lineage", {}).get("scan_not_in_dashboard", [])),
+        }
+    except (OSError, json.JSONDecodeError):
+        coverage = {"status": "coverage_report_unavailable"}
+    items = payload["items"]
+    return {
+        "scan_time": payload.get("scan_time"),
+        "market": payload.get("market", "TH"),
+        "refresh": payload.get("refresh"),
+        "count": len(items),
+        "stage_meta": payload.get("stage_meta", {}),
+        "stage_counts": payload.get("stage_counts", {}),
+        "projection_version": payload.get("projection_version"),
+        "coverage": coverage,
+    }
+
+
+# --- Compact card fields for lightweight first paint ---
+# These are the ONLY fields the overview needs to render before detail/chart loads.
+# Any field not listed here is "unknown" until the detail view requests it.
+COMPACT_CARD_FIELDS = (
+    "symbol", "close", "date", "stage", "phase", "phase_label",
+    "group", "action", "actionReason", "breakoutLevel", "stop", "cut",
+    "priceSource", "priceLabel", "stale", "intradaySource", "intradayStale",
+    "intent", "status", "tone", "volume", "tradeValue",
+    "layer2_group", "intradayFreshness",
+)
+
+
+def _compact_card(item: dict, market: str = "unknown") -> dict:
+    """Project a full card to the compact overview contract.
+
+    Missing enrichment fields become explicit 'unknown' so the UI never
+    misinterprets absence as a negative signal.  ``market`` is authoritative
+    at the payload root (same universe for all cards), so it is injected
+    explicitly rather than guessed per item.
+    """
+    out = {}
+    for f in COMPACT_CARD_FIELDS:
+        out[f] = item.get(f, "unknown" if f not in item else item.get(f))
+    # market: one canonical market per response; never guess from item absence
+    out["market"] = item.get("market", market)
+    # scan_time and data_fetched_at come from root, not per-card
+    return out
+
+
+def _load_dashboard_cache() -> dict:
+    """Load the persisted dashboard artifact without DB joins or rescanning."""
+    cache_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
+    try:
+        with open(cache_path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=503, detail=f"dashboard cache unavailable: {exc}")
+    if not isinstance(payload.get("items"), list):
+        raise HTTPException(status_code=503, detail="dashboard cache has no items list")
+    return payload
+
+
+@app.get("/dashboard/cards")
+def dashboard_cards(stage: str | None = None, l2: str | None = None,
+                    page: int = 1, page_size: int = 50):
+    """Return bounded card pages from the persisted dashboard artifact.
+
+    This endpoint is deliberately read-only and uses the same serialized card
+    contract as the existing snapshot endpoint.  Filters are applied before
+    pagination so the UI can request one Stage/L2 subgroup at a time.
+    """
+    if page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    if page_size < 1 or page_size > 200:
+        raise HTTPException(status_code=400, detail="page_size must be between 1 and 200")
+    valid_stages = {"S1_basing", "S2_uptrend", "S3_distributing", "S4_down"}
+    valid_l2 = {"up_leg", "pullback", "tight_base", "down_leg", "bounce"}
+    if stage and stage not in valid_stages:
+        raise HTTPException(status_code=400, detail=f"unsupported stage: {stage}")
+    if l2 and l2 not in valid_l2:
+        raise HTTPException(status_code=400, detail=f"unsupported l2: {l2}")
+    payload = _load_dashboard_cache()
+    items = [item for item in payload["items"]
+             if (not stage or item.get("stage") == stage)
+             and (not l2 or item.get("layer2_group") == l2)]
+    start = (page - 1) * page_size
+    cards = items[start:start + page_size]
+    return {
+        "scan_time": payload.get("scan_time"),
+        "stage": stage,
+        "l2": l2,
+        "page": page,
+        "page_size": page_size,
+        "total": len(items),
+        "cards": cards,
+    }
+
+
+@app.get("/dashboard/cards/compact")
+def dashboard_cards_compact(stage: str | None = None, l2: str | None = None,
+                            page: int = 1, page_size: int = 50):
+    """Return lightweight compact cards for first paint.
+
+    Returns ONLY the core fields needed for overview rendering.  Enrichment
+    (history, profile, MA/EMA, ATH, risk/R, breakoutEvidence, etc.) is
+    explicitly 'unknown' until the detail view loads via /dashboard/cards.
+
+    Mobile resilience: if the refresh call fails, the previously cached
+    compact cards remain visible — the UI never clears the grid on error.
+    """
+    if page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    if page_size < 1 or page_size > 200:
+        raise HTTPException(status_code=400, detail="page_size must be between 1 and 200")
+    valid_stages = {"S1_basing", "S2_uptrend", "S3_distributing", "S4_down"}
+    valid_l2 = {"up_leg", "pullback", "tight_base", "down_leg", "bounce"}
+    if stage and stage not in valid_stages:
+        raise HTTPException(status_code=400, detail=f"unsupported stage: {stage}")
+    if l2 and l2 not in valid_l2:
+        raise HTTPException(status_code=400, detail=f"unsupported l2: {l2}")
+    payload = _load_dashboard_cache()
+    items = [item for item in payload["items"]
+             if (not stage or item.get("stage") == stage)
+             and (not l2 or item.get("layer2_group") == l2)]
+    start = (page - 1) * page_size
+    page_items = items[start:start + page_size]
+    market = payload.get("market", "TH")
+    compact = [_compact_card(item, market=market) for item in page_items]
+    return {
+        "scan_time": payload.get("scan_time"),
+        "data_fetched_at": payload.get("data_fetched_at"),
+        "data_freshness_source": payload.get("data_freshness_source"),
+        "data_freshness_status": payload.get("data_freshness_status"),
+        "data_intraday_status": payload.get("data_intraday_status"),
+        "data_global_status": payload.get("data_global_status"),
+        "market_session": payload.get("market_session"),
+        "last_valid_session": payload.get("last_valid_session"),
+        "data_freshness_age_hours": payload.get("data_freshness_age_hours"),
+        "market": payload.get("market", "TH"),
+        "stage": stage,
+        "l2": l2,
+        "page": page,
+        "page_size": page_size,
+        "total": len(items),
+        "cards": compact,
+    }
+
+
 @app.get("/dashboard/snapshot")
 def dashboard_snapshot():
     """Progressive refresh: return the complete persisted scan card contract.
@@ -525,10 +698,14 @@ def dashboard_snapshot():
         try:
             with open(cache_path) as handle:
                 payload = json.load(handle)
-            if payload.get("scan_time") != scan.get("scan_time"):
-                raise ValueError("snapshot cache is not for latest scan")
+            # The dashboard builder writes the snapshot after the scan envelope
+            # and may legitimately produce a newer timestamp.  A timestamp
+            # mismatch is metadata, not cache corruption; treating it as a
+            # miss caused every request to run the expensive DB fallback.
+            if not isinstance(payload.get("items"), list):
+                raise ValueError("snapshot cache has no items")
             payload["items"] = apply_projection(payload.get("items", []))
-            payload.update(snapshot_payload(payload["items"], scan.get("scan_time")))
+            payload.update(snapshot_payload(payload["items"], payload.get("scan_time") or scan.get("scan_time")))
         except (OSError, ValueError, json.JSONDecodeError):
             # Safe fallback for a scan generated before the cache artifact was
             # introduced; normal deploys/builds never take this slow path.
@@ -592,6 +769,21 @@ def intraday_evaluate(mode: str, interval: str):
         return evaluate(mode, interval)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.get("/intraday/events")
+def intraday_events(confidence: str | None = None):
+    """Active intraday emerging/confirmed events (append-only, lower confidence).
+
+    Each event carries the resolved_daily_event_id lineage when the EOD scan
+    has confirmed it; the Daily baseline remains the official final class.
+    """
+    from scan_history import get_active_intraday_events
+    pg = get_pg()
+    try:
+        return {"events": get_active_intraday_events(pg, confidence=confidence)}
+    finally:
+        pg.close()
 
 
 def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
@@ -727,6 +919,18 @@ def run_scan(
             lifecycle = persist_breakout_lifecycle(pg, scanned, snapshot["run_id"], "signalix/daily-state-v2")
         finally:
             pg.close()
+        
+        # EOD reconciliation: promote intraday emerging events to Daily events
+        pg = get_pg()
+        try:
+            reconciliation = reconcile_intraday_events_at_eod(
+                pg, snapshot["run_id"], "signalix/daily-state-v2",
+                symbols=[row["symbol"] for row in scanned]
+            )
+            print(f"Intraday event reconciliation: {reconciliation}")
+        finally:
+            pg.close()
+        
         # Only actionable states publish signals; structure/no-long stay dashboard-only.
         cands = groups.get("breakout_new", []) + groups.get("uptrend_pullback", [])
     except Exception as e:
@@ -738,7 +942,7 @@ def run_scan(
     url = None
     if push:
         from datetime import datetime as _dt
-        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat())
+        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned)
     else:
         try:
             import build_dashboard
