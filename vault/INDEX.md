@@ -53,10 +53,15 @@
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~
 ~~2. **Mark handoff เก่า** — ทั้ง 5 ตัว mark HISTORICAL/SUPERSEDED เรียบร้อย ✅~~
 ~~3. **Coverage lineage 1,143/934/718** — `coverage_report.json` + runtime validator fixed ✅~~
-~~4. **Snapshot performance** — overview/cards API + static HTML async load; snapshot 47.8s → 2.73s ✅~~
+~~4. **Snapshot performance** — overview/cards API + static HTML async load; snapshot 47.8s → 2.73s ✅~~ *P0-1 commit 3906af1: compact overview contract (card `market` + explicit `unknown` projection)*
 ~~5. **Rendered acceptance** — real desktop/mobile/filter/modal/chart/error contract ✅~~
 6. *(ว่าง — reopen เมื่อเจองานใหม่)*
 
 ## 6. Changelog
 
+- **2026-08-19**: P0-1 compact overview data contract `DONE` (commit 3906af1) — `/dashboard/cards/compact` + `/dashboard/overview` + `/dashboard/cards`; RED→GREEN 9/9; browser mobile verified (390px no h-scroll; refresh-failure retains compact cards)
+
 - **2026-08-19**: สร้าง INDEX นี้; เริ่มรีเฟรช Architecture.md ให้ตรง stage-first
+- **2026-08-19 (P0-4)**: intraday event boundary — `scan_history.py` ต่อ `resolved_daily_event_id`/`reconciled_at` + observation dedup ต่อ candle + append-only mutation triggers; `reconcile_intraday_events_at_eod` ลิงก์ lineage เมื่อ EOD ยืนยัน; endpoint `/intraday/events`; tests: `test_intraday_event_boundary.py` + integration บน test DB (Architecture.md อัปเดตแล้ว)
+
+- **2026-08-19**: Setup Radar / Stage + Actionable Setup State redesign `DONE` — `backend/setup_state.py` (quality gate + proximity pure functions); wired into `screening.group_scan_results` → `daily_state`; `build_dashboard.serialize` exposes `setup_quality`/`setup_proximity`/`radar`/`radarBadge` + stage→proximity→rs sort; `dashboard_template.html` Setup Radar section + proximity pills, L2 UI pills removed. Verified: 231 tests green; `docker compose up -d --force-recreate` scan produces 84 radar items (READY/WATCH badges); S3/S4 proximity.state=null; browser (pyppeteer/Chromium) confirms Setup Radar heading, `data-prox` pills, no legacy L2 refs; screenshot at `/tmp/radar_screenshot.png`. Commits: 0d3a1ee (setup state), d383c9f (wiring), be99772 (serialize/sort/UI), 19b6c53 (test updates).
