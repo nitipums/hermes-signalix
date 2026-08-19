@@ -41,48 +41,71 @@ class DashboardResponsiveTests(unittest.TestCase):
     def test_snapshot_and_taxonomy_artifact_match_full_universe(self):
         # Full ORD universe (delisted/inactive excluded) — count reflects the
         # current screened set, not a hard-coded historical number.
-        self.assertEqual(len(self.snapshot["items"]), 725)
+        # The dashboard build reads scan_results.json (groups) and serializes
+        # every symbol that passes exclusion; the snapshot count must equal the
+        # number of items actually built.
+        scan = json.loads((HERE / "scan_results.json").read_text(encoding="utf-8"))
+        scan_symbols = {r["symbol"] for v in scan.get("groups", {}).values() for r in v}
+        snapshot_symbols = {i["symbol"] for i in self.snapshot["items"]}
+        self.assertEqual(len(self.snapshot["items"]), len(scan_symbols))
+        self.assertEqual(snapshot_symbols, scan_symbols)
         # NOTE: reconciled_taxonomy.jsonl is a separate reconciliation artifact
-        # and is still at 718 (not rebuilt in this change). It is intentionally
-        # NOT asserted here to avoid coupling the dashboard build count to an
-        # unrelated taxonomy file that needs its own refresh.
+        # and is intentionally NOT asserted here to avoid coupling the dashboard
+        # build count to an unrelated taxonomy file that needs its own refresh.
         # The hero copy is Thai ("หุ้นไทย ORD สแกน") and the count is injected
         # client-side into #covCount, so assert the placeholder + hero text.
         self.assertIn("หุ้นไทย ORD สแกน", self.html)
         self.assertIn('<span id="covCount">', self.html)
 
-    def test_template_has_sector_industry_and_momentum_filter_contract(self):
+    def test_template_has_sector_industry_and_proximity_filter_contract(self):
+        # After the Stage + Setup State redesign (2026-08-19), L2 pills are
+        # replaced by proximity pills. The independence filter contract
+        # (sector/industry/value/band/set50) is unchanged; proximity pills
+        # (data-prox) replace the old l2/l2mom bars.
         html = self.template
         for marker in (
             'id="sectorFilter"',
             'id="industryFilter"',
             'data-indep="sector"',
             'data-indep="industry"',
-            "let indep={set50:false,value:0,band:\"all\",sector:\"all\",industry:\"all\"}, l2Filter={}, l2MomFilter={};",
-            "const L2MOM_GROUPS=[\"strong\",\"up\",\"neutral\",\"down\",\"overbought\",\"oversold\"]",
-            'data-l2mom="${g}"',
-            "layer2_momentum?.group",
+            "let indep={set50:false,value:0,band:\"all\",sector:\"all\",industry:\"all\"}, proxFilter={};",
+            "const PROX_GROUPS=[\"action\",\"near_trigger\",\"forming\",\"extended\"]",
+            'data-prox="${g}"',
             "indep.sector",
             "indep.industry",
             "const root=document.getElementById(`${key}Filter`)",
+            "const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null",
+            "const inRadar=i=>!!i.radar",
+            "Setup Radar",
+            "radarBadge",
         ):
             self.assertIn(marker, html)
         self.assertIn("flex-wrap:wrap", html)
         self.assertNotIn(".l2-bar{overflow-x:auto;flex-wrap:nowrap", html)
+        # Legacy L2 JS helpers must NOT be present in the UI template.
+        for legacy in (
+            "l2Filter",
+            "l2MomFilter",
+            "structuralGroup",
+            "momentumGroup",
+            "L2MOM_GROUPS",
+            "data-l2mom",
+        ):
+            self.assertNotIn(legacy, html, f"legacy L2 UI marker {legacy!r} should be removed")
 
     def test_template_compatibility_helpers_cover_new_and_legacy_items(self):
         html = self.template
         for marker in (
-            "const structuralGroup=i=>i.layer2_structural?.group??i.layer2_group",
-            "const momentumGroup=i=>normalizeMomentumGroup(i.layer2_momentum?.group??i.layer2_momentum_group??i.momentum_group??i.layer2_signals?.momentum)",
+            "const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null",
+            "const inRadar=i=>!!i.radar",
             "const l3=i.layer3_qualifier??i.layer3_qualifiers",
             "const l3Badge=l3&&l3.score!==undefined",
             "Q${l3.score}",
         ):
             self.assertIn(marker, html)
-        # A legacy structural group must not silently become a momentum count.
-        momentum_helper = html.split("const momentumGroup=", 1)[1].split(";", 1)[0]
-        self.assertNotIn("i.layer2_group", momentum_helper)
+        # Legacy structural/momentum group helpers must NOT be present in the UI.
+        self.assertNotIn("const structuralGroup=", html)
+        self.assertNotIn("const momentumGroup=", html)
 
     # --- Contracts intentionally NOT yet built (tracked, not silently passing) ---
     def test_detail_modal_renders_badges_and_stale_provenance_contract(self):
