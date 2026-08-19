@@ -173,5 +173,6 @@ def test_group_scan_s4_proximity_null(monkeypatch):
     flat = [r for values in groups.values() for r in values]
     ds = flat[0]["daily_state"]
     assert ds["stage"] == "S4_down"
-    assert ds["setup_proximity"]["state"] is None
-    assert ds["setup_quality"]["pass"] is False  # quality still computed (never omitted)
+    assert ds["setup_proximity"]["state"] is None      # D5: S4 not actionable
+    assert "setup_quality" in ds and "pass" in ds["setup_quality"]  # D6: never omitted
+    # (radar=False invariant for S4 is asserted in Task 3: test_item_s3_radar_false)
