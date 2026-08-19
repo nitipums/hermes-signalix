@@ -783,6 +783,30 @@ def compute_layer2_momentum(symbol, df_60m):
         "group": group
     }
 
+
+def compute_layer3_qualifier(symbol, df_daily, df_60m, snapshot):
+    """Breakout quality 0-3 from volume/52wk/ATH. snapshot must have avgDailyValue20, high52, athHigh, close, volume."""
+    flags = {"vol": False, "wk52": False, "ath": False}
+    if not snapshot:
+        return {"score": 0, "flags": flags}
+    avg_val = snapshot.get("avgDailyValue20") or 0
+    high52 = snapshot.get("high52")
+    ath = snapshot.get("athHigh")
+    close = snapshot.get("close")
+    vol = snapshot.get("volume") or 0
+    # Volume flag: today's trade value >= 2 * avgDailyValue20
+    if avg_val > 0 and vol * close >= 2 * avg_val:
+        flags["vol"] = True
+    # 52wk flag: close > 52wk high
+    if high52 is not None and close is not None and close > high52:
+        flags["wk52"] = True
+    # ATH flag: close > all-time high
+    if ath is not None and close is not None and close > ath:
+        flags["ath"] = True
+    score = sum(flags.values())
+    return {"score": score, "flags": flags}
+
+
 def universe_layer2(pg, symbols):
     """Classify every symbol. compute_layer2 falls back to 'tight_base' for
     missing/short 60m data, so we ALWAYS emit a group (no None) — see Q18."""
