@@ -41,6 +41,7 @@ from scanner import (
 )
 from daily_setup_state import classify_daily_state
 from stage_classifier import classify_stage
+from setup_state import compute_setup_state
 
 CONDITION_LABELS = {
     "c1_price_above_150ma": "Price above MA150",
@@ -438,6 +439,8 @@ def group_scan_results(results, events=None):
             "range_20d_pct": readiness.get("range_20d_pct"),
             "near_pullback_reference": near_pullback,
             "vcp": vcp,
+            "buy_zones_90d": readiness.get("buy_zones_90d"),
+            "swing_high_90d": readiness.get("swing_high_90d"),
             "readiness_status": readiness.get("status"),
             "last_date": row.get("last_date"),
             "latest_scan_date": max((x.get("last_date") for x in results if x.get("last_date")), default=row.get("last_date")),
@@ -445,6 +448,11 @@ def group_scan_results(results, events=None):
         }
         # Single canonical classifier: Stage 1-4 (Minervini) + phase.
         state = classify_stage(evidence, events.get(row["symbol"]))
+        # Two-layer actionable setup state (quality gate + proximity timing).
+        # Attached at source so every serialization path (build/snapshot) inherits it.
+        setup = compute_setup_state(state["stage"], evidence)
+        state["setup_quality"] = setup["quality"]
+        state["setup_proximity"] = setup["proximity"]
         if row.get("last_date") and evidence.get("latest_scan_date") and row["last_date"] != evidence["latest_scan_date"]:
             state["data_freshness"] = "stale"
         # New-listing flag: trend derived from 60m intraday, not daily history.
