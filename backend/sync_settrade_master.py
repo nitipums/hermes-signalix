@@ -58,6 +58,26 @@ def fetch_master() -> list[dict]:
     return parse_stock_master(response.json())
 
 
+def rebuild_dashboard_after_master_sync() -> dict:
+    """Refresh persisted dashboard artifacts after the universe changes.
+
+    The weekly master sync runs independently from ``/scan``.  Without this
+    step, a symbol can be correctly marked inactive in ``symbol_master`` while
+    the already-served static dashboard still contains its old scan card until
+    the next scan.  ``build()`` applies the same inactive-symbol gate used by
+    the live snapshot, so this is a cheap, deterministic cleanup rather than
+    another market scan.
+    """
+    try:
+        import build_dashboard
+        info = build_dashboard.build()
+        return {"dashboard_rebuilt": True, "dashboard_securities": info.get("securities")}
+    except Exception as exc:  # pragma: no cover - exercised by deployment
+        # Do not hide a successful authoritative master commit.  Surface the
+        # failure in the sync result so the timer/log alerts can catch it.
+        return {"dashboard_rebuilt": False, "dashboard_error": repr(exc)[:240]}
+
+
 def sync_db(records: list[dict], dry_run: bool = False) -> dict:
     symbols = [r["symbol"] for r in records]
     conn = psycopg2.connect(
@@ -98,7 +118,11 @@ def sync_db(records: list[dict], dry_run: bool = False) -> dict:
                 (now_reason, missing),
             )
         conn.commit()
-        return {"official": len(symbols), "previous_active": len(previous_active), "activated_or_refreshed": len(symbols), "inactivated": len(missing), "inactivated_symbols": missing}
+        result = {"official": len(symbols), "previous_active": len(previous_active),
+                  "activated_or_refreshed": len(symbols), "inactivated": len(missing),
+                  "inactivated_symbols": missing}
+        result.update(rebuild_dashboard_after_master_sync())
+        return result
     except Exception:
         conn.rollback()
         raise
