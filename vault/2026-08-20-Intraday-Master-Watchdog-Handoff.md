@@ -42,6 +42,9 @@ Status: **current**
 - Session finalization: full pytest suite green; dashboard coverage fallback and
   scan-dashboard consistency tests aligned with current contracts; stale runtime
   logs/generated artifacts preserved in named stashes; Git working tree clean.
+- Dashboard provenance now shows one concise `Last Scanned` timestamp sourced from
+  the latest persisted intraday run; projection badge defaults prevent snapshot
+  build failure when reconciled artifact rows are incomplete.
 
 ## Operational notes
 
