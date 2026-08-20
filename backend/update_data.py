@@ -81,7 +81,8 @@ SETTRADE_SLEEP_SECONDS = float(os.getenv("SETTRADE_SLEEP_SECONDS", "0.25"))
 SETTRADE_REQUEST_TIMEOUT = int(os.getenv("SETTRADE_REQUEST_TIMEOUT", "35"))
 SETTRADE_DAILY_WORKERS = int(os.getenv("SETTRADE_DAILY_WORKERS", "10"))
 SETTRADE_BATCH_SIZE = int(os.getenv("SETTRADE_BATCH_SIZE", "10"))
-SETTRADE_BATCH_DELAY_SECONDS = float(os.getenv("SETTRADE_BATCH_DELAY_SECONDS", "1.0"))
+SETTRADE_BATCH_DELAY_SECONDS = float(os.getenv("SETTRADE_BATCH_DELAY_SECONDS", "0.5"))
+SETTRADE_INTRADAY_WORKERS = int(os.getenv("SETTRADE_INTRADAY_WORKERS", "1"))
 SETTRADE_BATCH_JITTER_SECONDS = float(os.getenv("SETTRADE_BATCH_JITTER_SECONDS", "0.25"))
 SETTRADE_SESSION_RETRIES = int(os.getenv("SETTRADE_SESSION_RETRIES", "1"))
 SETTRADE_RETRY_BACKOFF_SECONDS = float(os.getenv("SETTRADE_RETRY_BACKOFF_SECONDS", "2.0"))
@@ -479,83 +480,30 @@ def _parse_settrade_intraday(sym, interval, res, stats):
     return rows
 
 
-INTRADAY_GROUPS = {
-    # Tier 1: action-first names refreshed every 15 minutes.
-    "tier1": ("ready_validate", "retest_watch", "pullback_watch"),
-    # Tier 2: top breakout-watch names refreshed on :00/:30.
-    "tier2": ("breakout_watch",),
-    # Tier 3 source groups are capped/ranked below; never fetch all of them.
-    "tier3": ("recovery_watch", "base_building"),
-    # Backward-compatible/manual modes.
-    "active": ("ready_validate", "retest_watch", "pullback_watch", "breakout_watch",
-               "recovery_watch", "base_building"),
-    "act_prepare": ("ready_validate", "retest_watch", "pullback_watch", "breakout_watch"),
-    "monitor": ("recovery_watch", "base_building"),
-}
+def _intraday_universe(pg, instrument_types=("ORD",)):
+    """Return the complete active Settrade universe for every 60m run.
 
-
-def _rank_limited(rows, limit):
-    """Rank non-urgent rows by proximity, RS, liquidity and VCP readiness."""
-    def score(row):
-        tr = row.get("trade_readiness") or {}
-        close = float(row.get("close") or 0)
-        trigger = tr.get("breakout_level_20d")
-        proximity = 0.0
-        if close > 0 and trigger:
-            proximity = max(0.0, 1.0 - abs(float(trigger) - close) / close)
-        rs = float((row.get("trend_template") or {}).get("rs_rating") or 0)
-        volume = float(tr.get("volume_ratio_50") or 0)
-        vcp = 1.0 if (row.get("vcp") or {}).get("is_vcp") else 0.0
-        return (proximity * 40.0) + (rs * 0.35) + min(volume, 5.0) * 2.0 + vcp * 5.0
-    return sorted(rows, key=score, reverse=True)[:limit]
-
-
-def _intraday_shortlist(mode="act_prepare"):
-    """Return a bounded tiered shortlist for 60m refreshes."""
-    allowed = set(INTRADAY_GROUPS) | {"tiered"}
-    if mode not in allowed:
-        raise ValueError(f"unknown intraday shortlist mode: {mode}")
-    try:
-        with open(os.path.join(os.path.dirname(__file__), "scan_results.json")) as f:
-            data = json.load(f)
-    except (OSError, ValueError) as e:
-        raise RuntimeError(f"cannot read scan shortlist: {e}")
-    groups = data.get("groups", {})
-    def rows_for(names):
-        out = []
-        for name in names:
-            out.extend(groups.get(name, []))
-        return out
-    if mode == "tier1":
-        rows = rows_for(INTRADAY_GROUPS["tier1"])
-    elif mode == "tier2":
-        rows = _rank_limited(groups.get("breakout_watch", []), 50)
-    elif mode == "tier3":
-        rows = _rank_limited(rows_for(INTRADAY_GROUPS["tier3"]), 30)
-    elif mode == "tiered":
-        # Tier 1 is every 15m; Tier 2 joins on :00/:30. Tier 3 has its own
-        # hourly timer so it cannot stretch the hot-path request.
-        rows = rows_for(INTRADAY_GROUPS["tier1"])
-        minute = dt.datetime.now(BANGKOK_TZ).minute
-        # systemd may start a few seconds after the boundary; keep a small
-        # grace window so :00/:30 tier-2 runs are not accidentally skipped.
-        if minute <= 5 or 30 <= minute <= 35:
-            rows += _rank_limited(groups.get("breakout_watch", []), 50)
-    else:
-        rows = rows_for(INTRADAY_GROUPS[mode])
-    symbols, seen = [], set()
-    for row in rows:
-        symbol = row.get("symbol") if isinstance(row, dict) else row
-        if symbol and symbol != "SET" and symbol not in seen:
-            symbols.append(symbol); seen.add(symbol)
+    Intraday follows the current universe contract directly from symbol_master;
+    it is independent of scan output, groups, and scan timing.
+    """
+    cur = pg.cursor()
+    cur.execute(
+        "SELECT symbol FROM symbol_master "
+        "WHERE instrument_type = ANY(%s) "
+        "AND (status IS NULL OR status = 'active') "
+        "ORDER BY symbol",
+        (list(instrument_types),),
+    )
+    symbols = [row[0] for row in cur.fetchall() if row[0] != "SET"]
+    cur.close()
     return symbols
 
 
-def fetch_shortlist_intraday(pg, stats, limit=8, mode="active", interval="60m"):
+def fetch_intraday(pg, stats, limit=10, mode="full", interval="60m"):
     """Fetch one timeframe for one dashboard intent bucket."""
     if interval != "60m":
         raise ValueError(f"unsupported intraday interval: {interval}")
-    symbols = _intraday_shortlist(mode)
+    symbols = _intraday_universe(pg)
     market = _settrade_market()
     rows = []
     for sym in symbols:
@@ -595,12 +543,13 @@ def _utc_now_iso():
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
-def ingest_shortlist_intraday(
-        pg, stats, *, symbols=None, limit=8, mode="active", interval="60m",
+def ingest_intraday(
+        pg, stats, *, symbols=None, limit=10, mode="full", interval="60m",
         batch_size=SETTRADE_BATCH_SIZE,
         batch_delay=SETTRADE_BATCH_DELAY_SECONDS,
         batch_jitter=SETTRADE_BATCH_JITTER_SECONDS,
         per_symbol_delay=SETTRADE_SLEEP_SECONDS,
+        workers=SETTRADE_INTRADAY_WORKERS,
         session_retries=SETTRADE_SESSION_RETRIES,
         retry_backoff=SETTRADE_RETRY_BACKOFF_SECONDS,
         market_factory=_settrade_market, sleep_fn=time.sleep,
@@ -612,10 +561,12 @@ def ingest_shortlist_intraday(
         raise ValueError("intraday batch_size must be greater than zero")
     if min(batch_delay, batch_jitter, per_symbol_delay) < 0:
         raise ValueError("intraday delays must not be negative")
+    if workers <= 0:
+        raise ValueError("intraday workers must be greater than zero")
     if session_retries < 0 or retry_backoff < 0:
         raise ValueError("intraday retry settings must not be negative")
 
-    symbols = list(_intraday_shortlist(mode) if symbols is None else symbols)
+    symbols = list(_intraday_universe(pg) if symbols is None else symbols)
     run_id = uuid.uuid4().hex
     summary = {
         "run_id": run_id, "status": "failure",
@@ -671,51 +622,89 @@ def ingest_shortlist_intraday(
             batch_info["failed_symbols"] = list(batch_symbols)
             batch_info["errors"].append("session unavailable; bounded recovery exhausted")
         else:
-            while True:
-                attempt_rows, attempt_succeeded = [], []
-                attempt_failed, attempt_errors = [], []
-                session_error = None
-                for symbol_index, sym in enumerate(batch_symbols):
+            pending_symbols = list(batch_symbols)
+            while pending_symbols:
+                def fetch_one(sym):
                     try:
-                        with settrade_request_timeout():
-                            response = market.get_candlestick(
-                                symbol=sym, interval=interval, limit=limit,
-                                normalized=SETTRADE_NORMALIZED)
-                        parsed_rows = _parse_settrade_intraday(
-                            sym, interval, response, stats)
-                        if not parsed_rows:
-                            attempt_failed.append(sym)
-                            attempt_errors.append(f"{sym}: empty intraday response")
+                        call = lambda: market.get_candlestick(
+                            symbol=sym, interval=interval, limit=limit,
+                            normalized=SETTRADE_NORMALIZED)
+                        # SIGALRM is main-thread-only; SDK HTTP context already
+                        # carries requests timeout for parallel workers.
+                        if workers > 1:
+                            response = call()
                         else:
-                            attempt_rows.extend(parsed_rows)
-                            attempt_succeeded.append(sym)
+                            with settrade_request_timeout():
+                                response = call()
+                        parsed = _parse_settrade_intraday(sym, interval, response, {})
+                        if not parsed:
+                            return sym, [], "empty intraday response", None
+                        return sym, parsed, None, None
                     except Exception as exc:
                         if _is_settrade_session_error(exc):
-                            session_error = exc
+                            return sym, [], None, exc
+                        return sym, [], repr(exc)[:200], None
+
+                if workers > 1:
+                    with concurrent.futures.ThreadPoolExecutor(
+                            max_workers=min(workers, len(pending_symbols))) as pool:
+                        fetched = list(pool.map(fetch_one, pending_symbols))
+                else:
+                    fetched = []
+                    for index, sym in enumerate(pending_symbols):
+                        result = fetch_one(sym)
+                        fetched.append(result)
+                        if result[3] is not None:
                             break
+                        if per_symbol_delay and index < len(pending_symbols) - 1:
+                            sleep_fn(per_symbol_delay)
+
+                attempt_rows, attempt_succeeded = [], []
+                attempt_failed, attempt_errors = [], []
+                session_errors = []
+                for sym, parsed, error, session_exc in fetched:
+                    if session_exc is not None:
+                        session_errors.append(session_exc)
+                    elif error is not None:
                         attempt_failed.append(sym)
-                        attempt_errors.append(f"{sym}: {repr(exc)[:200]}")
-                    if per_symbol_delay and symbol_index < len(batch_symbols) - 1:
-                        sleep_fn(per_symbol_delay)
+                        attempt_errors.append(f"{sym}: {error}")
+                    else:
+                        attempt_rows.extend(parsed)
+                        attempt_succeeded.append(sym)
 
-                if session_error is None:
-                    batch_rows = attempt_rows
-                    completed_symbols = attempt_succeeded
-                    batch_info["failed_symbols"] = attempt_failed
-                    batch_info["errors"].extend(attempt_errors)
+                batch_rows.extend(attempt_rows)
+                completed_symbols.extend(attempt_succeeded)
+                batch_info["errors"].extend(attempt_errors)
+
+                failed_symbols = list(attempt_failed)
+                failed_symbols.extend(
+                    sym for sym, _parsed, _error, session_exc in fetched
+                    if session_exc is not None and sym not in failed_symbols
+                )
+                if session_errors:
+                    fetched_symbols = {sym for sym, _parsed, _error, _session_exc in fetched}
+                    failed_symbols.extend(
+                        sym for sym in pending_symbols
+                        if sym not in fetched_symbols and sym not in failed_symbols
+                    )
+                if not failed_symbols:
+                    batch_info["failed_symbols"] = []
                     break
 
-                stats["intraday_auth_failed"] += 1
+                batch_info["failed_symbols"] = failed_symbols
                 if summary["retry_count"] >= session_retries:
-                    session_exhausted = True
-                    batch_info["failed_symbols"] = list(batch_symbols)
-                    batch_info["errors"].append(repr(session_error)[:200])
+                    if session_errors:
+                        stats["intraday_auth_failed"] += len(session_errors)
                     break
+
                 summary["retry_count"] += 1
                 batch_info["retry_count"] += 1
+                if session_errors:
+                    stats["intraday_auth_failed"] += len(session_errors)
+                    market = market_factory()
                 if retry_backoff:
                     sleep_fn(retry_backoff * summary["retry_count"])
-                market = market_factory()
+                pending_symbols = failed_symbols
 
         batch_info["symbols_succeeded"] = len(completed_symbols)
         batch_info["symbols_failed"] = len(batch_info["failed_symbols"])
@@ -994,24 +983,26 @@ def run(args):
     run_id = f"intraday-{started_at.strftime('%Y%m%dT%H%M%SZ')}-{uuid.uuid4().hex[:8]}"
     print(f"timestamp={started_at.isoformat()} run_id={run_id} event=run_started")
     stats = {"files": 0, "rows_kept": 0, "dropped": 0, "bad_row": 0, "inserted": 0}
-    # Intraday scheduler path: no daily universe fetch and no rescan.
+    full_intraday = getattr(args, "intraday_full_universe", getattr(args, "intraday_shortlist", False))
+    # Intraday scheduler path: full active ORD universe, no scan-derived filter.
     if args.intraday_only:
         mode = args.intraday_mode
         interval = args.intraday_interval
-        symbols = _intraday_shortlist(mode)
-        print(f"intraday-only mode={mode} interval={interval} shortlist : {len(symbols)} symbols")
-        if args.dry_run:
-            print("  symbols: " + (", ".join(symbols) if symbols else "none"))
-            return 0
         pg = get_pg()
         try:
+            symbols = _intraday_universe(pg)
+            print(f"intraday-only mode=full interval={interval} universe : {len(symbols)} symbols")
+            if args.dry_run:
+                print("  symbols: " + (", ".join(symbols) if symbols else "none"))
+                return 0
             ensure_intraday_table(pg)
-            summary = ingest_shortlist_intraday(
+            summary = ingest_intraday(
                 pg, stats, symbols=symbols, limit=args.intraday_limit,
-                mode=mode, interval=interval,
+                mode="full", interval=interval,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
+                workers=getattr(args, "intraday_workers", SETTRADE_INTRADAY_WORKERS),
                 session_retries=args.intraday_session_retries,
                 retry_backoff=args.intraday_retry_backoff,
             )
@@ -1132,20 +1123,20 @@ def run(args):
     print(f"  new MAX(date) : {new_max}")
     pg.close()
 
-    # Intraday needs the freshly written daily shortlist, so it always runs
-    # after a scan; this adds at most 2 API calls per shortlisted symbol.
-    if (args.scan or args.intraday_shortlist) and not args.dry_run:
+    # Optional full-universe intraday refresh after the daily scan.
+    if (args.scan or full_intraday) and not args.dry_run:
         trigger_scan()
-    if args.intraday_shortlist and not args.dry_run:
+    if full_intraday and not args.dry_run:
         pg = get_pg()
         try:
             ensure_intraday_table(pg)
-            summary = ingest_shortlist_intraday(
+            summary = ingest_intraday(
                 pg, stats, limit=args.intraday_limit,
                 interval=args.intraday_interval,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
+                workers=getattr(args, "intraday_workers", SETTRADE_INTRADAY_WORKERS),
                 session_retries=args.intraday_session_retries,
                 retry_backoff=args.intraday_retry_backoff,
             )
@@ -1183,12 +1174,17 @@ def main():
                     help="if Settrade credentials/import fail, fall back to yfinance")
     ap.add_argument("--scan", action="store_true",
                     help="trigger a universe rescan after loading (default off)")
-    ap.add_argument("--intraday-shortlist", action="store_true",
-                    help="after scan fetch 60m only for the active shortlist")
+    # Full-universe intraday refresh; legacy flag remains accepted as an alias.
+    ap.add_argument("--intraday-full-universe", dest="intraday_full_universe", action="store_true",
+                    help="after scan fetch 60m for every active ORD symbol")
+    ap.add_argument("--intraday-shortlist", dest="intraday_full_universe", action="store_true",
+                    help=argparse.SUPPRESS)
     ap.add_argument("--intraday-only", action="store_true",
-                    help="refresh 60m from the existing active shortlist only; skips daily fetch and scan")
+                    help="refresh 60m for every active ORD symbol; skips daily fetch and scan")
     ap.add_argument("--intraday-limit", type=int, default=4,
                     help="60m bars per active ORD symbol (default 4)")
+    ap.add_argument("--intraday-workers", type=int, default=SETTRADE_INTRADAY_WORKERS,
+                    help="parallel fetch workers per intraday batch")
     ap.add_argument("--intraday-batch-size", type=int, default=SETTRADE_BATCH_SIZE,
                     help="symbols committed per intraday batch")
     ap.add_argument("--intraday-batch-delay", type=float, default=SETTRADE_BATCH_DELAY_SECONDS,
@@ -1199,8 +1195,8 @@ def main():
                     help="bounded U-102/session re-auth attempts per run")
     ap.add_argument("--intraday-retry-backoff", type=float, default=SETTRADE_RETRY_BACKOFF_SECONDS,
                     help="base seconds before session re-auth")
-    ap.add_argument("--intraday-mode", choices=("tier1", "tier2", "tier3", "tiered", "active", "act_prepare", "monitor"), default="tier1",
-                    help="tier1 every 15m; tier2 top 50 breakouts; tier3 top 30 monitor; tiered combines tier1+2 on :00/:30")
+    ap.add_argument("--intraday-mode", choices=("full",), default="full",
+                    help="full active ORD universe; retained as an explicit contract")
     ap.add_argument("--intraday-interval", choices=("60m",), default="60m",
                     help="single supported intraday interval")
     ap.add_argument("--no-scan", dest="scan", action="store_false",
