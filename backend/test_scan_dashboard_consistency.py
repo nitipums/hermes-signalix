@@ -13,7 +13,7 @@ class ScanDashboardConsistencyTests(unittest.TestCase):
         snapshot = root / "snapshot.json"
         scan.write_text(json.dumps({"scan_time": "now", "groups": scan_groups}), encoding="utf-8")
         dashboard.write_text(
-            "let items=" + json.dumps(dash_items) + ";\nlet stageMeta={};", encoding="utf-8"
+            "let items=" + json.dumps(dash_items) + ";const meta={};", encoding="utf-8"
         )
         snapshot.write_text(json.dumps({"scan_time": "now", "items": snap_items}), encoding="utf-8")
         return str(scan), str(dashboard), str(snapshot)
@@ -33,7 +33,7 @@ class ScanDashboardConsistencyTests(unittest.TestCase):
                     {"symbol": "BBB", "primary_group": "avoid"},
                 ],
             )
-            result = verify(scan, dashboard, snapshot, None)
+            result = verify(scan, dashboard, None)
             self.assertTrue(result["ok"], result)
 
     def test_group_count_mismatch_fails(self):
@@ -45,7 +45,7 @@ class ScanDashboardConsistencyTests(unittest.TestCase):
                 [{"symbol": "AAA", "group": "avoid"}],
                 [{"symbol": "AAA", "primary_group": "avoid"}],
             )
-            result = verify(scan, dashboard, snapshot, None)
+            result = verify(scan, dashboard, None)
             self.assertFalse(result["ok"])
             self.assertIn("dashboard item count differs from scan group total", result["failures"])
 

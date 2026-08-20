@@ -542,7 +542,16 @@ def dashboard_overview():
             "scan_not_in_dashboard_count": len(report.get("lineage", {}).get("scan_not_in_dashboard", [])),
         }
     except (OSError, json.JSONDecodeError):
-        coverage = {"status": "coverage_report_unavailable"}
+        # coverage_report.json is a generated/optional artifact. Keep the API
+        # contract usable from the dashboard snapshot instead of returning a
+        # shape that forces clients/tests to special-case missing keys.
+        coverage = {
+            "status": "coverage_report_unavailable",
+            "dashboard_count": len(payload.get("items", [])),
+            "scan_count": len(payload.get("items", [])),
+            "legacy_taxonomy_count": None,
+            "scan_not_in_dashboard_count": 0,
+        }
     items = payload["items"]
     return {
         "scan_time": payload.get("scan_time"),
