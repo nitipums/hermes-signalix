@@ -72,11 +72,13 @@ def apply_projection(items: list[dict], path: str = ARTIFACT_PATH) -> list[dict]
                 "group": group, "primary_group": group,
                 "primary_label": a["primary_label"], "primary_action": a["primary_action"],
                 "status": a["primary_label"], "action": a["primary_action"],
-                "quality_badge": a["quality_badge"], "freshness_badge": a["freshness_badge"],
-                "lifecycle_badge": a["lifecycle_badge"], "data_confidence": a["data_confidence"],
-                "evidence_date": a["evidence_date"], "raw_last_date": a["raw_last_date"],
-                "evidence_summary": a["evidence_summary"],
-                "reconciliation_reason": a["reconciliation_reason"],
+                "quality_badge": a.get("quality_badge", "not_flagged_low_quality"),
+                "freshness_badge": a.get("freshness_badge", "unknown"),
+                "lifecycle_badge": a.get("lifecycle_badge", group),
+                "data_confidence": a.get("data_confidence", "low"),
+                "evidence_date": a.get("evidence_date"), "raw_last_date": a.get("raw_last_date"),
+                "evidence_summary": a.get("evidence_summary", ""),
+                "reconciliation_reason": a.get("reconciliation_reason", "projection default: incomplete artifact row"),
                 "old_group_mapping": a.get("old_mapping", {}),
                 "nida_producer_fields": a.get("nida_producer_fields", {}),
                 "producer": {"nida": a.get("nida_producer_fields", {}),
@@ -126,5 +128,5 @@ def snapshot_payload(items: list[dict], scan_time=None) -> dict:
             "market": "TH", "refresh": "progressive_cards", "items": items,
             "primary_groups": PRIMARY_META,
             "primary_counts": dict(Counter(x["primary_group"] for x in items)),
-            "badge_counts": {name: dict(Counter(x[name] for x in items)) for name in
+            "badge_counts": {name: dict(Counter(x.get(name, "unknown") for x in items)) for name in
                              ("quality_badge", "freshness_badge", "lifecycle_badge", "data_confidence")}}
