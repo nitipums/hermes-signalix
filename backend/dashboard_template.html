@@ -666,6 +666,10 @@ function loadRemoteDashboard(){
   // four stage fetches — that created the visible blank → loading → uptrend →
   // complete sequence and temporarily hid S1/S3/S4 from the trader.
   const state=document.getElementById("liveState");
+  let loadDone=false;
+  const finishLoading=()=>{if(loadDone)return;loadDone=true;setLoadProgress(100,"Ready");document.body.classList.remove("loading");};
+  const failLoading=(err)=>{console.error("Signalix snapshot render failed",err);if(state)state.textContent="Load failed";setLoadProgress(100,"Load failed");document.body.classList.remove("loading");};
+  window.setTimeout(()=>{if(!loadDone){try{render();finishLoading();}catch(err){failLoading(err);}}},5000);
   try{
     setLoadProgress(18,"Reading complete snapshot");
     requestAnimationFrame(()=>{
@@ -680,15 +684,16 @@ function loadRemoteDashboard(){
         document.getElementById("provValid").textContent=`last valid: ${latest}`;
         setLoadProgress(70,"Building stage sections");
         requestAnimationFrame(()=>{
-          render();
-          if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
-          setLoadProgress(100,"Ready");
-          requestAnimationFrame(()=>document.body.classList.remove("loading"));
+          try{
+            render();
+            if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
+            requestAnimationFrame(finishLoading);
+          }catch(err){failLoading(err);}
         });
       });
     });
   }catch(err){
-    if(state)state.textContent="Load failed";
+    failLoading(err);
     document.getElementById("results").innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">ลองใหม่</button></div>`;
   }
 }
