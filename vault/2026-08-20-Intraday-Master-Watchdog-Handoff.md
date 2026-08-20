@@ -39,6 +39,9 @@ Status: **current**
 - Runtime checks: backend health 200 (DB/Redis up), dashboard 200.
 - Relevant tests passed: master parser, insufficient-history, screening policy,
   intraday resilience/ingestion; systemd-analyze verify passed.
+- Session finalization: full pytest suite green; dashboard coverage fallback and
+  scan-dashboard consistency tests aligned with current contracts; stale runtime
+  logs/generated artifacts preserved in named stashes; Git working tree clean.
 
 ## Operational notes
 
