@@ -87,18 +87,18 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 
 /* Cards — reduced density (P0). One bezel + pulse dot + price spike.
    The basic strip now shows only VOL + Value; RS/RSI/MACD moved to the modal. */
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.signal-card{ border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:13px 14px;position:relative;
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.signal-card{ min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:10px 12px;position:relative;
   transition:transform .12s ease,box-shadow .12s ease; }
 .signal-card:hover{ box-shadow:0 0 0 3px rgba(121,173,255,.18); }
 @media(prefers-reduced-motion:reduce){
   .signal-card{ transition:none; }
   .stage-pill{ transition:none; }
 }
-.signal-card.stage-S2_uptrend{border-left:4px solid var(--s2)}
-.signal-card.stage-S1_basing{border-left:4px solid var(--s1)}
-.signal-card.stage-S3_distributing{border-left:4px solid var(--s3)}
-.signal-card.stage-S4_down{border-left:4px solid var(--s4)}
+.signal-card.stage-S2_uptrend{border-left:3px solid var(--s2)}
+.signal-card.stage-S1_basing{border-left:3px solid var(--s1)}
+.signal-card.stage-S3_distributing{border-left:3px solid var(--s3)}
+.signal-card.stage-S4_down{border-left:3px solid var(--s4)}
 .pulse-dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto;margin-right:8px;
   box-shadow:0 0 0 3px rgba(var(--blue-rgb,121,173,255),.14)}
 .pulse-dot.s1{background:var(--s1);box-shadow:0 0 5px 2px rgba(111,139,186,.34)}
@@ -106,8 +106,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .pulse-dot.s3{background:var(--s3);box-shadow:0 0 5px 2px rgba(255,196,77,.34)}
 .pulse-dot.s4{background:var(--s4);box-shadow:0 0 5px 2px rgba(255,122,122,.34)}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
-.card-top .head{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
-.ticker{font-size:19px;font-weight:850;letter-spacing:-.03em}
+.card-top .head{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.ticker{font-size:18px;font-weight:850;letter-spacing:-.03em}
 .stage-badge{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px}
 .stage-badge.positive{background:var(--s2-tint);color:var(--s2)}
 .stage-badge.neutral{background:var(--s1-tint);color:var(--s1)}
@@ -121,11 +121,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .fresh-badge.unknown{background:#222;color:var(--muted)}
 .star{background:none;border:0;font-size:18px;color:var(--muted);min-width:40px;text-align:right}
 .star.saved{color:var(--amber)}
-.price{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
-.price b{font-size:21px;font-weight:850}
-.price small{color:var(--muted);font-size:11px;margin-left:5px}
+.price{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 7px}
+.price b{font-size:19px;font-weight:850}
+.price small{color:var(--muted);font-size:10px;margin-left:4px}
 .gain{color:var(--green)} .loss{color:var(--red)}
-.basic-strip{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-bottom:8px}
+.basic-strip{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-bottom:6px}
 .basic-strip b{color:var(--text)}
 .setup-evidence{font-size:11px;color:var(--blue);margin-bottom:6px}
 .setup-evidence.surge{color:var(--amber)}
@@ -134,10 +134,10 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .q-corner.q2{background:var(--s2-tint);color:var(--s2);border:1px solid var(--s2)}
 .q-corner.q1{background:var(--s1-tint);color:var(--s1);border:1px solid var(--s1)}
 .q-corner.q0{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
-.action-line{font-size:11px;padding:7px 9px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.action-line{font-size:10px;padding:6px 8px;border-radius:7px;background:var(--panel2);border:1px solid var(--line)}
 .action-line b{color:var(--text)}
 /* Quality bar — thin progress bar under the card strip for at-a-glance strength */
-.q-bar{width:100%;height:3px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
+.q-bar{width:100%;height:3px;border-radius:2px;background:var(--line);margin-top:4px;overflow:hidden}
 .q-bar span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
 .q-bar .q0{width:0;background:var(--s4)}
 .q-bar .q1{width:33%}
