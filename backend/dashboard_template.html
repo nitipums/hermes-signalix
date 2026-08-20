@@ -21,8 +21,21 @@ body{margin:0;background:var(--bg);color:var(--text);
   font:14px Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
 body.loading .app{visibility:hidden}
 body.loading #liveLoading{display:flex}
-#liveLoading{display:none;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
+#liveLoading{display:flex;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
   background:var(--bg);color:var(--muted);font-size:14px}
+.load-shell{width:min(360px,calc(100vw - 48px));text-align:center}
+.load-brand{font-size:26px;font-weight:850;letter-spacing:-.05em;color:var(--text);margin-bottom:18px}
+.load-brand span{color:var(--blue)}
+.load-chart{height:86px;margin:0 auto 18px;opacity:.9}
+.load-chart polyline{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:260;stroke-dashoffset:260;animation:loadLine 1.8s ease-in-out infinite}
+.load-chart line{stroke:var(--line);stroke-width:1}
+.load-chart .up{stroke:var(--green);stroke-width:3}.load-chart .down{stroke:var(--red);stroke-width:3}
+@keyframes loadLine{0%{stroke-dashoffset:260;opacity:.3}45%,70%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-60;opacity:.25}}
+.load-title{color:var(--text);font-weight:700;margin-bottom:10px}
+.load-meta{display:flex;justify-content:space-between;gap:10px;font:11px 'Fira Code';margin-bottom:7px}
+.load-percent{color:var(--blue);font-weight:700}.load-step{color:var(--muted);text-align:left}
+.load-track{height:5px;background:var(--panel2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.load-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:inherit;transition:width .22s ease}
 button,input{font:inherit} button{color:inherit;cursor:pointer}
 *{ -webkit-tap-highlight-color:transparent }
 button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}
@@ -177,8 +190,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.72);
   align-items:center;justify-content:center;padding:18px}
 .modal-bg.open{display:flex}
-.modal{width:min(560px,100%);max-height:86vh;overflow:auto;background:var(--panel);
+.modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:var(--panel);
   border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.modal-shell{padding:16px 18px 22px}
+.modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;margin:-2px -4px 8px;padding:2px 4px 10px;background:linear-gradient(var(--panel) 80%,transparent)}
+.modal-title{margin:0;flex:1;min-width:0;font-size:clamp(18px,4vw,24px);line-height:1.16;letter-spacing:-.035em}
 .tf-tools{display:flex;gap:6px;margin:6px 0}
 .tf-tools .chip{padding:6px 10px;font-size:11px}
 .tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
@@ -189,11 +205,35 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .nav-arrow{padding:0 12px}
 .modal-close{padding:0 14px;color:var(--red)}
 .chart-status{min-height:18px;color:var(--muted);font-size:11px;margin:2px 0 6px}
-.chart-canvas{width:100%;height:min(260px,30vh);touch-action:none;border-radius:10px;background:#0a0e17}
+.chart-canvas{width:100%;height:min(300px,34vh);touch-action:none;border-radius:12px;background:#080d18;border:1px solid #1d2b40}
+@media(max-width:620px){
+  .modal-bg{padding:8px;align-items:flex-start}
+  .modal{max-height:calc(100dvh - 16px);border-radius:16px;margin-top:8px}
+  .modal-shell{padding:12px 12px 18px}
+  .modal-head{margin:-1px -2px 6px;padding-bottom:8px}
+  .modal-title{font-size:18px}
+  .nav-arrow,.modal-close{min-width:44px;min-height:44px;padding:0 10px}
+  .tf-tools .chip{min-width:52px;min-height:44px;padding:9px 10px;font-size:12px}
+  .chart-canvas{height:230px}
+  .detail-badges .db-row{font-size:10px;align-items:flex-start}.detail-badges .db-v{text-align:right;max-width:62%}
+}
 </style>
 </head>
 <body class="loading">
-<div id="liveLoading">Loading live snapshot…</div>
+<div id="liveLoading" role="status" aria-live="polite" aria-busy="true">
+  <div class="load-shell">
+    <div class="load-brand">Signal<span>ix</span></div>
+    <svg class="load-chart" viewBox="0 0 320 86" aria-hidden="true">
+      <line x1="0" y1="72" x2="320" y2="72"/><line x1="0" y1="43" x2="320" y2="43"/><line x1="0" y1="14" x2="320" y2="14"/>
+      <path class="down" d="M24 20v28m-5-20h10m-5 20v17m-5-8h10M74 29v30m-5-22h10m-5 30v10m-5-5h10M124 34v25m-5-18h10m-5 25v12m-5-6h10"/>
+      <path class="up" d="M174 58v19m-5-12h10m-5-19v12m-5-6h10M224 42v26m-5-18h10m-5-18v10m-5-5h10M274 24v35m-5-27h10m-5 35v10m-5-5h10"/>
+      <polyline points="8,62 35,49 61,58 88,35 114,46 141,32 168,57 195,42 222,50 249,27 276,35 312,12"/>
+    </svg>
+    <div class="load-title">Preparing complete market snapshot</div>
+    <div class="load-meta"><span id="loadStep" class="load-step">Reading snapshot</span><span id="loadPercent" class="load-percent">0%</span></div>
+    <div class="load-track"><i id="loadProgress"></i></div>
+  </div>
+</div>
 <main class="app">
   <header class="topbar">
     <div class="brand">Signal<span>ix</span></div>
@@ -451,10 +491,10 @@ function openDetail(i){
   const bg=document.getElementById("modalBg");bg.classList.add("open");bg.setAttribute("aria-hidden","false");
   const q=(i.quality&&i.quality.flags||[]).join(" · ");
   const idx=(detailList||[]).indexOf(i.symbol);
-  document.getElementById("modalContent").innerHTML=`<div style="padding:20px 20px 24px">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+  document.getElementById("modalContent").innerHTML=`<div class="modal-shell">
+    <div class="modal-head">
       <button class="chip nav-arrow" id="prevStock" aria-label="หุ้นก่อนหน้า" aria-pressed="false">◀</button>
-      <h2 style="margin:0;flex:1">${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
+      <h2 class="modal-title">${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
       <button class="chip nav-arrow" id="nextStock" aria-label="หุ้นถัดไป" aria-pressed="false">▶</button>
       <button class="chip modal-close" id="closeModal" aria-label="ปิด" aria-pressed="false">✕</button>
     </div>
@@ -616,6 +656,10 @@ _mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[
 _mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
 const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
 
+function setLoadProgress(percent,step){
+  const bar=document.getElementById("loadProgress"), pct=document.getElementById("loadPercent"), label=document.getElementById("loadStep");
+  if(bar)bar.style.width=`${percent}%`; if(pct)pct.textContent=`${percent}%`; if(label)label.textContent=step;
+}
 function loadRemoteDashboard(){
   // Single coherent first paint: the built HTML already embeds the complete
   // snapshot. Do not paint compact S2 cards first and then replace them with
@@ -623,19 +667,30 @@ function loadRemoteDashboard(){
   // complete sequence and temporarily hid S1/S3/S4 from the trader.
   const state=document.getElementById("liveState");
   try{
-    bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
-    document.getElementById("covCount").textContent=items.length;
-    const dates=items.map(i=>i.dailyEodDecision?.as_of||i.date).filter(Boolean).sort();
-    const latest=dates.length?dates[dates.length-1]:"—";
-    if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
-    document.getElementById("provFetched").textContent="Snapshot embedded · complete universe";
-    document.getElementById("provSession").textContent="Market session: Asia/Bangkok";
-    document.getElementById("provValid").textContent=`last valid: ${latest}`;
-    render();
+    setLoadProgress(18,"Reading complete snapshot");
+    requestAnimationFrame(()=>{
+      bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
+      document.getElementById("covCount").textContent=items.length;
+      setLoadProgress(42,"Indexing symbols and stages");
+      requestAnimationFrame(()=>{
+        const dates=items.map(i=>i.dailyEodDecision?.as_of||i.date).filter(Boolean).sort();
+        const latest=dates.length?dates[dates.length-1]:"—";
+        document.getElementById("provFetched").textContent="Snapshot embedded · complete universe";
+        document.getElementById("provSession").textContent="Market session: Asia/Bangkok";
+        document.getElementById("provValid").textContent=`last valid: ${latest}`;
+        setLoadProgress(70,"Building stage sections");
+        requestAnimationFrame(()=>{
+          render();
+          if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
+          setLoadProgress(100,"Ready");
+          requestAnimationFrame(()=>document.body.classList.remove("loading"));
+        });
+      });
+    });
   }catch(err){
     if(state)state.textContent="Load failed";
     document.getElementById("results").innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">ลองใหม่</button></div>`;
-  }finally{ document.body.classList.remove("loading"); }
+  }
 }
 loadRemoteDashboard();
 </script>
