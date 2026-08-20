@@ -869,12 +869,11 @@ def fetch_yfinance(pg, after: dt.date, stats):
     GUARDS (per owner's data-quality concern about yfinance Thai prices):
       - DROP any bar with volume == 0 (yfinance pads holidays with a
         zero-volume flat bar that would corrupt moving averages).
-      - SANITY-CHECK continuity: the first fetched close must be within
-        +-15% of the last close already in price_data. If it is not, the
-        symbol is SKIPPED (likely a split/dividend adjust glitch or a
-        wrong instrument) and reported, rather than polluting the DB.
       - THROTTLE: fetch ONE ticker at a time with a small delay, and retry
         with backoff on YFRateLimitError (yfinance blocks bulk batches).
+
+    NOTE (2026-08-20, owner directive): the 15% first-close-vs-DB continuity
+    skip was REMOVED — Arm decided we pull ALL symbols, no price-gap filter.
     """
     try:
         import yfinance as yf
@@ -896,7 +895,6 @@ def fetch_yfinance(pg, after: dt.date, stats):
     cur.close()
     start = (after + dt.timedelta(days=1)).isoformat()
     rows = []
-    stats.setdefault("yf_skipped", 0)
     stats.setdefault("yf_zero_vol_dropped", 0)
     stats.setdefault("yf_rate_limited", 0)
     import time
@@ -908,17 +906,6 @@ def fetch_yfinance(pg, after: dt.date, stats):
         if len(sub) == 0:
             continue
         last_db = _last_close_in_db(pg, sym)
-        def _scalar(v):
-            return v.item() if hasattr(v, "item") else v
-        first_close = _scalar(sub.iloc[0]["Close"])
-        first_close = float(first_close)
-        if last_db is not None and last_db > 0:
-            gap = abs(first_close - last_db) / last_db
-            if gap > 0.15:
-                print(f"  ! skip {sym}: yfinance first close {first_close:.2f} "
-                      f"vs DB last {last_db:.2f} (gap {gap*100:.1f}% > 15%)")
-                stats["yf_skipped"] += 1
-                continue
         for idx, r in sub.iterrows():
             try:
                 def _scalar(v):
@@ -1094,8 +1081,7 @@ def run(args):
         # dry-run still reports what WOULD be written (without writing)
         if args.dry_run:
             print(f"yfinance would offer {len(yrows)} rows "
-                  f"(skipped {stats.get('yf_skipped',0)} symbols, "
-                  f"dropped {stats.get('yf_zero_vol_dropped',0)} zero-vol bars)")
+                  f"(dropped {stats.get('yf_zero_vol_dropped',0)} zero-vol bars)")
             # distinct symbols preview
             syms = {}
             for r in yrows:
@@ -1114,8 +1100,7 @@ def run(args):
     print(f"  rows offered  : {stats['inserted']} (ON CONFLICT DO NOTHING)")
     print(f"  dropped       : {stats['dropped']}")
     print(f"  bad rows      : {stats['bad_row']}")
-    if args.source == "yfinance" or stats.get("yf_skipped"):
-        print(f"  yf skipped    : {stats.get('yf_skipped', 0)} (price gap >15% vs DB)")
+    if args.source == "yfinance":
         print(f"  yf zero-vol   : {stats.get('yf_zero_vol_dropped', 0)} bars dropped")
     if args.source == "settrade" or stats.get("settrade_failed"):
         print(f"  stt failed    : {stats.get('settrade_failed', 0)} symbols")
