@@ -139,6 +139,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 /* Quality bar — thin progress bar under the card strip for at-a-glance strength */
 .q-bar{width:100%;height:3px;border-radius:2px;background:var(--line);margin-top:6px;overflow:hidden}
 .q-bar span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
+.q-bar .q0{width:0;background:var(--s4)}
 .q-bar .q1{width:33%}
 .q-bar .q2{width:66%}
 .q-bar .q3{width:100%}
@@ -313,7 +314,7 @@ function card(i){
     </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
     <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
     <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
-    ${l3&&l3.score!==undefined?`<div class="q-bar"><span class="q${Math.min(l3.score,3)}" style="width:${Math.max(10,Math.min(l3.score,3)/3*100)}%"></span></div>`:""}
+    ${l3&&l3.score!==undefined?`<div class="q-bar"><span class="q${Math.min(l3.score,3)}" style="width:${l3.score===0?0:Math.max(10,Math.min(l3.score,3)/3*100)}%"></span></div>`:""}
     ${company}
     ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
     ${i.volumeSurge?`<div class="setup-evidence surge">VOLUME SURGE ${num(i.volumeSurgeRatio,1)}×</div>`:""}

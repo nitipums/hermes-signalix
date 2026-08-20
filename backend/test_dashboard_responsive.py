@@ -161,6 +161,24 @@ class DashboardResponsiveTests(unittest.TestCase):
         for cls in (".pulse-dot.s1", ".pulse-dot.s2", ".pulse-dot.s3", ".pulse-dot.s4"):
             self.assertIn(cls, html)
 
+    def test_q_bar_has_all_quality_classes(self):
+        """q-bar must style Q0-Q3 so score=0 items don't collapse to blue."""
+        html = self.template
+        for cls in (".q-bar .q0", ".q-bar .q1", ".q-bar .q2", ".q-bar .q3"):
+            self.assertIn(cls, html, f"quality bar class {cls!r} missing from template CSS")
+        # Q0 bar must not use the generic blue .q-bar span background; it needs
+        # its own (muted/S4) colour so failing-quality items are scannable.
+        self.assertIn(".q-bar .q0", html)
+
+    def test_q_bar_generates_q_class_and_zero_width_for_score_zero(self):
+        """Card JS must emit class q0 for score=0 and width=0% (no 10% floor)."""
+        js = self.html
+        # The width formula must short-circuit to 0 for score===0 instead of
+        # Math.max(10, ...) which forced a 10% blue bar even for Q0.
+        self.assertIn("l3.score===0?0:Math.max(10", js)
+        # The emitted class token is still the compact q${min(score,3)} form.
+        self.assertIn("q${Math.min(l3.score,3)}", js)
+
 
 if __name__ == "__main__":
     unittest.main()
