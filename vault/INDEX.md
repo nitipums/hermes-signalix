@@ -28,6 +28,7 @@
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
 | `Postmortems/2026-08-19-Intraday-Evaluator-Import.md` | Intraday ExecStopPost import failure | ✅ current | fixed; reusable systemd/package-import lesson |
+| `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -64,4 +65,6 @@
 - **2026-08-19**: สร้าง INDEX นี้; เริ่มรีเฟรช Architecture.md ให้ตรง stage-first
 - **2026-08-19 (P0-4)**: intraday event boundary — `scan_history.py` ต่อ `resolved_daily_event_id`/`reconciled_at` + observation dedup ต่อ candle + append-only mutation triggers; `reconcile_intraday_events_at_eod` ลิงก์ lineage เมื่อ EOD ยืนยัน; endpoint `/intraday/events`; tests: `test_intraday_event_boundary.py` + integration บน test DB (Architecture.md อัปเดตแล้ว)
 
-- **2026-08-19**: Setup Radar / Stage + Actionable Setup State redesign `DONE` — `backend/setup_state.py` (quality gate + proximity pure functions); wired into `screening.group_scan_results` → `daily_state`; `build_dashboard.serialize` exposes `setup_quality`/`setup_proximity`/`radar`/`radarBadge` + stage→proximity→rs sort; `dashboard_template.html` Setup Radar section + proximity pills, L2 UI pills removed. Verified: 231 tests green; `docker compose up -d --force-recreate` scan produces 84 radar items (READY/WATCH badges); S3/S4 proximity.state=null; browser (pyppeteer/Chromium) confirms Setup Radar heading, `data-prox` pills, no legacy L2 refs; screenshot at `/tmp/radar_screenshot.png`. Commits: 0d3a1ee (setup state), d383c9f (wiring), be99772 (serialize/sort/UI), 19b6c53 (test updates).
+- **2026-08-19**: Setup Radar / Stage + Actionable Setup State redesign `DONE` — `backend/setup_state.py` (quality gate + proximity pure functions); wired into `screening.group_scan_results` → `daily_state`; `build_dashboard.serialize` exposes `setup_quality`/`setup_proximity`/`radar`/`radarBadge` + stage→proximity→rs sort; `dashboard_template.html` Setup Radar section + proximity pills, L2 UI pills removed. Verified: 231 tests green; Docker scan produces 84 radar items (READY/WATCH badges); S3/S4 proximity.state=null; browser confirms Setup Radar heading, `data-prox` pills, no legacy L2 refs; screenshot at `/tmp/radar_screenshot.png`. Commits: 0d3a1ee (setup state), d383c9f (wiring), be99772 (serialize/sort/UI), 19b6c53 (test updates).
+
+- **2026-08-20**: Settrade master became sole ORD authority; weekly sync + auto-reactivation/absent→inactive policy added. Intraday moved to 15-minute cadence, 10:00–16:45 Bangkok, 60m limit=4; old watchdog disabled and new 15m watchdog installed. Scanner keeps short-history symbols as explicit `INSUFFICIENT_HISTORY` non-signal rows. See `2026-08-20-Intraday-Master-Watchdog-Handoff.md`.

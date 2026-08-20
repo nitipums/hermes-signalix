@@ -13,7 +13,7 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 EnvironmentFile=/root/signalix/settradeupdated.env
 # Current/open 60m candle is retained and refreshed during continuous SET sessions.
-ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if { [ "$t" -ge 1015 ] && [ "$t" -le 1230 ]; } || { [ "$t" -ge 1445 ] && [ "$t" -le 1630 ]; }; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode full --intraday-interval 60m --intraday-limit 4 --intraday-workers 938 --intraday-batch-size 938 --intraday-batch-delay 0 --intraday-batch-jitter 0 --no-scan; else echo "signalix full ORD 60m: outside SET continuous session ($t Bangkok), skip"; fi'
+ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if [ "$t" -ge 1000 ] && [ "$t" -le 1645 ]; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode full --intraday-interval 60m --intraday-limit 4 --intraday-workers 10 --intraday-batch-size 50 --intraday-batch-delay 2 --intraday-batch-jitter 0.5 --no-scan; else echo "signalix full ORD 60m: outside configured window ($t Bangkok), skip"; fi'
 StandardOutput=append:/root/signalix/intraday_update_log.txt
 StandardError=append:/root/signalix/intraday_update_log.txt
 TimeoutStartSec=1800

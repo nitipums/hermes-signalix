@@ -1,0 +1,16 @@
+[Unit]
+Description=Signalix 15-minute intraday watchdog
+After=postgresql.service docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecCondition=/root/.venv_img/bin/python /root/signalix/backend/set_market_day_guard.py
+ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if [ "$t" -ge 1000 ] && [ "$t" -le 1645 ]; then exec /root/.venv_img/bin/python /root/signalix/backend/intraday_healthcheck.py --price-max-age-minutes 30 --state-max-age-minutes 30; else echo "signalix watchdog: outside configured window ($t Bangkok), skip"; fi'
+StandardOutput=append:/root/signalix/intraday_watchdog_log.jsonl
+StandardError=append:/root/signalix/intraday_watchdog_log.jsonl

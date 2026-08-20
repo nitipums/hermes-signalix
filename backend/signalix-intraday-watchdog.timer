@@ -1,0 +1,10 @@
+[Unit]
+Description=Signalix intraday watchdog every 15 minutes during configured window
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* *:00/15 Asia/Bangkok
+Persistent=true
+Unit=signalix-intraday-watchdog.service
+
+[Install]
+WantedBy=timers.target
