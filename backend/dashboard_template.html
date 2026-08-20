@@ -192,7 +192,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .chart-canvas{width:100%;height:min(260px,30vh);touch-action:none;border-radius:10px;background:#0a0e17}
 </style>
 </head>
-<body>
+<body class="loading">
 <div id="liveLoading">Loading live snapshot…</div>
 <main class="app">
   <header class="topbar">
@@ -616,51 +616,22 @@ _mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[
 _mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
 const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
 
-async function loadRemoteDashboard(){
-  document.body.classList.add("loading");
+function loadRemoteDashboard(){
+  // Single coherent first paint: the built HTML already embeds the complete
+  // snapshot. Do not paint compact S2 cards first and then replace them with
+  // four stage fetches — that created the visible blank → loading → uptrend →
+  // complete sequence and temporarily hid S1/S3/S4 from the trader.
   const state=document.getElementById("liveState");
   try{
-    // P0: Compact overview first paint — only core fields, fast & small
-    const compact=await fetch(`${apiBase}/dashboard/cards/compact?page_size=200`).then(r=>{if(!r.ok)throw new Error(`compact ${r.status}`);return r.json();});
-    stageMeta=compact.stage_meta||{};
-    items=compact.cards||[];
     bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
-    document.getElementById("covCount").textContent=compact.total??items.length;
-    const updated=compact.scan_time?new Date(compact.scan_time).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}):"—";
-    if(state)state.textContent=`Live · ${items.length} cards · Updated ${updated} ICT`;
-    
-    // Populate provenance header from compact response
-    const fetched=compact.data_fetched_at?new Date(compact.data_fetched_at).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:false}):"—";
-    document.getElementById("provFetched").textContent=`Latest data fetched: ${fetched}`;
-    document.getElementById("provSession").textContent=`Market session: ${compact.market_session?.status||"—"}`;
-    document.getElementById("provValid").textContent=`last valid: ${compact.last_valid_session||"—"}`;
-    
-    // First render with compact cards (fast, mobile-resilient)
+    document.getElementById("covCount").textContent=items.length;
+    const dates=items.map(i=>i.dailyEodDecision?.as_of||i.date).filter(Boolean).sort();
+    const latest=dates.length?dates[dates.length-1]:"—";
+    if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
+    document.getElementById("provFetched").textContent="Snapshot embedded · complete universe";
+    document.getElementById("provSession").textContent="Market session: Asia/Bangkok";
+    document.getElementById("provValid").textContent=`last valid: ${latest}`;
     render();
-    
-    // Background: upgrade to full cards for detail view (non-blocking)
-    Promise.all(STAGE_ORDER.map(async stage=>{
-      let page=1, all=[];
-      while(true){
-        const u=`${apiBase}/dashboard/cards?stage=${encodeURIComponent(stage)}&page=${page}&page_size=200`;
-        const res=await fetch(u); if(!res.ok)throw new Error(`cards ${res.status}`);
-        const data=await res.json(); all=all.concat(data.cards||[]);
-        if(all.length>=data.total||!(data.cards||[]).length)break;
-        page++;
-      }
-      return all;
-    })).then(pages=>{
-      const full=pages.flat();
-      bySymbol=Object.fromEntries(full.map(i=>[i.symbol,i]));
-      items=full;
-      document.getElementById("covCount").textContent=full.length;
-      // Re-render with enriched cards (detail view now has full data)
-      render();
-    }).catch(()=>{
-      // If full load fails, keep compact cards — mobile resilience
-      console.warn("Full card load failed, keeping compact overview");
-    });
-    
   }catch(err){
     if(state)state.textContent="Load failed";
     document.getElementById("results").innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">ลองใหม่</button></div>`;
