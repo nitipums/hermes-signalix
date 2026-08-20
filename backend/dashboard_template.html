@@ -242,9 +242,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       <i id="liveDot" aria-hidden="true"></i>
       <span id="liveState" aria-live="polite">Loading…</span>
       <span id="provenance" style="margin-left:12px;font-size:11px;color:var(--muted)">
-        <span id="provFetched">Latest data fetched: —</span> ·
-        <span id="provSession">Market session: —</span> ·
-        <span id="provValid">last valid: —</span>
+        <span id="provFetched">Last Scanned: —</span>
       </span>
     </div>
   </header>
@@ -309,6 +307,7 @@ const STAGE_SHORT={S1_basing:"กำลังสะสมฐาน",S2_uptrend:"
 const STAGE_TINT_BG={"s1":"var(--s1-tint)","s2":"var(--s2-tint)","s3":"var(--s3-tint)","s4":"var(--s4-tint)"};
 let items=__ITEMS__;
 let stageMeta=__STAGE_META__;
+let dashboardMeta=__DASHBOARD_META__;
 const copy={th:{navScreener:"คัดหุ้น",navWatchlist:"หุ้นติดตาม",navMarket:"ตลาด"}};
 let language=localStorage.getItem("signalix-language")||"th";
 const esc=v=>String(v??"—").replace(/[&<>'\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
@@ -678,11 +677,8 @@ function loadRemoteDashboard(){
       document.getElementById("covCount").textContent=items.length;
       setLoadProgress(42,"Indexing symbols and stages");
       requestAnimationFrame(()=>{
-        const dates=items.map(i=>i.dailyEodDecision?.as_of||i.date).filter(Boolean).sort();
-        const latest=dates.length?dates[dates.length-1]:"—";
-        document.getElementById("provFetched").textContent="Snapshot embedded · complete universe";
-        document.getElementById("provSession").textContent="Market session: Asia/Bangkok";
-        document.getElementById("provValid").textContent=`last valid: ${latest}`;
+        const fmtTime=v=>v?new Date(v).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})+" ICT":"—";
+        document.getElementById("provFetched").textContent=`Last Scanned: ${fmtTime(dashboardMeta.intraday_scan_time||dashboardMeta.data_fetched_at)}`;
         setLoadProgress(70,"Building stage sections");
         requestAnimationFrame(()=>{
           try{

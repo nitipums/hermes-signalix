@@ -868,6 +868,13 @@ def build(scanned=None):
         latest = snapshots(pg, [row["symbol"] for row in rows])
         last_valid_session = max((row.get("last_date") for row in rows if row.get("last_date")), default=None)
         freshness = dashboard_freshness(pg, last_valid_session=last_valid_session)
+        cur = pg.cursor()
+        cur.execute("""SELECT fetch_completed_at FROM intraday_ingestion_runs
+                       WHERE status IN ('full_success','partial_success')
+                       ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1""")
+        intraday_row = cur.fetchone()
+        intraday_scan_time = intraday_row[0].isoformat() if intraday_row and intraday_row[0] else None
+        cur.close()
         from screening import excluded_symbols, universe_layer2, universe_layer3, load_index_membership
         symbols = [row["symbol"] for row in rows]
         excluded = excluded_symbols(pg, market="TH")
@@ -906,6 +913,9 @@ def build(scanned=None):
                  else datetime.now(timezone.utc).isoformat())
     with open(SNAPSHOT_JSON, "w") as file:
         json.dump({"scan_time": scan_time, "market": "TH",
+                   "dashboard_meta": {"data_fetched_at": freshness.get("data_fetched_at"),
+                                      "intraday_scan_time": intraday_scan_time,
+                                      "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")},
                    "refresh": "progressive_cards", "items": items,
                    "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
                   separators=(",", ":"))
@@ -943,7 +953,10 @@ def build(scanned=None):
         template = tf.read()
     page = (template
             .replace("__ITEMS__", json.dumps(items, separators=(",", ":")))
-            .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":"))))
+            .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":")))
+            .replace("__DASHBOARD_META__", json.dumps({"data_fetched_at": freshness.get("data_fetched_at"),
+                                                        "intraday_scan_time": intraday_scan_time,
+                                                        "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")}, separators=(",", ":"))))
     with open(OUT_HTML, "w") as file:
         file.write(page)
     return {"securities": len(items), "groups": counts, "out": OUT_HTML}
