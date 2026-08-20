@@ -536,7 +536,8 @@ function drawChart(bars, tf){
     const yH=top+(1-(b.high-lo)/rng)*plotH, yL=top+(1-(b.low-lo)/rng)*plotH;
     const yC=top+(1-(b.close-lo)/rng)*plotH, yO=top+(1-(b.open-lo)/rng)*plotH;
     const up=b.close>=b.open;
-    ctx.strokeStyle=up?"var(--green)":"var(--red)"; ctx.fillStyle=ctx.strokeStyle;
+    const candleColor=up?"#43df9e":"#ff7a7a";
+    ctx.strokeStyle=candleColor; ctx.fillStyle=candleColor;
     ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();
     const bw=Math.max(1,cw*0.6);
     ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);
