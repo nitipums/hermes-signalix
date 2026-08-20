@@ -7,40 +7,47 @@ from verify_scan_dashboard import load_dashboard_items, verify
 
 
 class ScanDashboardConsistencyTests(unittest.TestCase):
+    def _write(self, root, scan_groups, dash_items, snap_items):
+        scan = root / "scan.json"
+        dashboard = root / "dashboard.html"
+        snapshot = root / "snapshot.json"
+        scan.write_text(json.dumps({"scan_time": "now", "groups": scan_groups}), encoding="utf-8")
+        dashboard.write_text(
+            "let items=" + json.dumps(dash_items) + ";\nlet stageMeta={};", encoding="utf-8"
+        )
+        snapshot.write_text(json.dumps({"scan_time": "now", "items": snap_items}), encoding="utf-8")
+        return str(scan), str(dashboard), str(snapshot)
+
     def test_matching_scan_dashboard_and_db_passes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            scan = root / "scan.json"
-            dashboard = root / "dashboard.html"
-            scan.write_text(json.dumps({"scan_time": "now", "groups": {
-                "ready": [{"symbol": "AAA"}],
-                "avoid": [{"symbol": "BBB"}],
-            }}), encoding="utf-8")
-            dashboard.write_text(
-                "let items=" + json.dumps([
+            scan, dashboard, snapshot = self._write(
+                root,
+                {"ready": [{"symbol": "AAA"}], "avoid": [{"symbol": "BBB"}]},
+                [
                     {"symbol": "AAA", "group": "ready"},
                     {"symbol": "BBB", "group": "avoid"},
-                ]) + ";const meta={}", encoding="utf-8"
+                ],
+                [
+                    {"symbol": "AAA", "primary_group": "ready"},
+                    {"symbol": "BBB", "primary_group": "avoid"},
+                ],
             )
-            result = verify(str(scan), str(dashboard), {
-                "evaluated_symbol_count": 2, "observation_count": 2,
-                "scan_date": "2026-08-14", "run_timestamp": "now",
-            })
+            result = verify(scan, dashboard, snapshot, None)
             self.assertTrue(result["ok"], result)
 
     def test_group_count_mismatch_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            scan = root / "scan.json"
-            dashboard = root / "dashboard.html"
-            scan.write_text(json.dumps({"groups": {"ready": [{"symbol": "AAA"}]}}), encoding="utf-8")
-            dashboard.write_text(
-                "let items=" + json.dumps([{ "symbol": "AAA", "group": "avoid" }]) + ";const meta={}",
-                encoding="utf-8",
+            scan, dashboard, snapshot = self._write(
+                root,
+                {"ready": [{"symbol": "AAA"}], "avoid": [{"symbol": "BBB"}]},
+                [{"symbol": "AAA", "group": "avoid"}],
+                [{"symbol": "AAA", "primary_group": "avoid"}],
             )
-            result = verify(str(scan), str(dashboard), None)
+            result = verify(scan, dashboard, snapshot, None)
             self.assertFalse(result["ok"])
-            self.assertIn("dashboard group counts differ from scan group counts", result["failures"])
+            self.assertIn("dashboard item count differs from scan group total", result["failures"])
 
     def test_loader_rejects_missing_assignment(self):
         with tempfile.NamedTemporaryFile("w", suffix=".html") as handle:

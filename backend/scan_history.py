@@ -162,7 +162,117 @@ def init_daily_scan_history_schema(pg):
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_events_symbol_idx ON daily_breakout_events(symbol, qualified_on DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_obs_event_idx ON daily_breakout_event_observations(event_id, observed_on DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS daily_scan_runs_scan_date_idx ON daily_scan_runs(scan_date, run_timestamp DESC)")
-        cur.execute("ALTER TABLE daily_scan_run_selection_audit DROP CONSTRAINT IF EXISTS daily_scan_run_selection_audit_selection_status_check")
+        # Intraday emerging events: append-only, lower confidence, reconciled by EOD
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS intraday_events (
+                id UUID PRIMARY KEY,
+                symbol TEXT NOT NULL,
+                origin TEXT NOT NULL,
+                trigger_price NUMERIC(18,4) NOT NULL,
+                first_seen TIMESTAMPTZ NOT NULL,
+                first_candle_ts TIMESTAMPTZ NOT NULL,
+                interval TEXT NOT NULL,
+                qualification_close DOUBLE PRECISION,
+                qualification_volume_ratio DOUBLE PRECISION,
+                pre_break_pivot_low NUMERIC(18,4),
+                failure_level NUMERIC(18,4),
+                trend_template_conditions INTEGER,
+                rs_rating DOUBLE PRECISION,
+                intraday_run_id TEXT REFERENCES intraday_ingestion_runs(run_id) ON DELETE SET NULL,
+                source_lineage JSONB NOT NULL DEFAULT '{}',
+                confidence TEXT NOT NULL DEFAULT 'emerging' CHECK (confidence IN ('emerging','confirmed','expired','invalidated','not_confirmed')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(symbol, first_candle_ts, trigger_price, interval)
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS intraday_event_observations (
+                id UUID PRIMARY KEY,
+                event_id UUID NOT NULL REFERENCES intraday_events(id) ON DELETE RESTRICT,
+                intraday_run_id TEXT REFERENCES intraday_ingestion_runs(run_id) ON DELETE SET NULL,
+                observed_at TIMESTAMPTZ NOT NULL,
+                candle_ts TIMESTAMPTZ NOT NULL,
+                stage TEXT NOT NULL,
+                close DOUBLE PRECISION NOT NULL,
+                distance_from_trigger_pct DOUBLE PRECISION,
+                rsi_daily DOUBLE PRECISION,
+                volume_ratio_50 DOUBLE PRECISION,
+                failure_reason TEXT,
+                raw_evidence JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(event_id, intraday_run_id)
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS intraday_events_symbol_idx ON intraday_events(symbol, first_candle_ts DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS intraday_events_confidence_idx ON intraday_events(confidence, first_candle_ts DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS intraday_event_obs_event_idx ON intraday_event_observations(event_id, observed_at DESC)")
+        # P0-4 hardenings: daily-event lineage, candle-level observation dedup,
+        # and append-only mutation guards on the intraday side.
+        # (a) Lineage link to the official Daily baseline once EOD confirms.
+        cur.execute("""
+            ALTER TABLE intraday_events
+            ADD COLUMN IF NOT EXISTS resolved_daily_event_id UUID REFERENCES daily_breakout_events(id) ON DELETE SET NULL
+        """)
+        cur.execute("""
+            ALTER TABLE intraday_events
+            ADD COLUMN IF NOT EXISTS reconciled_at TIMESTAMPTZ
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS intraday_events_resolved_idx ON intraday_events(resolved_daily_event_id)")
+        # (b) Observation uniqueness must be per candle, not per ingestion run:
+        #     the old UNIQUE(event_id, intraday_run_id) never fired because
+        #     intraday_run_id was NULL for evaluator-written rows.
+        cur.execute("""
+            ALTER TABLE intraday_event_observations
+            DROP CONSTRAINT IF EXISTS intraday_event_observations_event_id_intraday_run_id_key
+        """)
+        cur.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM pg_constraint WHERE conname = 'intraday_event_obs_event_candle_unique'
+                ) THEN
+                    ALTER TABLE intraday_event_observations
+                    ADD CONSTRAINT intraday_event_obs_event_candle_unique UNIQUE (event_id, candle_ts);
+                END IF;
+            END $$;
+        """)
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS intraday_event_obs_event_candle_uniq_idx ON intraday_event_observations(event_id, candle_ts)")
+        # (c) Append-only guards. Daily rows are already fully immutable.  The
+        #     intraday event row is append-only EXCEPT the confidence lifecycle
+        #     columns that only the EOD reconciler may transition; observations
+        #     are fully immutable.
+        cur.execute("""
+            CREATE OR REPLACE FUNCTION intraday_event_reject_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                IF TG_OP = 'DELETE' THEN
+                    RAISE EXCEPTION 'intraday events are append-only; deleting is not allowed';
+                END IF;
+                IF NEW.confidence IS DISTINCT FROM OLD.confidence
+                   OR NEW.resolved_daily_event_id IS DISTINCT FROM OLD.resolved_daily_event_id
+                   OR NEW.reconciled_at IS DISTINCT FROM OLD.reconciled_at THEN
+                    RETURN NEW;
+                END IF;
+                RAISE EXCEPTION 'intraday event rows are immutable except confidence lifecycle fields';
+            END;
+            $$ LANGUAGE plpgsql
+        """)
+        cur.execute("""
+            CREATE OR REPLACE FUNCTION intraday_event_observation_reject_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+                RAISE EXCEPTION 'intraday event observations are immutable';
+            END;
+            $$ LANGUAGE plpgsql
+        """)
+        for table, fn in (("intraday_events", "intraday_event_reject_mutation"),
+                          ("intraday_event_observations", "intraday_event_observation_reject_mutation")):
+            cur.execute(f"DROP TRIGGER IF EXISTS {table}_append_only ON {table}")
+            cur.execute(f"""
+                CREATE TRIGGER {table}_append_only
+                BEFORE UPDATE OR DELETE ON {table}
+                FOR EACH ROW EXECUTE FUNCTION {fn}()
+            """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS daily_scan_run_selection_audit (
                 run_id UUID PRIMARY KEY REFERENCES daily_scan_runs(id) ON DELETE RESTRICT,
@@ -172,6 +282,7 @@ def init_daily_scan_history_schema(pg):
             )
         """)
         # Existing installations predate the four-way audit vocabulary.
+        cur.execute("ALTER TABLE daily_scan_run_selection_audit DROP CONSTRAINT IF EXISTS daily_scan_run_selection_audit_selection_status_check")
         cur.execute("ALTER TABLE daily_scan_run_selection_audit ADD CONSTRAINT daily_scan_run_selection_audit_selection_status_check CHECK (selection_status IN ('selected','quarantined','legacy','excluded'))")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS daily_breakout_event_observation_selection_audit (
@@ -461,12 +572,15 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
             tr = row.get("trade_readiness") or {}
             scan_date = run_scan_date
             event_id = (row.get("active_breakout_event") or {}).get("event_id")
-            if state.get("primary_state") == "fresh_breakout" and not event_id:
-                trigger = state.get("reference_level")
+            # New stage-first classifier: phase == "breakout_new" indicates fresh breakout
+            # Legacy: primary_state == "fresh_breakout"
+            is_fresh_breakout = state.get("phase") == "breakout_new" or state.get("primary_state") == "fresh_breakout"
+            if is_fresh_breakout and not event_id:
+                trigger = state.get("reference_level") or tr.get("breakout_level_20d")
                 pivot = tr.get("pre_break_pivot_low")
                 if pivot is None:
                     raise ValueError(f"fresh breakout {symbol} missing required pre_break_pivot_low")
-                failure = state.get("failure_level") or pivot
+                failure = state.get("failure_level") or tr.get("stop_loss") or tr.get("suggested_stop") or pivot
                 cur.execute("""
                     INSERT INTO daily_breakout_events
                     (id,symbol,origin,trigger_price,qualified_on,qualification_close,qualification_volume_ratio,
@@ -485,14 +599,14 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
                     cur.execute("SELECT id FROM daily_breakout_events WHERE symbol=%s AND qualified_on=%s AND trigger_price=%s AND scanner_version=%s", (symbol, scan_date, str(trigger), scanner_version))
                     found = cur.fetchone(); event_id = str(found[0]) if found else None
             if event_id:
-                trigger = float(state.get("reference_level") or (row.get("active_breakout_event") or {}).get("trigger_price"))
+                trigger = float(state.get("reference_level") or tr.get("breakout_level_20d") or (row.get("active_breakout_event") or {}).get("trigger_price"))
                 distance = float(row.get("close")) / trigger - 1 if trigger else None
                 cur.execute("""
                     INSERT INTO daily_breakout_event_observations
                     (id,event_id,scan_run_id,observed_on,stage,close,distance_from_trigger_pct,rsi_daily,volume_ratio_50,failure_reason,raw_evidence)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT(event_id,scan_run_id) DO NOTHING
-                """, (str(uuid.uuid4()), event_id, run_id, scan_date, state.get("stage") or "fresh",
+                """, (str(uuid.uuid4()), event_id, run_id, scan_date, state.get("stage") or state.get("phase") or "fresh",
                       float(row.get("close")), distance, tr.get("rsi_daily"), tr.get("volume_ratio_50"),
                       state.get("failure_reason"), _json({"daily_state": state, "readiness": tr})))
                 observed += cur.rowcount
@@ -501,5 +615,285 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
     except Exception:
         pg.rollback()
         raise
+    finally:
+        cur.close()
+
+
+# ============================================================
+# Intraday emerging events — append-only, lower confidence
+# EOD scan owns final class; reconciles earlier events as
+# confirmed/expired/invalidated/not_confirmed.
+# ============================================================
+
+def persist_intraday_events(pg, events, *, intraday_run_id=None, source_lineage=None):
+    """Append intraday emerging events and their observations.
+
+    ``events`` is a list of dicts from intraday_evaluator with keys:
+      - symbol, origin, trigger_price, first_candle_ts, interval
+      - qualification_close, qualification_volume_ratio (optional)
+      - pre_break_pivot_low, failure_level (optional)
+      - trend_template_conditions, rs_rating (optional)
+      - observations: list of {candle_ts, stage, close, distance_from_trigger_pct,
+        rsi_daily, volume_ratio_50, failure_reason, raw_evidence}
+
+    Each run creates new rows; no upsert on events (append-only).
+    Observations are deduped by (event_id, intraday_run_id).
+    """
+    if not events:
+        return {"events_created": 0, "observations_appended": 0}
+
+    lineage = source_lineage or {"source": "intraday_evaluator", "freshness": "unspecified"}
+
+    cur = pg.cursor()
+    original_autocommit = getattr(pg, "autocommit", None)
+    transactional = isinstance(original_autocommit, bool) and original_autocommit
+    if transactional:
+        pg.autocommit = False
+    try:
+        created = 0
+        observed = 0
+        for ev in events:
+            symbol = str(ev.get("symbol") or "").upper()
+            if not symbol:
+                continue
+            trigger = ev.get("trigger_price")
+            if trigger is None:
+                continue
+            trigger_f = float(trigger)
+            interval = ev.get("interval") or "60m"
+            event_id = None
+            # Reuse an ACTIVE emerging/confirmed event for the same breakout
+            # cycle (symbol + trigger within tolerance + interval).  Without
+            # this, every candle that stays above the trigger fabricates a new
+            # event and the table explodes with near-identical rows.
+            cur.execute("""
+                SELECT id FROM intraday_events
+                WHERE symbol=%s AND interval=%s
+                  AND confidence IN ('emerging','confirmed')
+                  AND ABS(trigger_price - %s) <= %s * 0.005
+                ORDER BY first_candle_ts ASC, created_at ASC
+                LIMIT 1
+            """, (symbol, interval, trigger_f, trigger_f))
+            active = cur.fetchone()
+            if active:
+                event_id = str(active[0])
+            else:
+                event_id = str(uuid.uuid4())
+                cur.execute("""
+                    INSERT INTO intraday_events
+                    (id, symbol, origin, trigger_price, first_seen, first_candle_ts, interval,
+                     qualification_close, qualification_volume_ratio, pre_break_pivot_low,
+                     failure_level, trend_template_conditions, rs_rating,
+                     intraday_run_id, source_lineage)
+                    VALUES (%s,%s,%s,%s,NOW(),%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(symbol, first_candle_ts, trigger_price, interval) DO NOTHING
+                    RETURNING id
+                """, (
+                    event_id, symbol, ev.get("origin") or "intraday", str(trigger),
+                    ev.get("first_candle_ts"), interval,
+                    ev.get("qualification_close"), ev.get("qualification_volume_ratio"),
+                    ev.get("pre_break_pivot_low"), ev.get("failure_level"),
+                    ev.get("trend_template_conditions"), ev.get("rs_rating"),
+                    intraday_run_id, _json(lineage),
+                ))
+                returned = cur.fetchone()
+                if returned:
+                    created += 1
+                else:
+                    # Race: an identical row was inserted concurrently.
+                    cur.execute("""
+                        SELECT id FROM intraday_events
+                        WHERE symbol=%s AND first_candle_ts=%s AND trigger_price=%s AND interval=%s
+                    """, (symbol, ev.get("first_candle_ts"), str(trigger), interval))
+                    found = cur.fetchone()
+                    if found:
+                        event_id = str(found[0])
+                    else:
+                        continue
+
+            # Append observations for this event (one row per candle).
+            for obs in ev.get("observations") or []:
+                candle_ts = obs.get("candle_ts")
+                if candle_ts is None:
+                    continue
+                cur.execute("""
+                    INSERT INTO intraday_event_observations
+                    (id, event_id, intraday_run_id, observed_at, candle_ts, stage, close,
+                     distance_from_trigger_pct, rsi_daily, volume_ratio_50, failure_reason, raw_evidence)
+                    VALUES (%s,%s,%s,NOW(),%s,%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT(event_id, candle_ts) DO NOTHING
+                """, (
+                    str(uuid.uuid4()), event_id, intraday_run_id,
+                    candle_ts, obs.get("stage"), obs.get("close"),
+                    obs.get("distance_from_trigger_pct"), obs.get("rsi_daily"),
+                    obs.get("volume_ratio_50"), obs.get("failure_reason"),
+                    _json(obs.get("raw_evidence") or {}),
+                ))
+                observed += cur.rowcount
+        pg.commit()
+        return {"events_created": created, "observations_appended": observed}
+    except Exception:
+        pg.rollback()
+        raise
+    finally:
+        cur.close()
+        if transactional:
+            pg.autocommit = original_autocommit
+
+
+def reconcile_intraday_events_at_eod(pg, daily_run_id, scanner_version, symbols=None):
+    """EOD reconciliation: promote intraday emerging events to Daily events.
+
+    For each intraday event with confidence='emerging' for the given symbols,
+    check if the EOD scan confirms it (fresh_breakout with matching trigger).
+    If confirmed -> create daily_breakout_event + observations, mark intraday event 'confirmed'.
+    If expired/no match -> mark intraday event 'expired' or 'not_confirmed'.
+    If invalidated (below failure_level) -> mark intraday event 'invalidated'.
+
+    This is called from the EOD scan after persist_daily_scan_snapshot.
+    """
+    cur = pg.cursor()
+    try:
+        # Get the scan date of the owning EOD run
+        cur.execute("SELECT scan_date FROM daily_scan_runs WHERE id=%s", (daily_run_id,))
+        run_row = cur.fetchone()
+        if run_row is None:
+            raise ValueError(f"unknown daily scan run {daily_run_id}")
+        scan_date = run_row[0]
+
+        # Build a map of EOD breakout events from today's scan
+        cur.execute("""
+            SELECT e.id, e.symbol, e.trigger_price, e.origin, e.pre_break_pivot_low,
+                   e.failure_level, e.qualified_on, e.qualification_close, e.qualification_volume_ratio,
+                   e.trend_template_conditions, e.rs_rating
+            FROM daily_breakout_events e
+            WHERE e.scan_run_id = %s
+        """, (daily_run_id,))
+        eod_events = {}
+        for row in cur.fetchall():
+            eid, sym, trigger, origin, pivot, failure, qual_on, qual_close, qual_vol, tt_cond, rs = row
+            eod_events[sym] = {
+                "event_id": str(eid), "trigger_price": float(trigger), "origin": origin,
+                "pivot_low": float(pivot), "failure_level": float(failure),
+                "qualified_on": qual_on, "qualification_close": float(qual_close),
+                "qualification_volume_ratio": qual_vol,
+                "trend_template_conditions": tt_cond, "rs_rating": rs,
+            }
+
+        # Find intraday emerging events for these symbols (or all if symbols=None).
+        # Only 'emerging' rows are reconciled; already-finalized rows are
+        # left untouched (idempotent by construction).
+        where = "confidence = 'emerging'"
+        params = []
+        if symbols:
+            placeholders = ",".join(["%s"] * len(symbols))
+            where += f" AND symbol IN ({placeholders})"
+            params = [s.upper() for s in symbols]
+        cur.execute(f"""
+            SELECT id, symbol, trigger_price, first_candle_ts, failure_level, pre_break_pivot_low, intraday_run_id
+            FROM intraday_events
+            WHERE {where}
+            ORDER BY symbol, first_candle_ts
+        """, params)
+        intraday_emerging = cur.fetchall()
+
+        promoted = 0
+        expired = 0
+        invalidated = 0
+        not_confirmed = 0
+
+        for ev_id, symbol, trigger, first_candle_ts, failure_level, pivot_low, run_id in intraday_emerging:
+            trigger_f = float(trigger)
+            eod = eod_events.get(symbol)
+
+            # Check if EOD confirmed this breakout (same trigger ±0.5%)
+            if eod and abs(eod["trigger_price"] - trigger_f) / trigger_f <= 0.005:
+                # Confirmed: link the intraday event to the official Daily event
+                # that owns the final class, and record when reconciliation ran.
+                cur.execute("""
+                    UPDATE intraday_events
+                    SET confidence='confirmed', resolved_daily_event_id=%s, reconciled_at=NOW()
+                    WHERE id=%s
+                """, (eod["event_id"], ev_id))
+                promoted += 1
+            elif eod:
+                # EOD has a breakout for this symbol but different trigger -> not_confirmed
+                cur.execute("""
+                    UPDATE intraday_events
+                    SET confidence='not_confirmed', resolved_daily_event_id=NULL, reconciled_at=NOW()
+                    WHERE id=%s
+                """, (ev_id,))
+                not_confirmed += 1
+            else:
+                # No EOD breakout for this symbol today
+                # Check if intraday price action invalidated (below failure level)
+                cur.execute("""
+                    SELECT close FROM intraday_event_observations
+                    WHERE event_id=%s ORDER BY observed_at DESC LIMIT 1
+                """, (ev_id,))
+                latest_obs = cur.fetchone()
+                if latest_obs and failure_level is not None:
+                    latest_close = float(latest_obs[0])
+                    if latest_close <= float(failure_level):
+                        cur.execute("""
+                            UPDATE intraday_events
+                            SET confidence='invalidated', resolved_daily_event_id=NULL, reconciled_at=NOW()
+                            WHERE id=%s
+                        """, (ev_id,))
+                        invalidated += 1
+                        continue
+                # Otherwise expired (no EOD confirmation, not invalidated)
+                cur.execute("""
+                    UPDATE intraday_events
+                    SET confidence='expired', resolved_daily_event_id=NULL, reconciled_at=NOW()
+                    WHERE id=%s
+                """, (ev_id,))
+                expired += 1
+
+        pg.commit()
+        return {
+            "promoted": promoted, "expired": expired,
+            "invalidated": invalidated, "not_confirmed": not_confirmed,
+        }
+    except Exception:
+        pg.rollback()
+        raise
+    finally:
+        cur.close()
+
+
+def get_active_intraday_events(pg, confidence=None):
+    """Return active intraday events (for dashboard overlay)."""
+    cur = pg.cursor()
+    try:
+        where = "confidence IN ('emerging','confirmed')"
+        params = []
+        if confidence:
+            where = "confidence = %s"
+            params = [confidence]
+        cur.execute(f"""
+            SELECT DISTINCT ON (symbol)
+                id, symbol, origin, trigger_price, first_seen, first_candle_ts, interval,
+                confidence, failure_level, pre_break_pivot_low, intraday_run_id,
+                resolved_daily_event_id, reconciled_at
+            FROM intraday_events
+            WHERE {where}
+            ORDER BY symbol, first_candle_ts DESC
+        """, params)
+        out = {}
+        for row in cur.fetchall():
+            ev_id, symbol, origin, trigger, first_seen, first_candle, interval, conf, failure, pivot, run_id, resolved, reconciled = row
+            out[symbol] = {
+                "event_id": str(ev_id), "origin": origin, "trigger_price": float(trigger),
+                "first_seen": first_seen.isoformat() if first_seen else None,
+                "first_candle_ts": first_candle.isoformat() if first_candle else None,
+                "interval": interval, "confidence": conf,
+                "failure_level": float(failure) if failure else None,
+                "pivot_low": float(pivot) if pivot else None,
+                "intraday_run_id": str(run_id) if run_id else None,
+                "resolved_daily_event_id": str(resolved) if resolved else None,
+                "reconciled_at": reconciled.isoformat() if reconciled else None,
+            }
+        return out
     finally:
         cur.close()

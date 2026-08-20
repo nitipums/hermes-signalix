@@ -8,10 +8,13 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import uuid
 from pathlib import Path
 
 import psycopg2
 import psycopg2.extras
+
+from .scan_history import persist_intraday_events
 
 HERE = Path(__file__).parent
 SCAN_JSON = HERE / "scan_results.json"
@@ -20,9 +23,9 @@ PG = dict(host=os.getenv("POSTGRES_HOST", "127.0.0.1"), port=int(os.getenv("POST
           dbname=os.getenv("POSTGRES_DB", "signalix"))
 
 INTENT_GROUPS = {
-    "active": {"fresh_breakout", "breakout_retest", "trend_pullback", "breakout_setup", "breakout_extended", "base_forming"},
-    "act_prepare": {"fresh_breakout", "breakout_retest", "trend_pullback", "breakout_setup"},
-    "monitor": {"breakout_extended", "base_forming"},
+    "active": {"breakout_new", "uptrend_pullback", "waiting_breakout", "base", "down_or_broken"},
+    "act_prepare": {"breakout_new", "uptrend_pullback", "waiting_breakout"},
+    "monitor": {"base", "down_or_broken"},
 }
 GROUP_META = {
     "ready_validate": ("opportunity", "Ready to Validate", "positive"),
@@ -62,7 +65,7 @@ def classify(base_group: str, row: dict, price: float | None) -> tuple[str, str,
     trigger = readiness.get("breakout_level_20d")
     if price is None:
         return base_group, "WAIT", "No fresh stored intraday price. Daily state retained."
-    if base_group in {"fresh_breakout", "breakout_retest", "trend_pullback", "breakout_setup", "breakout_extended", "base_forming"}:
+    if base_group in {"breakout_new", "uptrend_pullback", "waiting_breakout", "base", "down_or_broken"}:
         return base_group, "WATCH", "Intraday evidence is informational only; it cannot overwrite the official Daily state."
     try:
         price = float(price); stop = float(stop) if stop is not None else None
@@ -72,11 +75,11 @@ def classify(base_group: str, row: dict, price: float | None) -> tuple[str, str,
         return base_group, "WAIT", "Invalid reference levels; Daily state retained."
     if stop is not None and price <= stop:
         return "avoid", "INVALIDATED", f"Intraday price {price:g} is at or below invalidation {stop:g}."
-    if base_group in {"ready_validate", "pullback_watch"} and lo is not None and lo <= price <= hi:
+    if base_group in {"uptrend_pullback"} and lo is not None and lo <= price <= hi:
         return "ready_validate", "READY TO VALIDATE", f"Intraday price {price:g} is inside the Daily reference entry zone {lo:g}–{hi:g}."
-    if base_group in {"breakout_watch", "retest_watch"} and trigger is not None and price >= trigger:
+    if base_group in {"waiting_breakout", "breakout_new"} and trigger is not None and price >= trigger:
         return "retest_watch", "BREAKOUT WATCH", f"Intraday price {price:g} is at/above the Daily breakout trigger {trigger:g}; wait for controlled retest."
-    if base_group == "ready_validate":
+    if base_group == "uptrend_pullback":
         return "pullback_watch", "WAIT FOR ENTRY ZONE", "Price is outside the reference entry zone; Daily structure remains qualified."
     return base_group, "WATCH", "Daily structure retained; intraday price has not crossed a defined action level."
 
@@ -106,6 +109,10 @@ def evaluate(mode: str, interval: str) -> dict:
         init_schema(pg); prices = _latest_prices(pg, symbols, interval)
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         changed=[]; evaluated=0
+
+        # Track intraday emerging events for persistence
+        intraday_events = []
+
         for base, row in rows:
             sym=row["symbol"]; quote=prices.get(sym); price=float(quote["close"]) if quote else None
             group, action, reason = classify(base,row,price); evaluated += 1
@@ -121,7 +128,62 @@ def evaluate(mode: str, interval: str) -> dict:
                            action=EXCLUDED.action,action_reason=EXCLUDED.action_reason,price=EXCLUDED.price,interval=EXCLUDED.interval,
                            candle_ts=EXCLUDED.candle_ts,evaluated_at=NOW(),updated_at=NOW()""",
                         (sym,base,group,action,reason,price,interval,quote["ts"] if quote else None))
+
+            # Detect and persist intraday emerging breakout events
+            # When intraday price crosses the daily breakout trigger, create an emerging event
+            readiness = row.get("trade_readiness") or {}
+            trigger = readiness.get("breakout_level_20d")
+            if price is not None and trigger is not None and price >= float(trigger):
+                # Intraday price is at/above the daily breakout trigger
+                # Create an emerging event if this is a breakout-related group
+                if base in {"breakout_new", "waiting_breakout"}:
+                    intraday_events.append({
+                        "symbol": sym,
+                        "origin": "intraday_breakout",
+                        "trigger_price": float(trigger),
+                        "first_candle_ts": quote["ts"],
+                        "interval": interval,
+                        "qualification_close": price,
+                        "qualification_volume_ratio": readiness.get("volume_ratio_50"),
+                        "pre_break_pivot_low": readiness.get("pre_break_pivot_low"),
+                        "failure_level": readiness.get("stop_loss") or readiness.get("suggested_stop"),
+                        "trend_template_conditions": row.get("trend_template", {}).get("conditions_met"),
+                        "rs_rating": row.get("trend_template", {}).get("rs_rating"),
+                        "observations": [{
+                            "candle_ts": quote["ts"],
+                            "stage": group,
+                            "close": price,
+                            "distance_from_trigger_pct": (price / float(trigger) - 1) if trigger else None,
+                            "rsi_daily": readiness.get("rsi_daily"),
+                            "volume_ratio_50": readiness.get("volume_ratio_50"),
+                            "failure_reason": None,
+                            "raw_evidence": {"base_group": base, "action": action, "reason": reason}
+                        }]
+                    })
+
         pg.commit(); cur.close()
+
+        # Persist intraday emerging events (append-only).  Attach provenance:
+        # the most recent intraday ingestion run id (if any) so the events link
+        # back to the candle batch that produced them.
+        if intraday_events:
+            provenance_run_id = None
+            try:
+                prov = pg.cursor()
+                prov.execute(
+                    "SELECT run_id FROM intraday_ingestion_runs "
+                    "WHERE status IN ('full_success','partial_success') "
+                    "ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1"
+                )
+                row = prov.fetchone()
+                provenance_run_id = row[0] if row else None
+                prov.close()
+            except Exception:
+                pass
+            persist_intraday_events(pg, intraday_events,
+                                    intraday_run_id=provenance_run_id,
+                                    source_lineage={"source": "intraday_evaluator", "mode": mode})
+
         return {"mode":mode,"interval":interval,"evaluated":evaluated,"priced":len(prices),"changes":changed}
     finally: pg.close()
 
