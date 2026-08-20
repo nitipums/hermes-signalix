@@ -39,7 +39,7 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         sleeps = []
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
-        summary = u.ingest_shortlist_intraday(
+        summary = u.ingest_intraday(
             MagicMock(), {}, symbols=["AAA", "BBB", "CCC"], batch_size=2,
             batch_delay=1.0, batch_jitter=0.25, per_symbol_delay=0,
             session_retries=1, market_factory=factory,
@@ -63,7 +63,7 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         ])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
-        summary = u.ingest_shortlist_intraday(
+        summary = u.ingest_intraday(
             MagicMock(), {}, symbols=["AAA"], batch_size=1,
             batch_delay=0, batch_jitter=0, per_symbol_delay=0,
             session_retries=1, retry_backoff=0, market_factory=factory,
@@ -81,7 +81,7 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         factory = MagicMock(side_effect=[first, recovered])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
-        summary = u.ingest_shortlist_intraday(
+        summary = u.ingest_intraday(
             MagicMock(), {}, symbols=["AAA", "BBB", "CCC", "DDD"], batch_size=2,
             batch_delay=0, batch_jitter=0, per_symbol_delay=0,
             session_retries=1, retry_backoff=0, market_factory=factory,
@@ -100,7 +100,7 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         market = FakeMarket([{}, candle()])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
-        summary = u.ingest_shortlist_intraday(
+        summary = u.ingest_intraday(
             MagicMock(), {}, symbols=["AAA", "BBB"], batch_size=2,
             batch_delay=0, batch_jitter=0, per_symbol_delay=0,
             session_retries=0, market_factory=MagicMock(return_value=market),
@@ -116,7 +116,7 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         market = FakeMarket([RuntimeError("bad AAA"), candle(), candle()])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
-        summary = u.ingest_shortlist_intraday(
+        summary = u.ingest_intraday(
             MagicMock(), {}, symbols=["AAA", "BBB", "CCC"], batch_size=2,
             batch_delay=0, batch_jitter=0, per_symbol_delay=0,
             session_retries=0, market_factory=MagicMock(return_value=market),
@@ -143,8 +143,8 @@ class IntradayBatchIngestionTests(unittest.TestCase):
             sleep_fn=lambda _seconds: None, jitter_fn=lambda _a, _b: 0,
         )
 
-        u.ingest_shortlist_intraday(MagicMock(), {}, market_factory=MagicMock(return_value=market), **kwargs)
-        u.ingest_shortlist_intraday(MagicMock(), {}, market_factory=MagicMock(return_value=market), **kwargs)
+        u.ingest_intraday(MagicMock(), {}, market_factory=MagicMock(return_value=market), **kwargs)
+        u.ingest_intraday(MagicMock(), {}, market_factory=MagicMock(return_value=market), **kwargs)
 
         self.assertEqual(insert_rows.call_count, 2)
         for invocation in insert_rows.call_args_list:
@@ -195,8 +195,8 @@ class IntradayUpsertContractTests(unittest.TestCase):
 
 class IntradayRunExitTests(unittest.TestCase):
     @patch("update_data.get_pg")
-    @patch("update_data._intraday_shortlist", return_value=["AAA"])
-    @patch("update_data.ingest_shortlist_intraday")
+    @patch("update_data._intraday_universe", return_value=["AAA"])
+    @patch("update_data.ingest_intraday")
     def test_partial_run_returns_nonzero_and_records_summary(self, ingest, _shortlist, get_pg):
         ingest.return_value = {
             "run_id": "run-1", "status": "partial_success",
@@ -205,8 +205,8 @@ class IntradayRunExitTests(unittest.TestCase):
             "rows_offered": 0, "failed_symbols": ["AAA"], "batches": [],
         }
         args = SimpleNamespace(
-            intraday_only=True, intraday_mode="tier1", intraday_interval="60m",
-            dry_run=False, intraday_limit=8, intraday_batch_size=5,
+            intraday_only=True, intraday_mode="full", intraday_interval="60m",
+            dry_run=False, intraday_limit=4, intraday_batch_size=5,
             intraday_batch_delay=1.0, intraday_batch_jitter=0.2,
             intraday_session_retries=1, intraday_retry_backoff=2.0,
         )
