@@ -50,6 +50,13 @@ button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}
   padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .nav button{border:0;background:transparent;border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
 .nav button.active,.nav button:hover{background:var(--panel2);color:var(--text)}
+/* Sticky control cluster — stage summary + filter bar + search stay in view
+   while scrolling long stage sections (2026-08-20 summary UX). Sits under the
+   sticky nav (z 10) so it never overlaps it; backdrop blur keeps cards legible. */
+.ctrl-sticky{position:sticky;top:0;z-index:9;background:#0a0e17ee;backdrop-filter:blur(12px);
+  padding:10px 0 6px;margin:0 -18px 10px;padding-left:18px;padding-right:18px}
+.ctrl-sticky .stage-summary{margin-bottom:10px}
+.ctrl-sticky .liquidity-tools,.ctrl-sticky .indep-row,.ctrl-sticky .search{margin-bottom:8px}
 .hero{padding:20px 0 14px;display:flex;justify-content:space-between;gap:14px;align-items:start;flex-wrap:wrap}
 h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .hero p{margin:0;color:var(--muted)}
@@ -248,6 +255,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   </header>
   <nav class="nav" role="menubar">
     <button class="chip active" data-page="screener" aria-label="คัดหุ้น (Stage)" role="menuitem">คัดหุ้น (Stage)</button>
+    <button class="chip" data-page="radar" aria-label="Setup Radar" role="menuitem">Radar</button>
     <button class="chip" data-page="watchlist" aria-label="หุ้นติดตาม" role="menuitem">หุ้นติดตาม</button>
     <button class="chip" data-page="market" aria-label="ตลาด" role="menuitem">ตลาด</button>
     <button class="chip" id="languageToggle" style="margin-left:auto" aria-label="Toggle language">EN</button>
@@ -257,33 +265,41 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       <div><h1>Stage-first Screener</h1><p>จัดกลุ่มตามโครงสร้างกราฟ (Minervini Stage 1–4) — ไม่ใช้ volume/liquidity กรองตอนแรก</p></div>
       <div class="coverage"><span id="covCount">—</span> หุ้นไทย ORD สแกน</div>
     </div>
-    <div class="stage-summary" id="stageSummary" role="group" aria-label="Stage summary"></div>
-    <!-- Row 1: liquidity / SET50 / value / price-band toggles -->
-    <div class="liquidity-tools" id="indepBar">
-      <button class="chip" id="set50Only" data-indep="set50" aria-pressed="false">SET50 เท่านั้น</button>
-      <select id="valueFilter" class="chip" aria-label="Value filter">
-        <option value="all">มูลค่าตลาด: ทั้งหมด</option>
-        <option value="5">≥ ฿5M/วัน</option>
-        <option value="10">≥ ฿10M/วัน</option>
-        <option value="20">≥ ฿20M/วัน</option>
-      </select>
-      <select id="priceBand" class="chip" aria-label="Price band">
-        <option value="all">ราคา: ทั้งหมด</option>
-        <option value="low">ต่ำ (&lt;฿2)</option>
-        <option value="mid">กลาง (฿2–10)</option>
-        <option value="high">สูง (&gt;฿10)</option>
-      </select>
-      <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true">ซ่อน low value (&lt;฿10M/วัน)</button>
-      <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false">โชว์ทั้งหมด</button>
+    <div class="ctrl-sticky" id="ctrlSticky">
+      <div class="stage-summary" id="stageSummary" role="group" aria-label="Stage summary"></div>
+      <!-- Row 1: liquidity / SET50 / value / price-band toggles -->
+      <div class="liquidity-tools" id="indepBar">
+        <button class="chip" id="set50Only" data-indep="set50" aria-pressed="false">SET50 เท่านั้น</button>
+        <select id="valueFilter" class="chip" aria-label="Value filter">
+          <option value="all">มูลค่าตลาด: ทั้งหมด</option>
+          <option value="5">≥ ฿5M/วัน</option>
+          <option value="10">≥ ฿10M/วัน</option>
+          <option value="20">≥ ฿20M/วัน</option>
+        </select>
+        <select id="priceBand" class="chip" aria-label="Price band">
+          <option value="all">ราคา: ทั้งหมด</option>
+          <option value="low">ต่ำ (&lt;฿2)</option>
+          <option value="mid">กลาง (฿2–10)</option>
+          <option value="high">สูง (&gt;฿10)</option>
+        </select>
+        <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true">ซ่อน low value (&lt;฿10M/วัน)</button>
+        <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false">โชว์ทั้งหมด</button>
+      </div>
+      <!-- Row 2: sector + industry in a horizontal scroll container (mobile-safe) -->
+      <div class="indep-row" id="indepRow" role="group" aria-label="Sector and industry filter">
+        <div id="sectorFilter" class="chip indep-sep" role="group" aria-label="Sector"></div>
+        <div id="industryFilter" class="chip indep-sep" role="group" aria-label="Industry"></div>
+      </div>
+      <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
     </div>
-    <!-- Row 2: sector + industry in a horizontal scroll container (mobile-safe) -->
-    <div class="indep-row" id="indepRow" role="group" aria-label="Sector and industry filter">
-      <div id="sectorFilter" class="chip indep-sep" role="group" aria-label="Sector"></div>
-      <div id="industryFilter" class="chip indep-sep" role="group" aria-label="Industry"></div>
-    </div>
-    <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
     <div id="results"></div>
     <div id="empty" class="empty" hidden>ไม่มีหุ้นตรงเงื่อนไข</div>
+  </section>
+  <section class="page" id="radar">
+    <div class="hero"><div><h1>Setup Radar</h1><p>คุณภาพผ่าน + ใกล้/ถึงจุดเข้า — หุ้นจับตาก่อน breakout</p></div><div class="coverage"><span id="radarCount">—</span> หุ้นใน Radar</div></div>
+    <div class="l2-bar" id="radarPills" role="group" aria-label="Radar proximity filter"></div>
+    <div id="radarResults"></div>
+    <div id="radarEmpty" class="empty" hidden>ไม่มีหุ้นใน Radar ตรงเงื่อนไข</div>
   </section>
   <section class="page" id="watchlist">
     <div class="hero"><div><h1>หุ้นติดตาม</h1><p id="watchState">บันทึกในอุปกรณ์นี้</p></div></div>
@@ -319,7 +335,7 @@ const apiBase=`${location.protocol}//${location.hostname}:8000`;
 const savedKey="signalix-watchlist-v2";
 let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
 let liquidity="liquid",detailItem=null,stageFilter="all";
-let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={};
+let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={}, radarProx="all";
 const PROX_GROUPS=["action","near_trigger","forming","extended"];
 const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
 const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null;
@@ -397,15 +413,10 @@ function render(){
     const short=STAGE_SHORT[s]||"";
     return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" aria-pressed="${stageFilter===s}" role="button" tabindex="0"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div class="desc">${esc(short)}</div></div>`;
   }).join("");
-  // sections by stage
+  // sections by stage — Radar moved to its own page (2026-08-20)
   const vals=current();
   const results=document.getElementById("results");
-  const radar=vals.filter(inRadar);
-  const radarHTML=radar.length?`<section class="stage-section radar-section"><div class="stage-head radar">
-  <h2>Setup Radar</h2><span class="badge">${radar.length}</span>
-  <span class="desc">คุณภาพผ่าน + ใกล้/ถึงจุดเข้า</span></div>
-  <div class="cards">${radar.map(card).join("")}</div></section>`:"";
-  results.innerHTML=radarHTML+STAGE_ORDER.map(s=>{
+  results.innerHTML=STAGE_ORDER.map(s=>{
     if(stageFilter!=="all"&&stageFilter!==s)return "";
     const list=vals.filter(i=>i.stage===s);
     if(!list.length)return "";
@@ -420,7 +431,28 @@ function render(){
   <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup</div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
-  renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
+  renderRadar();renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
+}
+function renderRadar(){
+  // Dedicated Radar page (2026-08-20): quality-pass setup + near/action only,
+  // with its own proximity pills. Same data contract as the old embedded section.
+  const root=document.getElementById("radarResults");
+  if(!root)return;
+  const radar=items.filter(inRadar);
+  const count=document.getElementById("radarCount");
+  if(count)count.textContent=radar.length;
+  const pills=document.getElementById("radarPills");
+  if(pills){
+    const groups=["action","near_trigger","forming","extended"];
+    const cnts={};groups.forEach(g=>cnts[g]=radar.filter(i=>proximityState(i)===g).length);
+    pills.innerHTML=[["all","All",radar.length],...groups.map(g=>[g,PROX_LABEL[g],cnts[g]])].map(([g,label,c])=>
+      `<button class="chip ${radarProx===g?"active":""}" data-radar-prox="${g}" aria-pressed="${radarProx===g}">${label} <b>${c}</b></button>`).join("");
+  }
+  const list=radarProx==="all"?radar:radar.filter(i=>proximityState(i)===radarProx);
+  root.innerHTML=list.length?`<div class="cards">${list.map(card).join("")}</div>`:"";
+  const empty=document.getElementById("radarEmpty");
+  if(empty)empty.hidden=!!list.length;
+  bind(root);
 }
 function renderMarket(){
   const grid=document.getElementById("marketGrid");
@@ -634,8 +666,9 @@ function stepStock(dir){
 }
 document.addEventListener("click",e=>{
   const page=e.target.closest("[data-page]");if(page){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===page.dataset.page));document.querySelectorAll("[data-page]").forEach(p=>p.classList.toggle("active",p.dataset.page===page.dataset.page));window.scrollTo(0,0);}
+  const radarP=e.target.closest("[data-radar-prox]");if(radarP){radarProx=radarP.dataset.radarProx;renderRadar();}
   const liq=e.target.closest("[data-liquidity]");if(liq){liquidity=liq.dataset.liquidity;document.getElementById("liquidOnly").classList.toggle("active",liquidity==="liquid");document.getElementById("showLowValue").classList.toggle("active",liquidity==="all");render();}
-  const sp=e.target.closest(".js-stage");if(sp){stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();}
+  const sp=e.target.closest(".js-stage");if(sp){stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();scrollToResults();}
   const set50=e.target.closest("#set50Only"); if(set50){indep.set50=!indep.set50;set50.classList.toggle("active",indep.set50);render();}
   const vf=e.target.closest("#valueFilter"); if(vf){indep.value=parseFloat(vf.value)||0;render();}
   const pb=e.target.closest("#priceBand"); if(pb){indep.band=pb.value;render();}
@@ -644,6 +677,15 @@ document.addEventListener("click",e=>{
   const star=e.target.closest("[data-star]");if(star){saved.has(star.dataset.star)?saved.delete(star.dataset.star):saved.add(star.dataset.star);persist();}
   if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
 });
+function scrollToResults(){
+  // After a stage-filter click, the results section is far below the sticky
+  // control cluster — bring it into view so the picked stage is visible.
+  if(document.getElementById("screener").classList.contains("active")){
+    const r=document.getElementById("results");
+    if(r&&!r.innerHTML.trim())return;
+    r.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+}
 document.getElementById("search").addEventListener("input",render);
 document.addEventListener("keydown",e=>{
   if(!document.getElementById("modalBg").classList.contains("open"))return;

@@ -62,7 +62,7 @@ class DashboardResponsiveTests(unittest.TestCase):
             # template literal (with escaped quotes) — assert the dynamic
             # pattern rather than a static "sector"/"industry" string.
             'data-indep="${key}"',
-            "let indep={set50:false,value:0,band:\"all\",sector:\"all\",industry:\"all\"}, proxFilter={};",
+            r'let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={}, radarProx="all";',
             "const PROX_GROUPS=[\"action\",\"near_trigger\",\"forming\",\"extended\"]",
             'data-prox="${g}"',
             "indep.sector",
@@ -134,9 +134,11 @@ class DashboardResponsiveTests(unittest.TestCase):
             "--s4-tint",
             # Quality corner badge (Q1-Q3 compact on card)
             ".q-corner",
-            # Setup Radar with proximity pills + radarBadge
-            "radar-section",
+            # Setup Radar — now its own page, with proximity pills + radarBadge
             "radarBadge",
+            'data-page="radar"',
+            "renderRadar()",
+            "radarPills",
             # Touch handling on canvas
             "touch-action:none",
             "cv.style.touchAction",
@@ -181,6 +183,57 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertIn("l3.score===0?0:Math.max(10", js)
         # The emitted class token is still the compact q${min(score,3)} form.
         self.assertIn("q${Math.min(l3.score,3)}", js)
+
+    # --- 2026-08-20 Summary UX: Radar page + sticky controls + auto-scroll ---
+    def test_nav_has_radar_page_button(self):
+        html = self.template
+        self.assertIn('data-page="radar"', html)
+        self.assertIn('aria-label="Setup Radar"', html)
+
+    def test_radar_page_section_and_contract(self):
+        html = self.template
+        self.assertIn('<section class="page" id="radar">', html)
+        for marker in (
+            'id="radarCount"',
+            'id="radarPills"',
+            'id="radarResults"',
+            'id="radarEmpty"',
+            'data-radar-prox="${g}"',
+            "renderRadar()",
+            "radarProx",
+        ):
+            self.assertIn(marker, html, f"radar page marker {marker!r} missing from template")
+
+    def test_radar_removed_from_screener_sections(self):
+        # The embedded Setup Radar section on the screener page is replaced by
+        # the dedicated Radar page — it must not render twice.
+        html = self.template
+        # Radar markup generation no longer prepends the section inside render().
+        self.assertNotIn("radarHTML", html)
+        self.assertNotIn('<section class="stage-section radar-section">', html)
+        self.assertNotIn('"stage-head radar"', html)
+
+    def test_sticky_control_cluster_present(self):
+        html = self.template
+        self.assertIn('class="ctrl-sticky" id="ctrlSticky"', html)
+        self.assertIn("position:sticky;top:0;z-index:9", html.replace(" ", ""))
+        # The stage summary + filter rows + search live inside the sticky wrapper.
+        self.assertIn('id="stageSummary"', html)
+        self.assertIn('id="indepBar"', html)
+        self.assertIn('id="search"', html)
+
+    def test_stage_filter_scrolls_to_results(self):
+        html = self.template
+        self.assertIn("scrollToResults()", html)
+        self.assertIn('r.scrollIntoView({behavior:"smooth",block:"start"})', html)
+        # Only stage pills trigger the scroll (filter bar is sticky and stays
+        # visible; the stage sections are what move out of view).
+        self.assertIn('stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();scrollToResults();', html)
+
+    def test_radar_proximity_pills_click_filter(self):
+        html = self.template
+        self.assertIn('const radarP=e.target.closest("[data-radar-prox]")', html)
+        self.assertIn("radarProx=radarP.dataset.radarProx;renderRadar()", html)
 
 
 if __name__ == "__main__":
