@@ -1187,8 +1187,8 @@ def main():
                     help="after scan fetch 60m only for the active shortlist")
     ap.add_argument("--intraday-only", action="store_true",
                     help="refresh 60m from the existing active shortlist only; skips daily fetch and scan")
-    ap.add_argument("--intraday-limit", type=int, default=8,
-                    help="60m bars per active shortlist symbol (default 8)")
+    ap.add_argument("--intraday-limit", type=int, default=4,
+                    help="60m bars per active ORD symbol (default 4)")
     ap.add_argument("--intraday-batch-size", type=int, default=SETTRADE_BATCH_SIZE,
                     help="symbols committed per intraday batch")
     ap.add_argument("--intraday-batch-delay", type=float, default=SETTRADE_BATCH_DELAY_SECONDS,

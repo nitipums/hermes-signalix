@@ -322,6 +322,43 @@ def analyze_symbol_db_ranked(symbol, pg=None):
             pg.close()
 
 
+def insufficient_history_row(symbol, df, rs_rating=0.0):
+    """Keep a symbol visible without inventing technical signals.
+
+    Full ORD scans must not drop an active symbol merely because its daily
+    history is shorter than the MA200/52-week calculation window. The row is
+    explicit non-signal state; downstream UI can show INSUFFICIENT HISTORY.
+    """
+    close = float(df["Close"].iloc[-1]) if df is not None and len(df) else None
+    previous = float(df["Close"].iloc[-2]) if df is not None and len(df) > 1 else None
+    change = ((close / previous - 1) * 100) if close is not None and previous else None
+    volume = float(df["Volume"].iloc[-1] or 0) if df is not None and len(df) else 0.0
+    last_date = df.index[-1].strftime("%Y-%m-%d") if df is not None and len(df) else None
+    return {
+        "symbol": symbol, "analysis_status": "INSUFFICIENT_HISTORY",
+        "close": close, "change": change, "volume": volume,
+        "trade_value": (close * volume) if close is not None else None,
+        "last_date": last_date, "trend_source": "daily",
+        "trend_template": {"pass": False, "conditions_met": 0,
+                            "reason": "insufficient history", "conditions": {},
+                            "ma": {}, "rs_rating": float(rs_rating or 0.0)},
+        "vcp": {"is_vcp": False, "contractions": [], "latest_contraction_pct": 0.0},
+        "buy_zone": {"50": None, "62": None},
+        "trade_readiness": {"status": "INSUFFICIENT_HISTORY",
+                             "readiness_status": "INSUFFICIENT_HISTORY",
+                             "reason": "Not enough daily bars for MA200/52-week analysis.",
+                             "buy_zones_90d": {}, "near_buy_zone": False},
+        "position_sizing": {}, "suggested_stop": None,
+        "daily_state": {
+            "stage": "S1_basing", "phase": "base_early",
+            "stage_label": "Stage 1 · Basing", "phase_label": "Insufficient history",
+            "setup_quality": {"pass": False, "reasons": ["insufficient_history"]},
+            "setup_proximity": {"state": None, "pivot": None, "distance_pct": None, "zone": None},
+            "trend_source": "daily", "data_freshness": "unknown",
+        },
+    }
+
+
 def analyze_symbol_db(symbol, pg=None, market_series=None, rel_return=None, rs_rating=None, df=None):
     """Full Minervini pipeline for one symbol, reading from PostgreSQL.
 
@@ -340,8 +377,10 @@ def analyze_symbol_db(symbol, pg=None, market_series=None, rel_return=None, rs_r
     try:
         if df is None:
             df = load_symbol(symbol, pg=pg, lookback=SCAN_LOOKBACK)
-        if df is None or len(df) < MIN_DAYS:
+        if df is None:
             return None
+        if len(df) < MIN_DAYS:
+            return insufficient_history_row(symbol, df, rs_rating=rs_rating)
         if market_series is None:
             market_series = load_market(pg=pg, lookback=400)
         if rs_rating is None:
@@ -448,6 +487,11 @@ def group_scan_results(results, events=None):
         }
         # Single canonical classifier: Stage 1-4 (Minervini) + phase.
         state = classify_stage(evidence, events.get(row["symbol"]))
+        if row.get("analysis_status") == "INSUFFICIENT_HISTORY":
+            state["phase"] = "insufficient_history"
+            state["phase_label"] = "Insufficient history"
+            state["setup_quality"] = {"pass": False, "reasons": ["insufficient_history"]}
+            state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
         # Two-layer actionable setup state (quality gate + proximity timing).
         # Attached at source so every serialization path (build/snapshot) inherits it.
         _setup = compute_setup_state(state["stage"], evidence)
@@ -588,7 +632,7 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
                                            lookback=SCAN_LOOKBACK, market=market)
                 if idf is not None and len(idf) >= 50:
                     df, trend_source = idf, "intraday_60m"
-            if df is None or len(df) < 20:
+            if df is None or len(df) < 1:
                 continue
             c = df["Close"]
             look = min(RS_LOOKBACK, len(c))

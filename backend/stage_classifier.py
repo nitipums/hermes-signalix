@@ -52,6 +52,7 @@ STAGE_LABELS = {
     "S4_down": "Stage 4 · Down",
 }
 PHASE_LABELS = {
+    "insufficient_history": "Insufficient history",
     "base_early": "Base early",
     "base_tight": "Base tight (VCP)",
     "breakout_new": "Breakout new",

@@ -1,0 +1,16 @@
+[Unit]
+Description=Signalix weekly Settrade authoritative stock master sync
+After=network-online.target signalix_postgres.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/sync_settrade_master.py
+StandardOutput=append:/root/signalix/settrade_master_sync.log
+StandardError=append:/root/signalix/settrade_master_sync.log
+TimeoutStartSec=180

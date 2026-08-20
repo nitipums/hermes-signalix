@@ -627,6 +627,9 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
     phase = (row.get("daily_state") or {}).get("phase")
     a_label, a_value, b_label, b_value = plan(effective_group, readiness, trend, decision_snapshot, phase=phase)
     action, action_reason = determine_action(effective_group, readiness, decision_snapshot, zones, phase=phase)
+    if readiness.get("status") == "INSUFFICIENT_HISTORY":
+        action = "INSUFFICIENT HISTORY"
+        action_reason = readiness.get("reason") or "Not enough history for technical analysis."
     flags = quality_flags(group, row, snapshot)
     if any(f["code"] == "extended" for f in flags):
         action, action_reason = "DO NOT CHASE", "Breakout is extended; wait for a new base or controlled retest."

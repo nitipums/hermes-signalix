@@ -1,0 +1,11 @@
+[Unit]
+Description=Weekly Signalix Settrade stock master sync
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=10m
+Unit=signalix-settrade-master.service
+
+[Install]
+WantedBy=timers.target
