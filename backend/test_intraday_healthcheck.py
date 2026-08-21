@@ -39,7 +39,7 @@ class IntradayHealthcheckTests(unittest.TestCase):
             now=NOW,
             max_age_minutes=30,
         )
-        self.assertEqual([a["code"] for a in alerts], ["price_data_stale"])
+        self.assertEqual([a["code"] for a in alerts], ["intraday_price_data_stale"])
         self.assertEqual(alerts[0]["age_minutes"], 31.0)
 
     def test_stale_evaluator_state_is_alerted(self):
@@ -62,7 +62,7 @@ class IntradayHealthcheckTests(unittest.TestCase):
         )
         self.assertEqual(
             [a["code"] for a in alerts],
-            ["price_data_missing", "intraday_state_missing"],
+            ["intraday_price_data_missing", "intraday_state_missing"],
         )
 
     def test_60m_candle_uses_interval_aware_threshold(self):

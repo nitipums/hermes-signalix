@@ -239,11 +239,13 @@ class IntradayRunExitTests(unittest.TestCase):
         )
 
         with patch("update_data.ensure_intraday_table"), \
-             patch("update_data.record_intraday_run_summary") as record:
+             patch("update_data.record_intraday_run_summary") as record, \
+             patch("update_data.refresh_dashboard_from_existing_scan") as refresh:
             exit_code = u.run(args)
 
         self.assertEqual(exit_code, 1)
         record.assert_called_once_with(get_pg.return_value, ingest.return_value)
+        refresh.assert_called_once_with()
         get_pg.return_value.close.assert_called_once_with()
 
 

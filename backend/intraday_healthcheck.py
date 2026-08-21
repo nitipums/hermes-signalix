@@ -70,7 +70,7 @@ def evaluate_health(service_state, price_ts, evaluated_at, now=None,
         })
 
     freshness = (
-        ("price_data", price_ts, "price_data_stale", "price_data_missing",
+        ("intraday_price_data", price_ts, "intraday_price_data_stale", "intraday_price_data_missing",
          price_max_age_minutes),
         ("intraday_state", evaluated_at, "intraday_state_stale", "intraday_state_missing",
          state_max_age_minutes),

@@ -1005,6 +1005,21 @@ def trigger_scan():
         print(f"  ! in-process scan failed: {repr(e)[:160]}")
 
 
+def refresh_dashboard_from_existing_scan():
+    """Rebuild the served dashboard from the last Daily scan plus fresh 60m data.
+
+    Intraday-only intentionally does not run a Daily scan, but the static
+    dashboard still needs its cards/provenance refreshed after the upsert.
+    ``build()`` reads the existing scan artifact and set-based DB snapshots;
+    it does not change Daily membership or classification.
+    """
+    import build_dashboard
+
+    result = build_dashboard.build()
+    print("  dashboard refreshed from existing Daily scan: " + json.dumps(result, sort_keys=True))
+    return result
+
+
 # ---------- main ----------
 def run(args):
     started_at = dt.datetime.now(dt.timezone.utc)
@@ -1046,6 +1061,7 @@ def run(args):
                 updated=summary.get("rows_updated", 0),
                 failed=summary["symbols_failed"],
             ))
+            refresh_dashboard_from_existing_scan()
         finally:
             pg.close()
         return 0 if summary["status"] == "full_success" else 1
