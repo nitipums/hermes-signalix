@@ -26,6 +26,18 @@ Reads `price_data` from Postgres (NOT yfinance). Benchmark for RS Rating = the
 
 Computes: Trend Template 8/8, VCP contractions, RS Rating, Buy Zone (Fib 0.5/0.618), Stop, Trade Readiness. **Deterministic — no LLM.**
 
+## `instruments.py` — instrument authority
+Returns bounded active-ORD identity/taxonomy records from `symbol_master` and
+profile provenance with SET factsheet priority, Yahoo fallback, and honest
+unknown/absent states. Public API: `GET /instruments?limit=` and
+`GET /instruments/{symbol}`.
+
+## `fetch_fundamentals_subagent.py` — SET factsheet refresh
+Bounded, resumable active-ORD factsheet scraper. It persists JSONL progress and
+upserts only factsheet fields that are missing, preserving stronger existing
+profile evidence. The `signalix-factsheet-refresh.timer` runs 20 symbols per
+weekday cycle; the scraper is not a signal/price source.
+
 ## `scanner.py` — legacy/standalone scanner
 Original pandas scanner (pre-DB rewrite). Kept for reference; `screening.py` is
 the live engine. Imports `scan_universe` must stay at module top in `app.py`.

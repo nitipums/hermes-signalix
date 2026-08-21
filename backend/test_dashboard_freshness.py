@@ -70,8 +70,10 @@ class SnapshotFreshnessTests(unittest.TestCase):
             [("TFG", "2026-08-08", 9.6, 9.8, 9.4, 900_000), ("TFG", "2026-08-11", 10.0, 10.2, 9.7, 1_000_000)],
             # full archive ATH
             [("TFG", 10.2, 1.0)],
-            # optional company profile
-            [("TFG", "Thai Foods Group", "Food", "Agriculture", "Food", "test", "2026-08-11", 123_000_000, 45.5, 49.0)],
+            # optional company profile (7 cols: symbol, name, sector, industry,
+            # business_summary, source, fetched_at — matches the narrowed query
+            # in build_dashboard.snapshots that dropped the price_data columns)
+            [("TFG", "Thai Foods Group", "Food", "Agriculture", "Food", "test", "2026-08-11")],
             # newest stored 60m quote
             [("TFG", "60m", "2026-08-11 09:30:00+00:00", 9.9, 1000)],
             # same-time cumulative volume query

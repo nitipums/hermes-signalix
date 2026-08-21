@@ -1,0 +1,11 @@
+[Unit]
+Description=Signalix bounded SET factsheet refresh weekday timer
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* 03:10 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=10m
+Unit=signalix-factsheet-refresh.service
+
+[Install]
+WantedBy=timers.target

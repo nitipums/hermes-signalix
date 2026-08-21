@@ -76,3 +76,5 @@
 - **2026-08-20 (Dashboard UX)**: Moved Setup Radar to its own nav page (`#radar`), wrapped stage summary + filter rows + search in a sticky control cluster (`#ctrlSticky`), and stage-filter clicks auto-scroll to results. Tests 17/17 + related 47 passed; served HTML verified in real browser desktop + mobile (no h-scroll, sticky works at scrollY=1200). Commit `edaffbd`.
 
 - **2026-08-21 (Intraday E2E)**: Fixed intraday-only path so every 60m fetch/evaluation rebuilds dashboard artifacts from the existing Daily scan; watchdog now tolerates expected partial-success, uses 90m candle / 30m evaluator thresholds, and morning no-agent monitor checks/self-heals served freshness. Commits `6ffb62e`, `d7b8a39`; 30 focused tests passed; live browser showed updated `Last Scanned`.
+
+- **2026-08-21 (Instrument authority)**: Added active-ORD `instruments.py`, migration 004, bounded SET factsheet refresh timer (20 symbols/cycle), and `/instruments` APIs. Verified factsheet run: 20/20 fetched and parsed; production `company_profiles` now has 20 `set_factsheet` rows. Yahoo remains fallback. Focused authority/scraper/dashboard tests pass.

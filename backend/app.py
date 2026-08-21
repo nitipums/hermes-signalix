@@ -379,6 +379,40 @@ def list_excluded_symbols():
         pg.close()
 
 
+@app.get("/instruments")
+def list_instruments(limit: int = 200):
+    """Return bounded authoritative active-ORD identity/taxonomy records."""
+    from instruments import instrument_master, profile_taxonomy
+    limit = max(1, min(int(limit), 1000))
+    pg = get_pg()
+    try:
+        records = instrument_master(pg)[:limit]
+        profiles = profile_taxonomy(pg, [r["symbol"] for r in records])
+        for record in records:
+            record["profile"] = profiles.get(record["symbol"], {
+                "symbol": record["symbol"], "missing": True,
+                "source": None,
+            })
+        return {"count": len(records), "limit": limit, "source": "symbol_master", "instruments": records}
+    finally:
+        pg.close()
+
+
+@app.get("/instruments/{symbol}")
+def get_instrument(symbol: str):
+    """Return one authoritative identity plus honest profile provenance."""
+    from instruments import instrument_identity, profile_taxonomy
+    pg = get_pg()
+    try:
+        identity = instrument_identity(pg, symbol)
+        if identity is None:
+            raise HTTPException(status_code=404, detail="instrument identity not found")
+        profile = profile_taxonomy(pg, [symbol]).get(symbol)
+        return {"instrument": identity, "profile": profile}
+    finally:
+        pg.close()
+
+
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results  # noqa: E402
 from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402

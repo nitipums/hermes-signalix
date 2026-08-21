@@ -124,15 +124,24 @@ def snapshots(pg, symbols):
     if not symbols:
         return {}
     cur = pg.cursor()
-    cur.execute("""SELECT q.symbol,q.date,q.close,q.volume,q.rn,cp.sector,cp.industry,
-                          cp.market_cap,cp.free_float_pct,cp.foreign_limit_pct
+    # P0-2 instrument authority: join through symbol_master so the canonical
+    # venue/asset_class/currency/timezone/session taxonomy is available, and
+    # prefer the SET factsheet taxonomy source over the Yahoo fallback for
+    # sector/industry. company_profiles is non-decision enrichment data only.
+    cur.execute("""SELECT q.symbol,q.date,q.close,q.volume,q.rn,
+                          cp.sector,cp.industry,cp.market_cap,
+                          cp.free_float_pct,cp.foreign_limit_pct,cp.company_name,
+                          cp.source AS profile_source,cp.fetched_at AS profile_fetched_at,
+                          sm.venue,sm.asset_class,sm.currency,sm.timezone,sm.session,sm.source AS inst_source
                    FROM (
                      SELECT symbol,date,close,volume,
                             ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
                      FROM price_data
                      WHERE market='TH' AND symbol=ANY(%s)
                    ) q
-                   LEFT JOIN company_profiles cp ON q.symbol = cp.symbol
+                   LEFT JOIN symbol_master sm
+                     ON sm.symbol=q.symbol AND sm.instrument_type='ORD'
+                   LEFT JOIN company_profiles cp ON cp.symbol = q.symbol
                    WHERE q.rn <= 2
                    ORDER BY q.symbol,q.rn""", (symbols,))
     out = {}
@@ -143,6 +152,15 @@ def snapshots(pg, symbols):
         market_cap = row[7] if len(row) > 7 else None
         free_float_pct = row[8] if len(row) > 8 else None
         foreign_limit_pct = row[9] if len(row) > 9 else None
+        company_name = row[10] if len(row) > 10 else None
+        profile_source = row[11] if len(row) > 11 else None
+        profile_fetched_at = row[12] if len(row) > 12 else None
+        venue = row[13] if len(row) > 13 else None
+        asset_class = row[14] if len(row) > 14 else None
+        currency = row[15] if len(row) > 15 else None
+        timezone = row[16] if len(row) > 16 else None
+        session = row[17] if len(row) > 17 else None
+        inst_source = row[18] if len(row) > 18 else None
         value = out.setdefault(symbol, {})
         if rn == 1:
             value.update({"date": str(date), "close": float(close), "volume": float(volume or 0),
@@ -151,7 +169,16 @@ def snapshots(pg, symbols):
                           "daily_turnover": float(close) * float(volume or 0),
                           "sector": sector, "industry": industry,
                           "market_cap": market_cap, "free_float_pct": free_float_pct,
-                          "foreign_limit_pct": foreign_limit_pct})
+                          "foreign_limit_pct": foreign_limit_pct,
+                          "companyName": company_name,
+                          "profileSource": profile_source,
+                          "profileFetchedAt": str(profile_fetched_at) if profile_fetched_at else None,
+                          # P0-2 instrument authority taxonomy from symbol_master.
+                          # Provenance: inst_source (settrade_stock_master) beats
+                          # the Yahoo fallback for venue/currency/timezone/session.
+                          "venue": venue, "asset_class": asset_class,
+                          "currency": currency, "timezone": timezone,
+                          "session": session, "instrument_source": inst_source})
         else:
             value["previous_close"] = float(close)
             value["daily_previous_close"] = float(close)
@@ -203,17 +230,36 @@ def snapshots(pg, symbols):
         out.setdefault(symbol, {}).update({"athHigh": round(float(high), 2) if high is not None else None,
                                             "athLow": round(float(low), 2) if low is not None else None})
     cur.close()
-    # Non-price identity metadata is cached asynchronously. It is intentionally
-    # not a price/decision input and may be absent while the cache is filling.
+    # Non-price identity metadata is cached asynchronously (non-decision data).
+    # The first snapshot query already joined sector/industry/profile_source,
+    # but company_profiles may still hold a longer business_summary and the
+    # legacy Yahoo rows. Merge only when the first query found nothing, so the
+    # authoritative SET-sourced taxonomy (sector/industry) is never overwritten
+    # by a stale Yahoo fallback value.
     cur = pg.cursor()
-    cur.execute("""SELECT symbol,company_name,sector,industry,business_summary,source,fetched_at,
-                          market_cap,free_float_pct,foreign_limit_pct
+    cur.execute("""SELECT symbol, company_name, sector, industry,
+                          business_summary, source, fetched_at
                    FROM company_profiles WHERE symbol=ANY(%s)""", (symbols,))
-    for symbol, name, sector, industry, summary, source, fetched_at, market_cap, free_float_pct, foreign_limit_pct in cur.fetchall():
-        out.setdefault(symbol, {}).update({"companyName": name, "sector": sector, "industry": industry,
-            "businessSummary": summary, "profileSource": source, "profileFetchedAt": str(fetched_at),
-            "market_cap": market_cap, "free_float_pct": free_float_pct,
-            "foreign_limit_pct": foreign_limit_pct})
+    for symbol, name, sector, industry, summary, source, fetched_at in cur.fetchall():
+        val = out.setdefault(symbol, {})
+        # Prefer existing values (already authoritative via the symbol_master
+        # join); only fill what was genuinely absent. This keeps Yahoo from
+        # clobbering SET-sourced taxonomy.
+        if val.get("companyName") is None and name is not None:
+            val["companyName"] = name; val["profileSource"] = source
+            val["profileFetchedAt"] = str(fetched_at)
+        if val.get("sector") is None and sector is not None:
+            val["sector"] = sector
+            if not val.get("profileSource"):
+                val["profileSource"] = source; val["profileFetchedAt"] = str(fetched_at)
+        if val.get("industry") is None and industry is not None:
+            val["industry"] = industry
+            if not val.get("profileSource"):
+                val["profileSource"] = source; val["profileFetchedAt"] = str(fetched_at)
+        if val.get("businessSummary") is None and summary is not None:
+            val["businessSummary"] = summary
+            if not val.get("profileSource"):
+                val["profileSource"] = source; val["profileFetchedAt"] = str(fetched_at)
     cur.close()
     # Overlay the newest stored intraday close when available. This is a DB-only
     # freshness choice: it never implies streaming/real-time market data.
@@ -785,6 +831,12 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "companyName": snapshot.get("companyName"), "sector": snapshot.get("sector"), "industry": snapshot.get("industry"),
         "businessSummary": (snapshot.get("businessSummary") or "")[:320] or None, "profileSource": snapshot.get("profileSource"),
         "profileFetchedAt": snapshot.get("profileFetchedAt"),
+        # P0-2 instrument authority taxonomy (symbol_master). These are the
+        # canonical SET/mai ordinary-share descriptors used for venue routing,
+        # currency conversion, session/freshness and audit provenance.
+        "venue": snapshot.get("venue"), "assetClass": snapshot.get("asset_class"),
+        "currency": snapshot.get("currency"), "timezone": snapshot.get("timezone"),
+        "marketSession": snapshot.get("session"), "instrumentSource": snapshot.get("instrument_source"),
         "ma50": readiness.get("above_ma50"), "ma10Value": number(snapshot.get("ma10")),
         "ma20Value": number(snapshot.get("ma20")), "ma50Value": number(snapshot.get("ma50")),
         "ma200Value": number(snapshot.get("ma200")), "macd": number(snapshot.get("macd"), 3),

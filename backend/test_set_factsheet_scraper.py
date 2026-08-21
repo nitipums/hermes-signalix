@@ -73,7 +73,8 @@ def test_symbols_from_db_uses_only_active_ord_universe():
     assert symbols_from_db(cur) == ["A", "B"]
     assert "instrument_type = 'ORD'" in cur.calls[1][0]
     assert "'COMMON'" not in cur.calls[1][0]
-    assert "status IS NULL OR status = 'active'" in cur.calls[1][0]
+    assert "status = 'active'" in cur.calls[1][0]
+    assert "COALESCE(cp.source, '') <> 'set_factsheet'" in cur.calls[1][0]
 
 
 def test_symbols_from_db_legacy_fallback_stays_ord_only():

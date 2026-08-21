@@ -134,7 +134,14 @@ def symbols_from_db(cur: Any) -> list[str]:
     """Prefer the canonical active ORD universe, with safe legacy fallback."""
     cur.execute("SELECT to_regclass('public.symbol_master')")
     if cur.fetchone()[0]:
-        cur.execute("SELECT DISTINCT symbol FROM symbol_master WHERE instrument_type = 'ORD' AND (status IS NULL OR status = 'active') ORDER BY symbol")
+        cur.execute(
+            """SELECT sm.symbol FROM symbol_master sm
+               LEFT JOIN company_profiles cp ON cp.symbol = sm.symbol
+               WHERE sm.instrument_type = 'ORD'
+                 AND (sm.status IS NULL OR sm.status = 'active')
+                 AND COALESCE(cp.source, '') <> 'set_factsheet'
+               ORDER BY sm.symbol"""
+        )
     else:
         cur.execute("SELECT DISTINCT symbol FROM price_data WHERE instrument_type = 'ORD' ORDER BY symbol")
     return [row[0] for row in cur.fetchall()]

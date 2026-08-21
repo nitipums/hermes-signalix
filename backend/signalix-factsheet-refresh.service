@@ -1,0 +1,16 @@
+[Unit]
+Description=Signalix bounded SET factsheet profile refresh (active ORD only)
+After=postgresql.service docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/fetch_fundamentals_subagent.py --limit 20 --sleep 1.0 --output /root/signalix/factsheets/factsheets.jsonl
+StandardOutput=append:/root/signalix/factsheet_refresh.log
+StandardError=append:/root/signalix/factsheet_refresh.log
+TimeoutStartSec=900
