@@ -53,11 +53,10 @@ def main():
     status, body = get(DASH)
     html = body.decode("utf-8")
     assert status == 200
-    for marker in ("company-name", "Moving averages", "Latest data fetched:", "Market session:", "last valid:", "set_market_day_guard", "Asia/Bangkok", "VOL", "data-timeframe=\"60m\"", "No stored", "not substituted"):
+    for marker in ("company-name", "decision-banner", "modal-subtitle", "title-link", "Last data fetched:", "Setup quality", "Risk", "Trigger", "VOL", "data-timeframe=\"1D\"", "Loading Daily chart", "Try again"):
         assert marker in html, marker
-    assert "i.fullTimestamp" not in html
-    assert "i.ageLabel" not in html
-    assert 'class="provenance' not in html
+    for removed in ("Market session:", "last valid:", "set_market_day_guard", "Evidence provenance", "Canonical event", "confidence"):
+        assert removed not in html, removed
     print({"health": health, "items": len(snap["items"]), "dashboard_bytes": len(body), "contracts": "ok"})
 
 

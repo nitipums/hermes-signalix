@@ -163,11 +163,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .q-bar .q1{width:33%}
 .q-bar .q2{width:66%}
 .q-bar .q3{width:100%}
-.detail-badges{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel2)}
-.detail-badges .db-row{display:flex;justify-content:space-between;gap:12px;font-size:11px;padding:3px 0;border-bottom:1px solid var(--line)}
-.detail-badges .db-row:last-child{border-bottom:0}
-.detail-badges .db-k{color:var(--muted)}
-.detail-badges .db-v{color:var(--text);font-weight:700}
+
 .empty{color:var(--muted);padding:30px;text-align:center}
 
 /* Market breadth pulse — single-line A/D ratio bar */
@@ -194,36 +190,38 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   .nav-arrow,.modal-close{min-width:44px;min-height:44px;padding:11px 14px;font-size:16px}
   #chartPanLeft,#chartPanRight{min-width:44px;min-height:44px;padding:11px 14px;font-size:15px}
 }
-.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.72);
-  align-items:center;justify-content:center;padding:18px}
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.78);align-items:center;justify-content:center;padding:16px}
 .modal-bg.open{display:flex}
-.modal{width:min(620px,100%);max-height:92vh;overflow:auto;background:var(--panel);
-  border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
-.modal-shell{padding:16px 18px 22px}
-.modal-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;margin:-2px -4px 8px;padding:2px 4px 10px;background:linear-gradient(var(--panel) 80%,transparent)}
-.modal-title{margin:0;flex:1;min-width:0;font-size:clamp(18px,4vw,24px);line-height:1.16;letter-spacing:-.035em}
-.tf-tools{display:flex;gap:6px;margin:6px 0}
+.modal{width:min(700px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.modal-shell{padding:18px 24px 24px}
+.modal-head{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:32px minmax(0,1fr) 32px 32px;align-items:start;gap:8px;margin:0 0 14px;padding:0 0 10px;background:linear-gradient(var(--panel) 84%,transparent)}
+.modal-title{margin:0;min-width:0;font-size:clamp(20px,4vw,25px);line-height:1.12;letter-spacing:-.04em}
+.modal-title .title-link{color:var(--text);text-decoration:none}.modal-title .title-link:hover{color:var(--blue)}
+.modal-subtitle{display:block;margin-top:5px;color:var(--muted);font-size:12px;font-weight:650;letter-spacing:.01em}
+.tf-tools{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
 .tf-tools .chip{padding:6px 10px;font-size:11px}
 .tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
-.modal .chip{margin-top:14px}
-.tv-link{background:var(--panel2);border:1px solid var(--line);color:var(--blue);font-weight:700}
-.tv-link:hover{background:#1c2a3d}
-.nav-arrow,.modal-close{font-weight:800;font-size:15px;line-height:1}
-.nav-arrow{padding:0 12px}
-.modal-close{padding:0 14px;color:var(--red)}
-.chart-status{min-height:18px;color:var(--muted);font-size:11px;margin:2px 0 6px}
+.modal .chip{margin-top:0}
+.tv-link{display:inline-flex;align-items:center;gap:4px;color:var(--blue);font-size:11px;font-weight:750;text-decoration:none}
+.tv-link:hover{color:var(--text)}
+.nav-arrow,.modal-close{width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--muted);font-size:15px;font-weight:800;line-height:1}
+.nav-arrow:hover,.modal-close:hover{color:var(--text);border-color:var(--blue);background:#1d2b40}
+.nav-arrow:disabled{opacity:.35;cursor:not-allowed}
+.modal-close{color:var(--red)}
+.decision-banner{padding:12px 14px;margin:0 0 14px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:10px;background:var(--panel2)}
+.decision-banner .decision-label{font-size:16px;font-weight:850;letter-spacing:.02em}
+.decision-banner .decision-reason{margin-top:4px;color:var(--muted);font-size:13px;line-height:1.45}
+.modal-price{display:flex;align-items:baseline;gap:12px;margin:0 0 12px}.modal-price b{font-size:29px;letter-spacing:-.045em}.modal-price span{font-size:14px;font-weight:750}
+.modal-section-label{margin:16px 0 8px;color:var(--muted);font-size:11px;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+.detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}.detail-fact{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.detail-fact .k{display:block;color:var(--muted);font-size:11px}.detail-fact .v{display:block;margin-top:3px;color:var(--text);font-size:13px;font-weight:750}
+.setup-note{padding:10px 12px;border-left:3px solid var(--amber);background:rgba(255,196,77,.08);border-radius:8px;color:var(--text);font-size:13px;line-height:1.45}
+.risk-note{padding:10px 12px;border-left:3px solid var(--red);background:rgba(255,122,122,.07);border-radius:8px;color:var(--text);font-size:13px;line-height:1.45}
+.chart-status{min-height:18px;color:var(--muted);font-size:12px;margin:4px 0 4px}.chart-status.error{color:var(--red)}
 .chart-canvas{width:100%;height:min(300px,34vh);touch-action:none;border-radius:12px;background:#080d18;border:1px solid #1d2b40}
+.chart-freshness{margin:3px 0 10px;color:var(--muted);font-size:12px}
+.chart-freshness.stale{color:var(--amber)}
 @media(max-width:620px){
-  .modal-bg{padding:8px;align-items:flex-start}
-  .modal{max-height:calc(100dvh - 16px);border-radius:16px;margin-top:8px}
-  .modal-shell{padding:12px 12px 18px}
-  .modal-head{margin:-1px -2px 6px;padding-bottom:8px}
-  .modal-title{font-size:18px}
-  .nav-arrow,.modal-close{min-width:44px;min-height:44px;padding:0 10px}
-  .tf-tools .chip{min-width:52px;min-height:44px;padding:9px 10px;font-size:12px}
-  .chart-canvas{height:230px}
-  .detail-badges .db-row{font-size:10px;align-items:flex-start}.detail-badges .db-v{text-align:right;max-width:62%}
-}
+  .modal-bg{padding:0;align-items:flex-end}.modal{width:100%;max-height:94vh;border-radius:16px 16px 0 0;margin:0}.modal-shell{padding:16px 16px calc(24px + env(safe-area-inset-bottom))}.modal-head{grid-template-columns:32px minmax(0,1fr) 32px 32px;margin-bottom:12px}.modal-title{font-size:20px}.modal-subtitle{font-size:12px}.detail-facts{grid-template-columns:1fr 1fr}.tf-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.tf-tools .chip{min-width:58px;min-height:40px}.chart-canvas{height:250px}.detail-facts .v,.setup-note,.risk-note{font-size:13px}}
 </style>
 </head>
 <body class="loading">
@@ -493,31 +491,23 @@ function bind(root=document){
 }
 const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
 const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
-function provenancePanel(i){
-  // Detail-level provenance (Q7/Q12): show data source, freshness, lifecycle,
-  // confidence and the canonical-event vs old-group mapping so traders can
-  // judge trust. Mirrors the contract the responsive test asserts.
-  const fresh=i.dataFreshness||{};
-  const dt=i.dailyEodDecision||{};
-  const stale=!!i.stale;
-  const freshStatus=fresh.status||(stale?"stale":"fresh");
-  const source=esc(i.priceLabel||(i.intradayAvailable?"Intraday":"Daily EOD"));
-  const asOf=esc(dt.as_of||i.date||"—");
-  const reason=stale?"Old group mapping superseded by Daily EOD for decisions":(i.intradayAvailable?"Live intraday quote":"Latest available EOD");
-  const lf=i.lifecycle||{};
-  const lifecycleLabel=esc(lf.label||"—");
-  const confidence=i.eligibility==="eligible"?"eligible":"not_eligible";
-  const marketSession=i.market_session||{};
-  return `<div class="detail-badges" id="detail-badges">
-    <div class="db-row"><span class="db-k">Quality</span><span class="db-v">${(i.quality&&i.quality.confidence)||"—"}</span></div>
-    <div class="db-row"><span class="db-k">Latest data fetched:</span><span class="db-v">${freshStatus} · ${source}</span></div>
-    <div class="db-row"><span class="db-k">Market session:</span><span class="db-v">${esc(marketSession.status||"—")} · ${esc(marketSession.timezone||"Asia/Bangkok")} · ${esc(marketSession.source||"set_market_day_guard")}</span></div>
-    <div class="db-row"><span class="db-k">last valid:</span><span class="db-v">${esc(marketSession.last_valid_session||asOf)}</span></div>
-    <div class="db-row"><span class="db-k">Lifecycle</span><span class="db-v">${lifecycleLabel}</span></div>
-    <div class="db-row"><span class="db-k">Confidence</span><span class="db-v">${confidence}</span></div>
-    <div class="db-row"><span class="db-k">Evidence provenance</span><span class="db-v">${esc(i.profileSource||"price_data")}</span></div>
-    <div class="db-row"><span class="db-k">Canonical event</span><span class="db-v">${esc(i.phase_label||"—")}</span></div>
-  </div>`;
+function decisionPanel(i){
+  const setup=i.setupState||i.phase_label||"No actionable setup";
+  const trend=i.trendState||i.stage_label||"—";
+  const rs=i.rs==null?"—":`RS ${num(i.rs,0)}`;
+  const rsi=i.rsi==null?"—":`RSI ${num(i.rsi,0)}`;
+  const vol=i.volumeRatio50==null?"—":`${num(i.volumeRatio50,2)}× volume`;
+  const risk=i.riskStop==null?"No defined stop":`Stop ${num(i.riskStop)}`;
+  const trigger=i.breakoutEvidence?.trigger!=null?`Close above ${num(i.breakoutEvidence.trigger)}`:(i.primaryValue||"Wait for setup proof");
+  return `<div class="modal-section-label">Setup quality</div>
+    <div class="detail-facts">
+      <div class="detail-fact"><span class="k">Trend / structure</span><span class="v">${esc(trend)}</span></div>
+      <div class="detail-fact"><span class="k">Setup</span><span class="v">${esc(setup)}</span></div>
+      <div class="detail-fact"><span class="k">Relative strength</span><span class="v">${esc(rs)}</span></div>
+      <div class="detail-fact"><span class="k">Momentum / volume</span><span class="v">${esc(rsi)} · ${esc(vol)}</span></div>
+    </div>
+    <div class="modal-section-label">Risk</div><div class="risk-note">${esc(risk)}</div>
+    <div class="modal-section-label">Trigger</div><div class="setup-note">${esc(trigger)}</div>`;
 }
 let detailGen=0;
 let chartAbort=null;
@@ -530,62 +520,45 @@ function openDetail(i){
   const idx=(detailList||[]).indexOf(i.symbol);
   document.getElementById("modalContent").innerHTML=`<div class="modal-shell">
     <div class="modal-head">
-      <button class="chip nav-arrow" id="prevStock" aria-label="หุ้นก่อนหน้า" aria-pressed="false">◀</button>
-      <h2 class="modal-title">${esc(i.symbol)} — ${esc(i.stage_label)} · ${esc(i.phase_label)}</h2>
-      <button class="chip nav-arrow" id="nextStock" aria-label="หุ้นถัดไป" aria-pressed="false">▶</button>
-      <button class="chip modal-close" id="closeModal" aria-label="ปิด" aria-pressed="false">✕</button>
+      <button class="nav-arrow" id="prevStock" aria-label="Older stock" title="Older stock">‹</button>
+      <h2 class="modal-title"><a class="title-link" id="modalTitleLink" target="_blank" rel="noopener noreferrer">${esc(i.symbol)} · ${esc(i.companyName||"")}</a><span class="modal-subtitle">${esc(i.stage_label||"—")} · ${esc(i.phase_label||i.setupState||"—")}</span></h2>
+      <button class="nav-arrow" id="nextStock" aria-label="Newer stock" title="Newer stock">›</button>
+      <button class="modal-close" id="closeModal" aria-label="Close" title="Close">×</button>
     </div>
+    <div class="decision-banner"><div class="decision-label">${esc(i.action||"NO ACTIONABLE SETUP")}</div><div class="decision-reason">${esc(i.actionReason||"Review the setup before acting.")}</div></div>
+    <div class="modal-price"><b>${num(i.close)}</b><span class="${(i.change||0)>=0?"gain":"loss"}">${pct(i.change)}</span><span class="muted">${esc(i.priceLabel||"Daily EOD")}</span></div>
+    <div class="modal-section-label">Price history</div>
     <div class="tf-tools">
-      <button class="chip tf" data-tf="1h" aria-pressed="false">1h</button>
-      <button class="chip tf active" data-tf="1D" aria-pressed="true">1D</button>
-      <button class="chip tf" data-tf="1W" aria-pressed="false">1W</button>
-      <button class="chip tf" data-tf="1M" aria-pressed="false">1M</button>
+      <button class="chip tf" data-tf="1h" aria-pressed="false">60m</button>
+      <button class="chip tf active" data-tf="1D" aria-pressed="true">Daily</button>
+      <button class="chip tf" data-tf="1W" aria-pressed="false">Weekly</button>
+      <button class="chip tf" data-tf="1M" aria-pressed="false">Monthly</button>
     </div>
-    <canvas id="detailChart" class="chart-canvas" data-timeframe="60m"></canvas>
+    <canvas id="detailChart" class="chart-canvas" data-timeframe="1D"></canvas>
     <div id="chartStatus" class="chart-status" role="status" aria-live="polite"></div>
-    <div id="chartLegend" style="font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"><span>Moving averages</span></div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <button class="chip" id="chartPanLeft" aria-label="เลื่อนย้อน">◀◀</button>
-      <button class="chip" id="chartPanRight" aria-label="เลื่อนไปหน้า">▶▶</button>
-      <div id="chartPanHint" style="font-size:11px;color:var(--slate)">ลาก/สกปร์เลื่อนแกนเวลา</div>
-    </div>
-    <a class="chip tv-link" id="tvLink" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;text-decoration:none">TradingView ↗</a>
-    <div class="quality-strip"><span class="q">RS ${num(i.rs,0)}</span><span class="q">RSI ${num(i.rsi,0)}</span><span class="q">MACD ${num(i.macd,2)}</span>${q?`<span class="q warn">${esc(q)}</span>`:""}</div>
-    <div class="basic-strip"><span>Close <b>${num(i.close)}</b></span><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
-    ${i.action?`<div class="action-line"><b>${esc(i.action)}</b><br>${esc(i.actionReason)}</div>`:""}
-    ${provenancePanel(i)}
+    <div id="chartFreshness" class="chart-freshness">Last data fetched: ${esc(i.intradayLatestTime||i.date||"—")} · ${esc(i.priceLabel||"Daily EOD")}</div>
+    <div id="chartLegend" style="font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div class="modal-section-label">Setup decision</div>
+    ${decisionPanel(i)}
   </div>`;
   document.getElementById("prevStock").onclick=()=>stepStock(-1);
   document.getElementById("nextStock").onclick=()=>stepStock(1);
   document.getElementById("closeModal").onclick=()=>closeModal();
-  document.getElementById("tvLink").href=`https://www.tradingview.com/chart/?symbol=SET:${encodeURIComponent(i.symbol)}`;
+  document.getElementById("modalTitleLink").href=`https://www.tradingview.com/chart/?symbol=SET:${encodeURIComponent(i.symbol)}`;
   document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
     if(myGen!==detailGen)return;
     chartViewOffset=0; setActiveTf(b.dataset.tf); loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
   });
-  pickTimeframe(i.symbol).then(tf=>{
-    if(myGen!==detailGen)return;
-    document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf));
-    loadChart(i.symbol, TF_API[tf], myGen);
-  });
+  loadChart(i.symbol, "1D", myGen);
   bind();
   bindChartPan();
 }
 let currentTf="1D";
 function setActiveTf(tf){ currentTf=tf; document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf)); }
-function pickTimeframe(symbol){
-  return fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=1M&limit=500`)
-    .then(r=>r.json()).then(d=>{
-      const months=d&&d.bars?d.bars.length:0;
-      if(months<=3)return "1h";
-      if(months>60)return "1M";
-      return "1D";
-    }).catch(()=> "1D");
-}
 function loadChart(symbol, tf, gen){
   if(gen!==undefined && gen!==detailGen)return;
   currentTf=tf;
-  const status=document.getElementById("chartStatus"); if(status)status.textContent="กำลังโหลด chart…";
+  const status=document.getElementById("chartStatus"); if(status){status.className="chart-status";status.textContent=`Loading ${TF_LABEL[tf]||tf} chart…`;}
   if(chartAbort)chartAbort.abort();
   const ac=chartAbort=new AbortController();
   const fetchLimit=(tf==="1M")?500:200;
@@ -593,7 +566,12 @@ function loadChart(symbol, tf, gen){
     .then(r=>r.json()).then(d=>{ if(gen!==detailGen)return; if(d&&d.bars&&d.bars.length){ lastBars=d.bars; drawChart(d.bars, tf); if(status)status.textContent=""; } else { fallback(symbol,tf,gen); } })
     .catch(()=>{ if(gen===detailGen)fallback(symbol,tf,gen); });
 }
-function fallback(symbol,tf,gen){ if(gen!==detailGen)return; const nx={"60M":"1D","1D":"1W","1W":"1M","1M":null}[tf]; if(nx){ const status=document.getElementById("chartStatus"); if(status)status.textContent=`ไม่มีข้อมูล ${TF_LABEL[tf]||tf}; แสดง timeframe ถัดไปแทน`; setActiveTf(nx); loadChart(symbol,nx,gen); } else { const status=document.getElementById("chartStatus"); if(status)status.textContent="No stored chart data — not substituted"; } }
+function fallback(symbol,tf,gen){
+  if(gen!==detailGen)return;
+  const status=document.getElementById("chartStatus");
+  const label=TF_LABEL[tf]||tf;
+  if(status){status.className="chart-status error";status.innerHTML=`${label} chart unavailable · <button class="chip" id="chartRetry" type="button">Try again</button>`;const retry=document.getElementById("chartRetry");if(retry)retry.onclick=()=>loadChart(symbol,tf,gen);}
+}
 let chartViewOffset=0; // how many bars scrolled back from the right edge (pan)
 function drawChart(bars, tf){
   const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;

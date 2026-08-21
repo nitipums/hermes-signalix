@@ -32,9 +32,8 @@ class DashboardResponsiveTests(unittest.TestCase):
             self.assertIn(marker, self.html)
 
     def test_tradingview_link_present_in_modal(self):
-        self.assertIn('class="chip tv-link"', self.html)
-        self.assertIn('id="tvLink"', self.html)
-        self.assertIn("TradingView", self.html)
+        self.assertIn('class="title-link"', self.template)
+        self.assertIn("tradingview.com/chart", self.template)
 
     def test_snapshot_and_taxonomy_artifact_match_full_universe(self):
         # Full ORD universe (delisted/inactive excluded) — count reflects the
@@ -113,23 +112,32 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertNotIn("const structuralGroup=", html)
         self.assertNotIn("const momentumGroup=", html)
 
-    # --- Contracts intentionally NOT yet built (tracked, not silently passing) ---
-    def test_detail_modal_renders_badges_and_stale_provenance_contract(self):
-        html = self.html
+    def test_detail_modal_is_decision_first_and_daily_default(self):
+        html = self.template
         for marker in (
-            "detail-badges",
-            "Quality",
-            "Latest data fetched:",
-            "Market session:",
-            "last valid:",
-            "Lifecycle",
-            "Confidence",
-            "Evidence provenance",
-            "Canonical event",
+            "decision-banner",
+            "decisionPanel(i)",
+            "modal-subtitle",
+            "title-link",
+            "chartFreshness",
+            "Last data fetched:",
+            'data-tf="1D" aria-pressed="true"',
+            'loadChart(i.symbol, "1D", myGen)',
+            "setup-note",
+            "risk-note",
         ):
             self.assertIn(marker, html)
-        self.assertIn("const fresh=i.dataFreshness||{}", html)
-        self.assertIn("freshStatus=fresh.status||", html)
+        for removed in (
+            "Market session:",
+            "last valid:",
+            "Evidence provenance",
+            "Canonical event",
+            "Confidence",
+            "provenancePanel(i)",
+            'id="tvLink"',
+        ):
+            self.assertNotIn(removed, html)
+
 
     # --- Creative redesign markers (beyond the mechanical proposal) ---
     def test_creative_markers_in_template(self):
