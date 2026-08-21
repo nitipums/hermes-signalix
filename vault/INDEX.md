@@ -29,6 +29,7 @@
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
 | `Postmortems/2026-08-19-Intraday-Evaluator-Import.md` | Intraday ExecStopPost import failure | ✅ current | fixed; reusable systemd/package-import lesson |
 | `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
+| `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -68,3 +69,7 @@
 - **2026-08-19**: Setup Radar / Stage + Actionable Setup State redesign `DONE` — `backend/setup_state.py` (quality gate + proximity pure functions); wired into `screening.group_scan_results` → `daily_state`; `build_dashboard.serialize` exposes `setup_quality`/`setup_proximity`/`radar`/`radarBadge` + stage→proximity→rs sort; `dashboard_template.html` Setup Radar section + proximity pills, L2 UI pills removed. Verified: 231 tests green; Docker scan produces 84 radar items (READY/WATCH badges); S3/S4 proximity.state=null; browser confirms Setup Radar heading, `data-prox` pills, no legacy L2 refs; screenshot at `/tmp/radar_screenshot.png`. Commits: 0d3a1ee (setup state), d383c9f (wiring), be99772 (serialize/sort/UI), 19b6c53 (test updates).
 
 - **2026-08-20**: Settrade master became sole ORD authority; weekly sync + auto-reactivation/absent→inactive policy added. Intraday moved to 15-minute cadence, 10:00–16:45 Bangkok, 60m limit=4; old watchdog disabled and new 15m watchdog installed. Scanner keeps short-history symbols as explicit `INSUFFICIENT_HISTORY` non-signal rows. See `2026-08-20-Intraday-Master-Watchdog-Handoff.md`.
+
+- **2026-08-20 (Data semantics)**: Removed the 15% yfinance price-gap skip in `update_data.py` — owner directive: pull ALL symbols, no price-gap filter. Excluded `COLOR` from `symbol_master` (status='excluded', reason: Settrade Symbol not found) so it drops from scan + dashboard; official master sync will auto-reactivate if it reappears. Verified: 931 active / 1 excluded, scan universe 904, COLOR absent from snapshot + served dashboard. See `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` + Decisions.md.
+
+- **2026-08-20 (Dashboard UX)**: Moved Setup Radar to its own nav page (`#radar`), wrapped stage summary + filter rows + search in a sticky control cluster (`#ctrlSticky`), and stage-filter clicks auto-scroll to results. Tests 17/17 + related 47 passed; served HTML verified in real browser desktop + mobile (no h-scroll, sticky works at scrollY=1200). Commit `edaffbd`.

@@ -5,8 +5,9 @@
             ┌─────────────────── EOD INGESTION ───────────────────┐
    Thai EOD │  update_data.py  (local zip → drive → Settrade → yf) │
    zip /    │  incremental, idempotent (ON CONFLICT DO NOTHING)    │
-   Drive /  └───────────────┬──────────────────────────────────────┘
-   Settrade                ▼
+   Drive /  │  yfinance: NO 15% price-gap skip (2026-08-20)        │
+   Settrade └───────────────┬──────────────────────────────────────┘
+                    ▼
                     PostgreSQL  price_data / intraday_price_data / company_profiles
                         │  (SET index = benchmark for RS)
                         ▼

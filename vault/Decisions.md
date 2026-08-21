@@ -77,3 +77,15 @@ Reason: Prior labels conflated “not an immediate entry” with a broken trend.
 Decision: A breakout event stores a canonical `NUMERIC(18,4)` original trigger and append-only observations linked to immutable scan runs. Fresh confirmation requires close >=1% above trigger and volume >=1.2x. Setup window is <=5% below trigger (near <=3%, watch >3–5%); retest is +/-3%. Persist the 5-session pre-break pivot low and use `max(pivot_low, trigger × 0.96)` as the failure level.
 
 Reason: Rolling 20D highs cannot reliably distinguish fresh break, retest, extension, and failure. A development event baseline created before the direct 5-session pivot calculation was backed up and reset; the clean baseline scan started after the corrected calculation.
+
+## 2026-08-20 — Pull ALL symbols: remove 15% price-gap skip (owner directive)
+
+Decision: Remove the yfinance-fallback price-continuity guard entirely. `fetch_yfinance` no longer skips a symbol whose first fetched close deviates >15% from the last DB close. Pull every known symbol; no price-gap filter.
+
+Reason: Arm: “เราคุยกันแล้วว่าดึงทั้งหมด”. The 15% guard was a yfinance data-quality safety net but also silently dropped real names (especially low-priced stocks where a 0.01→0.02 change is a 50% gap). Owner wants complete coverage over defensive skipping.
+
+## 2026-08-20 — Exclude COLOR from ORD master (owner override)
+
+Decision: Mark `COLOR` as `status='excluded'` in `symbol_master` with reason `Owner override: Settrade Symbol not found [COLOR]`. It drops out of the scan universe and dashboard. Official Settrade weekly master sync remains the authority: if COLOR reappears on the official list, the sync auto-reactivates it.
+
+Reason: Settrade API consistently returns `Symbol not found [COLOR]` (was already `inactive` from the 60m run). Arm: “color exclude ไปเลยก็ได้ครับ”.
