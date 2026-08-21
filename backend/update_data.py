@@ -625,25 +625,11 @@ def ingest_intraday(
             pending_symbols = list(batch_symbols)
             while pending_symbols:
                 def fetch_one(sym):
-                    try:
-                        call = lambda: market.get_candlestick(
-                            symbol=sym, interval=interval, limit=limit,
-                            normalized=SETTRADE_NORMALIZED)
-                        # SIGALRM is main-thread-only; SDK HTTP context already
-                        # carries requests timeout for parallel workers.
-                        if workers > 1:
-                            response = call()
-                        else:
-                            with settrade_request_timeout():
-                                response = call()
-                        parsed = _parse_settrade_intraday(sym, interval, response, {})
-                        if not parsed:
-                            return sym, [], "empty intraday response", None
-                        return sym, parsed, None, None
-                    except Exception as exc:
-                        if _is_settrade_session_error(exc):
-                            return sym, [], None, exc
-                        return sym, [], repr(exc)[:200], None
+                    return _fetch_one_intraday(
+                        sym, interval, market,
+                        workers=workers, limit=limit,
+                        sleep_fn=sleep_fn, retry_empty=True,
+                    )
 
                 if workers > 1:
                     with concurrent.futures.ThreadPoolExecutor(
@@ -692,16 +678,22 @@ def ingest_intraday(
                     break
 
                 batch_info["failed_symbols"] = failed_symbols
-                if summary["retry_count"] >= session_retries:
-                    if session_errors:
-                        stats["intraday_auth_failed"] += len(session_errors)
-                    break
-
-                summary["retry_count"] += 1
-                batch_info["retry_count"] += 1
                 if session_errors:
+                    # A session-level failure (U-102) is bounded by the outer
+                    # session_retries loop; an empty response is not a session
+                    # error, so it must not consume the session retry budget.
+                    if summary["retry_count"] >= session_retries:
+                        stats["intraday_auth_failed"] += len(session_errors)
+                        break
+                    summary["retry_count"] += 1
+                    batch_info["retry_count"] += 1
                     stats["intraday_auth_failed"] += len(session_errors)
                     market = market_factory()
+                elif summary["retry_count"] >= session_retries:
+                    break
+                else:
+                    summary["retry_count"] += 1
+                    batch_info["retry_count"] += 1
                 if retry_backoff:
                     sleep_fn(retry_backoff * summary["retry_count"])
                 pending_symbols = failed_symbols
@@ -744,6 +736,55 @@ def ingest_intraday(
         summary["status"] = "partial_success"
     summary["fetch_completed_at"] = _utc_now_iso()
     return summary
+
+
+def _parse_settrade_intraday_missing_market(sym, interval, market, *, limit, workers, sleep_fn):
+    """Retry a Settrade intraday fetch whose parsed candles came back empty.
+
+    Empty intraday responses are transient (a batch init just before a market
+    session needs Settrade to warm its cache), so an immediate single retry
+    converts most of them into real candles and shrinks the partial_success
+    tail. Session-level errors (U-102) are NOT handled here: they are already
+    bounded by the outer session_retries loop in ingest_intraday.
+    """
+    try:
+        call = lambda: market.get_candlestick(
+            symbol=sym, interval=interval, limit=limit,
+            normalized=SETTRADE_NORMALIZED)
+        if workers > 1:
+            response = call()
+        else:
+            with settrade_request_timeout():
+                response = call()
+        parsed = _parse_settrade_intraday(sym, interval, response, {})
+        if parsed:
+            return sym, parsed, None, None
+        return sym, [], "empty intraday response", None
+    except Exception as exc:
+        if _is_settrade_session_error(exc):
+            return sym, [], None, exc
+        return sym, [], repr(exc)[:200], None
+
+
+def _fetch_one_intraday(sym, interval, market, *, workers, limit, sleep_fn, retry_empty):
+    """Fetch one symbol's 60m candles with a bounded empty-response retry.
+
+    Only genuine Settrade empty responses are retried (transient warm-up);
+    non-session exceptions (timeouts, HTTP errors) are not retried here and
+    fall through to the existing failure accounting.
+    """
+    result = _parse_settrade_intraday_missing_market(
+        sym, interval, market, workers=workers, limit=limit, sleep_fn=sleep_fn)
+    if retry_empty and result[2] == "empty intraday response" and result[3] is None:
+        if sleep_fn:
+            sleep_fn(1.0)
+        retried = _parse_settrade_intraday_missing_market(
+            sym, interval, market, workers=workers, limit=limit, sleep_fn=sleep_fn)
+        if retried[1]:
+            # Retry recovered real candles; clear the transient empty error.
+            retried = (retried[0], retried[1], None, None)
+        return retried
+    return result
 
 
 def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instrument_types=None, flush_batch=0, repair_gaps=False, symbols=None):

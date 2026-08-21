@@ -97,7 +97,9 @@ class IntradayBatchIngestionTests(unittest.TestCase):
 
     @patch("update_data.insert_intraday_rows")
     def test_empty_symbol_response_prevents_false_full_success(self, insert_rows):
-        market = FakeMarket([{}, candle()])
+        # AAA's first response is empty and stays empty after the single retry;
+        # BBB returns a real candle. Outcomes: {} {} (AAA fetch+retry) + candle (BBB).
+        market = FakeMarket([{}, {}, candle()])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
 
         summary = u.ingest_intraday(
@@ -112,6 +114,29 @@ class IntradayBatchIngestionTests(unittest.TestCase):
         self.assertFalse(insert_rows.call_args.kwargs["record_fetch_status"])
 
     @patch("update_data.insert_intraday_rows")
+    def test_empty_response_is_retried_once_and_recovers(self, insert_rows):
+        # First call returns {} (empty) then candle() on the retry.
+        # AAA consumes 2 outcomes (fetch + retry); BBB consumes 1 more.
+        market = FakeMarket([{}, candle(), candle()])
+        insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
+        sleeps = []
+
+        summary = u.ingest_intraday(
+            MagicMock(), {}, symbols=["AAA", "BBB"], batch_size=2,
+            batch_delay=0, batch_jitter=0, per_symbol_delay=0,
+            session_retries=0, market_factory=MagicMock(return_value=market),
+            sleep_fn=sleeps.append, jitter_fn=lambda _a, _b: 0,
+        )
+
+        self.assertEqual(summary["status"], "full_success")
+        self.assertEqual(summary["symbols_failed"], 0)
+        self.assertEqual(summary["failed_symbols"], [])
+        # AAA called twice: first empty, then retried with candle(). BBB once.
+        self.assertEqual(market.symbols, ["AAA", "AAA", "BBB"])
+        # The empty retry sleeps 1 second before re-fetching.
+        self.assertEqual(sleeps, [1.0])
+
+    @patch("update_data.insert_intraday_rows")
     def test_partial_failure_continues_and_never_advances_success_timestamp(self, insert_rows):
         market = FakeMarket([RuntimeError("bad AAA"), candle(), candle()])
         insert_rows.side_effect = lambda _pg, rows, **_kw: len(rows)
@@ -123,6 +148,8 @@ class IntradayBatchIngestionTests(unittest.TestCase):
             sleep_fn=lambda _seconds: None, jitter_fn=lambda _a, _b: 0,
         )
 
+        # Session-level failure (U-102) is NOT an empty-response retry; AAA
+        # raises once and is not re-fetched, then BBB/CCC succeed.
         self.assertEqual(market.symbols, ["AAA", "BBB", "CCC"])
         self.assertEqual(summary["status"], "partial_success")
         self.assertEqual(summary["symbols_succeeded"], 2)
