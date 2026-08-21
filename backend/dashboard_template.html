@@ -80,18 +80,17 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .stage-pill.active{outline:2px solid var(--blue);outline-offset:2px;
   box-shadow:0 0 0 3px rgba(121,173,255,.22)}
 
-/* Filter controls — 2-row mobile layout (P0).
-   Row 1 = liquidity/value/band toggles (flex-wrap short chips).
-   Row 2 = sector+industry independence chips in a HORIZONTAL scroll container
-   (NOT flex-wrap — prevents the "Healthcare cut off" truncation the vision found). */
+/* Filter controls — compact, resettable, mobile-safe. Dropdowns keep long
+   sector/industry taxonomies usable without a horizontal chip strip. */
 .liquidity-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .chip{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
 .chip.active,.chip:active{background:var(--panel2);color:var(--text)}
-.indep-row{display:flex;gap:8px;overflow-x:auto;flex-wrap:nowrap;padding-bottom:6px;margin-bottom:10px;scrollbar-width:thin}
-.indep-row .chip{flex:0 0 auto}
-.indep-row .chip.active{background:var(--panel2);color:var(--text)}
-.indep-row .chip.indep-sep{border-left:2px solid var(--s3);border-right:2px solid var(--line)}
+.indep-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.filter-select{display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted);font-size:11px;font-weight:700}
+.filter-select select{width:100%;min-width:0}
+.indep-row select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-weight:700}
 .search{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:11px 14px;color:var(--text);margin-bottom:16px}
+@media(max-width:620px){.indep-row{grid-template-columns:1fr}.filter-select{font-size:12px}}
 .stage-section{margin-bottom:26px}
 .stage-head{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
 .stage-head h2{margin:0;font-size:18px;letter-spacing:-.03em}
@@ -285,10 +284,14 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
         <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true">ซ่อน low value (&lt;฿10M/วัน)</button>
         <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false">โชว์ทั้งหมด</button>
       </div>
-      <!-- Row 2: sector + industry in a horizontal scroll container (mobile-safe) -->
+      <!-- Row 2: compact sector + industry dropdowns -->
       <div class="indep-row" id="indepRow" role="group" aria-label="Sector and industry filter">
-        <div id="sectorFilter" class="chip indep-sep" role="group" aria-label="Sector"></div>
-        <div id="industryFilter" class="chip indep-sep" role="group" aria-label="Industry"></div>
+        <label class="filter-select" for="sectorFilter">Sector
+          <select id="sectorFilter" aria-label="Sector filter"><option value="all">All</option></select>
+        </label>
+        <label class="filter-select" for="industryFilter">Industry
+          <select id="industryFilter" aria-label="Industry filter"><option value="all">All</option></select>
+        </label>
       </div>
       <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
     </div>
@@ -380,13 +383,14 @@ function card(i){
 function populateIndependenceFilters(){
   ["sector","industry"].forEach(key=>{
     const values=[...new Set(items.map(i=>profileValue(i,key)).filter(Boolean))].sort();
-    const list=key==="industry"?values.slice(0,20):values;
     const root=document.getElementById(`${key}Filter`); if(!root)return;
-    root.innerHTML=`<span style="font-size:11px;color:var(--muted)">${key[0].toUpperCase()+key.slice(1)}:</span>`+
-      ["all",...list].map(v=>`<button class="chip ${indep[key]===v?"active":""}" data-indep="${key}" data-value="${esc(v)}" aria-pressed="${indep[key]===v}">${v==="all"?"All":esc(v)}</button>`).join("");
+    root.innerHTML=`<option value="all">All ${key[0].toUpperCase()+key.slice(1)}</option>`+
+      values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    root.value=indep[key]||"all";
+    root.onchange=()=>{indep[key]=root.value||"all";render();};
   });
 }
-function current(){
+function current(excludeProxStage=null){
   const q=document.getElementById("search").value.trim().toLowerCase();
   return items.filter(i=>{
     if(liquidity!=="all"&&i.lowValue)return false;
@@ -397,7 +401,7 @@ function current(){
     if(indep.sector!=="all"&&profileValue(i,"sector")!==indep.sector)return false;
     if(indep.industry!=="all"&&profileValue(i,"industry")!==indep.industry)return false;
     const pf=proxFilter[i.stage];
-    if(pf&&pf!=="all"&&proximityState(i)!==pf)return false;
+    if(excludeProxStage!==i.stage&&pf&&pf!=="all"&&proximityState(i)!==pf)return false;
     if(q&&!`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q))return false;
     return true;
   });
@@ -419,16 +423,17 @@ function render(){
   results.innerHTML=STAGE_ORDER.map(s=>{
     if(stageFilter!=="all"&&stageFilter!==s)return "";
     const list=vals.filter(i=>i.stage===s);
-    if(!list.length)return "";
-    const m=stageMeta[s]||{count:list.length};
-    const counts={}; PROX_GROUPS.forEach(g=>counts[g]=list.filter(i=>proximityState(i)===g).length);
+    const baseList=current(s).filter(i=>i.stage===s);
+    if(!baseList.length)return "";
+    const m=stageMeta[s]||{count:baseList.length};
+    const counts={}; PROX_GROUPS.forEach(g=>counts[g]=baseList.filter(i=>proximityState(i)===g).length);
     const subpills=PROX_GROUPS.map(g=>`<button class="chip l2sub ${proxFilter[s]===g?"active":""}" data-stage="${s}" data-prox="${g}" aria-pressed="${proxFilter[s]===g}">${PROX_LABEL[g]} <b>${counts[g]}</b></button>`).join("");
-    const proxEmpty=proxFilter[s]&&proxFilter[s]!=="all"&&!list.some(i=>proximityState(i)===proxFilter[s]);
+    const proxEmpty=!!proxFilter[s]&&proxFilter[s]!=="all"&&!list.length;
     return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
   <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
   <span class="desc">${esc(STAGE_DESC[s])}</span></div>
-  <div class="l2-bar">${subpills}<button class="chip l2sub ${!proxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!proxFilter[s]}">All <b>${list.length}</b></button></div>
-  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup</div>`:""}</section>`;
+  <div class="l2-bar">${subpills}<button class="chip l2sub ${!proxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!proxFilter[s]}">All <b>${baseList.length}</b></button></div>
+  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup — choose All to reset</div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
   renderRadar();renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));

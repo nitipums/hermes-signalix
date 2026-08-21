@@ -57,11 +57,7 @@ class DashboardResponsiveTests(unittest.TestCase):
         for marker in (
             'id="sectorFilter"',
             'id="industryFilter"',
-            # sector/industry chips are generated dynamically in JS via
-            # populateIndependenceFilters() using data-indep="${key}" inside a
-            # template literal (with escaped quotes) — assert the dynamic
-            # pattern rather than a static "sector"/"industry" string.
-            'data-indep="${key}"',
+            "root.onchange=",
             r'let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={}, radarProx="all";',
             "const PROX_GROUPS=[\"action\",\"near_trigger\",\"forming\",\"extended\"]",
             'data-prox="${g}"',
@@ -86,6 +82,22 @@ class DashboardResponsiveTests(unittest.TestCase):
             "data-l2mom",
         ):
             self.assertNotIn(legacy, html, f"legacy L2 UI marker {legacy!r} should be removed")
+
+    def test_template_has_sector_industry_dropdown_and_stable_proximity_reset_contract(self):
+        html = self.template
+        for marker in (
+            '<select id="sectorFilter"',
+            '<select id="industryFilter"',
+            "root.onchange=",
+            "const baseList=current(s).filter(i=>i.stage===s)",
+            'data-prox="all"',
+            "function current(excludeProxStage=null){",
+        ):
+            self.assertIn(marker, html)
+        self.assertNotIn('id="sectorFilter" class="chip indep-sep"', html)
+        self.assertNotIn('id="industryFilter" class="chip indep-sep"', html)
+        self.assertNotIn(".indep-row{display:flex;gap:8px;overflow-x:auto", html)
+
 
     def test_template_compatibility_helpers_cover_new_and_legacy_items(self):
         html = self.template
