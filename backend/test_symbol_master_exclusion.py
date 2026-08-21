@@ -47,15 +47,14 @@ class TestSymbolMasterExclusion(unittest.TestCase):
         pg2 = pg_connect()
         try:
             cur = pg2.cursor()
-            cur.execute("SELECT count(DISTINCT symbol) FROM price_data "
-                        "WHERE market='TH' AND instrument_type='ORD'")
-            present = cur.fetchone()[0]
-            cur.execute("SELECT count(*) FROM symbol_master WHERE status IN "
-                        "('inactive','delisted','excluded')")
-            excluded_master = cur.fetchone()[0]
+            cur.execute("SELECT count(DISTINCT p.symbol) FROM price_data p "
+                        "LEFT JOIN symbol_master s ON s.symbol=p.symbol "
+                        "WHERE p.market='TH' AND p.instrument_type='ORD' "
+                        "AND (s.status IS NULL OR s.status='active')")
+            expected = cur.fetchone()[0]
         finally:
             pg2.close()
-        self.assertEqual(len(syms), present - excluded_master)
+        self.assertEqual(len(syms), expected)
 
     def test_scan_universe_excludes_delisted(self):
         cands, near = screening.scan_universe(min_conditions=8, limit=None)

@@ -89,3 +89,9 @@ Reason: Arm: “เราคุยกันแล้วว่าดึงทั�
 Decision: Mark `COLOR` as `status='excluded'` in `symbol_master` with reason `Owner override: Settrade Symbol not found [COLOR]`. It drops out of the scan universe and dashboard. Official Settrade weekly master sync remains the authority: if COLOR reappears on the official list, the sync auto-reactivates it.
 
 Reason: Settrade API consistently returns `Symbol not found [COLOR]` (was already `inactive` from the 60m run). Arm: “color exclude ไปเลยก็ได้ครับ”.
+
+## 2026-08-21 — Exclude persistent intraday-empty tail
+
+Decision: Mark ACAP, BLISS, GSTEEL, KKC, NWR, TAPAC, and WELL as `symbol_master.status='excluded'` with an owner-override reason. All seven returned empty Settrade 60m responses persistently and had no EOD data or EOD latest date older than one year as of 2026-08-21. The nine remaining persistent intraday-empty symbols were not excluded because their EOD data was newer than one year.
+
+Reason: Retry fixes transient Settrade warm-up misses, but these seven have zero intraday rows across repeated runs and stale/no EOD evidence. Excluding them prevents repeated partial-success noise and removes them from the scan/dashboard universe. If an official master sync reactivates a symbol, re-evaluate it rather than silently assuming the gap is fixed.
