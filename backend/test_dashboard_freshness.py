@@ -1,8 +1,9 @@
 import datetime as dt
 import unittest
+from decimal import Decimal
 from unittest.mock import MagicMock
 
-from build_dashboard import dashboard_freshness, market_session_status, serialize, snapshots
+from build_dashboard import _json_default, dashboard_freshness, market_session_status, serialize, snapshots
 
 
 class SnapshotFreshnessTests(unittest.TestCase):
@@ -164,6 +165,12 @@ class SnapshotFreshnessTests(unittest.TestCase):
 
         self.assertIsNone(freshness["data_fetched_at"])
         self.assertEqual(freshness["display"], "Unknown / Stale")
+
+
+    def test_dashboard_json_default_serializes_db_decimal(self):
+        self.assertEqual(_json_default(Decimal("123.45")), 123.45)
+        with self.assertRaises(TypeError):
+            _json_default(object())
 
 
 if __name__ == "__main__":

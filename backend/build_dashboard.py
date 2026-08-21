@@ -3,6 +3,7 @@ import html
 import json
 import os
 from datetime import datetime, timezone
+from decimal import Decimal
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
@@ -32,6 +33,15 @@ GROUPS = (
     ("down_or_broken", "ขาลง / หลุด", "risk", "danger", "โครงสร้างอ่อนหรือหลุด; ไม่เปิด long ใหม่"),
 )
 GROUP_BY_KEY = {g[0]: g for g in GROUPS}
+
+
+def _json_default(value):
+    """Serialize DB-native numeric/time values without leaking Decimal to JSON."""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (datetime,)):
+        return value.isoformat()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def get_pg():
@@ -970,7 +980,7 @@ def build(scanned=None):
                                       "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")},
                    "refresh": "progressive_cards", "items": items,
                    "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
-                  separators=(",", ":"))
+                  separators=(",", ":"), default=_json_default)
     counts = {key: sum(1 for item in items if item["primary_group"] == key) for key, *_ in PRIMARY_GROUPS}
     meta = {key: {"title": v["label"], "action": v["action"], "intent": "presentation", "tone": "neutral", "description": v["action"], "count": counts[key]}
             for key, v in PRIMARY_META.items()}
@@ -1004,11 +1014,11 @@ def build(scanned=None):
     with open(template_path, encoding="utf-8") as tf:
         template = tf.read()
     page = (template
-            .replace("__ITEMS__", json.dumps(items, separators=(",", ":")))
-            .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":")))
+            .replace("__ITEMS__", json.dumps(items, separators=(",", ":"), default=_json_default))
+            .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":"), default=_json_default))
             .replace("__DASHBOARD_META__", json.dumps({"data_fetched_at": freshness.get("data_fetched_at"),
                                                         "intraday_scan_time": intraday_scan_time,
-                                                        "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")}, separators=(",", ":"))))
+                                                        "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")}, separators=(",", ":"), default=_json_default)))
     with open(OUT_HTML, "w") as file:
         file.write(page)
     return {"securities": len(items), "groups": counts, "out": OUT_HTML}

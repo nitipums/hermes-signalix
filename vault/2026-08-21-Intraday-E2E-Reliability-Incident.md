@@ -48,7 +48,11 @@ The live watchdog returned `HEALTHY`, systemd `Result=success`, `ExecMainStatus=
 
 Focused regression suite: **30 tests passed**. `systemd-analyze verify` passed.
 
-## Self-healing boundary
+## Follow-up root cause found after factsheet integration
+
+The first factsheet-enriched 60m run exposed a second serialization defect: PostgreSQL `NUMERIC` values (for example `market_cap`) reached dashboard items as `Decimal`, and `json.dump/json.dumps` had no encoder. The fetch and DB upsert succeeded, but dashboard rebuild raised `TypeError: Object of type Decimal is not JSON serializable`, leaving the previous dashboard artifact served.
+
+Fix: `build_dashboard._json_default()` converts `Decimal` to float and datetime values to ISO strings for both snapshot JSON and embedded HTML. Regression coverage was added. A live rebuild now produces identical local/served `intraday_scan_time` matching the latest ingestion completion.
 
 Automatic recovery covers:
 
