@@ -102,6 +102,7 @@ class DashboardResponsiveTests(unittest.TestCase):
         html = self.template
         for marker in (
             ".topbar{height:50px}",
+            ".top-search-row",
             ".stage-pill{min-width:calc(50% - 3px);padding:8px 9px",
             ".stage-pill .cnt{font-size:20px}",
             ".liquidity-tools .chip,.liquidity-tools select{min-height:34px",
