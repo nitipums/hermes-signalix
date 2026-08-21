@@ -50,5 +50,26 @@ class EodHealthcheckTests(unittest.TestCase):
             self.assertFalse(path.with_suffix(".json.tmp").exists())
 
 
+class EodHealthcheckTolerantExitTests(unittest.TestCase):
+    """partial_success (intraday universe) is a tolerated EOD outcome."""
+
+    def test_expected_pipeline_exit_1_counts_as_success(self):
+        alerts = evaluate_health(
+            {"Result": "exit-code", "ExecMainStatus": "1"},
+            dt.date(2026, 8, 14), dt.date(2026, 8, 14),
+            dt.date(2026, 8, 14), NOW,
+        )
+        self.assertEqual(alerts, [])
+
+    def test_unexpected_exit_code_still_alerts(self):
+        alerts = evaluate_health(
+            {"Result": "exit-code", "ExecMainStatus": "2"},
+            dt.date(2026, 8, 14), dt.date(2026, 8, 14),
+            dt.date(2026, 8, 14), NOW,
+        )
+        self.assertEqual([a["code"] for a in alerts], ["service_failed"])
+        self.assertEqual(alerts[0]["exec_main_status"], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

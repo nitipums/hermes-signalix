@@ -36,6 +36,22 @@ def expected_market_date(now=None):
     return local
 
 
+def _tolerated_exit(service_state):
+    """Whether a failed systemd state is an expected pipeline outcome.
+
+    update_data returns 1 when the intraday full-universe pass ends
+    partial_success (a bounded number of Settrade symbols return empty
+    responses). That is a known ops condition, not an EOD failure; data
+    freshness is independently verified below.
+    """
+    result = service_state.get("Result", "unknown")
+    try:
+        exec_status = int(service_state.get("ExecMainStatus", -1))
+    except (TypeError, ValueError):
+        exec_status = -1
+    return result == "exit-code" and exec_status == 1
+
+
 def evaluate_health(service_state, eod_date, scan_date, expected_date, now=None):
     """Return deterministic alert records for EOD/data/scan failures."""
     alerts = []
@@ -44,7 +60,7 @@ def evaluate_health(service_state, eod_date, scan_date, expected_date, now=None)
         exec_status = int(service_state.get("ExecMainStatus", -1))
     except (TypeError, ValueError):
         exec_status = -1
-    if result not in ("success", "") or exec_status != 0:
+    if (result not in ("success", "") or exec_status != 0) and not _tolerated_exit(service_state):
         alerts.append({
             "code": "service_failed",
             "result": result,
