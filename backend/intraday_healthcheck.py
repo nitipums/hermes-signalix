@@ -44,7 +44,8 @@ def _age_minutes(value, now):
 
 def evaluate_health(service_state, price_ts, evaluated_at, now=None,
                     max_age_minutes=None, price_max_age_minutes=90,
-                    state_max_age_minutes=30, failed_invocations=None):
+                    state_max_age_minutes=30, failed_invocations=None,
+                    expected_partial_success=False):
     """Return deterministic alert records for all unhealthy checks."""
     now = _as_utc(now or dt.datetime.now(UTC))
     if max_age_minutes is not None:
@@ -55,13 +56,16 @@ def evaluate_health(service_state, price_ts, evaluated_at, now=None,
         exec_status = int(service_state.get("ExecMainStatus", -1))
     except (TypeError, ValueError):
         exec_status = -1
-    if result not in ("success", "") or exec_status != 0:
+    expected_partial = (
+        expected_partial_success and result == "exit-code" and exec_status == 1
+    )
+    if not expected_partial and (result not in ("success", "") or exec_status != 0):
         alerts.append({
             "code": "service_failed",
             "result": result,
             "exec_main_status": exec_status,
         })
-    elif failed_invocations:
+    elif failed_invocations and not expected_partial:
         alerts.append({
             "code": "service_failed",
             "result": result,
@@ -202,6 +206,17 @@ def read_freshness(pg):
         cur.close()
 
 
+def read_latest_ingestion_status(pg):
+    cur = pg.cursor()
+    try:
+        cur.execute("""SELECT status FROM intraday_ingestion_runs
+                       ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1""")
+        row = cur.fetchone()
+        return row[0] if row else None
+    finally:
+        cur.close()
+
+
 def get_pg():
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
@@ -238,6 +253,7 @@ def main(argv=None):
         pg = get_pg()
         try:
             price_ts, evaluated_at = read_freshness(pg)
+            latest_ingestion_status = read_latest_ingestion_status(pg)
         finally:
             pg.close()
         alerts = evaluate_health(
@@ -249,6 +265,7 @@ def main(argv=None):
             price_max_age_minutes=args.price_max_age_minutes,
             state_max_age_minutes=args.state_max_age_minutes,
             failed_invocations=failed_invocations,
+            expected_partial_success=(latest_ingestion_status == "partial_success"),
         )
         record_failure_observations(observations, failed_invocations, now)
     except Exception as exc:

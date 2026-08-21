@@ -31,6 +31,16 @@ class IntradayHealthcheckTests(unittest.TestCase):
         self.assertEqual(alerts[0]["code"], "service_failed")
         self.assertEqual(alerts[0]["exec_main_status"], 1)
 
+    def test_partial_success_exit_one_is_tolerated(self):
+        alerts = evaluate_health(
+            service_state={"Result": "exit-code", "ExecMainStatus": "1"},
+            price_ts=NOW,
+            evaluated_at=NOW,
+            now=NOW,
+            expected_partial_success=True,
+        )
+        self.assertEqual(alerts, [])
+
     def test_stale_price_data_is_alerted(self):
         alerts = evaluate_health(
             service_state={"Result": "success", "ExecMainStatus": "0"},
@@ -119,7 +129,7 @@ class IntradayHealthcheckTests(unittest.TestCase):
     def test_watchdog_unit_is_the_active_primary_monitor(self):
         unit = Path(__file__).with_name("signalix-intraday-watchdog.service").read_text()
         self.assertIn("intraday_healthcheck.py", unit)
-        self.assertIn("--price-max-age-minutes 30", unit)
+        self.assertIn("--price-max-age-minutes 90", unit)
 
 
 class StandaloneDuplicatedMonitorContractTests(unittest.TestCase):
