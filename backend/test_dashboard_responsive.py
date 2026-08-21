@@ -98,6 +98,19 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertNotIn(".indep-row{display:flex;gap:8px;overflow-x:auto", html)
 
 
+    def test_mobile_first_viewport_is_compact(self):
+        html = self.template
+        for marker in (
+            ".topbar{height:50px}",
+            ".stage-pill{min-width:calc(50% - 3px);padding:8px 9px",
+            ".stage-pill .cnt{font-size:20px}",
+            ".liquidity-tools .chip,.liquidity-tools select{min-height:34px",
+            ".indep-row{grid-template-columns:1fr 1fr",
+            ".search{min-height:38px",
+        ):
+            self.assertIn(marker, html)
+
+
     def test_template_compatibility_helpers_cover_new_and_legacy_items(self):
         html = self.template
         for marker in (
