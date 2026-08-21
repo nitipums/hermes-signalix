@@ -211,6 +211,43 @@ def _quality_hints(evidence: dict) -> dict:
     }
 
 
+def _primary_state_from_stage_phase(stage: str, phase: str, evidence: dict, event: dict | None) -> str:
+    """Deterministic mapping from (stage, phase, event) to one of the 7 P0 states.
+
+    The 7 canonical primary states:
+      breakout_setup, fresh_breakout, breakout_retest, breakout_extended,
+      trend_pullback, base_forming, no_long_setup
+
+    `breakdown_candidate` from the legacy daily_setup_state contract is unified
+    into `no_long_setup` — it is not a contract state.
+    """
+    if stage == "S2_uptrend":
+        if phase == "breakout_extended":
+            return "breakout_extended"
+        if phase == "uptrend_pullback":
+            return "trend_pullback"
+        if phase == "waiting_breakout":
+            return "breakout_setup"
+        if phase == "broken":
+            return "no_long_setup"
+        if phase == "breakout_new":
+            # Distinguish fresh vs retest via event age + distance to trigger.
+            if event:
+                age = int(event.get("age_sessions") or 0)
+                original = _f(event.get("trigger_price")) or _f(evidence.get("rolling_trigger"))
+                if original > 0:
+                    distance = _f(evidence.get("close")) / original - 1
+                    if age >= 1 and abs(distance) <= RETEST_TOLERANCE_PCT:
+                        return "breakout_retest"
+                    return "fresh_breakout"
+            # No event: rolling trigger close-through => fresh_breakout
+            return "fresh_breakout"
+    if stage == "S1_basing":
+        return "base_forming"
+    # S3_distributing (topping) or S4_down (declining/broken)
+    return "no_long_setup"
+
+
 def classify_stage(evidence: dict, event: dict | None = None) -> dict:
     """Return one canonical {stage, phase} + layer-2 quality hints.
 
@@ -224,11 +261,13 @@ def classify_stage(evidence: dict, event: dict | None = None) -> dict:
     """
     stage = _stage_from_trend(evidence)
     phase = _phase_within_stage(stage, evidence, event)
+    primary_state = _primary_state_from_stage_phase(stage, phase, evidence, event)
     labels = {
         "stage": stage,
         "phase": phase,
         "stage_label": STAGE_LABELS.get(stage, stage),
         "phase_label": PHASE_LABELS.get(phase, phase),
+        "primary_state": primary_state,
     }
     # Layer-2 quality (hints only).
     labels["quality"] = _quality_hints(evidence)

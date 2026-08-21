@@ -77,6 +77,8 @@ class SnapshotFreshnessTests(unittest.TestCase):
             [("TFG", "Thai Foods Group", "Food", "Agriculture", "Food", "test", "2026-08-11")],
             # newest stored 60m quote
             [("TFG", "60m", "2026-08-11 09:30:00+00:00", 9.9, 1000)],
+            # intraday feed status
+            [],
             # same-time cumulative volume query
             [],
         ]

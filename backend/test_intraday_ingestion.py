@@ -224,7 +224,7 @@ class IntradayRunExitTests(unittest.TestCase):
     @patch("update_data.get_pg")
     @patch("update_data._intraday_universe", return_value=["AAA"])
     @patch("update_data.ingest_intraday")
-    def test_partial_run_returns_nonzero_and_records_summary(self, ingest, _shortlist, get_pg):
+    def test_partial_run_returns_success_and_records_summary(self, ingest, _shortlist, get_pg):
         ingest.return_value = {
             "run_id": "run-1", "status": "partial_success",
             "symbols_attempted": 1, "symbols_succeeded": 0, "symbols_failed": 1,
@@ -243,7 +243,7 @@ class IntradayRunExitTests(unittest.TestCase):
              patch("update_data.refresh_dashboard_from_existing_scan") as refresh:
             exit_code = u.run(args)
 
-        self.assertEqual(exit_code, 1)
+        self.assertEqual(exit_code, 0)
         record.assert_called_once_with(get_pg.return_value, ingest.return_value)
         refresh.assert_called_once_with()
         get_pg.return_value.close.assert_called_once_with()

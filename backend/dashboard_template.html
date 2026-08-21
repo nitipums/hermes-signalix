@@ -147,6 +147,7 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .gain{color:var(--green)} .loss{color:var(--red)}
 .basic-strip{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-bottom:6px}
 .basic-strip b{color:var(--text)}
+.trigger-distance{font-size:11px;color:var(--amber);font-weight:750;margin:2px 0 6px}
 .setup-evidence{font-size:11px;color:var(--blue);margin-bottom:6px}
 .setup-evidence.surge{color:var(--amber)}
 .q-corner{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
@@ -164,7 +165,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .q-bar .q2{width:66%}
 .q-bar .q3{width:100%}
 
-.empty{color:var(--muted);padding:30px;text-align:center}
+.market-posture{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:10px 12px;margin:0 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.posture-main{display:flex;align-items:baseline;gap:9px;white-space:nowrap}.posture-kicker{color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.posture-main strong{font-size:16px;color:var(--amber)}.market-posture.favorable .posture-main strong{color:var(--green)}.market-posture.defensive .posture-main strong{color:var(--red)}
+.posture-metrics{display:flex;gap:14px;color:var(--muted);font-size:11px}.posture-metrics b{color:var(--text);margin-left:3px}.posture-method{color:var(--muted);font-size:10px;text-align:right}
+.empty{color:var(--muted);padding:30px;text-align:center}.empty div{margin-top:6px;font-size:12px;color:var(--muted)}
+@media(max-width:620px){.market-posture{grid-template-columns:1fr auto;gap:4px 10px;padding:8px 10px}.posture-main{grid-column:1}.posture-metrics{grid-column:1/-1;gap:12px}.posture-method{grid-column:2;grid-row:1;text-align:right;max-width:130px;line-height:1.25}}
 
 /* Market breadth pulse — single-line A/D ratio bar */
 .breadth-pulse{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:12px}
@@ -221,7 +226,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .chart-freshness{margin:3px 0 10px;color:var(--muted);font-size:12px}
 .chart-freshness.stale{color:var(--amber)}
 @media(max-width:620px){
-  .modal-bg{padding:0;align-items:flex-end}.modal{width:100%;max-height:94vh;border-radius:16px 16px 0 0;margin:0}.modal-shell{padding:16px 16px calc(24px + env(safe-area-inset-bottom))}.modal-head{grid-template-columns:32px minmax(0,1fr) 32px 32px;margin-bottom:12px}.modal-title{font-size:20px}.modal-subtitle{font-size:12px}.detail-facts{grid-template-columns:1fr 1fr}.tf-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.tf-tools .chip{min-width:58px;min-height:40px}.chart-canvas{height:250px}.detail-facts .v,.setup-note,.risk-note{font-size:13px}}
+  .modal-bg{padding:0;align-items:flex-end}.modal{width:100%;max-height:94vh;border-radius:16px 16px 0 0;margin:0}.modal-shell{padding:16px 16px calc(24px + env(safe-area-inset-bottom))}.modal-head{grid-template-columns:44px minmax(0,1fr) 44px 44px;margin-bottom:12px}.modal-head .nav-arrow,.modal-head .modal-close{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;font-size:18px}.modal-title{font-size:20px}.modal-subtitle{font-size:12px}.detail-facts{grid-template-columns:1fr 1fr}.tf-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.tf-tools .chip{min-width:58px;min-height:40px}.chart-canvas{height:250px}.detail-facts .v,.setup-note,.risk-note{font-size:13px}}
+@media(max-width:620px){.modal-head .nav-arrow,.modal-head .modal-close{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;font-size:18px}}
 /* Compact first viewport: preserve touch targets, reduce chrome density. */
 @media(max-width:620px){
   .topbar{height:50px}.brand{font-size:18px}.fresh{font-size:10px;gap:5px}.fresh i{width:6px;height:6px;box-shadow:0 0 0 3px #1b2737}
@@ -275,6 +281,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
       <div class="coverage"><span id="covCount">—</span> หุ้นไทย ORD สแกน</div>
     </div>
+    <section id="marketPosture" class="market-posture" aria-label="Market posture">
+      <div class="posture-main"><span class="posture-kicker">Market Posture</span><strong id="postureState">Mixed</strong></div>
+      <div class="posture-metrics"><span>Stage breadth <b id="postureStagePct">—</b></span><span>Above MA200 <b id="postureMaPct">—</b></span></div>
+      <div id="postureMethod" class="posture-method">Context only · not a trade instruction</div>
+    </section>
     <div class="ctrl-sticky" id="ctrlSticky">
       <div class="stage-summary" id="stageSummary" role="group" aria-label="Stage summary"></div>
       <!-- One compact tool group: universe + market quality + classification -->
@@ -303,13 +314,13 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       </div>
     </div>
     <div id="results"></div>
-    <div id="empty" class="empty" hidden>ไม่มีหุ้นตรงเงื่อนไข</div>
+    <div id="empty" class="empty" hidden>ไม่มีหุ้นตรงเงื่อนไข<div id="emptyReason"></div></div>
   </section>
   <section class="page" id="radar">
     <div class="hero"><div><h1>Setup Radar</h1><p>คุณภาพผ่าน + ใกล้/ถึงจุดเข้า — หุ้นจับตาก่อน breakout</p></div><div class="coverage"><span id="radarCount">—</span> หุ้นใน Radar</div></div>
     <div class="l2-bar" id="radarPills" role="group" aria-label="Radar proximity filter"></div>
     <div id="radarResults"></div>
-    <div id="radarEmpty" class="empty" hidden>ไม่มีหุ้นใน Radar ตรงเงื่อนไข</div>
+    <div id="radarEmpty" class="empty" hidden>ไม่มีหุ้นใน Radar ตรงเงื่อนไข<div id="radarEmptyReason"></div></div>
   </section>
   <section class="page" id="watchlist">
     <div class="hero"><div><h1>หุ้นติดตาม</h1><p id="watchState">บันทึกในอุปกรณ์นี้</p></div></div>
@@ -349,12 +360,34 @@ let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilt
 const PROX_GROUPS=["action","near_trigger","forming","extended"];
 const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
 const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null;
+function computeMarketPosture(items){
+  const xs=Array.isArray(items)?items:[];
+  const total=xs.length||1;
+  const constructive=xs.filter(i=>i.stage==="S1_basing"||i.stage==="S2_uptrend").length;
+  const constructivePct=constructive/total*100;
+  const ma=xs.map(i=>({i,ma200:i.ma200??i.ma200Value})).filter(x=>Number.isFinite(Number(x.i.close))&&Number.isFinite(Number(x.ma200))&&Number(x.ma200)>0);
+  const above=ma.filter(x=>Number(x.i.close)>Number(x.ma200)).length;
+  const ma200Pct=ma.length?above/ma.length*100:null;
+  let state="Mixed",reason="MA200 breadth unavailable";
+  if(ma.length){
+    reason=`Stage breadth ${constructivePct.toFixed(1)}% · MA200 breadth ${ma200Pct.toFixed(1)}%`;
+    if(constructivePct>=55&&ma200Pct>=50)state="Favorable";
+    else if(constructivePct<40||ma200Pct<35)state="Defensive";
+  }
+  return {state,constructivePct,ma200Pct,eligibleMa200:ma.length,reason};
+}
+function triggerDistance(i){
+  const trigger=Number(i?.breakoutEvidence?.trigger), close=Number(i?.close);
+  if(!Number.isFinite(trigger)||trigger<=0||!Number.isFinite(close))return null;
+  return {trigger,distance_pct:(close-trigger)/trigger*100};
+}
 const inRadar=i=>!!i.radar;
 const profileValue=(i,key)=>i[key]??i.independence?.[key];
 const qCornerClass=(s)=>{const c={3:"q3",2:"q2",1:"q1",0:"q0"}[s];return c?`q-corner ${c}`:""};
 
 function freshBadge(i){
   // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
+  if(i.intradayFreshness?.status==="unavailable" && i.intradayFeedStatus==="unavailable") return `<span class="fresh-badge eod" title="60m unavailable: ${esc(i.intradayFeedReason||"No intraday bars")}; Daily EOD used for decisions">60m unavailable · Daily EOD</span>`;
   if(i.stale) return `<span class="fresh-badge stale" title="Data is stale; Daily EOD shown for decisions">⚠ Stale</span>`;
   if(i.intradayAvailable) return `<span class="fresh-badge live" title="Live intraday quote available">● Intraday</span>`;
   if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="Source: ${esc(i.priceLabel)}">Daily EOD</span>`;
@@ -363,6 +396,8 @@ function freshBadge(i){
 function card(i){
   const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
   const tone=STAGE_TONE[i.stage]||"neutral";
+  const td=triggerDistance(i);
+  const triggerLine=td?`<div class="trigger-distance">Trigger ฿${num(td.trigger)} · ${pct(td.distance_pct)}</div>`:"";
   const l3=i.layer3_qualifier??i.layer3_qualifiers;
   const l3Badge=l3&&l3.score!==undefined?`<span class="q-corner ${qCornerClass(l3.score)}" title="Quality Q${l3.score}">Q${l3.score}</span>`:"";
   const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
@@ -380,6 +415,7 @@ function card(i){
     </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
     <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
     <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
+    ${triggerLine}
     ${l3&&l3.score!==undefined?`<div class="q-bar"><span class="q${Math.min(l3.score,3)}" style="width:${l3.score===0?0:Math.max(10,Math.min(l3.score,3)/3*100)}%"></span></div>`:""}
     ${company}
     ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
@@ -413,8 +449,19 @@ function current(excludeProxStage=null){
     return true;
   });
 }
+function renderMarketPosture(){
+  const p=computeMarketPosture(items), root=document.getElementById("marketPosture");
+  if(!root)return;
+  root.classList.remove("favorable","defensive","mixed");
+  root.classList.add(p.state.toLowerCase());
+  document.getElementById("postureState").textContent=p.state;
+  document.getElementById("postureStagePct").textContent=`${p.constructivePct.toFixed(1)}%`;
+  document.getElementById("postureMaPct").textContent=p.ma200Pct===null?"—":`${p.ma200Pct.toFixed(1)}%`;
+  document.getElementById("postureMethod").textContent=p.ma200Pct===null?"MA200 breadth unavailable · context only":"Stage breadth + MA200 breadth · context only, not a trade instruction";
+}
 function render(){
   document.getElementById("covCount").textContent=items.length;
+  renderMarketPosture();
   populateIndependenceFilters();
   // stage summary pills (clickable filter) — stage tint + solid count + descriptor
   const sum=document.getElementById("stageSummary");
@@ -443,6 +490,8 @@ function render(){
   <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup — choose All to reset</div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
+  const emptyReason=document.getElementById("emptyReason");
+  if(emptyReason)emptyReason.textContent=vals.length?"":"No qualifying setups for the current filters";
   renderRadar();renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
 }
 function renderRadar(){
@@ -464,6 +513,8 @@ function renderRadar(){
   root.innerHTML=list.length?`<div class="cards">${list.map(card).join("")}</div>`:"";
   const empty=document.getElementById("radarEmpty");
   if(empty)empty.hidden=!!list.length;
+  const emptyReason=document.getElementById("radarEmptyReason");
+  if(emptyReason)emptyReason.textContent=list.length?"":"No qualifying setups in Radar for this proximity filter";
   bind(root);
 }
 function renderMarket(){

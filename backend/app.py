@@ -19,6 +19,8 @@ import psycopg2
 import psycopg2.extras
 import redis
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form, Header
+
+from provenance_contract import compute_freshness, FRESH, STALE, UNKNOWN
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
@@ -415,7 +417,7 @@ def get_instrument(symbol: str):
 
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results  # noqa: E402
-from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
+from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, breakout_event_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
 # All senders + formatters live in delivery.py so the batch scan (here) and the
 # standalone Redis consumer format + push identically.
 from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
@@ -536,13 +538,33 @@ def dashboard_overview_payload(scan_path):
 
 
 def us_watchlist_overview_payload(scan_path):
-    """Return the curated US payload without joining chart/history/profile data."""
+    """Return the curated US payload without joining chart/history/profile data.
+
+    The US scan file is the single source of truth for its own provenance:
+    it carries scan_time at the envelope and per-row.  We surface scan_time
+    as root-level data_fetched_at (max of per-row scan_time) so the US page
+    has the same provenance contract shape as the TH dashboard snapshot.
+
+    Freshness is computed via the centralized P0 contract (provenance_contract)
+    using the same INTRADAY_STALE_HOURS threshold as the TH dashboard — the US
+    page never hardcodes "unknown" for a fetch timestamp it actually received.
+    """
     with open(scan_path) as handle:
         payload = json.load(handle)
+    cards = payload.get("results", [])
+    # data_fetched_at: the most recent per-symbol scan_time from the US file.
+    # Falls back to the envelope scan_time if per-row timestamps are missing.
+    row_times = [row.get("scan_time") for row in cards if row.get("scan_time")]
+    data_fetched_at = max(row_times) if row_times else payload.get("scan_time")
+    freshness_status = compute_freshness(data_fetched_at)
     return {"universe": payload.get("universe"), "market": "US",
             "benchmark": payload.get("benchmark_symbol"), "source": payload.get("source"),
+            "scan_time": payload.get("scan_time"),
+            "data_fetched_at": data_fetched_at,
+            "data_freshness_source": payload.get("source"),
+            "data_freshness_status": freshness_status,
             "cards": [{"symbol": row["symbol"], "close": row.get("close")}
-                      for row in payload.get("results", [])]}
+                      for row in cards]}
 
 
 def _load_dashboard_cache() -> dict:
@@ -589,6 +611,7 @@ def dashboard_overview():
     items = payload["items"]
     return {
         "scan_time": payload.get("scan_time"),
+        "build_timestamp": payload.get("build_timestamp"),
         "market": payload.get("market", "TH"),
         "refresh": payload.get("refresh"),
         "count": len(items),
@@ -607,7 +630,7 @@ COMPACT_CARD_FIELDS = (
     "group", "action", "actionReason", "breakoutLevel", "stop", "cut",
     "priceSource", "priceLabel", "stale", "intradaySource", "intradayStale",
     "intent", "status", "tone", "volume", "tradeValue",
-    "layer2_group", "intradayFreshness",
+    "layer2_group", "intradayFreshness", "dataFreshness",
 )
 
 
@@ -621,7 +644,9 @@ def _compact_card(item: dict, market: str = "unknown") -> dict:
     """
     out = {}
     for f in COMPACT_CARD_FIELDS:
-        out[f] = item.get(f, "unknown" if f not in item else item.get(f))
+        out[f] = item.get(f)
+        if out[f] is None:
+            out[f] = "unknown"
     # market: one canonical market per response; never guess from item absence
     out["market"] = item.get("market", market)
     # scan_time and data_fetched_at come from root, not per-card
@@ -706,17 +731,20 @@ def dashboard_cards_compact(stage: str | None = None, l2: str | None = None,
     start = (page - 1) * page_size
     page_items = items[start:start + page_size]
     market = payload.get("market", "TH")
+    dashboard_meta = payload.get("dashboard_meta", {})
     compact = [_compact_card(item, market=market) for item in page_items]
     return {
         "scan_time": payload.get("scan_time"),
-        "data_fetched_at": payload.get("data_fetched_at"),
-        "data_freshness_source": payload.get("data_freshness_source"),
-        "data_freshness_status": payload.get("data_freshness_status"),
+        "build_timestamp": payload.get("build_timestamp"),
+        "data_fetched_at": payload.get("data_fetched_at") or dashboard_meta.get("data_fetched_at"),
+        "data_freshness_source": payload.get("data_freshness_source") or dashboard_meta.get("data_freshness_source"),
+        "data_freshness_status": payload.get("data_freshness_status") or dashboard_meta.get("data_freshness_status"),
         "data_intraday_status": payload.get("data_intraday_status"),
         "data_global_status": payload.get("data_global_status"),
-        "market_session": payload.get("market_session"),
-        "last_valid_session": payload.get("last_valid_session"),
+        "market_session": payload.get("market_session") or dashboard_meta.get("market_session"),
+        "last_valid_session": payload.get("last_valid_session") or (dashboard_meta.get("market_session") or {}).get("last_valid_session"),
         "data_freshness_age_hours": payload.get("data_freshness_age_hours"),
+        "dashboard_meta": dashboard_meta,
         "market": payload.get("market", "TH"),
         "stage": stage,
         "l2": l2,
@@ -725,6 +753,39 @@ def dashboard_cards_compact(stage: str | None = None, l2: str | None = None,
         "total": len(items),
         "cards": compact,
     }
+
+
+def _active_intraday_events(items):
+    """Collect non-null intradayEventEvidence fields from serialized cards.
+
+    Returns a list of symbol-keyed evidence dicts for cards carrying an active
+    emerging/confirmed intraday breakout event. Each entry exposes the source
+    (intraday_run_id), freshness (intraday_candle_at/stale), and baseline
+    (daily_close/daily_date) lineage required by the P0 reconciliation contract.
+    """
+    out = []
+    for item in items:
+        evidence = item.get("intradayEventEvidence")
+        if evidence:
+            out.append({
+                "symbol": item.get("symbol"),
+                "confidence": evidence.get("confidence"),
+                "origin": evidence.get("origin"),
+                "trigger_price": evidence.get("trigger_price"),
+                "failure_level": evidence.get("failure_level"),
+                "first_seen": evidence.get("first_seen"),
+                "first_candle_ts": evidence.get("first_candle_ts"),
+                "interval": evidence.get("interval"),
+                "intraday_run_id": evidence.get("intraday_run_id"),
+                "resolved_daily_event_id": evidence.get("resolved_daily_event_id"),
+                "reconciled_at": evidence.get("reconciled_at"),
+                "baseline_close": evidence.get("baseline_close"),
+                "baseline_date": evidence.get("baseline_date"),
+                "intraday_close": evidence.get("intraday_close"),
+                "intraday_candle_at": evidence.get("intraday_candle_at"),
+                "stale": evidence.get("stale"),
+            })
+    return out
 
 
 @app.get("/dashboard/snapshot")
@@ -760,8 +821,17 @@ def dashboard_snapshot():
             # miss caused every request to run the expensive DB fallback.
             if not isinstance(payload.get("items"), list):
                 raise ValueError("snapshot cache has no items")
+            # Preserve build/dashboard metadata from the file before snapshot_payload
+            # overwrites the file-derived keys (it resets scan_time, market, refresh,
+            # projection_version, etc. but does not carry dashboard_meta/build_timestamp).
+            saved_build_ts = payload.get("build_timestamp")
+            saved_dashboard_meta = payload.get("dashboard_meta")
             payload["items"] = apply_projection(payload.get("items", []))
             payload.update(snapshot_payload(payload["items"], payload.get("scan_time") or scan.get("scan_time")))
+            if saved_build_ts is not None:
+                payload["build_timestamp"] = saved_build_ts
+            if saved_dashboard_meta is not None:
+                payload["dashboard_meta"] = saved_dashboard_meta
         except (OSError, ValueError, json.JSONDecodeError):
             # Safe fallback for a scan generated before the cache artifact was
             # introduced; normal deploys/builds never take this slow path.
@@ -774,6 +844,7 @@ def dashboard_snapshot():
                        "refresh": "progressive_cards", "items": fallback_items}
             payload.update(snapshot_payload(payload["items"], scan.get("scan_time")))
         return {**payload,
+                "build_timestamp": payload.get("build_timestamp"),
                 "data_fetched_at": freshness["data_fetched_at"],
                 "data_freshness_source": freshness["source"],
                 "data_freshness_status": freshness["status"],
@@ -781,7 +852,11 @@ def dashboard_snapshot():
                 "data_global_status": freshness.get("global_status"),
                 "market_session": freshness.get("market_session"),
                 "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
-                "data_freshness_age_hours": freshness.get("age_hours")}
+                "data_freshness_age_hours": freshness.get("age_hours"),
+                # P0: expose append-only intraday emerging-event reconciliation
+                # state. Daily is the official state; these are lower-confidence
+                # intraday observations awaiting/confirming EOD reconciliation.
+                "intradayEvents": _active_intraday_events(payload.get("items", []))}
     except Exception as exc:
         raise HTTPException(status_code=503, detail=f"dashboard snapshot unavailable: {exc}")
 

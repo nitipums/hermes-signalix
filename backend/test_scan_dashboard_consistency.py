@@ -10,7 +10,7 @@ class ScanDashboardConsistencyTests(unittest.TestCase):
     def _write(self, root, scan_groups, dash_items, snap_items):
         scan = root / "scan.json"
         dashboard = root / "dashboard.html"
-        snapshot = root / "snapshot.json"
+        snapshot = root / "dashboard_snapshot.json"
         scan.write_text(json.dumps({"scan_time": "now", "groups": scan_groups}), encoding="utf-8")
         dashboard.write_text(
             "let items=" + json.dumps(dash_items) + ";const meta={};", encoding="utf-8"

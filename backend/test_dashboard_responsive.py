@@ -153,6 +153,41 @@ class DashboardResponsiveTests(unittest.TestCase):
             self.assertNotIn(removed, html)
 
 
+    def test_market_posture_contract(self):
+        html = self.template
+        for marker in (
+            'id="marketPosture"',
+            "function computeMarketPosture(items)",
+            "ma200:i.ma200??i.ma200Value",
+            "Favorable",
+            "Defensive",
+            "MA200 breadth unavailable",
+            'id="postureMethod"',
+        ):
+            self.assertIn(marker, html)
+
+    def test_trigger_distance_contract(self):
+        html = self.template
+        for marker in (
+            "function triggerDistance(i)",
+            "breakoutEvidence",
+            "distance_pct",
+            "Trigger",
+            "triggerDistance(i)",
+        ):
+            self.assertIn(marker, html)
+
+    def test_empty_states_distinguish_zero_results_from_load_error(self):
+        html = self.template
+        for marker in (
+            'id="emptyReason"',
+            'id="radarEmptyReason"',
+            "No qualifying setups",
+            "โหลดข้อมูลไม่สำเร็จ",
+            "ลองใหม่",
+        ):
+            self.assertIn(marker, html)
+
     # --- Creative redesign markers (beyond the mechanical proposal) ---
     def test_creative_markers_in_template(self):
         html = self.template

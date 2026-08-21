@@ -37,7 +37,7 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 EnvironmentFile=/root/signalix/settradeupdated.env
 Environment=SETTRADE_DAILY_WORKERS=30
-ExecStart=/root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --scan --intraday-shortlist --flush-batch 100
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --scan --flush-batch 100
 ExecStartPost=/root/.venv_img/bin/python /root/signalix/backend/verify_scan_dashboard.py
 StandardOutput=append:/root/signalix/update_log.txt
 StandardError=append:/root/signalix/update_log.txt

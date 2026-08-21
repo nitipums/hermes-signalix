@@ -2,6 +2,7 @@
 import unittest
 
 from stage_classifier import classify_stage, STAGE_LABELS, PHASE_LABELS
+from daily_setup_state import PRIMARY_STATES
 
 
 def ev(**kw):
@@ -117,6 +118,73 @@ class StageClassifierTests(unittest.TestCase):
         # exactly one stage, one phase
         self.assertIsInstance(r["stage"], str)
         self.assertIsInstance(r["phase"], str)
+
+    # ---- primary_state: deterministic mapping to exactly 7 canonical states ----
+    def test_primary_state_is_in_canonical_set(self):
+        r = classify_stage(ev())
+        self.assertIn(r["primary_state"], PRIMARY_STATES)
+
+    def test_S2_breakout_new_is_fresh_breakout(self):
+        r = classify_stage(ev(rolling_trigger=9.8, close=10.0))
+        self.assertEqual(r["stage"], "S2_uptrend")
+        self.assertEqual(r["phase"], "breakout_new")
+        self.assertEqual(r["primary_state"], "fresh_breakout")
+
+    def test_S2_breakout_new_with_retrace_is_breakout_retest(self):
+        r = classify_stage(ev(rolling_trigger=9.8, close=10.0,
+                              volume_ratio_50=1.0, trend_template_conditions=8,
+                              range_20d_pct=10.0),
+                           event={"trigger_price": 9.8, "age_sessions": 2, "pivot_low": 9.4})
+        self.assertEqual(r["phase"], "breakout_new")
+        self.assertEqual(r["primary_state"], "breakout_retest")
+
+    def test_S2_breakout_extended_is_extended(self):
+        r = classify_stage(ev(rolling_trigger=9.8, close=10.8, rsi_daily=76.0),
+                           event={"trigger_price": 9.8, "age_sessions": 1, "pivot_low": 9.4})
+        self.assertEqual(r["phase"], "breakout_extended")
+        self.assertEqual(r["primary_state"], "breakout_extended")
+
+    def test_S2_uptrend_pullback_is_trend_pullback(self):
+        r = classify_stage(ev(near_pullback_reference=True))
+        self.assertEqual(r["phase"], "uptrend_pullback")
+        self.assertEqual(r["primary_state"], "trend_pullback")
+
+    def test_S2_waiting_breakout_is_breakout_setup(self):
+        r = classify_stage(ev(rolling_trigger=10.3, close=10.1))
+        self.assertEqual(r["phase"], "waiting_breakout")
+        self.assertEqual(r["primary_state"], "breakout_setup")
+
+    def test_S2_broken_is_no_long_setup(self):
+        r = classify_stage(ev(rolling_trigger=9.8, close=9.3),
+                           event={"trigger_price": 9.8, "age_sessions": 1, "pivot_low": 9.4})
+        self.assertEqual(r["phase"], "broken")
+        self.assertEqual(r["primary_state"], "no_long_setup")
+
+    def test_S1_basing_is_base_forming(self):
+        r = classify_stage(ev(close=9.5, ma50=9.2, ma150=9.1, ma200=9.0,
+                              above_ma50=True, above_ma150=True, above_ma200=True,
+                              ma50_slope_20d_pct=0.2, ma150_slope_20d_pct=0.1, ma200_slope_20d_pct=0.2))
+        self.assertEqual(r["stage"], "S1_basing")
+        self.assertEqual(r["primary_state"], "base_forming")
+
+    def test_S3_distributing_is_no_long_setup(self):
+        r = classify_stage(ev(close=10.0, ma50=8.8, ma150=9.0, ma200=8.5,
+                              above_ma50=False, above_ma150=True, above_ma200=True,
+                              ma50_slope_20d_pct=-1.0, ma150_slope_20d_pct=0.2, ma200_slope_20d_pct=0.3))
+        self.assertEqual(r["primary_state"], "no_long_setup")
+
+    def test_S4_down_is_no_long_setup(self):
+        r = classify_stage(ev(close=8.0, ma50=8.5, ma150=9.0, ma200=9.2,
+                              above_ma50=False, above_ma150=False, above_ma200=False,
+                              ma50_slope_20d_pct=-2.0, ma150_slope_20d_pct=-2.0, ma200_slope_20d_pct=-2.0))
+        self.assertEqual(r["stage"], "S4_down")
+        self.assertEqual(r["primary_state"], "no_long_setup")
+
+    def test_no_breakdown_candidate_in_primary_states(self):
+        """breakdown_candidate is unified into no_long_setup per P0 contract."""
+        self.assertNotIn("breakdown_candidate", PRIMARY_STATES)
+        self.assertIn("no_long_setup", PRIMARY_STATES)
+        self.assertEqual(len(PRIMARY_STATES), 7)
 
 
 if __name__ == "__main__":

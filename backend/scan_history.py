@@ -162,6 +162,33 @@ def init_daily_scan_history_schema(pg):
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_events_symbol_idx ON daily_breakout_events(symbol, qualified_on DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_obs_event_idx ON daily_breakout_event_observations(event_id, observed_on DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS daily_scan_runs_scan_date_idx ON daily_scan_runs(scan_date, run_timestamp DESC)")
+        # Immutable stage-transition log for the breakout event lifecycle.
+        # Each row records from_stage -> to_stage for one event observation cycle,
+        # attributed to the scan run that observed it. The event row holds the
+        # original trigger_price / pre_break_pivot_low / failure_level; this table
+        # records the observation-level stage progression (fresh->extended->
+        # broken->failed etc.). Idempotent on (event_id, to_stage, observed_on,
+        # scan_run_id); append-only via the shared daily_scan_history_reject_mutation
+        # trigger added below.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS daily_breakout_event_stage_transitions (
+               -- immutable trigger function: daily_scan_history_reject_mutation
+                id UUID PRIMARY KEY,
+                event_id UUID NOT NULL REFERENCES daily_breakout_events(id) ON DELETE RESTRICT,
+                from_stage TEXT,
+                to_stage TEXT NOT NULL,
+                observed_on DATE NOT NULL,
+                close DOUBLE PRECISION NOT NULL,
+                distance_from_trigger_pct DOUBLE PRECISION,
+                scan_run_id UUID NOT NULL REFERENCES daily_scan_runs(id) ON DELETE RESTRICT,
+                failure_reason TEXT,
+                raw_evidence JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(event_id, to_stage, observed_on, scan_run_id)
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_stage_transitions_event_idx ON daily_breakout_event_stage_transitions(event_id, observed_on DESC, created_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_stage_transitions_scan_run_idx ON daily_breakout_event_stage_transitions(scan_run_id)")
         # Intraday emerging events: append-only, lower confidence, reconciled by EOD
         cur.execute("""
             CREATE TABLE IF NOT EXISTS intraday_events (
@@ -375,7 +402,7 @@ def init_daily_scan_history_schema(pg):
             END;
             $$ LANGUAGE plpgsql
         """)
-        for table in ("daily_scan_runs", "daily_scan_observations", "daily_analysis_snapshots", "daily_breakout_events", "daily_breakout_event_observations"):
+        for table in ("daily_scan_runs", "daily_scan_observations", "daily_analysis_snapshots", "daily_breakout_events", "daily_breakout_event_observations", "daily_breakout_event_stage_transitions"):
             cur.execute(f"DROP TRIGGER IF EXISTS {table}_immutable ON {table}")
             cur.execute(f"""
                 CREATE TRIGGER {table}_immutable
@@ -552,10 +579,70 @@ def active_breakout_events(pg):
         cur.close()
 
 
+def breakout_event_lifecycle(pg, event_id):
+    """Return the immutable lifecycle timeline for a single breakout event.
+
+    Includes the event row (original trigger / pivot / failure_level), all
+    observations in chronological order, and all recorded stage transitions
+    (from_stage -> to_stage).  This is a read-only projection over append-only
+    tables; no rows are ever mutated.
+    """
+    cur = pg.cursor()
+    try:
+        cur.execute("""
+            SELECT e.symbol, e.origin, e.trigger_price, e.qualified_on,
+                   e.qualification_close, e.pre_break_pivot_low, e.failure_level,
+                   e.rs_rating, e.scan_run_id, e.created_at
+            FROM daily_breakout_events e
+            WHERE e.id = %s
+        """, (str(event_id),))
+        ev = cur.fetchone()
+        if ev is None:
+            return None
+        event = {
+            "symbol": ev[0], "origin": ev[1], "trigger_price": float(ev[2]),
+            "qualified_on": str(ev[3]), "qualification_close": float(ev[4]) if ev[4] else None,
+            "pivot_low": float(ev[5]), "failure_level": float(ev[6]),
+            "rs_rating": float(ev[7]) if ev[7] else None,
+            "scan_run_id": str(ev[8]), "created_at": ev[9].isoformat(),
+        }
+        cur.execute("""
+            SELECT o.observed_on, o.stage, o.close, o.distance_from_trigger_pct,
+                   o.rsi_daily, o.volume_ratio_50, o.failure_reason, o.scan_run_id
+            FROM daily_breakout_event_observations o
+            WHERE o.event_id = %s
+            ORDER BY o.observed_on ASC, o.created_at ASC
+        """, (str(event_id),))
+        observations = [
+            {"observed_on": str(r[0]), "stage": r[1], "close": float(r[2]),
+             "distance_from_trigger_pct": float(r[3]) if r[3] else None,
+             "rsi_daily": float(r[4]) if r[4] else None,
+             "volume_ratio_50": float(r[5]) if r[5] else None,
+             "failure_reason": r[6], "scan_run_id": str(r[7])}
+            for r in cur.fetchall()
+        ]
+        cur.execute("""
+            SELECT t.from_stage, t.to_stage, t.observed_on, t.close,
+                   t.distance_from_trigger_pct, t.failure_reason, t.scan_run_id
+            FROM daily_breakout_event_stage_transitions t
+            WHERE t.event_id = %s
+            ORDER BY t.observed_on ASC, t.created_at ASC
+        """, (str(event_id),))
+        transitions = [
+            {"from_stage": r[0], "to_stage": r[1], "observed_on": str(r[2]),
+             "close": float(r[3]), "distance_from_trigger_pct": float(r[4]) if r[4] else None,
+             "failure_reason": r[5], "scan_run_id": str(r[6])}
+            for r in cur.fetchall()
+        ]
+        return {"event": event, "observations": observations, "transitions": transitions}
+    finally:
+        cur.close()
+
+
 def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
     """Append new events/observations; never update historical lifecycle rows."""
     cur = pg.cursor()
-    created = observed = 0
+    created = observed = transitions = 0
     try:
         # The owning run is the authority for observation date.  This prevents
         # a stale/mislabelled evaluator payload from creating new mismatches.
@@ -572,14 +659,23 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
             tr = row.get("trade_readiness") or {}
             scan_date = run_scan_date
             event_id = (row.get("active_breakout_event") or {}).get("event_id")
+            if event_id:
+                cur.execute("SELECT id FROM daily_breakout_events WHERE id=%s", (str(event_id),))
+                found = cur.fetchone()
+                event_id = str(found[0]) if found else None
             # New stage-first classifier: phase == "breakout_new" indicates fresh breakout
             # Legacy: primary_state == "fresh_breakout"
-            is_fresh_breakout = state.get("phase") == "breakout_new" or state.get("primary_state") == "fresh_breakout"
+            is_fresh_breakout = (state.get("phase") == "breakout_new"
+                                 or state.get("primary_state") == "fresh_breakout"
+                                 or row.get("scan_group") == "breakout_new")
             if is_fresh_breakout and not event_id:
                 trigger = state.get("reference_level") or tr.get("breakout_level_20d")
                 pivot = tr.get("pre_break_pivot_low")
                 if pivot is None:
-                    raise ValueError(f"fresh breakout {symbol} missing required pre_break_pivot_low")
+                    # A malformed candidate must not abort persistence for the
+                    # complete scan. Keep it dashboard-visible, but do not
+                    # create an immutable lifecycle event without its pivot.
+                    continue
                 failure = state.get("failure_level") or tr.get("stop_loss") or tr.get("suggested_stop") or pivot
                 cur.execute("""
                     INSERT INTO daily_breakout_events
@@ -601,17 +697,41 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
             if event_id:
                 trigger = float(state.get("reference_level") or tr.get("breakout_level_20d") or (row.get("active_breakout_event") or {}).get("trigger_price"))
                 distance = float(row.get("close")) / trigger - 1 if trigger else None
+                current_stage = state.get("stage") or state.get("phase") or "fresh"
+                # Record the observation (idempotent: one per event+run).
                 cur.execute("""
                     INSERT INTO daily_breakout_event_observations
                     (id,event_id,scan_run_id,observed_on,stage,close,distance_from_trigger_pct,rsi_daily,volume_ratio_50,failure_reason,raw_evidence)
                     VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     ON CONFLICT(event_id,scan_run_id) DO NOTHING
-                """, (str(uuid.uuid4()), event_id, run_id, scan_date, state.get("stage") or state.get("phase") or "fresh",
+                """, (str(uuid.uuid4()), event_id, run_id, scan_date, current_stage,
                       float(row.get("close")), distance, tr.get("rsi_daily"), tr.get("volume_ratio_50"),
                       state.get("failure_reason"), _json({"daily_state": state, "readiness": tr})))
-                observed += cur.rowcount
+                observed += int(cur.rowcount or 0)
+                # Record stage transition: compare current stage against the most
+                # recent preceding observation stage for this event.  Only the
+                # first observation in a given stage+date emits a transition row
+                # (idempotent via UNIQUE(event_id, to_stage, observed_on, scan_run_id)).
+                cur.execute("""
+                    SELECT stage FROM daily_breakout_event_observations
+                    WHERE event_id=%s AND scan_run_id<>%s
+                    ORDER BY observed_on DESC, created_at DESC LIMIT 1
+                """, (event_id, run_id))
+                prev = cur.fetchone()
+                from_stage = prev[0] if prev else None
+                if from_stage != current_stage:
+                    cur.execute("""
+                        INSERT INTO daily_breakout_event_stage_transitions
+                        (id,event_id,from_stage,to_stage,observed_on,close,
+                         distance_from_trigger_pct,scan_run_id,failure_reason,raw_evidence)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        ON CONFLICT(event_id,to_stage,observed_on,scan_run_id) DO NOTHING
+                    """, (str(uuid.uuid4()), event_id, from_stage, current_stage, scan_date,
+                          float(row.get("close")), distance, run_id,
+                          state.get("failure_reason"), _json({"daily_state": state, "readiness": tr})))
+                    transitions += int(cur.rowcount or 0)
         pg.commit()
-        return {"events_created": created, "observations_appended": observed}
+        return {"events_created": created, "observations_appended": observed, "transitions_recorded": transitions}
     except Exception:
         pg.rollback()
         raise
@@ -729,7 +849,7 @@ def persist_intraday_events(pg, events, *, intraday_run_id=None, source_lineage=
                     obs.get("volume_ratio_50"), obs.get("failure_reason"),
                     _json(obs.get("raw_evidence") or {}),
                 ))
-                observed += cur.rowcount
+                observed += int(cur.rowcount or 0)
         pg.commit()
         return {"events_created": created, "observations_appended": observed}
     except Exception:

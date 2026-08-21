@@ -46,20 +46,25 @@ from contextlib import contextmanager
 import psycopg2
 import psycopg2.extras
 
+# Load Settrade creds from .env (systemd provides PG env vars directly)
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=False)  # never override systemd Environment=
 except Exception:
     pass
 
 # ---------- config ----------
-PG = dict(
-    host=os.getenv("POSTGRES_HOST", "postgres"),
-    port=int(os.getenv("POSTGRES_PORT", "5432")),
-    user=os.getenv("POSTGRES_USER", "signalix"),
-    password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
-    dbname=os.getenv("POSTGRES_DB", "signalix"),
-)
+def _pg_config():
+    """Read PG config at call time so systemd Environment= takes precedence."""
+    return dict(
+        host=os.getenv("POSTGRES_HOST", "postgres"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        user=os.getenv("POSTGRES_USER", "signalix"),
+        password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
+        dbname=os.getenv("POSTGRES_DB", "signalix"),
+    )
+
+PG = _pg_config()
 DROP_DIRS = [
     os.getenv("UPLOAD_DIR", "/root/signalix/uploads"),
     os.getenv("SEED_DIR", "/root/signalix/seed_data/set-archive_EOD"),
@@ -133,7 +138,7 @@ def classify(ticker: str):
 
 # ---------- db ----------
 def get_pg():
-    return psycopg2.connect(**PG)
+    return psycopg2.connect(**_pg_config())
 
 
 def get_max_date(pg):
@@ -287,6 +292,61 @@ def record_intraday_run_summary(pg, summary):
             json.dumps(summary["failed_symbols"]), json.dumps(summary["batches"]),
         ),
     )
+    pg.commit()
+    cur.close()
+
+
+def ensure_intraday_feed_status_table(pg):
+    cur = pg.cursor()
+    cur.execute("""CREATE TABLE IF NOT EXISTS intraday_feed_status (
+        symbol TEXT PRIMARY KEY,
+        feed TEXT NOT NULL DEFAULT 'settrade_intraday_60m',
+        status TEXT NOT NULL DEFAULT 'available',
+        consecutive_failures INTEGER NOT NULL DEFAULT 0,
+        reason TEXT,
+        last_success_at TIMESTAMPTZ,
+        last_failure_at TIMESTAMPTZ,
+        retry_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )""")
+    pg.commit()
+    cur.close()
+
+
+def update_intraday_feed_status(pg, summary, cooldown_hours=24):
+    """Track per-symbol intraday capability without excluding Daily/EOD data."""
+    ensure_intraday_feed_status_table(pg)
+    failed = set(summary.get("failed_symbols") or [])
+    attempted = set()
+    # Summary failed_symbols is authoritative for failures; attempted symbols
+    # are read from the active universe so successful symbols can be reset.
+    cur = pg.cursor()
+    cur.execute("SELECT symbol FROM symbol_master WHERE instrument_type='ORD' AND (status IS NULL OR status='active')")
+    attempted.update(row[0] for row in cur.fetchall())
+    now = dt.datetime.now(dt.timezone.utc)
+    for symbol in sorted(attempted):
+        if symbol in failed:
+            cur.execute("""INSERT INTO intraday_feed_status
+                (symbol,status,consecutive_failures,reason,last_failure_at,retry_at,updated_at)
+                VALUES(%s,'retry',1,'empty_or_failed_response',%s,%s,%s)
+                ON CONFLICT(symbol) DO UPDATE SET
+                  consecutive_failures=intraday_feed_status.consecutive_failures+1,
+                  status=CASE WHEN intraday_feed_status.consecutive_failures+1 >= 3
+                              THEN 'unavailable' ELSE 'retry' END,
+                  reason='empty_or_failed_response', last_failure_at=EXCLUDED.last_failure_at,
+                  retry_at=CASE WHEN intraday_feed_status.consecutive_failures+1 >= 3
+                                THEN EXCLUDED.retry_at ELSE NULL END,
+                  updated_at=EXCLUDED.updated_at""",
+                (symbol, now, now + dt.timedelta(hours=cooldown_hours), now))
+        else:
+            cur.execute("""INSERT INTO intraday_feed_status
+                (symbol,status,consecutive_failures,last_success_at,retry_at,updated_at)
+                VALUES(%s,'available',0,%s,NULL,%s)
+                ON CONFLICT(symbol) DO UPDATE SET
+                  status='available', consecutive_failures=0,
+                  reason=NULL, last_success_at=EXCLUDED.last_success_at,
+                  retry_at=NULL, updated_at=EXCLUDED.updated_at""",
+                (symbol, now, now))
     pg.commit()
     cur.close()
 
@@ -486,12 +546,17 @@ def _intraday_universe(pg, instrument_types=("ORD",)):
     Intraday follows the current universe contract directly from symbol_master;
     it is independent of scan output, groups, and scan timing.
     """
+    ensure_intraday_feed_status_table(pg)
     cur = pg.cursor()
     cur.execute(
-        "SELECT symbol FROM symbol_master "
-        "WHERE instrument_type = ANY(%s) "
-        "AND (status IS NULL OR status = 'active') "
-        "ORDER BY symbol",
+        "SELECT sm.symbol FROM symbol_master sm "
+        "WHERE sm.instrument_type = ANY(%s) "
+        "AND (sm.status IS NULL OR sm.status = 'active') "
+        "AND NOT EXISTS ("
+        "  SELECT 1 FROM intraday_feed_status fs "
+        "  WHERE fs.symbol = sm.symbol AND fs.feed='settrade_intraday_60m' "
+        "    AND fs.status='unavailable' AND (fs.retry_at IS NULL OR fs.retry_at > now())"
+        ") ORDER BY sm.symbol",
         (list(instrument_types),),
     )
     symbols = [row[0] for row in cur.fetchall() if row[0] != "SET"]
@@ -1049,6 +1114,7 @@ def run(args):
                 session_retries=args.intraday_session_retries,
                 retry_backoff=args.intraday_retry_backoff,
             )
+            update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
             print(format_intraday_run_log(
@@ -1064,7 +1130,9 @@ def run(args):
             refresh_dashboard_from_existing_scan()
         finally:
             pg.close()
-        return 0 if summary["status"] == "full_success" else 1
+        # Partial coverage is recorded in the run summary and is operationally
+        # successful: one bad/empty symbol must not mark the whole timer failed.
+        return 0 if summary["status"] in ("full_success", "partial_success") else 1
 
     pg = get_pg()
     if args.since:
@@ -1182,11 +1250,14 @@ def run(args):
                 session_retries=args.intraday_session_retries,
                 retry_backoff=args.intraday_retry_backoff,
             )
+            update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
         finally:
             pg.close()
-        if summary["status"] != "full_success":
+        # Partial coverage is recorded in the run summary and is operationally
+        # successful: one bad/empty symbol must not mark the whole timer failed.
+        if summary["status"] not in ("full_success", "partial_success"):
             return 1
     return 0
 

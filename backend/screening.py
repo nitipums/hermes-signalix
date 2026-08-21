@@ -350,7 +350,8 @@ def insufficient_history_row(symbol, df, rs_rating=0.0):
                              "buy_zones_90d": {}, "near_buy_zone": False},
         "position_sizing": {}, "suggested_stop": None,
         "daily_state": {
-            "stage": "S1_basing", "phase": "base_early",
+            "stage": "S1_basing", "phase": "insufficient_history",
+            "primary_state": "base_forming",
             "stage_label": "Stage 1 · Basing", "phase_label": "Insufficient history",
             "setup_quality": {"pass": False, "reasons": ["insufficient_history"]},
             "setup_proximity": {"state": None, "pivot": None, "distance_pct": None, "zone": None},
@@ -490,6 +491,7 @@ def group_scan_results(results, events=None):
         if row.get("analysis_status") == "INSUFFICIENT_HISTORY":
             state["phase"] = "insufficient_history"
             state["phase_label"] = "Insufficient history"
+            state["primary_state"] = "base_forming"
             state["setup_quality"] = {"pass": False, "reasons": ["insufficient_history"]}
             state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
         # Two-layer actionable setup state (quality gate + proximity timing).

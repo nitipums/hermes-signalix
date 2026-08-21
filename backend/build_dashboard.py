@@ -79,9 +79,9 @@ def dashboard_freshness(pg, now=None, last_valid_session=None):
         "data_fetched_at": None,
         "display": "Unknown / Stale",
         "source": "unknown",
-        "status": "unknown",
+        "status": UNKNOWN,
         "intraday_status": "unknown_stale",
-        "global_status": "unknown",
+        "global_status": UNKNOWN,
         "market_session": market_session_status(now, last_valid_session),
         "age_hours": None,
     }
@@ -106,8 +106,8 @@ def dashboard_freshness(pg, now=None, last_valid_session=None):
             now = now.replace(tzinfo=timezone.utc)
         age_hours = max(0.0, (now.astimezone(timezone.utc) - fetched_at).total_seconds() / 3600.0)
         market = market_session_status(now, last_valid_session)
-        intraday_status = "fresh" if age_hours < INTRADAY_STALE_HOURS else "stale"
-        global_status = "fresh" if intraday_status == "fresh" else "stale"
+        intraday_status = FRESH if age_hours < _CONTRACT_STALE_HOURS else STALE
+        global_status = FRESH if intraday_status == FRESH else STALE
         # Closed sessions intentionally suppress a global freshness alarm;
         # candle age remains independently visible and auditable.
         if market["status"] == "market_closed":
@@ -274,16 +274,33 @@ def snapshots(pg, symbols):
     # Overlay the newest stored intraday close when available. This is a DB-only
     # freshness choice: it never implies streaming/real-time market data.
     cur = pg.cursor()
-    cur.execute("""SELECT DISTINCT ON (symbol) symbol, interval, ts, close, volume
-        FROM intraday_price_data
-        WHERE symbol=ANY(%s) AND interval = '60m'
-        ORDER BY symbol, ts DESC""", (symbols,))
+    cur.execute("""SELECT DISTINCT ON (ip.symbol) ip.symbol, ip.interval, ip.ts, ip.close, ip.volume
+        FROM intraday_price_data ip
+        LEFT JOIN intraday_feed_status fs
+          ON fs.symbol=ip.symbol AND fs.feed='settrade_intraday_60m'
+        WHERE ip.symbol=ANY(%s) AND ip.interval = '60m'
+          AND (fs.status IS NULL OR fs.status <> 'unavailable' OR fs.retry_at <= now())
+        ORDER BY ip.symbol, ip.ts DESC""", (symbols,))
     for symbol, interval, ts, close, volume in cur.fetchall():
         value = out.setdefault(symbol, {})
         value.update({"close": float(close), "date": str(ts), "price_source": interval,
                       "volume": float(volume or 0), "turnover": float(close) * float(volume or 0),
                       "previous_close": value.get("daily_previous_close"), "change": None})
-    cur.close()
+    try:
+        cur.execute("""SELECT symbol,status,reason,consecutive_failures,last_failure_at,retry_at
+            FROM intraday_feed_status WHERE symbol=ANY(%s) AND feed='settrade_intraday_60m'""", (symbols,))
+        for symbol, status, reason, failures, last_failure, retry_at in cur.fetchall():
+            out.setdefault(symbol, {}).update({
+                "intraday_feed_status": status,
+                "intraday_feed_reason": reason,
+                "intraday_feed_failures": int(failures or 0),
+                "intraday_feed_retry_at": str(retry_at) if retry_at else None,
+            })
+        cur.close()
+    except Exception:
+        # Backward-compatible with isolated/unit DBs created before the
+        # feed-status table; production creates it before intraday runs.
+        pass
     # Same-time cumulative-volume comparison. For every symbol use the latest
     # local BKK intraday timestamp today and total its bars up to that time;
     # compare against the most recent prior trading day at the same cutoff.
@@ -340,6 +357,12 @@ def snapshots(pg, symbols):
 INTRADAY_STALE_HOURS = 1
 MIN_DAILY_TURNOVER_THB = 5_000_000
 BREAKOUT_VOLUME_REQUIREMENT = 1.20
+
+# Canonical freshness statuses — single source of truth from provenance_contract.
+from provenance_contract import (
+    INTRADAY_STALE_HOURS as _CONTRACT_STALE_HOURS,
+    FRESH, STALE, AGING, UNKNOWN,
+)
 
 
 def _price_band(close):
@@ -419,6 +442,46 @@ def pullback_reference_status(row, snapshot):
         "current": number(current_n), "reference": number(reference_n),
         "comparison": "above_or_at" if holding else "below",
     }
+
+
+def intraday_event_evidence(snapshot, intraday_event=None):
+    """Serialize intraday emerging-event evidence for the detail/UI layer.
+
+    Daily is the official state; this is provenance only. Exposes the
+    source/freshness/baseline lineage required by the P0 contract: when an
+    intraday emerging event exists, the card carries its confidence lifecycle
+    (emerging/confirmed/expired/invalidated/not_confirmed) and, when reconciled,
+    the resolved Daily baseline event it maps to.
+    """
+    if not intraday_event:
+        return None
+    confidence = intraday_event.get("confidence")
+    if confidence not in ("emerging", "confirmed"):
+        return None
+    evidence = {
+        "confidence": confidence,
+        "origin": intraday_event.get("origin"),
+        "trigger_price": number(intraday_event.get("trigger_price")),
+        "failure_level": number(intraday_event.get("failure_level")),
+        "first_seen": intraday_event.get("first_seen"),
+        "first_candle_ts": intraday_event.get("first_candle_ts"),
+        "interval": intraday_event.get("interval"),
+        "intraday_run_id": intraday_event.get("intraday_run_id"),
+        "resolved_daily_event_id": intraday_event.get("resolved_daily_event_id"),
+        "reconciled_at": intraday_event.get("reconciled_at"),
+    }
+    # Baseline evidence: the Daily close that anchors the trigger level
+    if snapshot:
+        evidence["baseline_close"] = number(snapshot.get("daily_close"))
+        evidence["baseline_date"] = snapshot.get("daily_date")
+    else:
+        evidence["baseline_close"] = None
+        evidence["baseline_date"] = None
+    # Freshness evidence: the newest stored intraday close + age
+    evidence["intraday_close"] = number(snapshot.get("close")) if snapshot else None
+    evidence["intraday_candle_at"] = snapshot.get("date") if snapshot else None
+    evidence["stale"] = bool(snapshot.get("stale")) if snapshot else False
+    return evidence
 
 
 def determine_action(group, readiness, snapshot, zones, phase=None):
@@ -658,7 +721,8 @@ def plan(group, readiness, trend, snapshot, phase=None):
 
 def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None,
               layer3=None, sector=None, industry=None, market_cap=None,
-              free_float_pct=None, foreign_limit_pct=None):
+              free_float_pct=None, foreign_limit_pct=None,
+              intraday_event=None):
     readiness, trend = row.get("trade_readiness", {}), row.get("trend_template", {})
     intraday_state = intraday_state or {}
     l2 = layer2 or {}
@@ -712,7 +776,9 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "label": f"{(STAGE_LABELS.get(stage, stage))} · {(PHASE_LABELS.get(phase, phase))}",
     }
     daily_as_of = snapshot.get("daily_date") or snapshot.get("date")
-    intraday_source = snapshot.get("price_source")
+    feed_status = snapshot.get("intraday_feed_status")
+    feed_unavailable = feed_status == "unavailable"
+    intraday_source = None if feed_unavailable else snapshot.get("price_source")
     # Stage-first canonical projection (Minervini S1-S4 + phase). The persisted
     # daily_state carries {stage, phase, ...}; legacy primary_state is gone.
     canonical = dict(row.get("daily_state") or {})
@@ -792,10 +858,15 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "intradayLatestTime": snapshot.get("date") if intraday_source else None,
         "intradayAge": _card_age if intraday_source else None,
         "intradayStale": intraday_stale if intraday_source else None,
-        "intradayAvailable": bool(intraday_source),
-        "intradayFreshness": {"status": "stale" if intraday_stale else ("fresh" if intraday_source else "unavailable"),
+        "intradayFeedStatus": feed_status,
+        "intradayFeedReason": snapshot.get("intraday_feed_reason"),
+        "intradayFeedFailures": snapshot.get("intraday_feed_failures", 0),
+        "intradayFeedRetryAt": snapshot.get("intraday_feed_retry_at"),
+        "intradayAvailable": bool(intraday_source) and not feed_unavailable,
+        "intradayFreshness": {"status": "unavailable" if feed_unavailable else ("stale" if intraday_stale else ("fresh" if intraday_source else "unavailable")),
                               "source": intraday_source, "candle_at": snapshot.get("date") if intraday_source else None,
                               "age": _card_age if intraday_source else None},
+        "freshness_badge": "stale" if stale else ("fresh" if daily_as_of or intraday_source else "unknown"),
         "daily_eod_freshness": {"status": "latest_available" if daily_as_of else "unavailable",
                                 "source": "price_data", "as_of": daily_as_of},
         "dailyEodDecision": {"source": "Daily EOD", "as_of": daily_as_of,
@@ -803,7 +874,8 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
                              "turnover": number(snapshot.get("daily_turnover"), 0)},
         "decision_source": "Daily EOD",
         "decision_source_as_of": daily_as_of,
-        "staleNote": ("A newer intraday quote exists but is stale; Daily EOD shown for decisions."
+        "staleNote": ("60m intraday feed unavailable; Daily EOD shown for decisions."
+                      if feed_unavailable else "A newer intraday quote exists but is stale; Daily EOD shown for decisions."
                       if stale else ""),
         "action": action, "actionReason": action_reason, "canonicalAction": canonical_action,
         "trendState": canonical.get("trendState"), "setupState": canonical.get("setupState"),
@@ -814,6 +886,7 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "riskStop": risk.get("riskStop"), "athFlag": quality_flag,
         "lifecycle": lifecycle,
         "breakoutEvidence": breakout,
+        "intradayEventEvidence": intraday_event_evidence(snapshot, intraday_event),
         "pullbackReference": pullback,
         "qualityFlags": flags, "qualityWarning": "; ".join(f["label"] for f in flags),
         "dailyState": canonical,
@@ -943,6 +1016,15 @@ def build(scanned=None):
         layer2_map = universe_layer2(pg, symbols)
         layer3_map = universe_layer3(pg, symbols)
         set50_set = load_index_membership(pg)
+        # P0: intraday emerging events are append-only; fetch active ones
+        # (emerging/confirmed) so serialize can expose source/freshness/baseline
+        # evidence on each card. Daily remains the official decision source.
+        active_events = {}
+        try:
+            from scan_history import get_active_intraday_events
+            active_events = get_active_intraday_events(pg)
+        except Exception:
+            pass
     finally:
         pg.close()
     overlays = {}
@@ -955,6 +1037,7 @@ def build(scanned=None):
         market_cap=latest.get(row["symbol"], {}).get("market_cap"),
         free_float_pct=latest.get(row["symbol"], {}).get("free_float_pct"),
         foreign_limit_pct=latest.get(row["symbol"], {}).get("foreign_limit_pct"),
+        intraday_event=active_events.get(row["symbol"]),
     ) for key, values in source_groups.items() for row in values
       if row["symbol"] not in excluded]
     items = apply_projection(items)
@@ -973,11 +1056,44 @@ def build(scanned=None):
     # Derive scan_time from the scanned rows (no dependency on a stale file).
     scan_time = (scanned[0].get("scan_time") if scanned and isinstance(scanned[0], dict) and scanned[0].get("scan_time")
                  else datetime.now(timezone.utc).isoformat())
+    build_timestamp = datetime.now(timezone.utc).isoformat()
+    # P0: expose intraday emerging-event reconciliation state in the snapshot
+    # metadata so the UI can surface source/freshness/baseline evidence. Daily
+    # remains the official state; these are append-only provenance rows.
+    event_counts = {"emerging": 0, "confirmed": 0}
+    try:
+        from scan_history import get_active_intraday_events
+        for ev in active_events.values():
+            event_counts[ev.get("confidence", "emerging")] = event_counts.get(
+                ev.get("confidence", "emerging"), 0) + 1
+    except Exception:
+        pass
     with open(SNAPSHOT_JSON, "w") as file:
+        # Root-level provenance fields are the canonical contract shared with
+        # the US watchlist payload (app.py).  data_fetched_at is the actual DB
+        # fetch timestamp; data_freshness_status is computed via the contract
+        # so "market_closed" never replaces a real freshness classification.
+        from provenance_contract import compute_freshness
+        _root_data_fetched = freshness.get("data_fetched_at")
+        _root_freshness_status = compute_freshness(_root_data_fetched)
         json.dump({"scan_time": scan_time, "market": "TH",
-                   "dashboard_meta": {"data_fetched_at": freshness.get("data_fetched_at"),
+                   "build_timestamp": build_timestamp,
+                   "data_fetched_at": _root_data_fetched,
+                   "data_freshness_source": freshness.get("source"),
+                   "data_freshness_status": _root_freshness_status,
+                   "data_global_status": _root_freshness_status,
+                   "data_freshness_age_hours": freshness.get("age_hours"),
+                   "market_session": freshness.get("market_session", {}),
+                   "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
+                   "dashboard_meta": {"build_timestamp": build_timestamp,
+                                      "data_fetched_at": freshness.get("data_fetched_at"),
+                                      "data_freshness_source": freshness.get("source"),
                                       "intraday_scan_time": intraday_scan_time,
-                                      "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")},
+                                      "data_freshness_status": freshness.get("status"),
+                                      "data_freshness_source": freshness.get("source"),
+                                      "market_session": freshness.get("market_session", {}),
+                                      "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
+                                      "intraday_event_counts": event_counts},
                    "refresh": "progressive_cards", "items": items,
                    "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
                   separators=(",", ":"), default=_json_default)
@@ -1016,9 +1132,12 @@ def build(scanned=None):
     page = (template
             .replace("__ITEMS__", json.dumps(items, separators=(",", ":"), default=_json_default))
             .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":"), default=_json_default))
-            .replace("__DASHBOARD_META__", json.dumps({"data_fetched_at": freshness.get("data_fetched_at"),
+            .replace("__DASHBOARD_META__", json.dumps({"build_timestamp": build_timestamp,
+                                                        "data_fetched_at": freshness.get("data_fetched_at"),
                                                         "intraday_scan_time": intraday_scan_time,
-                                                        "market_session": freshness.get("market_session", {}).get("status", "Asia/Bangkok")}, separators=(",", ":"), default=_json_default)))
+                                                        "data_freshness_status": freshness.get("status"),
+                                                        "data_freshness_source": freshness.get("source"),
+                                                        "market_session": freshness.get("market_session", {})}, separators=(",", ":"), default=_json_default)))
     with open(OUT_HTML, "w") as file:
         file.write(page)
     return {"securities": len(items), "groups": counts, "out": OUT_HTML}
