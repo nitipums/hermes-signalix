@@ -53,6 +53,15 @@ Status: **current**
 not missing data. Empty intraday responses remain fetch errors, not proof that
 an official symbol is delisted; the official master controls active/inactive.
 
+## E2E dashboard freshness continuation — 2026-08-21
+
+The intraday-only path now rebuilds the dashboard from the existing Daily scan
+after every completed 60m fetch/evaluation. Watchdog partial-success tolerance
+and cadence-aware freshness are documented in
+`2026-08-21-Intraday-E2E-Reliability-Incident.md`. The old “DB updated but static
+dashboard stale” gap is closed; verify served browser `Last Scanned`, not only
+local files or HTTP status.
+
 ## Related
 
 - [[Architecture]]

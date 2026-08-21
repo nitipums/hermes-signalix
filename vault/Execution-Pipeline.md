@@ -37,7 +37,12 @@ The product must let a user answer, quickly and honestly:
 - Dashboard overview is progressive: persisted cards render first; detail/chart is requested per symbol. Thai and US AI Buildout are linked through dashboard navigation.
 - The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
 
-## Active priority sequence
+## Current reliability status — 2026-08-21
+
+The intraday E2E path is now explicit and verified: full active ORD 60m fetch → DB upsert → evaluator → rebuild dashboard from existing Daily scan → served `:3001` → browser `Last Scanned`. `partial_success` is expected for a bounded Settrade-empty tail and is tolerated when freshness is healthy. The morning no-agent monitor checks the chain every 15 minutes and can self-heal a dashboard freshness mismatch once before alerting.
+
+This closes the previous “DB updated but dashboard stale” gap. Unexpected source/credential/network/code failures still alert for operator action; the system does not silently modify source code.
+
 
 Only pull one tightly scoped implementation item at a time. Bee is the final evidence gate; worker completion is not final approval.
 

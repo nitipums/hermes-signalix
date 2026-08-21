@@ -35,9 +35,14 @@ Professional, **English-only**, dark-theme screening workspace. Reads
 `scan_results.json`, emits `dashboard.html` with per-stock cards + clickable
 chart lightbox (canvas, no chart images). Charts fetched from `/chart/{sym}`.
 
-## `dashboard_server.py` — static server (sidecar)
-Serves `/app/dashboard.html` on :3001. `Access-Control-Allow-Origin: *` so
-Telegram/bot links work. Runs inside the backend container alongside FastAPI.
+Intraday-only runs rebuild this artifact from the existing Daily scan after 60m
+upsert/evaluation; they do not rerun Daily classification.
+
+## `dashboard_server.py` — static server (separate dashboard service)
+Serves `/dashboard.html` on :3001 from the bind-mounted `/root/signalix/backend`
+directory. Runtime container is `signalix_dashboard`; it is separate from the
+FastAPI `signalix_backend` service. Verify served artifact freshness against the
+latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 
 ## `app.py` — FastAPI backend
 Routes:

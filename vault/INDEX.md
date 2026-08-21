@@ -16,7 +16,7 @@
 | ไฟล์ | เรื่อง | สถานะ | หมายเหตุ |
 |---|---|---|---|
 | `README.md` | ภาพรวม project | ✅ active | |
-| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **อัปเดตแล้ว 2026-08-19: stage-first + intraday 60m full active ORD; current production shape workers=938/batch=938/delay=0; evaluator uses package module invocation** |
+| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **อัปเดตแล้ว 2026-08-21: separate dashboard service + intraday fetch→DB→evaluator→dashboard E2E contract** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
@@ -30,18 +30,19 @@
 | `Postmortems/2026-08-19-Intraday-Evaluator-Import.md` | Intraday ExecStopPost import failure | ✅ current | fixed; reusable systemd/package-import lesson |
 | `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
+| `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
-|| ไฟล์ | เรื่อง | สถานะ |
-||---|---|---|
-|| `2026-08-13-Intraday-Dashboard-Handoff.md` | Intraday dashboard 60m | 🟡 **HISTORICAL** (ถูก sequential 2026-08-18 ทับ) |
-|| `2026-08-15-EOD-Scan-Optimization-Handoff.md` | Settrade EOD 30 workers/860 sym | 🟡 **HISTORICAL** (metric เก่า, architecture เปลี่ยน) |
-|| `2026-08-15-Khim-End-to-End-Fix-Handoff.md` | Khim fix | 🟡 **HISTORICAL** |
-|| `2026-08-15-Signalix-Taxonomy-Redesign-Handoff` | taxonomy 718 redesign | 🟡 **HISTORICAL — SUPERSEDED** (โดน stage-first ทับ; ดู `2026-08-17-Stage-First...`) |
-|| `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | ✅ **current** — สถาปัตยกรรมปัจจุบัน (LAYER1/LAYER2) |
-|| `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
-|| `Roadmap-Kanban.md` | **Experimental Kanban board** (Markdown) | ✅ **current** — synced from all plans + actual verified 2026-08-19 |
+| ไฟล์ | เรื่อง | สถานะ |
+|---|---|---|
+| `2026-08-13-Intraday-Dashboard-Handoff.md` | Intraday dashboard 60m | 🟡 **HISTORICAL** (ถูก sequential 2026-08-18 ทับ) |
+| `2026-08-15-EOD-Scan-Optimization-Handoff.md` | Settrade EOD 30 workers/860 sym | 🟡 **HISTORICAL** (metric เก่า, architecture เปลี่ยน) |
+| `2026-08-15-Khim-End-to-End-Fix-Handoff.md` | Khim fix | 🟡 **HISTORICAL** |
+| `2026-08-15-Signalix-Taxonomy-Redesign-Handoff` | taxonomy 718 redesign | 🟡 **HISTORICAL — SUPERSEDED** (โดน stage-first ทับ; ดู `2026-08-17-Stage-First...`) |
+| `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | ✅ **current** — สถาปัตยกรรมปัจจุบัน (LAYER1/LAYER2) |
+| `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
+| `Roadmap-Kanban.md` | **Experimental Kanban board** (Markdown) | ✅ **current** — synced from all plans + actual verified 2026-08-19 |
 
 ## 4. สถานะซิงค์กับ fact_store
 
@@ -73,3 +74,5 @@
 - **2026-08-20 (Data semantics)**: Removed the 15% yfinance price-gap skip in `update_data.py` — owner directive: pull ALL symbols, no price-gap filter. Excluded `COLOR` from `symbol_master` (status='excluded', reason: Settrade Symbol not found) so it drops from scan + dashboard; official master sync will auto-reactivate if it reappears. Verified: 931 active / 1 excluded, scan universe 904, COLOR absent from snapshot + served dashboard. See `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` + Decisions.md.
 
 - **2026-08-20 (Dashboard UX)**: Moved Setup Radar to its own nav page (`#radar`), wrapped stage summary + filter rows + search in a sticky control cluster (`#ctrlSticky`), and stage-filter clicks auto-scroll to results. Tests 17/17 + related 47 passed; served HTML verified in real browser desktop + mobile (no h-scroll, sticky works at scrollY=1200). Commit `edaffbd`.
+
+- **2026-08-21 (Intraday E2E)**: Fixed intraday-only path so every 60m fetch/evaluation rebuilds dashboard artifacts from the existing Daily scan; watchdog now tolerates expected partial-success, uses 90m candle / 30m evaluator thresholds, and morning no-agent monitor checks/self-heals served freshness. Commits `6ffb62e`, `d7b8a39`; 30 focused tests passed; live browser showed updated `Last Scanned`.

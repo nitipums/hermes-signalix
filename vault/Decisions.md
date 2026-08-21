@@ -95,3 +95,9 @@ Reason: Settrade API consistently returns `Symbol not found [COLOR]` (was alread
 Decision: Mark ACAP, BLISS, GSTEEL, KKC, NWR, TAPAC, and WELL as `symbol_master.status='excluded'` with an owner-override reason. All seven returned empty Settrade 60m responses persistently and had no EOD data or EOD latest date older than one year as of 2026-08-21. The nine remaining persistent intraday-empty symbols were not excluded because their EOD data was newer than one year.
 
 Reason: Retry fixes transient Settrade warm-up misses, but these seven have zero intraday rows across repeated runs and stale/no EOD evidence. Excluding them prevents repeated partial-success noise and removes them from the scan/dashboard universe. If an official master sync reactivates a symbol, re-evaluate it rather than silently assuming the gap is fixed.
+
+## 2026-08-21 — Intraday fetch-to-dashboard E2E contract
+
+Decision: Intraday `--no-scan` remains separate from Daily classification, but every completed 60m ingestion/evaluation must rebuild `dashboard.html` and `dashboard_snapshot.json` from the existing Daily scan. Watchdog treats expected `partial_success` as tolerated, identifies `intraday_price_data` explicitly, and uses a 90-minute 60m candle threshold plus 30-minute evaluator-state threshold.
+
+Reason: A healthy DB fetch previously left the static served dashboard stale. Process exit 0/1 and HTTP 200 are not sufficient; acceptance is Settrade fetch → DB run/rows → evaluator → dashboard artifacts → served dashboard → browser `Last Scanned`.

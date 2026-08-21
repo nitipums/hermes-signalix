@@ -61,6 +61,8 @@ See [[2026-08-13-Intraday-Dashboard-Handoff]] for the full verified technical ha
 
 **P0 continuation:** verify systemd calendar parser/cadence, build an active-ORD-only company/instrument master pipeline, add provenance/tests/mobile visual test coverage, and do not restart the stopped 7,147-symbol Yahoo metadata backfill. `company_profiles` currently has a partial cache only; it is non-decision context.
 
+**Intraday E2E reliability (DONE 2026-08-21):** intraday-only fetch now rebuilds dashboard artifacts from the existing Daily scan after DB upsert/evaluation; watchdog tolerates expected partial-success and uses cadence-aware freshness thresholds; a temporary morning monitor checks and self-heals served dashboard freshness. See `2026-08-21-Intraday-E2E-Reliability-Incident.md`.
+
 **Ploy-ready continuation:** use the Market View to Action roadmap below after P0 integrity work. Product discovery is already curated in [[Product-Strategy-Market-to-Action]]; begin with domain contracts and immutable recommendation/outcome persistence, not broad new UI.
 
 ## Open gaps vs SaaS goal
