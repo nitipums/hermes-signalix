@@ -41,8 +41,21 @@ class TestSymbolMasterExclusion(unittest.TestCase):
         # active names still present
         self.assertIn("KBANK", syms)
         self.assertIn("PTT", syms)
-        # total should be the 939 active ORD names
-        self.assertEqual(len(syms), 939)
+        # Scan universe = active ORD symbols present in price_data (no staleness
+        # pre-filter) minus excluded master symbols. Bind to live DB state, not
+        # a stale hardcode.
+        pg2 = pg_connect()
+        try:
+            cur = pg2.cursor()
+            cur.execute("SELECT count(DISTINCT symbol) FROM price_data "
+                        "WHERE market='TH' AND instrument_type='ORD'")
+            present = cur.fetchone()[0]
+            cur.execute("SELECT count(*) FROM symbol_master WHERE status IN "
+                        "('inactive','delisted','excluded')")
+            excluded_master = cur.fetchone()[0]
+        finally:
+            pg2.close()
+        self.assertEqual(len(syms), present - excluded_master)
 
     def test_scan_universe_excludes_delisted(self):
         cands, near = screening.scan_universe(min_conditions=8, limit=None)
