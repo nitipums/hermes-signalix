@@ -7,7 +7,6 @@ import unittest
 from pathlib import Path
 
 from intraday_healthcheck import (
-    _journal_failure_records,
     evaluate_health,
     read_failure_observations,
     record_failure_observations,
@@ -117,41 +116,22 @@ class IntradayHealthcheckTests(unittest.TestCase):
             self.assertEqual(unobserved_failures(failed, persisted), [])
             self.assertEqual(persisted["seen_invocation_ids"], ["failed-run-1"])
 
-    def test_journal_failure_records_are_correlated_and_deduplicated_by_invocation(self):
-        records = [
-            {
-                "INVOCATION_ID": "failed-run-1",
-                "__REALTIME_TIMESTAMP": "1786684800000000",
-                "MESSAGE": "Main process exited, code=exited, status=1/FAILURE",
-            },
-            {
-                "INVOCATION_ID": "failed-run-1",
-                "__REALTIME_TIMESTAMP": "1786684800001000",
-                "MESSAGE": "Failed with result 'exit-code'.",
-            },
-        ]
-        failures = _journal_failure_records(records)
-        self.assertEqual(len(failures), 1)
-        self.assertEqual(failures[0]["invocation_id"], "failed-run-1")
-        self.assertEqual(failures[0]["failed_at"], "2026-08-14T05:20:00+00:00")
+    def test_watchdog_unit_is_the_active_primary_monitor(self):
+        unit = Path(__file__).with_name("signalix-intraday-watchdog.service").read_text()
+        self.assertIn("intraday_healthcheck.py", unit)
+        self.assertIn("--price-max-age-minutes 30", unit)
 
-    def test_outside_session_shell_path_emits_valid_json(self):
-        unit = Path(__file__).with_name("signalix-intraday-healthcheck.service").read_text()
-        command = next(line.split("'", 1)[1].rsplit("'", 1)[0]
-                       for line in unit.splitlines() if line.startswith("ExecStart="))
-        command = command.replace("%%", "%", 1).replace(
-            "t=$(TZ=Asia/Bangkok date +%H%M);", "t=0000;", 1)
-        command = command.replace("/root/.venv_img/bin/python", sys.executable)
-        command = command.replace(
-            "/root/signalix/backend/intraday_healthcheck.py",
-            str(Path(__file__).with_name("intraday_healthcheck.py")),
-        )
-        output = subprocess.run(
-            ["/bin/bash", "-lc", command], check=True, text=True, capture_output=True
-        ).stdout
-        payload = json.loads(output)
-        self.assertEqual(payload["level"], "HEALTHY")
-        self.assertEqual(payload["status"], "outside_session_skipped")
+
+class StandaloneDuplicatedMonitorContractTests(unittest.TestCase):
+    """The 15m watchdog supersedes the old standalone healthcheck unit."""
+
+    def test_standalone_healthcheck_unit_is_removed_from_repo(self):
+        unit = Path(__file__).with_name("signalix-intraday-healthcheck.service")
+        self.assertFalse(unit.exists(), "obsolete duplicated monitor unit must be deleted")
+
+    def test_standalone_healthcheck_timer_is_removed_from_repo(self):
+        timer = Path(__file__).with_name("signalix-intraday-healthcheck.timer")
+        self.assertFalse(timer.exists(), "obsolete duplicated monitor timer must be deleted")
 
 
 if __name__ == "__main__":
