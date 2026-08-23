@@ -433,6 +433,8 @@ Signalix is therefore a **scenario-based UX critic and idea generator** around S
 
 ## 2026-08-22 — Decision-quality Setup Copilot (approved product direction)
 
+> **SUPERSEDED IN PART (2026-08-23):** The product thesis, full-ORD preservation, deterministic gates, provenance, lifecycle, and explainable ranking remain current. The former default queue composition (`DEVELOPING` included) and regime-aware presentation/ranking are superseded by the owner-approved **Daily Shortlist + All Stocks Explorer** contract in section 11 and `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`: Daily Shortlist shows only `READY`/`PRE_READY`; regime is context only; Explorer owns broad research.
+
 ### Product thesis
 
 Signalix's primary new product direction is a **decision-quality copilot for experienced, self-directed traders**. It is setup-first: the product helps a trader find and assess new technical setups, separating trend quality, setup maturity, entry readiness, and risk. It is not a beginner education product, a generic scanner, or a portfolio manager in the first phase.
@@ -919,3 +921,15 @@ Implementation readiness: `REVISE` / `NOT VERIFIED` pending evidence matrix exec
 Canonical contract gate: `PASS` for specification takeover by Lite/Bee.
 
 Dependent Action Queue, Outcome Log, and UI redesign cards MUST remain blocked until this canonical file is read back and this gate is explicitly accepted. No production implementation, live portfolio action, or automatic trading is authorized by this contract alone.
+
+## 11. 2026-08-23 — Owner-approved Daily Shortlist reset
+
+Owner approved a product reset to a **Daily Shortlist** as Signalix's default decision surface and retained the existing stage-first dashboard as a secondary **All Stocks Explorer**. The approved design is `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`.
+
+- Daily Shortlist serves Thai Daily-chart swing trades held for several days to several weeks.
+- It publishes only `READY` and `PRE_READY` candidates; `DEVELOPING`, base-building, invalidated, broken, low-liquidity, and `DO NOT CHASE` names are excluded from this surface.
+- FULL active ORD coverage remains the scan/data foundation. A 20-day average daily traded-value gate of **THB 10,000,000** determines Daily Shortlist eligibility only; it must not delete or hide symbols from the full scan or Explorer.
+- Ranking is deterministic and explainable: structure 40%, entry readiness 30%, risk/reward 20%, with liquidity as a hard gate and tie-breaker. Market regime remains visible context only and does not alter eligibility or rank.
+- All Stocks Explorer is research-only, remains secondary navigation, and must clearly state that its full-universe results are not trade suggestions.
+
+Implementation readiness remains `REVISE` / `NOT VERIFIED`. This approved design does not authorize implementation until the owner reviews the written design and accepts a focused execution plan.

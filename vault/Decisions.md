@@ -112,3 +112,10 @@ Reason: Retry fixes transient Settrade warm-up misses, but these seven have zero
 Decision: Intraday `--no-scan` remains separate from Daily classification, but every completed 60m ingestion/evaluation must rebuild `dashboard.html` and `dashboard_snapshot.json` from the existing Daily scan. Watchdog treats expected `partial_success` as tolerated, identifies `intraday_price_data` explicitly, and uses a 90-minute 60m candle threshold plus 30-minute evaluator-state threshold.
 
 Reason: A healthy DB fetch previously left the static served dashboard stale. Process exit 0/1 and HTTP 200 are not sufficient; acceptance is Settrade fetch → DB run/rows → evaluator → dashboard artifacts → served dashboard → browser `Last Scanned`.
+
+## 2026-08-23 — Daily Shortlist default; All Stocks Explorer retained
+Decision: Make **Daily Shortlist** the default Signalix surface for trustworthy Thai Daily swing-trade setups. Retain the current stage-first dashboard as a secondary **All Stocks Explorer** for full-ORD research; label it clearly as research rather than suggestions.
+
+Daily Shortlist eligibility: all active Thai ORD are scanned, while publication requires 20-day average daily traded value of at least **THB 10,000,000**. Publish only `READY` and `PRE_READY`; exclude developing/base-building, broken, invalidated, low-liquidity, and `DO NOT CHASE` names. Ranking is deterministic and explainable: structure 40%, entry readiness 30%, risk/reward 20%, liquidity as hard gate/tie-breaker. Market regime is visible context only and must not suppress, rank-penalize, or otherwise modify candidates.
+
+Reason: Owner confirmed the next version must be a trustworthy daily shortlist, not a filter-heavy full-market terminal. Keeping Explorer preserves broad research and FULL ORD coverage without diluting the decision surface.

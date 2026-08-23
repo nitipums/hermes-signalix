@@ -36,7 +36,7 @@
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; 2026-08-22 setup-first direction added** |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; Daily Shortlist default + All Stocks Explorer retained, owner-approved 2026-08-23** |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
@@ -77,6 +77,7 @@
 
 ## 6. Changelog
 
+- **2026-08-23**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; canonical design: `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`. Implementation remains pending written-design review and focused plan approval.
 - **2026-08-22**: Added cross-team review resolution to `Product-Strategy-Market-to-Action.md` after independent Ploy, Prae, View, Mali, Nida, and Khim reviews; direction PASS, implementation readiness REVISE; added regime/state/ranking/lifecycle/acceptance clarifications.
 - **2026-08-22**: Added the approved **Decision-quality Setup Copilot** direction to the canonical `Product-Strategy-Market-to-Action.md`: experienced self-directed trader, setup-first, regime-aware queue, hard gates + quality ranking, immutable event-based outcomes, and explicit non-goals.
 - **2026-08-22**: Team/provider closeout: created Prae PM, revived View designer, verified local A2A/profile boundaries, and recorded the provider allocation in `Team-Operating-Model.md`.
