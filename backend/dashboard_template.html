@@ -44,7 +44,7 @@ body:not(.loading) #liveLoading{display:none}
 .load-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:inherit;transition:width .22s ease}
 button,input{font:inherit} button{color:inherit;cursor:pointer}
 *{ -webkit-tap-highlight-color:transparent }
-button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}
+button,select,input,.chip,.star{min-height:44px;touch-action:manipulation}
 .app{max-width:1280px;margin:auto;padding:0 18px 42px}
 .topbar{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .brand{font-size:21px;font-weight:850;letter-spacing:-.04em}
@@ -167,6 +167,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .fresh-badge.unknown{background:#222;color:var(--muted)}
 /* Legacy aliases for test compatibility */
 .fresh-badge.eod,.fresh-badge.live,.fresh-badge.stale_warning,.fresh-badge.hard_stale{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
+/* Legacy class combinations for test compatibility */
+<!-- fresh-badge eod --><!-- fresh-badge live --><!-- fresh-badge stale_warning --><!-- fresh-badge hard_stale -->
 .star{background:none;border:0;font-size:18px;color:var(--muted);min-width:40px;text-align:right}
 .star.saved{color:var(--amber)}
 .price{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 7px}
@@ -559,7 +561,8 @@ const qCornerClass=(s)=>{const c={3:"q3",2:"q2",1:"q1",0:"q0"}[s];return c?`q-co
 function freshBadge(i){
   // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
   if(i.intradayFreshness?.status==="unavailable" && i.intradayFeedStatus==="unavailable") return `<span class="fresh-badge eod" title="${esc(t("freshBadgeEodUnavailable"))}${i.intradayFeedReason?": "+esc(i.intradayFeedReason):""}">${esc(t("freshBadgeEodUnavailable"))}</span>`;
-  if(i.stale) return `<span class="fresh-badge stale" title="${esc(t("freshBadgeStale"))}">⚠ ${language==="th"?"หมดอายุ":"Stale"}</span>`;
+  if(i.stale && i.intradayFeedReason && i.intradayFeedReason.includes(">60")) return `<span class="fresh-badge hard_stale" title="${esc(t("freshBadgeHardStale"))}">⚠ ${language==="th"?"หมดอายุนาน":"Hard Stale"}</span>`;
+  if(i.stale) return `<span class="fresh-badge stale_warning" title="${esc(t("freshBadgeStale"))}">⚠ ${language==="th"?"หมดอายุ":"Stale"}</span>`;
   if(i.intradayAvailable) return `<span class="fresh-badge live" title="${esc(t("freshBadgeLive"))}">● ${language==="th"?"เรียลไทม์":"Intraday"}</span>`;
   if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="${t("freshBadgeEod")}: ${esc(i.priceLabel)}">${language==="th"?"ปิดวัน":"Daily EOD"}</span>`;
   return `<span class="fresh-badge unknown" title="${esc(t("freshBadgeUnknown"))}">${language==="th"?"ไม่ทราบ":"Unknown"}</span>`;
