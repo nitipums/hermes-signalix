@@ -1045,6 +1045,37 @@ def run_scan(
             )
         finally:
             pg.close()
+
+        # Persist market regime for this scan run (Contract v0.2.0 §3)
+        run_id = snapshot["run_id"]
+        pg = get_pg()
+        try:
+            # The regime is already attached to each symbol in scanned by scan_universe
+            # Extract from the first symbol that has it
+            regime_data = None
+            for row in scanned:
+                if row.get("market_regime"):
+                    regime_data = row["market_regime"]
+                    break
+            if regime_data:
+                from scan_history import persist_market_regime
+                persist_market_regime(
+                    pg,
+                    run_id=run_id,
+                    regime_state=regime_data.get("regime_state", "NORMAL"),
+                    atr_pct_20d=regime_data.get("inputs", {}).get("atr_pct_20d"),
+                    median_spread_bps=regime_data.get("inputs", {}).get("median_spread_bps"),
+                    liquidity_event_flag=regime_data.get("inputs", {}).get("liquidity_event_flag"),
+                    breadth_pct_above_ma50=regime_data.get("inputs", {}).get("breadth_pct_above_ma50"),
+                    benchmark_at_or_above_ma50=regime_data.get("inputs", {}).get("benchmark_at_or_above_ma50"),
+                    liquidity_event_reason_codes=regime_data.get("liquidity_event_reason_codes", []),
+                    reason_codes=regime_data.get("reason_codes", []),
+                    policy_version=regime_data.get("policy_version", "regime-v0.2.0"),
+                    data_timestamp_utc=regime_data.get("data_timestamp_utc"),
+                )
+        finally:
+            pg.close()
+
         pg = get_pg()
         try:
             lifecycle = persist_breakout_lifecycle(pg, scanned, snapshot["run_id"], "signalix/daily-state-v2")

@@ -189,6 +189,37 @@ def init_daily_scan_history_schema(pg):
         """)
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_stage_transitions_event_idx ON daily_breakout_event_stage_transitions(event_id, observed_on DESC, created_at DESC)")
         cur.execute("CREATE INDEX IF NOT EXISTS daily_breakout_event_stage_transitions_scan_run_idx ON daily_breakout_event_stage_transitions(scan_run_id)")
+
+        # Market Regime (Contract v0.2.0 regime-v0.2.0) - append-only per scan run
+        cur.execute("""CREATE TABLE IF NOT EXISTS daily_market_regime (
+                id UUID PRIMARY KEY,
+                run_id UUID NOT NULL REFERENCES daily_scan_runs(id) ON DELETE RESTRICT,
+                regime_state TEXT NOT NULL CHECK (regime_state IN (
+                    'HIGH_VOLATILITY', 'LIQUIDITY_EVENT', 'LOW_SPREAD', 'NORMAL'
+                )),
+                atr_pct_20d DOUBLE PRECISION,
+                median_spread_bps DOUBLE PRECISION,
+                liquidity_event_flag BOOLEAN,
+                breadth_pct_above_ma50 DOUBLE PRECISION,
+                benchmark_at_or_above_ma50 BOOLEAN,
+                liquidity_event_reason_codes JSONB,
+                reason_codes JSONB,
+                policy_version TEXT NOT NULL,
+                data_timestamp_utc TIMESTAMPTZ NOT NULL,
+                computed_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                UNIQUE(run_id)
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS daily_market_regime_run_id_idx ON daily_market_regime(run_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS daily_market_regime_state_idx ON daily_market_regime(regime_state)")
+        cur.execute("CREATE INDEX IF NOT EXISTS daily_market_regime_data_ts_idx ON daily_market_regime(data_timestamp_utc)")
+        # Attach mutation guard (reuse existing immutable trigger)
+        cur.execute("DROP TRIGGER IF EXISTS daily_market_regime_immutable ON daily_market_regime")
+        cur.execute("""CREATE TRIGGER daily_market_regime_immutable
+                BEFORE UPDATE OR DELETE ON daily_market_regime
+                FOR EACH ROW EXECUTE FUNCTION daily_scan_history_reject_mutation()
+        """)
+
         # Intraday emerging events: append-only, lower confidence, reconciled by EOD
         cur.execute("""
             CREATE TABLE IF NOT EXISTS intraday_events (
@@ -449,6 +480,59 @@ def _retry_root_run_id(cur, retry_of_run_id):
     if row is None:
         raise ValueError("retry_of_run_id does not reference an existing run")
     return parent_id, str(row[0])
+
+
+def persist_market_regime(
+    pg,
+    run_id: str,
+    regime_state: str,
+    atr_pct_20d: float | None,
+    median_spread_bps: float | None,
+    liquidity_event_flag: bool | None,
+    breadth_pct_above_ma50: float | None,
+    benchmark_at_or_above_ma50: bool | None,
+    liquidity_event_reason_codes: list[str] | None,
+    reason_codes: list[str],
+    policy_version: str,
+    data_timestamp_utc: str,
+) -> str:
+    """
+    Persist market regime for a scan run (append-only, one per run).
+
+    Returns the regime row UUID.
+    """
+    import json as _json
+    regime_id = str(uuid.uuid4())
+    cur = pg.cursor()
+    try:
+        cur.execute(
+            """INSERT INTO daily_market_regime
+               (id, run_id, regime_state, atr_pct_20d, median_spread_bps,
+                liquidity_event_flag, breadth_pct_above_ma50, benchmark_at_or_above_ma50,
+                liquidity_event_reason_codes, reason_codes, policy_version, data_timestamp_utc)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (
+                regime_id,
+                run_id,
+                regime_state,
+                atr_pct_20d,
+                median_spread_bps,
+                liquidity_event_flag,
+                breadth_pct_above_ma50,
+                benchmark_at_or_above_ma50,
+                _json.dumps(liquidity_event_reason_codes or []),
+                _json.dumps(reason_codes or []),
+                policy_version,
+                data_timestamp_utc,
+            ),
+        )
+        pg.commit()
+        return regime_id
+    except Exception:
+        pg.rollback()
+        raise
+    finally:
+        cur.close()
 
 
 def persist_daily_scan_snapshot(

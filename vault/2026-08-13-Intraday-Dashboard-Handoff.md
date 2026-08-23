@@ -1,5 +1,7 @@
 # Signalix Handoff — 2026-08-13
 
+> **STATUS: HISTORICAL** · Evidence only. Current intraday/runtime rules live in `Architecture.md`, `Deployment.md`, and `Execution-Pipeline.md`.
+
 > Curated end-of-session handoff for Bee, Ploy, and future implementers. It records what is deployed, what was verified, known limits, and the next safe work order. No secrets are stored here.
 
 ## Executive outcome

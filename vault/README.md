@@ -1,5 +1,7 @@
 # Signalix — Project Vault
 
+> **STATUS: REVIEW_REQUIRED** · This overview still contains older 2026-08-12 status claims. Reconcile against `Documentation-Governance.md`, `Architecture.md`, `Deployment.md`, and `Execution-Pipeline.md` before treating the table below as current.
+
 AI Trading-Agent SaaS for Thai SET retail traders. Trend-Following engine
 (Mark Minervini / VCP) that auto-screens the market, scores setups, and pushes
 real-time alerts to **Telegram**.
@@ -7,19 +9,25 @@ real-time alerts to **Telegram**.
 > Owner: Nitipum.s (collaborates with Arm). This vault is the canonical
 > knowledge base — keep it in sync after every structural change.
 
-## Status (updated 2026-08-12)
+## Status (updated 2026-08-23)
+
 | Layer | State | Notes |
 |-------|-------|-------|
-| Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent |
+| Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
 | Dashboard (web) | ✅ Done | dark-theme HTML, charts, port 3001 |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ✅ Done | Redis `signals` → `signalix_delivery` → Telegram |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |
 | **LINE** | ❌ Dropped | user decision; `notify-api.line.me` DNS-blocked on VPS |
-| LLM summarization (Phase 3) | ✅ Done | Nous portal `upstage/solar-pro4:free`, token from Hermes runtime |
-| User / Auth / Subscription | ⬜ Gap | needed for true SaaS |
-| Frontend app | ⬜ Gap | dashboard is read-only HTML |
+| LLM summarization (Phase 3) | ✅ Done | Nous `upstage/solar-pro4:free`, Thai "why now" note |
+| Multi-tenant user routing + tier quota | ✅ Done | `users.py` + `TIER_LIMITS` enforced 2026-08-12 |
+| Portal frontend (self-service SPA) | ✅ Done | portal.html ↔ backend APIs; watchlist sync |
+| Subscription / payment billing | ⬜ Gap | tier field exists; no payment/subscription frontend |
+| Full SaaS login frontend | ⬜ Gap | no login UI; owner-only deep links |
+
+> Older claim that User/Auth/Subscription and Frontend were pure gaps reflected the 2026-08-12 state. Multi-tier routing, enforcement, and a self-service portal shipped shortly after; only the login/ billing UI remains.
+
 
 ## Quick links
 - [[Architecture]] — data flow + container map

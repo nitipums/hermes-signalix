@@ -220,17 +220,21 @@ class ReconcileIntradayEventsTests(unittest.TestCase):
 
 
 class GetActiveIntradayEventsTests(unittest.TestCase):
-    # Column order for get_active_intraday_events SELECT:
+    # Column order for get_active_intraday_events SELECT (D1 fix adds the
+    # LATERAL observation join):
     # id, symbol, origin, trigger_price, first_seen, first_candle_ts, interval,
     # confidence, failure_level, pre_break_pivot_low, intraday_run_id,
-    # resolved_daily_event_id, reconciled_at
+    # resolved_daily_event_id, reconciled_at,
+    # o.candle_ts AS obs_candle_ts, o.close AS obs_close
     def _confirmed_row(self):
         return ("evt-1", "TEST", "intraday_breakout", 11.0, RUN_TS, CANDLE_TS,
-                "60m", "confirmed", 10.5, 10.0, "run-1", "daily-event-id-1", RUN_TS)
+                "60m", "confirmed", 10.5, 10.0, "run-1", "daily-event-id-1", RUN_TS,
+                CANDLE_TS, 11.2)
 
     def _emerging_row(self):
         return ("evt-1", "TEST", "intraday_breakout", 11.0, RUN_TS, CANDLE_TS,
-                "60m", "emerging", 10.5, 10.0, "run-xyz", None, None)
+                "60m", "emerging", 10.5, 10.0, "run-xyz", None, None,
+                CANDLE_TS, 11.2)
 
     def test_confirmed_event_carries_resolved_daily_event_id_baseline(self):
         from scan_history import get_active_intraday_events
@@ -262,6 +266,60 @@ class GetActiveIntradayEventsTests(unittest.TestCase):
         get_active_intraday_events(pg)
         sql = cur.execute.call_args_list[0].args[0]
         self.assertIn("confidence IN ('emerging','confirmed')", sql)
+
+
+class GetActiveIntradayEventsFreshnessTests(unittest.TestCase):
+    """D1 regression: active events must expose observation-joined freshness."""
+
+    def _row(self, conf="emerging"):
+        return ("evt-1", "TEST", "intraday_breakout", 11.0, RUN_TS, CANDLE_TS,
+                "60m", conf, 10.5, 10.0, "run-xyz", None, None,
+                # joined latest observation: candle_ts, close
+                CANDLE_TS + dt.timedelta(hours=1), 11.6)
+
+    def test_select_joins_intraday_event_observations(self):
+        from scan_history import get_active_intraday_events
+
+        pg, cur = _pg()
+        cur.fetchall.return_value = []
+        get_active_intraday_events(pg)
+        sql = cur.execute.call_args_list[0].args[0]
+        self.assertIn("intraday_event_observations", sql)
+
+    def test_emerging_event_carries_freshness_evidence(self):
+        from scan_history import get_active_intraday_events
+
+        pg, cur = _pg()
+        cur.fetchall.return_value = [self._row()]
+        out = get_active_intraday_events(pg, now=RUN_TS)
+        ev = out["TEST"]
+        self.assertEqual(ev["freshness"]["candle_ts"],
+                         (CANDLE_TS + dt.timedelta(hours=1)).isoformat())
+        self.assertEqual(ev["freshness"]["close"], 11.6)
+        self.assertIn(ev["freshness"]["status"], ("fresh", "aging", "stale", "unknown"))
+        self.assertIsInstance(ev["freshness"]["stale"], bool)
+
+    def test_stale_observation_is_classified_stale(self):
+        from scan_history import get_active_intraday_events
+
+        pg, cur = _pg()
+        cur.fetchall.return_value = [self._row()]
+        out = get_active_intraday_events(pg, now=RUN_TS + dt.timedelta(hours=80))
+        self.assertTrue(out["TEST"]["freshness"]["stale"])
+        self.assertEqual(out["TEST"]["freshness"]["status"], "stale")
+
+    def test_no_observation_yields_unknown_freshness_not_crash(self):
+        from scan_history import get_active_intraday_events
+
+        pg, cur = _pg()
+        row = list(self._row())
+        row[13] = None
+        row[14] = None
+        cur.fetchall.return_value = [tuple(row)]
+        out = get_active_intraday_events(pg, now=RUN_TS)
+        self.assertIsNone(out["TEST"]["freshness"]["candle_ts"])
+        self.assertIsNone(out["TEST"]["freshness"]["close"])
+        self.assertFalse(out["TEST"]["freshness"]["stale"])
 
 
 if __name__ == "__main__":

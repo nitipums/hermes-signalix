@@ -1,10 +1,15 @@
 # Signalix Decisions
 
+> **STATUS: CURRENT** · Canonical decision ledger. Active work-management rule is recorded below: Markdown pipeline active; Kanban audit/archive only.
+
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-15 — Markdown execution pipeline replaces Signalix Kanban
-Decision: Retire the Signalix Kanban board and its recurring heartbeat. Use [[Execution-Pipeline]] as the canonical durable work-management source, with focused implementation plans in `/root/signalix/.hermes/plans/`.
-Reason: Arm found Kanban ineffective. The board's useful product, integrity, and evidence constraints were curated into the Markdown pipeline; the archived board remains historical evidence, not an active queue.
+## Work management — final owner decision 2026-08-23
+
+Decision: **Markdown `Execution-Pipeline.md` is the active Signalix work source. Kanban is audit/archive only and must not be used for new dispatches.** Focused executable plans live under `/root/signalix/.hermes/plans/` and must link back to the pipeline row.
+
+Reason: Kanban generated duplicate/blocked graph noise and required more orchestration than the bounded work justified. Keep its history for audit, but use one controlled Markdown sequence for active work.
+
 
 ## 2026-08-12 — LINE dropped
 Decision: Drop LINE delivery for Signalix alerts.
@@ -83,6 +88,12 @@ Reason: Rolling 20D highs cannot reliably distinguish fresh break, retest, exten
 Decision: Remove the yfinance-fallback price-continuity guard entirely. `fetch_yfinance` no longer skips a symbol whose first fetched close deviates >15% from the last DB close. Pull every known symbol; no price-gap filter.
 
 Reason: Arm: “เราคุยกันแล้วว่าดึงทั้งหมด”. The 15% guard was a yfinance data-quality safety net but also silently dropped real names (especially low-priced stocks where a 0.01→0.02 change is a 50% gap). Owner wants complete coverage over defensive skipping.
+
+## 2026-08-21 — Intraday feed availability is separate from instrument eligibility
+
+Decision: Track Settrade 60m availability in `intraday_feed_status`, not in `symbol_master`. After three consecutive empty/failed responses, a symbol is skipped only by the 60m fetch for a 24-hour cooldown. Successful fetch resets the status.
+
+Reason: Eleven symbols repeatedly returned no Settrade intraday bars, but removing them from `symbol_master` would incorrectly remove valid Daily/EOD history and scan coverage. The dashboard must show `60m unavailable · Daily EOD` and keep Daily EOD as the decision source. `COLOR` remains the separate instrument-master exception because Settrade reports the symbol itself as not found.
 
 ## 2026-08-20 — Exclude COLOR from ORD master (owner override)
 

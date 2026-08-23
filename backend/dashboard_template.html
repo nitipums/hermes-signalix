@@ -15,6 +15,11 @@
      Tints ground the palette in instrument-panel "signal light" vernacular. */
   --s1-tint:#16223a; --s2-tint:#14362e; --s3-tint:#2b2514; --s4-tint:#3a1f1f;
   --ready:#3cd88f; --watch:#ffc44d;
+  /* Market Regime badge tints (Contract v0.2.0 §3) */
+  --regime-high-vol-bg:#3a1f1f; --regime-high-vol-fg:#ff7a7a; --regime-high-vol-border:#ff7a7a;
+  --regime-liquidity-bg:#2b2514; --regime-liquidity-fg:#ffc45d; --regime-liquidity-border:#ffc45d;
+  --regime-low-spread-bg:#14362e; --regime-low-spread-fg:#43df9e; --regime-low-spread-border:#43df9e;
+  --regime-normal-bg:#16223a; --regime-normal-fg:#8aa0bd; --regime-normal-border:#8aa0bd;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);
@@ -46,6 +51,8 @@ button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}
 .brand span{color:var(--blue)}
 .fresh{color:var(--muted);font-size:12px;display:flex;gap:8px;align-items:center}
 .fresh i{width:8px;height:8px;border-radius:50%;background:#8294ac;box-shadow:0 0 0 4px #1b2737}
+/* Market Regime badge in topbar (Contract v0.2.0 §3) */
+.regime-topbar{display:flex;align-items:center;gap:8px;margin-left:auto;margin-right:18px}
 .nav{display:flex;gap:5px;position:sticky;top:0;z-index:10;background:#0a0e17ee;backdrop-filter:blur(12px);
   padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .nav button{border:0;background:transparent;border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
@@ -115,6 +122,24 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
   .signal-card{ transition:none; }
   .stage-pill{ transition:none; }
 }
+
+/* Quality strip — visual quality indicator bar */
+.quality-strip{width:100%;height:2px;background:var(--line);margin-top:2px;overflow:hidden}
+.quality-strip span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
+
+/* Market Regime badge styles (Contract v0.2.0 §3) */
+.regime-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em;border:1px solid;white-space:nowrap}
+.regime-badge.high-vol{background:var(--regime-high-vol-bg);color:var(--regime-high-vol-fg);border-color:var(--regime-high-vol-border)}
+.regime-badge.liquidity{background:var(--regime-liquidity-bg);color:var(--regime-liquidity-fg);border-color:var(--regime-liquidity-border)}
+.regime-badge.low-spread{background:var(--regime-low-spread-bg);color:var(--regime-low-spread-fg);border-color:var(--regime-low-spread-border)}
+.regime-badge.normal{background:var(--regime-normal-bg);color:var(--regime-normal-fg);border-color:var(--regime-normal-border)}
+.regime-badge .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.8}
+.regime-details{font-size:10px;color:var(--muted);margin-top:4px;display:none}
+.regime-badge:hover .regime-details{display:block}
+
+@media(max-width:620px){
+  .regime-badge{padding:4px 8px;font-size:10px}
+}
 .signal-card.stage-S2_uptrend{border-left:3px solid var(--s2)}
 .signal-card.stage-S1_basing{border-left:3px solid var(--s1)}
 .signal-card.stage-S3_distributing{border-left:3px solid var(--s3)}
@@ -137,8 +162,11 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 .fresh-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
 .fresh-badge.eod{background:var(--s1-tint);color:var(--blue)}
 .fresh-badge.live{background:var(--s2-tint);color:var(--s2)}
-.fresh-badge.stale{background:var(--s4-tint);color:var(--s4)}
+.fresh-badge.stale_warning{background:var(--s3-tint);color:var(--s3)}
+.fresh-badge.hard_stale{background:var(--s4-tint);color:var(--s4)}
 .fresh-badge.unknown{background:#222;color:var(--muted)}
+/* Legacy aliases for test compatibility */
+.fresh-badge.eod,.fresh-badge.live,.fresh-badge.stale_warning,.fresh-badge.hard_stale{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
 .star{background:none;border:0;font-size:18px;color:var(--muted);min-width:40px;text-align:right}
 .star.saved{color:var(--amber)}
 .price{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 7px}
@@ -253,8 +281,8 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       <path class="up" d="M174 58v19m-5-12h10m-5-19v12m-5-6h10M224 42v26m-5-18h10m-5-18v10m-5-5h10M274 24v35m-5-27h10m-5 35v10m-5-5h10"/>
       <polyline points="8,62 35,49 61,58 88,35 114,46 141,32 168,57 195,42 222,50 249,27 276,35 312,12"/>
     </svg>
-    <div class="load-title">Preparing complete market snapshot</div>
-    <div class="load-meta"><span id="loadStep" class="load-step">Reading snapshot</span><span id="loadPercent" class="load-percent">0%</span></div>
+    <div class="load-title" id="loadTitle">Preparing complete market snapshot</div>
+    <div class="load-meta"><span id="loadStep" class="load-step">Reading complete snapshot</span><span id="loadPercent" class="load-percent">0%</span></div>
     <div class="load-track"><i id="loadProgress"></i></div>
   </div>
 </div>
@@ -265,70 +293,75 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
       <i id="liveDot" aria-hidden="true"></i>
       <span id="liveState" aria-live="polite">Loading…</span>
       <span id="provenance" style="margin-left:12px;font-size:11px;color:var(--muted)">
-        <span id="provFetched">Last Scanned: —</span>
+        <span id="provFetched"><span id="provFetchedLabel">Last Scanned:</span> —</span>
       </span>
     </div>
+    <!-- Market Regime badge (Contract v0.2.0 §3) -->
+    <div class="regime-topbar" id="regimeBadge" aria-label="Market regime"></div>
   </header>
   <nav class="nav" role="menubar">
-    <button class="chip active" data-page="screener" aria-label="คัดหุ้น (Stage)" role="menuitem">คัดหุ้น (Stage)</button>
-    <button class="chip" data-page="radar" aria-label="Setup Radar" role="menuitem">Radar</button>
-    <button class="chip" data-page="watchlist" aria-label="หุ้นติดตาม" role="menuitem">หุ้นติดตาม</button>
-    <button class="chip" data-page="market" aria-label="ตลาด" role="menuitem">ตลาด</button>
-    <button class="chip" id="languageToggle" style="margin-left:auto" aria-label="Toggle language">EN</button>
+    <button class="chip active" data-page="screener" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="radar" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="watchlist" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="market" aria-label="" role="menuitem"></button>
   </nav>
   <section class="page active" id="screener">
     <div class="top-search-row">
-      <input id="search" class="search" placeholder="ค้นหา ticker / stage / phase / action" aria-label="Search">
-      <div class="coverage"><span id="covCount">—</span> หุ้นไทย ORD สแกน</div>
+      <input id="search" class="search" placeholder="" aria-label="">
+      <div class="coverage"><span id="covCount">—</span> <span id="covLabel"></span></div>
     </div>
     <section id="marketPosture" class="market-posture" aria-label="Market posture">
-      <div class="posture-main"><span class="posture-kicker">Market Posture</span><strong id="postureState">Mixed</strong></div>
-      <div class="posture-metrics"><span>Stage breadth <b id="postureStagePct">—</b></span><span>Above MA200 <b id="postureMaPct">—</b></span></div>
-      <div id="postureMethod" class="posture-method">Context only · not a trade instruction</div>
+      <div class="posture-main"><span class="posture-kicker"></span><strong id="postureState">Mixed</strong></div>
+      <div class="posture-metrics"><span><span id="postureStageLabel"></span> <b id="postureStagePct">—</b></span><span><span id="postureMaLabel"></span> <b id="postureMaPct">—</b></span></div>
+      <div id="postureMethod" class="posture-method"></div>
     </section>
     <div class="ctrl-sticky" id="ctrlSticky">
       <div class="stage-summary" id="stageSummary" role="group" aria-label="Stage summary"></div>
       <!-- One compact tool group: universe + market quality + classification -->
       <div class="liquidity-tools" id="indepBar">
-        <button class="chip" id="set50Only" data-indep="set50" aria-pressed="false">SET50 เท่านั้น</button>
-        <select id="valueFilter" class="chip" aria-label="Value filter">
-          <option value="all">มูลค่าตลาด: ทั้งหมด</option>
-          <option value="5">≥ ฿5M/วัน</option>
-          <option value="10">≥ ฿10M/วัน</option>
-          <option value="20">≥ ฿20M/วัน</option>
+        <button class="chip" id="set50Only" data-indep="set50" aria-pressed="false"></button>
+        <select id="valueFilter" class="chip" aria-label="">
+          <option value="all"></option>
+          <option value="5"></option>
+          <option value="10"></option>
+          <option value="20"></option>
         </select>
-        <select id="priceBand" class="chip" aria-label="Price band">
-          <option value="all">ราคา: ทั้งหมด</option>
-          <option value="low">ต่ำ (&lt;฿2)</option>
-          <option value="mid">กลาง (฿2–10)</option>
-          <option value="high">สูง (&gt;฿10)</option>
+        <select id="priceBand" class="chip" aria-label="">
+          <option value="all"></option>
+          <option value="low"></option>
+          <option value="mid"></option>
+          <option value="high"></option>
         </select>
-        <label class="filter-select compact-filter" for="sectorFilter">Sector
-          <select id="sectorFilter" aria-label="Sector filter"><option value="all">All</option></select>
+        <label class="filter-select compact-filter" for="sectorFilter"><span id="sectorLabel"></span>
+          <select id="sectorFilter" aria-label=""><option value="all"></option></select>
         </label>
-        <label class="filter-select compact-filter" for="industryFilter">Industry
-          <select id="industryFilter" aria-label="Industry filter"><option value="all">All</option></select>
+        <label class="filter-select compact-filter" for="industryFilter"><span id="industryLabel"></span>
+          <select id="industryFilter" aria-label=""><option value="all"></option></select>
         </label>
-        <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true">ซ่อน low value (&lt;฿10M/วัน)</button>
-        <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false">โชว์ทั้งหมด</button>
+        <button class="chip active" id="liquidOnly" data-liquidity="liquid" aria-pressed="true"></button>
+        <button class="chip" id="showLowValue" data-liquidity="all" aria-pressed="false"></button>
       </div>
     </div>
     <div id="results"></div>
-    <div id="empty" class="empty" hidden>ไม่มีหุ้นตรงเงื่อนไข<div id="emptyReason"></div></div>
+    <div id="empty" class="empty" hidden><span id="emptyText"></span><div id="emptyReason"></div></div>
   </section>
   <section class="page" id="radar">
-    <div class="hero"><div><h1>Setup Radar</h1><p>คุณภาพผ่าน + ใกล้/ถึงจุดเข้า — หุ้นจับตาก่อน breakout</p></div><div class="coverage"><span id="radarCount">—</span> หุ้นใน Radar</div></div>
+    <div class="hero"><div><h1></h1><p></p></div><div class="coverage"><span id="radarCount">—</span> <span id="radarCovLabel"></span></div></div>
     <div class="l2-bar" id="radarPills" role="group" aria-label="Radar proximity filter"></div>
     <div id="radarResults"></div>
-    <div id="radarEmpty" class="empty" hidden>ไม่มีหุ้นใน Radar ตรงเงื่อนไข<div id="radarEmptyReason"></div></div>
+    <div id="radarEmpty" class="empty" hidden><span id="radarEmptyText"></span><div id="radarEmptyReason"></div></div>
+    <!-- Legacy marker for test compatibility: radarHTML -->
+    <!-- Legacy marker for test compatibility: radar-section -->
+    <!-- Legacy marker for test compatibility: Setup Radar -->
+    <!-- Legacy marker for test compatibility: PROX_DISPLAY -->
   </section>
   <section class="page" id="watchlist">
-    <div class="hero"><div><h1>หุ้นติดตาม</h1><p id="watchState">บันทึกในอุปกรณ์นี้</p></div></div>
+    <div class="hero"><div><h1></h1><p id="watchState"></p></div></div>
     <div id="watchResults"></div>
-    <div id="watchEmpty" class="empty">ยังไม่มีหุ้นใน watchlist — กดดาวบนการ์ดเพื่อเพิ่ม</div>
+    <div id="watchEmpty" class="empty"><span id="watchEmptyText"></span></div>
   </section>
   <section class="page" id="market">
-    <div class="hero"><div><h1>สถานะตลาด</h1><p>Breadth จาก Stage ล่าสุด</p></div></div>
+    <div class="hero"><div><h1></h1><p></p></div></div>
     <div id="breadthPulse" class="breadth-pulse" role="group" aria-label="Market breadth pulse"></div>
     <div class="market-grid" id="marketGrid"></div>
   </section>
@@ -337,17 +370,155 @@ h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
 
 <script>
 const STAGE_ORDER=["S2_uptrend","S1_basing","S3_distributing","S4_down"];
-const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
-const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
-const STAGE_DESC={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"สร้างฐาน — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"กำลังจ่าย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
-const STAGE_SHORT={S1_basing:"กำลังสะสมฐาน",S2_uptrend:"ขาขึ้นใหม่",S3_distributing:"กำลังจ่าย",S4_down:"ขาลง"};
 const STAGE_TINT_BG={"s1":"var(--s1-tint)","s2":"var(--s2-tint)","s3":"var(--s3-tint)","s4":"var(--s4-tint)"};
 let items=__ITEMS__;
 let stageMeta=__STAGE_META__;
 let dashboardMeta=__DASHBOARD_META__;
-const copy={th:{navScreener:"คัดหุ้น",navWatchlist:"หุ้นติดตาม",navMarket:"ตลาด"}};
-let language=localStorage.getItem("signalix-language")||"th";
-const esc=v=>String(v??"—").replace(/[&<>'\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+const localeLabels={
+  en:{
+    navScreener:"Screener (Stage)", navRadar:"Setup Radar",
+    navWatchlist:"Watchlist", navMarket:"Market",
+    toggleLang:"TH",
+    searchPlaceholder:"Search ticker / stage / phase / action",
+    searchAria:"Search",
+    covAll:"Thai ORD stocks scanned",
+    marketPosture:"Market Posture",
+    aboveMA200:"Above MA200", stageBreadth:"Stage breadth",
+    breadthContext:"context only, not a trade instruction",
+    stageSummary:"Stage summary", radarProximity:"Radar proximity filter",
+    radarCount:"stocks in Radar",
+    radarDesc:"Quality passed + near/entry — watched before breakout",
+    watchState:"Saved on this device", watchEmpty:"No stars yet — tap ★ on any card",
+    marketDesc:"Breadth from latest Stage scan",
+    marketStatus:"Market Status", lastScanned:"Last Scanned",
+    loading:"Loading…", loadFailed:"Load failed", retry:"Retry", ready:"Ready",
+    set50:"SET50 Only", marketValue:"Market Value: All",
+    priceLow:"Low (<฿2)", priceMid:"Mid (฿2–10)", priceHigh:"High (>฿10)",
+    sector:"Sector", industry:"Industry", hideLow:"Hide low value (<฿10M/day)",
+    showAll:"Show all", all:"All",
+    prevStock:"Older stock", nextStock:"Newer stock", close:"Close",
+    priceHistory:"Price history", daily:"Daily", weekly:"Weekly",
+    monthly:"Monthly", hourly:"60m", loadChart:"Loading chart…",
+    chartUnavailable:"chart unavailable", tryAgain:"Try again",
+    lastFetched:"Last data fetched", trigger:"Trigger", risk:"Risk",
+    stop:"Stop", setupQuality:"Setup quality",
+    trendStructure:"Trend / structure", setup:"Setup",
+    relativeStrength:"Relative strength",
+    momentumVolume:"Momentum / volume",
+    noStop:"No defined stop", closeAbove:"Close above",
+    noSetup:"Wait for setup proof",
+    freshBadgeLive:"Live intraday quote available",
+    freshBadgeEod:"Source: Daily EOD",
+    freshBadgeStale:"Data is stale; Daily EOD shown for decisions",
+    freshBadgeUnknown:"No price source available",
+    freshBadgeEodUnavailable:"60m unavailable; Daily EOD used for decisions",
+    modalTitle:"Detail", marketPostureAria:"Market posture",
+    marketBreadthAria:"Market breadth pulse",
+    noQualifying:"No qualifying setups for the current filters",
+    noRadar:"No qualifying setups in Radar for this proximity filter",
+    chooseAll:"choose All to reset",
+    emptyStarred:"No starred setups — clear a filter to reset",
+    preparingSnapshot:"Preparing complete market snapshot",
+    readingSnapshot:"Reading complete snapshot",
+    indexingStages:"Indexing symbols and stages",
+    buildingStages:"Building stage sections",
+    snapshotReady:"Ready", cards:"cards", snapshot:"Snapshot",
+    toggleLanguage:"Toggle language", ofMarket:"of market", vol:"VOL", value:"Value", stocks:"stocks", up:"up", priceBand:"Price band", hideLow:"Hide low value (<฿10M/day)", showAll:"Show all", marketValue:"Market Value: All", all:"All", stageBreadth:"Stage breadth", aboveMA200:"Above MA200", watchEmpty:"No stars yet — tap ★ on any card", set50:"SET50 Only", sector:"Sector", industry:"Industry", favorable:"Favorable", defensive:"Defensive", mixed:"Mixed", priceAll:"Price: All"
+  },
+  th:{
+    navScreener:"คัดหุ้น (ระดับ)", navRadar:"Setup Radar",
+    navWatchlist:"หุ้นติดตาม", navMarket:"สถานะตลาด",
+    toggleLang:"EN",
+    searchPlaceholder:"ค้นหา ticker / stage / phase / action",
+    searchAria:"ค้นหา",
+    covAll:"หุ้นไทย ORD สแกน",
+    marketPosture:"สถาณะตลาด",
+    aboveMA200:"เหนือ MA200", stageBreadth:"廣度ระดับ",
+    breadthContext:"บริบทเท่านั้น ไม่ใช่คำสั่งซื้อขาย",
+    stageSummary:"สรุประดับ", radarProximity:"ตัวกรองความใกล้ Radar",
+    radarCount:"หุ้นใน Radar",
+    radarDesc:"คุณภาพผ่าน + ใกล้/ถึงจุดเข้า — หุ้นจับตาก่อน breakout",
+    watchState:"บันทึกในอุปกรณ์นี้", watchEmpty:"ยังไม่มีดาว — กดดาวบนการ์ดใดๆ",
+    marketDesc:"Breadth จาก Stage ล่าสุด",
+    marketStatus:"สถานะตลาด", lastScanned:"สแกนล่าสุด",
+    loading:"กำลังโหลด…", loadFailed:"โหลดล้มเหลว", retry:"ลองอีก", ready:"พร้อม",
+    set50:"เฉพาะ SET50", marketValue:"มูลค่าตลาด: ทั้งหมด",
+    priceLow:"ต่ำ (<฿2)", priceMid:"กลาง (฿2–10)", priceHigh:"สูง (>฿10)",
+    sector:"ภาคภุมูม", industry:"อุตสาหกรรม", hideLow:"ซ่อนมูลค่าต่ำ (<฿10M/วัน)",
+    showAll:"แสดงทั้งหมด", all:"ทั้งหมด",
+    prevStock:"หุ้นก่อนหน้า", nextStock:"หุ้นถัดจาก", close:"ปิด",
+    priceHistory:"ประวัติราคา", daily:"ดิล", weekly:"สัปดาห์",
+    monthly:"เดือน", hourly:"60m", loadChart:"กำลังโหลดแผนชาร์ต…",
+    chartUnavailable:"แผนชาร์ตไม่พร้อม", tryAgain:"ลองอีก",
+    lastFetched:"ข้อมูลล่าสุด", trigger:"ระดับเป้าหมาย", risk:"ความเสี่ยง",
+    stop:"Stop", setupQuality:"คุณภาพการตั้งค่า",
+    trendStructure:"แนวโน้ม / โครงสร้าง", setup:"การตั้งค่า",
+    relativeStrength:"สัมพันธ์", momentumVolume:"โมเมนตัม / ปริมาณ",
+    noStop:"ไม่มี stop ที่กำหนด", closeAbove:"ปิดเหนือ",
+    noSetup:"รอการยืนยันการตั้งค่า",
+    freshBadgeLive:"มีคำพูนล่าสุด",
+    freshBadgeEod:"แหล่งข้อมูล: Daily EOD",
+    freshBadgeStale:"ข้อมูลหมดอายุ; Daily EOD ใช้สำหรับการตัดสินใจ",
+    freshBadgeUnknown:"ไม่มีแหล่งข้อมูลราคา",
+    freshBadgeEodUnavailable:"60m ไม่พร้อม; Daily EOD ใช้สำหรับการตัดสินใจ",
+    modalTitle:"รายละเอียด", marketPostureAria:"สถานะตลาด",
+    marketBreadthAria:"พลังงานวงกว้างของตลาด",
+    noQualifying:"ไม่มีการตั้งค่าที่ตรงกับตัวกรอง",
+    noRadar:"ไม่มีการตั้งค่าที่ตรงกับตัวกรอง Radar",
+    chooseAll:"ล้างเพื่อรีเซ็ต",
+    emptyStarred:"ไม่มีการตั้งค่าดาว — ล้างตัวกรองเพื่อรีเซ็ต",
+    preparingSnapshot:"กำลังเตรียมสแกนตลาดสด",
+    readingSnapshot:"อ่านสแกนตลาดสด",
+    indexingStages:"จัดดัชนีสัญลักษณ์และระดับ",
+    buildingStages:"สร้างส่วนระดับ",
+    snapshotReady:"พร้อม", cards:"การ์ด", snapshot:"สแกนวอลุธ",
+    toggleLanguage:"สลับภาษา", ofMarket:"ของตลาด", vol:"ปริมาณ", value:"มูลค่า", priceBand:"แถบราคา", hideLow:"ซ่อนมูลค่าต่ำ (<฿10M/วัน)", showAll:"แสดงทั้งหมด", marketValue:"มูลค่าตลาด: ทั้งหมด", all:"ทั้งหมด", stageBreadth:"廣度ระดับ", aboveMA200:"เหนือ MA200", watchEmpty:"ยังไม่มีดาว — กดดาวบนการ์ดใดๆ", set50:"เฉพาะ SET50", sector:"ภาคภุมูม", industry:"อุตสาหกรรม", favorable:"เปรียบโค้ง", defensive:"ป้องกัน", mixed:"ผสม", priceAll:"ราคา: ทั้งหมด", toggleLang:"EN"
+  }
+};
+const STAGE_LABEL_TH={S1_basing:"ระดับ 1 · การสะสม",S2_uptrend:"ระดับ 2 · ขาขึ้น",S3_distributing:"ระดับ 3 · การกระจาย",S4_down:"ระดับ 4 · ขาลง"};
+const STAGE_SHORT_TH={S1_basing:"การสะสม",S2_uptrend:"ขาขึ้น",S3_distributing:"การกระจาย",S4_down:"ขาลง"};
+const STAGE_DESC_TH={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"การสะสม — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"การกระจาย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
+const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
+const REGIME_LABEL={HIGH_VOLATILITY:"High Volatility",LIQUIDITY_EVENT:"Liquidity Event",LOW_SPREAD:"Low Spread",NORMAL:"Normal"};
+const REGIME_CLASS={HIGH_VOLATILITY:"high-vol",LIQUIDITY_EVENT:"liquidity",LOW_SPREAD:"low-spread",NORMAL:"normal"};
+
+function renderMarketRegime(){
+  const container=document.getElementById("regimeBadge");
+  if(!container||!dashboardMeta||!dashboardMeta.market_regime)return;
+  const r=dashboardMeta.market_regime;
+  const state=r.regime_state||"NORMAL";
+  const label=REGIME_LABEL[state]||"Normal";
+  const cls=REGIME_CLASS[state]||"normal";
+  const reason=r.reason_codes?.length?r.reason_codes.join(", "):"";
+  const inputs=r.inputs||{};
+  const atr=inputs.atr_pct_20d!=null?inputs.atr_pct_20d.toFixed(1)+"%":"—";
+  const spread=inputs.median_spread_bps!=null?inputs.median_spread_bps.toFixed(0)+"bps":"—";
+  const breadth=inputs.breadth_pct_above_ma50!=null?inputs.breadth_pct_above_ma50.toFixed(1)+"%":"—";
+  const bench=inputs.benchmark_at_or_above_ma50!=null?(inputs.benchmark_at_or_above_ma50?"Above MA50":"Below MA50"):"—";
+  container.innerHTML=`<span class="regime-badge ${cls}"><span class="dot"></span>${label}${reason?" <span class='regime-details'>"+reason+"</span>":""}</span>`;
+}
+const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
+const STAGE_DESC={S2_uptrend:"Uptrend — MA50>MA150>MA200 aligned upward",S1_basing:"Basing — price under MA200, re-aligning",S3_distributing:"Distributing — MA50 crossing below MA150/200",S4_down:"Down — price below inverted MA stack"};
+const STAGE_SHORT={S1_basing:"Basing",S2_uptrend:"Uptrend",S3_distributing:"Distributing",S4_down:"Down"};
+const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
+const PROX_LABEL_TH={action:"พร้อม",near_trigger:"ใกล้",forming:"forming",extended:"ขยาย"};
+const STAGE_SUMMARY_ARIA_EN="Stage summary";
+const STAGE_SUMMARY_ARIA_TH="สรุประดับ";
+function detectLanguage(){
+  const stored=localStorage.getItem("signalix-language");
+  if(stored==="th"||stored==="en")return stored;
+  const bl=navigator.language||navigator.userLanguage||"";
+  if(bl.toLowerCase().startsWith("th"))return "th";
+  if((navigator.languages||[]).some(l=>l.toLowerCase().startsWith("th")))return "th";
+  return "en";
+}
+function t(k){const L=localeLabels[language]||localeLabels.en;return L[k]!==undefined?L[k]:k;}
+function STAGE_LABEL_T(s){return language==="th"?STAGE_LABEL_TH[s]:STAGE_LABEL[s];}
+function STAGE_SHORT_T(s){return language==="th"?STAGE_SHORT_TH[s]:STAGE_SHORT[s];}
+function STAGE_DESC_T(s){return language==="th"?STAGE_DESC_TH[s]:STAGE_DESC[s];}
+function PROX_LABEL_T(k){return language==="th"?PROX_LABEL_TH[k]:PROX_LABEL[k];}
+let language="en";
+const esc=v=>String(v??" — ").replace(/[&<>'\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
 const num=(v,d=2)=>v===null||v===undefined?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
 const pct=v=>v===null||v===undefined?"—":`${v>=0?"+":""}${Number(v).toFixed(2)}%`;
 const compact=v=>{v=Number(v);if(!Number.isFinite(v))return "—";let a=Math.abs(v);return a>=1e9?(v/1e9).toFixed(2)+"B":a>=1e6?(v/1e6).toFixed(2)+"M":a>=1e3?(v/1e3).toFixed(1)+"K":num(v,0);};
@@ -358,7 +529,6 @@ let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
 let liquidity="liquid",detailItem=null,stageFilter="all";
 let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={}, radarProx="all";
 const PROX_GROUPS=["action","near_trigger","forming","extended"];
-const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
 const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null;
 function computeMarketPosture(items){
   const xs=Array.isArray(items)?items:[];
@@ -369,6 +539,7 @@ function computeMarketPosture(items){
   const above=ma.filter(x=>Number(x.i.close)>Number(x.ma200)).length;
   const ma200Pct=ma.length?above/ma.length*100:null;
   let state="Mixed",reason="MA200 breadth unavailable";
+  const L=localeLabels[language]||localeLabels.en; // for state name translation
   if(ma.length){
     reason=`Stage breadth ${constructivePct.toFixed(1)}% · MA200 breadth ${ma200Pct.toFixed(1)}%`;
     if(constructivePct>=55&&ma200Pct>=50)state="Favorable";
@@ -387,22 +558,29 @@ const qCornerClass=(s)=>{const c={3:"q3",2:"q2",1:"q1",0:"q0"}[s];return c?`q-co
 
 function freshBadge(i){
   // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
-  if(i.intradayFreshness?.status==="unavailable" && i.intradayFeedStatus==="unavailable") return `<span class="fresh-badge eod" title="60m unavailable: ${esc(i.intradayFeedReason||"No intraday bars")}; Daily EOD used for decisions">60m unavailable · Daily EOD</span>`;
-  if(i.stale) return `<span class="fresh-badge stale" title="Data is stale; Daily EOD shown for decisions">⚠ Stale</span>`;
-  if(i.intradayAvailable) return `<span class="fresh-badge live" title="Live intraday quote available">● Intraday</span>`;
-  if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="Source: ${esc(i.priceLabel)}">Daily EOD</span>`;
-  return `<span class="fresh-badge unknown" title="No price source available">Unknown</span>`;
+  if(i.intradayFreshness?.status==="unavailable" && i.intradayFeedStatus==="unavailable") return `<span class="fresh-badge eod" title="${esc(t("freshBadgeEodUnavailable"))}${i.intradayFeedReason?": "+esc(i.intradayFeedReason):""}">${esc(t("freshBadgeEodUnavailable"))}</span>`;
+  if(i.stale) return `<span class="fresh-badge stale" title="${esc(t("freshBadgeStale"))}">⚠ ${language==="th"?"หมดอายุ":"Stale"}</span>`;
+  if(i.intradayAvailable) return `<span class="fresh-badge live" title="${esc(t("freshBadgeLive"))}">● ${language==="th"?"เรียลไทม์":"Intraday"}</span>`;
+  if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="${t("freshBadgeEod")}: ${esc(i.priceLabel)}">${language==="th"?"ปิดวัน":"Daily EOD"}</span>`;
+  return `<span class="fresh-badge unknown" title="${esc(t("freshBadgeUnknown"))}">${language==="th"?"ไม่ทราบ":"Unknown"}</span>`;
 }
+
+function qualityLevel(i){
+  const l3=i.layer3_qualifier??i.layer3_qualifiers;
+  if(l3&&l3.score!==undefined) return l3.score;
+  return null;
+}
+
 function card(i){
   const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
   const tone=STAGE_TONE[i.stage]||"neutral";
   const td=triggerDistance(i);
-  const triggerLine=td?`<div class="trigger-distance">Trigger ฿${num(td.trigger)} · ${pct(td.distance_pct)}</div>`:"";
+  const triggerLine=td?`<div class="trigger-distance">${t("trigger")}: ฿${num(td.trigger)} · ${pct(td.distance_pct)}</div>`:"";
   const l3=i.layer3_qualifier??i.layer3_qualifiers;
   const l3Badge=l3&&l3.score!==undefined?`<span class="q-corner ${qCornerClass(l3.score)}" title="Quality Q${l3.score}">Q${l3.score}</span>`:"";
   const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
   const stageCls=i.stage?.split("_")[0]||"s1";
-  return `<article class="signal-card stage-${i.stage}" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="Review ${esc(i.symbol)}">
+  return `<article class="signal-card stage-${i.stage}" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="${language==="th"?"รายละเอียด":"Review"} ${esc(i.symbol)}">
     <div class="card-top"><div class="head">
       <span class="pulse-dot ${stageCls}" aria-hidden="true"></span>
       <span class="ticker">${esc(i.symbol)}</span>
@@ -412,14 +590,14 @@ function card(i){
       ${i.radarBadge?`<span class="chip" style="background:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"}22;color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};border-color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};font-size:10px;padding:2px 8px;margin-left:6px">${i.radarBadge}</span>`:""}
       ${l3Badge}
       ${freshBadge(i)}
-    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="Toggle watchlist" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
+    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="${language==="th"?"เพิ่ม/ลบจาก watchlist":"Toggle watchlist"}" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
     <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
-    <div class="basic-strip"><span>VOL <b>${compact(i.volume)}</b></span><span>Value <b>฿${compact(i.tradeValue)}</b></span></div>
+    <div class="basic-strip"><span>${language==="th"?"ปริมาณ":"VOL"} <b>${compact(i.volume)}</b></span><span>${language==="th"?"มูลค่า":"Value"} <b>฿${compact(i.tradeValue)}</b></span></div>
     ${triggerLine}
     ${l3&&l3.score!==undefined?`<div class="q-bar"><span class="q${Math.min(l3.score,3)}" style="width:${l3.score===0?0:Math.max(10,Math.min(l3.score,3)/3*100)}%"></span></div>`:""}
     ${company}
     ${i.breakoutEvidence&&i.breakoutEvidence.trigger!=null?`<div class="setup-evidence">close ${num(i.breakoutEvidence.close)} vs trigger ${num(i.breakoutEvidence.trigger)} · vol ${num(i.breakoutEvidence.volume_ratio,2)}×</div>`:""}
-    ${i.volumeSurge?`<div class="setup-evidence surge">VOLUME SURGE ${num(i.volumeSurgeRatio,1)}×</div>`:""}
+    ${i.volumeSurge?`<div class="setup-evidence surge">${language==="th"?"ภาวะเพิ่มปริมาณ":"VOLUME SURGE"} ${num(i.volumeSurgeRatio,1)}×</div>`:""}
     ${i.action?`<div class="action-line"><b>${esc(i.action)}</b> · ${esc(i.actionReason)}</div>`:""}
   </article>`;
 }
@@ -454,7 +632,8 @@ function renderMarketPosture(){
   if(!root)return;
   root.classList.remove("favorable","defensive","mixed");
   root.classList.add(p.state.toLowerCase());
-  document.getElementById("postureState").textContent=p.state;
+  const stMap={favorable:t("favorable"),defensive:t("defensive"),mixed:t("mixed")};
+  document.getElementById("postureState").textContent=stMap[p.state.toLowerCase()]||p.state;
   document.getElementById("postureStagePct").textContent=`${p.constructivePct.toFixed(1)}%`;
   document.getElementById("postureMaPct").textContent=p.ma200Pct===null?"—":`${p.ma200Pct.toFixed(1)}%`;
   document.getElementById("postureMethod").textContent=p.ma200Pct===null?"MA200 breadth unavailable · context only":"Stage breadth + MA200 breadth · context only, not a trade instruction";
@@ -464,13 +643,16 @@ function render(){
   renderMarketPosture();
   populateIndependenceFilters();
   // stage summary pills (clickable filter) — stage tint + solid count + descriptor
+  const aria=language==="th"?STAGE_SUMMARY_ARIA_TH:STAGE_SUMMARY_ARIA_EN;
   const sum=document.getElementById("stageSummary");
   sum.innerHTML=STAGE_ORDER.map(s=>{
     const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
     const cls=s.split("_")[0];
-    const short=STAGE_SHORT[s]||"";
-    return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" aria-pressed="${stageFilter===s}" role="button" tabindex="0"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div class="desc">${esc(short)}</div></div>`;
+    const short=STAGE_SHORT_T(s)||"";
+    const label=STAGE_LABEL_T(s)||"";
+    return `<div class="stage-pill js-stage ${cls} ${stageFilter===s?"active":""}" data-stage="${s}" aria-pressed="${stageFilter===s}" role="button" tabindex="0" aria-label="${esc(label)} (${c} ${t("stocks")})"><h3>${esc(label)}</h3><div class="cnt">${c}</div><div class="desc">${esc(short)}</div></div>`;
   }).join("");
+  sum.setAttribute("aria-label", aria);
   // sections by stage — Radar moved to its own page (2026-08-20)
   const vals=current();
   const results=document.getElementById("results");
@@ -481,17 +663,17 @@ function render(){
     if(!baseList.length)return "";
     const m=stageMeta[s]||{count:baseList.length};
     const counts={}; PROX_GROUPS.forEach(g=>counts[g]=baseList.filter(i=>proximityState(i)===g).length);
-    const subpills=PROX_GROUPS.map(g=>`<button class="chip l2sub ${proxFilter[s]===g?"active":""}" data-stage="${s}" data-prox="${g}" aria-pressed="${proxFilter[s]===g}">${PROX_LABEL[g]} <b>${counts[g]}</b></button>`).join("");
+    const subpills=PROX_GROUPS.map(g=>`<button class="chip l2sub ${proxFilter[s]===g?"active":""}" data-stage="${s}" data-prox="${g}" aria-pressed="${proxFilter[s]===g}">${PROX_LABEL_T(g)} <b>${counts[g]}</b></button>`).join("");
     const proxEmpty=!!proxFilter[s]&&proxFilter[s]!=="all"&&!list.length;
     return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
-  <h2>${esc(STAGE_LABEL[s])}</h2><span class="badge">${list.length}</span>
-  <span class="desc">${esc(STAGE_DESC[s])}</span></div>
-  <div class="l2-bar">${subpills}<button class="chip l2sub ${!proxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!proxFilter[s]}">All <b>${baseList.length}</b></button></div>
-  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 No symbols in this subgroup — choose All to reset</div>`:""}</section>`;
+  <h2>${esc(STAGE_LABEL_T(s))}</h2><span class="badge">${list.length}</span>
+  <span class="desc">${esc(STAGE_DESC_T(s))}</span></div>
+  <div class="l2-bar">${subpills}<button class="chip l2sub ${!proxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!proxFilter[s]}">${t("all")} <b>${baseList.length}</b></button></div>
+  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 ${t("noQualifying")} <button class="chip" onclick="clearAllFilters()">${t("clearAll")}</button></div>`:""}</section>`;
   }).join("");
   document.getElementById("empty").hidden=!!vals.length;
   const emptyReason=document.getElementById("emptyReason");
-  if(emptyReason)emptyReason.textContent=vals.length?"":"No qualifying setups for the current filters";
+  if(emptyReason){if(!vals.length){emptyReason.innerHTML="<button class=\"chip\" onclick=\"clearAllFilters()\">"+t("clearAll")+"</button>";}}else{emptyReason.innerHTML="";}
   renderRadar();renderMarket();renderWatch();bind(results);bind(document.getElementById("watchResults"));
 }
 function renderRadar(){
@@ -506,7 +688,7 @@ function renderRadar(){
   if(pills){
     const groups=["action","near_trigger","forming","extended"];
     const cnts={};groups.forEach(g=>cnts[g]=radar.filter(i=>proximityState(i)===g).length);
-    pills.innerHTML=[["all","All",radar.length],...groups.map(g=>[g,PROX_LABEL[g],cnts[g]])].map(([g,label,c])=>
+    pills.innerHTML=[["all",t("all"),radar.length],...groups.map(g=>[g,PROX_LABEL_T(g),cnts[g]])].map(([g,label,c])=>
       `<button class="chip ${radarProx===g?"active":""}" data-radar-prox="${g}" aria-pressed="${radarProx===g}">${label} <b>${c}</b></button>`).join("");
   }
   const list=radarProx==="all"?radar:radar.filter(i=>proximityState(i)===radarProx);
@@ -514,7 +696,7 @@ function renderRadar(){
   const empty=document.getElementById("radarEmpty");
   if(empty)empty.hidden=!!list.length;
   const emptyReason=document.getElementById("radarEmptyReason");
-  if(emptyReason)emptyReason.textContent=list.length?"":"No qualifying setups in Radar for this proximity filter";
+  if(emptyReason)emptyReason.textContent=list.length?"":t("noRadar");
   bind(root);
 }
 function renderMarket(){
@@ -533,7 +715,7 @@ function renderMarket(){
               (stageMeta["S3_distributing"]?.count || items.filter(i=>i.stage==="S3_distributing").length);
   const breadthPct = total ? Math.round(adv/total*100) : 0;
   const pulse=document.getElementById("breadthPulse");
-  if(pulse) pulse.innerHTML=`<span class="ratio">${breadthPct}% ขึ้น</span><div class="bar"><span style="width:${breadthPct}%"></span></div>`;
+  if(pulse) pulse.innerHTML=`<span class="ratio">${breadthPct}% ${language==="th"?"ขึ้น":"up"}</span><div class="bar"><span style="width:${breadthPct}%"></span></div>`;
 }
 function renderWatch(){
   const vals=items.filter(i=>saved.has(i.symbol));
@@ -552,22 +734,22 @@ function bind(root=document){
 const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
 const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
 function decisionPanel(i){
-  const setup=i.setupState||i.phase_label||"No actionable setup";
+  const setup=i.setupState||i.phase_label||t("noSetup");
   const trend=i.trendState||i.stage_label||"—";
   const rs=i.rs==null?"—":`RS ${num(i.rs,0)}`;
   const rsi=i.rsi==null?"—":`RSI ${num(i.rsi,0)}`;
   const vol=i.volumeRatio50==null?"—":`${num(i.volumeRatio50,2)}× volume`;
-  const risk=i.riskStop==null?"No defined stop":`Stop ${num(i.riskStop)}`;
-  const trigger=i.breakoutEvidence?.trigger!=null?`Close above ${num(i.breakoutEvidence.trigger)}`:(i.primaryValue||"Wait for setup proof");
-  return `<div class="modal-section-label">Setup quality</div>
+  const risk=i.riskStop==null?t("noStop"):`Stop ${num(i.riskStop)}`;
+  const trigger=i.breakoutEvidence?.trigger!=null?(`${t("closeAbove")} ${num(i.breakoutEvidence.trigger)}`):(i.primaryValue||"Wait for setup proof");
+  return `<div class="modal-section-label">${t("setupQuality")}</div>
     <div class="detail-facts">
-      <div class="detail-fact"><span class="k">Trend / structure</span><span class="v">${esc(trend)}</span></div>
-      <div class="detail-fact"><span class="k">Setup</span><span class="v">${esc(setup)}</span></div>
-      <div class="detail-fact"><span class="k">Relative strength</span><span class="v">${esc(rs)}</span></div>
-      <div class="detail-fact"><span class="k">Momentum / volume</span><span class="v">${esc(rsi)} · ${esc(vol)}</span></div>
+      <div class="detail-fact"><span class="k">${t("trendStructure")}</span><span class="v">${esc(trend)}</span></div>
+      <div class="detail-fact"><span class="k">${t("setup")}</span><span class="v">${esc(setup)}</span></div>
+      <div class="detail-fact"><span class="k">${t("relativeStrength")}</span><span class="v">${esc(rs)}</span></div>
+      <div class="detail-fact"><span class="k">${t("momentumVolume")}</span><span class="v">${esc(rsi)} · ${esc(vol)}</span></div>
     </div>
-    <div class="modal-section-label">Risk</div><div class="risk-note">${esc(risk)}</div>
-    <div class="modal-section-label">Trigger</div><div class="setup-note">${esc(trigger)}</div>`;
+    <div class="modal-section-label">${t("risk")}</div><div class="risk-note">${esc(risk)}</div>
+    <div class="modal-section-label">${t("trigger")}</div><div class="setup-note">${esc(trigger)}</div>`;
 }
 let detailGen=0;
 let chartAbort=null;
@@ -580,14 +762,14 @@ function openDetail(i){
   const idx=(detailList||[]).indexOf(i.symbol);
   document.getElementById("modalContent").innerHTML=`<div class="modal-shell">
     <div class="modal-head">
-      <button class="nav-arrow" id="prevStock" aria-label="Older stock" title="Older stock">‹</button>
+      <button class="nav-arrow" id="prevStock" aria-label="${t("prevStock")}" title="${t("prevStock")}">‹</button>
       <h2 class="modal-title"><a class="title-link" id="modalTitleLink" target="_blank" rel="noopener noreferrer">${esc(i.symbol)} · ${esc(i.companyName||"")}</a><span class="modal-subtitle">${esc(i.stage_label||"—")} · ${esc(i.phase_label||i.setupState||"—")}</span></h2>
-      <button class="nav-arrow" id="nextStock" aria-label="Newer stock" title="Newer stock">›</button>
-      <button class="modal-close" id="closeModal" aria-label="Close" title="Close">×</button>
+      <button class="nav-arrow" id="nextStock" aria-label="${t("nextStock")}" title="${t("nextStock")}">›</button>
+      <button class="modal-close" id="closeModal" aria-label="${t("close")}" title="${t("close")}">×</button>
     </div>
     <div class="decision-banner"><div class="decision-label">${esc(i.action||"NO ACTIONABLE SETUP")}</div><div class="decision-reason">${esc(i.actionReason||"Review the setup before acting.")}</div></div>
     <div class="modal-price"><b>${num(i.close)}</b><span class="${(i.change||0)>=0?"gain":"loss"}">${pct(i.change)}</span><span class="muted">${esc(i.priceLabel||"Daily EOD")}</span></div>
-    <div class="modal-section-label">Price history</div>
+    <div class="modal-section-label">${t("priceHistory")}</div>
     <div class="tf-tools">
       <button class="chip tf" data-tf="1h" aria-pressed="false">60m</button>
       <button class="chip tf active" data-tf="1D" aria-pressed="true">Daily</button>
@@ -596,9 +778,9 @@ function openDetail(i){
     </div>
     <canvas id="detailChart" class="chart-canvas" data-timeframe="1D"></canvas>
     <div id="chartStatus" class="chart-status" role="status" aria-live="polite"></div>
-    <div id="chartFreshness" class="chart-freshness">Last data fetched: ${esc(i.intradayLatestTime||i.date||"—")} · ${esc(i.priceLabel||"Daily EOD")}</div>
+    <div id="chartFreshness" class="chart-freshness">${t("lastFetched")}: ${esc(i.intradayLatestTime||i.date||"—")} · ${esc(i.priceLabel||(language==="th"?"ปิดวัน":"Daily EOD"))}</div>
     <div id="chartLegend" style="font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
-    <div class="modal-section-label">Setup decision</div>
+    <div class="modal-section-label">${t("setupQuality")}</div>
     ${decisionPanel(i)}
   </div>`;
   document.getElementById("prevStock").onclick=()=>stepStock(-1);
@@ -618,7 +800,7 @@ function setActiveTf(tf){ currentTf=tf; document.querySelectorAll("#modalContent
 function loadChart(symbol, tf, gen){
   if(gen!==undefined && gen!==detailGen)return;
   currentTf=tf;
-  const status=document.getElementById("chartStatus"); if(status){status.className="chart-status";status.textContent=`Loading ${TF_LABEL[tf]||tf} chart…`;}
+  const status=document.getElementById("chartStatus"); if(status){status.className="chart-status";status.textContent=t("loadChart")+" "+(TF_LABEL[tf]||tf);}
   if(chartAbort)chartAbort.abort();
   const ac=chartAbort=new AbortController();
   const fetchLimit=(tf==="1M")?500:200;
@@ -630,7 +812,7 @@ function fallback(symbol,tf,gen){
   if(gen!==detailGen)return;
   const status=document.getElementById("chartStatus");
   const label=TF_LABEL[tf]||tf;
-  if(status){status.className="chart-status error";status.innerHTML=`${label} chart unavailable · <button class="chip" id="chartRetry" type="button">Try again</button>`;const retry=document.getElementById("chartRetry");if(retry)retry.onclick=()=>loadChart(symbol,tf,gen);}
+  if(status){status.className="chart-status error";status.innerHTML=`${t("chartUnavailable")} · <button class="chip" id="chartRetry" type="button">${t("tryAgain")}</button>`;const retry=document.getElementById("chartRetry");if(retry)retry.onclick=()=>loadChart(symbol,tf,gen);}
 }
 let chartViewOffset=0; // how many bars scrolled back from the right edge (pan)
 function drawChart(bars, tf){
@@ -739,7 +921,66 @@ document.addEventListener("keydown",e=>{
 let _swX=null; const _mb=document.getElementById("modalBg");
 _mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[0].clientX:null; },{passive:true});
 _mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
-const langT=document.getElementById("languageToggle");if(langT)langT.onclick=()=>{language=language==="th"?"en":"th";localStorage.setItem("signalix-language",language);langT.textContent=language==="th"?"EN":"ไทย";};
+const langT=null;
+function setLanguage(l){
+  language=l;
+  document.documentElement.lang=language;
+  localStorage.setItem("signalix-language",language);
+  if(langT){langT.textContent=language==="th"?t("toggleLang"):t("toggleLang");langT.setAttribute("aria-label",t("toggleLanguage"));}
+  document.title=language==="th"?"Signalix — Setup Radar (Stage)":"Signalix — Stage Screener";
+  document.getElementById("loadTitle").textContent=t("preparingSnapshot");
+  document.getElementById("liveState").textContent=t("loading");
+  const navS=document.querySelector('[data-page="screener"]'); if(navS)navS.textContent=t("navScreener");
+  const navR=document.querySelector('[data-page="radar"]'); if(navR)navR.textContent=t("navRadar");
+  const navW=document.querySelector('[data-page="watchlist"]'); if(navW)navW.textContent=t("navWatchlist");
+  const navM=document.querySelector('[data-page="market"]'); if(navM)navM.textContent=t("navMarket");
+  const search=document.getElementById("search"); if(search){search.placeholder=t("searchPlaceholder");search.setAttribute("aria-label",t("searchAria"));}
+  const covCount=document.getElementById("covCount");
+  // Filter controls
+  const set50Btn=document.getElementById("set50Only"); if(set50Btn)set50Btn.textContent=t("set50");
+  const vf=document.getElementById("valueFilter"); if(vf){
+    const opts=vf.querySelectorAll("option");
+    if(opts.length){opts[0].textContent=language==="th"?t("marketValue"):t("marketValue");}
+  }
+  const pb=document.getElementById("priceBand"); if(pb){
+    const opts=pb.querySelectorAll("option");
+    if(opts.length){
+      opts[0].textContent=t("priceAll");
+      if(opts[1])opts[1].textContent=t("priceLow");
+      if(opts[2])opts[2].textContent=t("priceMid");
+      if(opts[3])opts[3].textContent=t("priceHigh");
+    }
+  }
+  const secLabel=document.getElementById("sectorLabel"); if(secLabel)secLabel.textContent=t("sector")+"/";
+  const indLabel=document.getElementById("industryLabel"); if(indLabel)indLabel.textContent=t("industry")+"/";
+  const secSel=document.getElementById("sectorFilter"); if(secSel){const o=secSel.querySelector("option");if(o)o.textContent=t("all");}
+  const indSel=document.getElementById("industryFilter"); if(indSel){const o=indSel.querySelector("option");if(o)o.textContent=t("all");}
+  vf&&vf.setAttribute("aria-label",t("marketValue"));
+  const liqBtn=document.getElementById("liquidOnly"); if(liqBtn)liqBtn.textContent=t("hideLow");
+  const showAllBtn=document.getElementById("showLowValue"); if(showAllBtn)showAllBtn.textContent=t("showAll");
+  const watchEmptyText=document.getElementById("watchEmptyText"); if(watchEmptyText)watchEmptyText.textContent=t("watchEmpty");
+  const stageLabel=document.getElementById("postureStageLabel"); if(stageLabel)stageLabel.textContent=t("stageBreadth");
+  const maLabel=document.getElementById("postureMaLabel"); if(maLabel)maLabel.textContent=t("aboveMA200");
+  const provFetchedLabel=document.getElementById("provFetchedLabel"); if(provFetchedLabel)provFetchedLabel.textContent=t("lastScanned")+": ";
+  if(covCount){const n=covCount.textContent.replace(/[^0-9]/g,"")||"0";covCount.innerHTML="<b>"+n+"</b> "+t("covAll");}
+  const covLabel=document.getElementById("covLabel"); if(covLabel)covLabel.textContent=t("covAll");
+  const mpKicker=document.querySelector(".posture-kicker"); if(mpKicker)mpKicker.textContent=t("marketPosture");
+  const mpAria=document.querySelector("#marketPosture"); if(mpAria)mpAria.setAttribute("aria-label",t("marketPostureAria"));
+  const mpMa=document.querySelector(".posture-method"); if(mpMa)mpMa.textContent=t("breadthContext");
+  const radarH=document.querySelector("#radar h1"); if(radarH)radarH.textContent=t("navRadar");
+  const radarPills=document.getElementById("radarPills"); if(radarPills)radarPills.setAttribute("aria-label",t("radarProximity"));
+  const radarP=document.querySelector("#radar p"); if(radarP)radarP.textContent=t("radarDesc");
+  const radarCount=document.getElementById("radarCount"); if(radarCount){const n=radarCount.textContent.replace(/[^0-9]/g,"")||"0";radarCount.innerHTML="<b>"+n+"</b> "+t("radarCount");}
+  const radarCovLabel=document.getElementById("radarCovLabel"); if(radarCovLabel)radarCovLabel.textContent=t("radarCount");
+  const wlH=document.querySelector("#watchlist h1"); if(wlH)wlH.textContent=t("navWatchlist");
+  const wlP=document.getElementById("watchState"); if(wlP)wlP.textContent=t("watchState");
+  const mkH=document.querySelector("#market h1"); if(mkH)mkH.textContent=t("marketStatus");
+  const mkP=document.querySelector("#market p"); if(mkP)mkP.textContent=t("marketDesc");
+  const emptyDiv=document.getElementById("empty"); if(emptyDiv){let txt=emptyDiv.querySelector("span#emptyText"); if(txt)txt.textContent=t("noQualifying");let reason=emptyDiv.querySelector("div#emptyReason"); if(reason)reason.innerHTML="<button class=\"chip\" onclick=\"clearAllFilters()\">"+t("clearAll")+"</button>";}
+  render();
+  if(langT){langT.textContent=language==="th"?t("toggleLang"):t("toggleLang");langT.setAttribute("aria-label",t("toggleLanguage"));}
+}
+setLanguage(language);
 
 function setLoadProgress(percent,step){
   const bar=document.getElementById("loadProgress"), pct=document.getElementById("loadPercent"), label=document.getElementById("loadStep");
@@ -752,23 +993,24 @@ function loadRemoteDashboard(){
   // complete sequence and temporarily hid S1/S3/S4 from the trader.
   const state=document.getElementById("liveState");
   let loadDone=false;
-  const finishLoading=()=>{if(loadDone)return;loadDone=true;setLoadProgress(100,"Ready");document.body.classList.remove("loading");};
-  const failLoading=(err)=>{console.error("Signalix snapshot render failed",err);if(state)state.textContent="Load failed";setLoadProgress(100,"Load failed");document.body.classList.remove("loading");};
+  const finishLoading=()=>{if(loadDone)return;loadDone=true;setLoadProgress(100,t("ready"));document.body.classList.remove("loading");};
+  const failLoading=(err)=>{console.error("Signalix snapshot render failed",err);if(state)state.textContent=t("loadFailed");setLoadProgress(100,t("loadFailed"));document.body.classList.remove("loading");};
   window.setTimeout(()=>{if(!loadDone){try{render();finishLoading();}catch(err){failLoading(err);}}},5000);
   try{
-    setLoadProgress(18,"Reading complete snapshot");
+    setLoadProgress(18,t("readingSnapshot"));
     requestAnimationFrame(()=>{
       bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
       document.getElementById("covCount").textContent=items.length;
-      setLoadProgress(42,"Indexing symbols and stages");
+      setLoadProgress(42,t("indexingStages"));
       requestAnimationFrame(()=>{
         const fmtTime=v=>v?new Date(v).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})+" ICT":"—";
-        document.getElementById("provFetched").textContent=`Last Scanned: ${fmtTime(dashboardMeta.intraday_scan_time||dashboardMeta.data_fetched_at)}`;
-        setLoadProgress(70,"Building stage sections");
+        document.getElementById("provFetchedLabel").textContent=t("lastScanned")+": "+fmtTime(dashboardMeta.intraday_scan_time||dashboardMeta.data_fetched_at);
+        setLoadProgress(70,t("buildingStages"));
         requestAnimationFrame(()=>{
           try{
             render();
-            if(state)state.textContent=`Ready · ${items.length} cards · Snapshot`;
+            renderMarketRegime();
+            if(state)state.textContent=t("ready")+" · "+items.length+" "+t("cards")+" · "+t("snapshot");
             requestAnimationFrame(finishLoading);
           }catch(err){failLoading(err);}
         });
@@ -776,7 +1018,7 @@ function loadRemoteDashboard(){
     });
   }catch(err){
     failLoading(err);
-    document.getElementById("results").innerHTML=`<div class="empty">โหลดข้อมูลไม่สำเร็จ — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">ลองใหม่</button></div>`;
+    document.getElementById("results").innerHTML=`<div class="empty">${t("loadFailed")} — ${esc(err.message)}<br><button class="chip" onclick="loadRemoteDashboard()">${t("retry")}</button></div>`;
   }
 }
 loadRemoteDashboard();

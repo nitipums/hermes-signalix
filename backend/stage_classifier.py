@@ -56,6 +56,7 @@ PHASE_LABELS = {
     "base_early": "Base early",
     "base_tight": "Base tight (VCP)",
     "breakout_new": "Breakout new",
+    "breakout_retest": "Breakout retest",
     "breakout_extended": "Breakout extended",
     "uptrend_pullback": "Uptrend pullback",
     "waiting_breakout": "Waiting breakout",
@@ -161,7 +162,7 @@ def _phase_within_stage(stage: str, evidence: dict, event: dict | None) -> str:
             if distance >= EXTENDED_FROM_TRIGGER_PCT or rsi >= EXTENDED_RSI:
                 return "breakout_extended"
             if age >= 1 and abs(distance) <= RETEST_TOLERANCE_PCT:
-                return "breakout_new"  # retest
+                return "breakout_retest"  # controlled retest of the original trigger
             if age <= 2:
                 return "breakout_new"  # fresh
         # rolling trigger path (no persisted event): a Daily close through the
@@ -222,6 +223,8 @@ def _primary_state_from_stage_phase(stage: str, phase: str, evidence: dict, even
     into `no_long_setup` — it is not a contract state.
     """
     if stage == "S2_uptrend":
+        if phase == "breakout_retest":
+            return "breakout_retest"
         if phase == "breakout_extended":
             return "breakout_extended"
         if phase == "uptrend_pullback":

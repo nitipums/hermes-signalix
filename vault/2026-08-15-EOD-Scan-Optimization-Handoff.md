@@ -1,5 +1,7 @@
 # Signalix EOD Scan & Dashboard Handoff
 
+> **STATUS: HISTORICAL** · Historical optimization evidence. Use current `Architecture.md` and `Deployment.md` for active operations.
+
 - **Date:** 2026-08-15
 - **Owner / final gate:** Bee (lite)
 - **Project:** Signalix

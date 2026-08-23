@@ -1,5 +1,7 @@
 # Components
 
+> **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`. Legacy modules are labeled in-place.
+
 Every backend module, what it does, and its hard rules.
 
 ## `update_data.py` — EOD ingestion
@@ -48,7 +50,12 @@ Professional, **English-only**, dark-theme screening workspace. Reads
 chart lightbox (canvas, no chart images). Charts fetched from `/chart/{sym}`.
 
 Intraday-only runs rebuild this artifact from the existing Daily scan after 60m
-upsert/evaluation; they do not rerun Daily classification.
+upsert/evaluation; they do not rerun Daily classification. The active feed is
+filtered by `intraday_feed_status`: after three consecutive Settrade empty/fail
+responses a symbol is `unavailable` for a 24-hour cooldown. This filter is
+intraday-only; Daily/EOD membership and historical data remain intact. Cards
+show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD` rather
+than relabelling an old Daily value as 60m.
 
 ## `dashboard_server.py` — static server (separate dashboard service)
 Serves `/dashboard.html` on :3001 from the bind-mounted `/root/signalix/backend`

@@ -241,7 +241,11 @@ def test_item_exposes_setup_state_and_radar():
     assert item["setup_quality"]["pass"] is True
     assert item["setup_proximity"]["state"] == "near_trigger"
     assert item["radar"] is True
-    assert item["radarBadge"] == "WATCH"
+    # t_3ae98ae4 R2: legacy READY/WATCH badges are no longer emitted; the
+    # old vocabulary survives only under explicit legacy_alias.
+    assert item["radarBadge"] is None
+    assert item["legacy_alias"]["proximity_state"] == "NEAR TRIGGER"
+    assert item["action_queue"] == "qualified_pullback"
 
 
 def test_item_s3_radar_false():

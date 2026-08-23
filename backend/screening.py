@@ -42,6 +42,7 @@ from scanner import (
 from daily_setup_state import classify_daily_state
 from stage_classifier import classify_stage
 from setup_state import compute_setup_state
+from ranking import compute_symbol_ranking, RANKING_WEIGHTS
 
 CONDITION_LABELS = {
     "c1_price_above_150ma": "Price above MA150",
@@ -523,9 +524,21 @@ def group_scan_results(results, events=None):
         row["daily_state"] = state
         row["scan_group"] = key
         row["group_reason"] = f"{state['stage_label']} · {state['phase_label']}"
+        
+        # Compute ranking (Contract v0.2.0 §5)
+        regime_state = None
+        if row.get("market_regime"):
+            regime_state = row["market_regime"].get("regime_state")
+        compute_symbol_ranking(row, regime_state)
+        
         groups[key].append(row)
     for values in groups.values():
-        values.sort(key=lambda row: row["trend_template"]["rs_rating"], reverse=True)
+        # Sort by ranking total_score (descending), fallback to RS rating
+        values.sort(key=lambda row: (
+            row.get("ranking", {}).get("total_score") is not None,
+            row.get("ranking", {}).get("total_score") or 0.0,
+            row.get("trend_template", {}).get("rs_rating", 0.0)
+        ), reverse=True)
     return groups
 
 

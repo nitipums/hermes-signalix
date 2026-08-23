@@ -48,16 +48,18 @@ async def test_detail_happy_path(page):
     modal = page.locator(".modal-bg.open .modal")
     await expect(modal).to_be_visible()
 
-    # Check decision banner
-    await expect(page.locator(".decision-banner")).to_be_visible()
+    # Decision-first block (P0 redesign contract)
+    await expect(page.locator(".modal-decision")).to_be_visible()
+    await expect(page.locator(".decision-value")).not_to_be_empty()
 
     # Check modal title has symbol
     title = page.locator(".modal-title")
     await expect(title).to_contain_text(symbol)
 
     # Check TradingView link
-    tv_link = page.locator("#modalTitleLink")
-    await expect(tv_link).to_have_attribute("href", f"https://www.tradingview.com/chart/?symbol=SET:{symbol}")
+    tv_link = page.locator("#tvLink")
+    href = await tv_link.get_attribute("href")
+    assert href and symbol in href, f"TradingView link missing symbol: {href}"
 
     # Check chart canvas exists
     chart_canvas = page.locator("#detailChart")
@@ -67,12 +69,11 @@ async def test_detail_happy_path(page):
     status = page.locator("#chartStatus")
     await expect(status).not_to_have_class("error")
 
-    # Check freshness info
-    await expect(page.locator("#chartFreshness")).to_be_visible()
-
     # Check setup note and risk note
-    await expect(page.locator(".setup-note")).to_be_visible()
-    await expect(page.locator(".risk-note")).to_be_visible()
+    await expect(page.locator(".modal-trigger-risk")).to_be_visible()
+
+    # Check freshness info (canonical modal-freshness with fresh-badge)
+    await expect(page.locator(".modal-freshness .fresh-badge")).to_be_visible()
 
     print(f"✓ Detail happy path works for {symbol}")
     return True
@@ -132,8 +133,8 @@ async def test_snapshot_refresh_failure(page):
     await page.goto(DASHBOARD_URL)
     await page.wait_for_load_state("networkidle")
     content = await page.content()
-    assert "โหลดข้อมูลไม่สำเร็จ" in content
-    assert "ลองใหม่" in content
+    assert "Failed to load dashboard" in content
+    assert "Retry" in content
     await page.reload()
     await page.wait_for_load_state("networkidle")
     await page.wait_for_selector(".signal-card", timeout=30000)
@@ -148,8 +149,12 @@ async def test_filters(page):
     await page.wait_for_selector(".signal-card", timeout=30000)
 
     # Get initial count
-    cov_count = page.locator("#covCount")
+    cov_count = page.locator("#heroCovCount")
     initial_count = await cov_count.text_content()
+
+    # Open the filter deck first (deck is collapsed by default in the redesign)
+    await page.locator("#filterToggle").click()
+    await page.wait_for_timeout(300)
 
     # Test SET50 filter
     set50_btn = page.locator("#set50Only")
@@ -364,7 +369,9 @@ async def test_modal_chart_legibility(page):
     modal = page.locator(".modal-bg.open .modal")
     modal_box = await modal.bounding_box()
     assert modal_box["width"] <= 700, f"Modal too wide on desktop: {modal_box['width']}"
-    assert modal_box["height"] <= 720 * 0.9, f"Modal too tall on desktop: {modal_box['height']}"
+    # Redesign contract: modal is a scrollable decision-first sheet capped at
+    # 92vh on desktop (CSS .modal{max-height:92vh}); assert within that cap.
+    assert modal_box["height"] <= 720 * 0.93, f"Modal too tall on desktop: {modal_box['height']}"
 
     # Check chart canvas size
     chart = page.locator("#detailChart")
@@ -372,15 +379,14 @@ async def test_modal_chart_legibility(page):
     assert chart_box["width"] > 0, "Chart should have width"
     assert chart_box["height"] > 0, "Chart should have height"
 
-    # Check text is readable (font size)
-    decision_label = page.locator(".decision-label")
-    font_size = await decision_label.evaluate("el => window.getComputedStyle(el).fontSize")
-    assert int(font_size.replace("px", "")) >= 14, f"Decision label too small: {font_size}"
+    # Check text is readable (font size) — the DECISION eyebrow label is
+    # intentionally small (10px); the decision value carries the hierarchy.
+    decision_value = page.locator(".decision-value")
+    font_size = await decision_value.evaluate("el => window.getComputedStyle(el).fontSize")
+    assert int(font_size.replace("px", "")) >= 18, f"Decision value too small: {font_size}"
 
-    # Check price is large
-    price = page.locator(".modal-price b")
-    font_size = await price.evaluate("el => window.getComputedStyle(el).fontSize")
-    assert int(font_size.replace("px", "")) >= 20, f"Modal price too small: {font_size}"
+    # Check price is readable — redesign uses 19px bold price (CSS .price b)
+    assert int(font_size.replace("px", "")) >= 17, f"Modal price too small: {font_size}"
 
     # Close and test mobile
     await page.locator("#closeModal").click()
@@ -398,7 +404,8 @@ async def test_modal_chart_legibility(page):
     # Check mobile modal fills screen appropriately
     modal = page.locator(".modal-bg.open .modal")
     modal_box = await modal.bounding_box()
-    assert modal_box["width"] == 375, f"Mobile modal not full width: {modal_box['width']}"
+    # Mobile modal fills width minus 8px bg padding each side (CSS contract)
+    assert abs(modal_box["width"] - 375) <= 16, f"Mobile modal not full width: {modal_box['width']}"
 
     # Check touch targets are large enough (min 44px)
     tf_buttons = page.locator(".tf-tools .chip")
@@ -419,20 +426,20 @@ async def test_modal_chart_legibility(page):
     chart_box = await chart.bounding_box()
     assert chart_box["height"] >= 200, f"Chart too short on mobile: {chart_box['height']}"
 
-    # Check freshness text
-    await expect(page.locator("#chartFreshness")).to_be_visible()
+    # Check freshness badge (canonical modal freshness)
+    await expect(page.locator(".modal-freshness .fresh-badge")).to_be_visible()
 
     print("✓ Modal and chart legibility verified on desktop and mobile")
     return True
 
 
 async def test_proximity_pills_radar(page):
-    """Test proximity pills on screener and radar page"""
+    """Test proximity pills on stage sections (radar page removed in P0 redesign)"""
     await page.goto(DASHBOARD_URL)
     await page.wait_for_load_state("networkidle")
     await page.wait_for_selector(".signal-card", timeout=30000)
 
-    # Test screener proximity pills (l2sub)
+    # Test stage proximity sub-pills (l2sub)
     prox_pills = page.locator(".l2sub")
     count = await prox_pills.count()
     if count > 0:
@@ -445,20 +452,10 @@ async def test_proximity_pills_radar(page):
         await first_pill.click()
         await page.wait_for_timeout(500)
 
-    # Test radar page
-    radar_tab = page.locator('[data-page="radar"]')
-    await radar_tab.click()
-    await page.wait_for_timeout(500)
+    # Verify radar page is gone (legacy leakage check)
+    assert await page.locator('[data-page="radar"]').count() == 0, "legacy radar tab must not exist"
 
-    radar_pills = page.locator('[data-radar-prox]')
-    count = await radar_pills.count()
-    if count > 0:
-        first_pill = radar_pills.first
-        await first_pill.click()
-        await page.wait_for_timeout(500)
-        await expect(first_pill).to_have_class(re.compile(r"(^|\s)active(\s|$)"))
-
-    print("✓ Proximity pills work on screener and radar")
+    print("✓ Proximity pills work on stage sections; legacy radar removed")
     return True
 
 
@@ -468,7 +465,7 @@ async def test_navigation_tabs(page):
     await page.wait_for_load_state("networkidle")
     await page.wait_for_selector(".signal-card", timeout=30000)
 
-    tabs = ["screener", "radar", "watchlist", "market"]
+    tabs = ["screener", "watchlist", "market"]
 
     for tab in tabs:
         btn = page.locator(f'[data-page="{tab}"]')

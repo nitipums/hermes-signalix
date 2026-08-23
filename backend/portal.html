@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Signalix — สมัครสมาชิก & ตั้งหุ้นติดตาม</title>
+<title>Signalix — Subscribe & Set Watchlist</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2333; --line:#283041;
@@ -51,47 +51,47 @@
 </head>
 <body>
   <h1>📡 Signalix</h1>
-  <div class="sub">ตั้งหุ้นติดตามรับสัญญาณ Minervini แจ้งเตือนเข้า Telegram</div>
-  <a href="/dashboard.html" style="display:inline-block;font-size:13px;color:var(--acc2);margin:-10px 0 14px">↗ ดู Dashboard ตลาดทั้งหมด</a>
+  <div class="sub">Set watchlist for Minervini signals via Telegram</div>
+  <a href="/dashboard.html" style="display:inline-block;font-size:13px;color:var(--acc2);margin:-10px 0 14px">↗ View full Market Dashboard</a>
 
   <div class="panel">
-    <label>Telegram Chat ID ของคุณ</label>
-    <input id="chat" type="text" placeholder="เช่น 7295704669" autocomplete="off">
-    <div class="hint">หา chat id ได้จาก @userinfobot บน Telegram</div>
-    <button id="loadBtn">โหลดสถานะของฉัน</button>
+    <label>Your Telegram Chat ID</label>
+    <input id="chat" type="text" placeholder="e.g., 7295704669" autocomplete="off">
+    <div class="hint">Find chat id via @userinfobot on Telegram</div>
+    <button id="loadBtn">Load my status</button>
     <div id="loadMsg" class="msg"></div>
   </div>
 
   <div id="dash" class="hidden">
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <strong>สถานะบัญชี</strong>
+        <strong>Account Status</strong>
         <span id="tierTag" class="tag free">free</span>
       </div>
-      <div class="metric">หุ้นที่ติดตาม: <b id="wlCount">0</b> / <b id="wlCap">5</b></div>
+      <div class="metric">Watchlist: <b id="wlCount">0</b> / <b id="wlCap">5</b></div>
       <div class="bar"><i id="wlBar"></i></div>
-      <div class="metric">แจ้งเตือนวันนี้: <b id="alCount">0</b> / <b id="alCap">10</b></div>
+      <div class="metric">Alerts today: <b id="alCount">0</b> / <b id="alCap">10</b></div>
       <div class="bar"><i id="alBar"></i></div>
       <div class="metric" id="modeLine"></div>
     </div>
 
     <div class="panel">
-      <label>เพิ่มหุ้นติดตาม (ticker SET หุ้นสามัญ/ORD เช่น TRT, KBANK คั่นจุลภาคได้)</label>
+      <label>Add to watchlist (SET tickers e.g., TRT, KBANK)</label>
       <input id="addSym" type="text" placeholder="TRT, KBANK, PTT">
-      <div class="hint">พิมพ์ ticker ตัวพิมพ์ใหญ่หรือเล็กก็ได้ ระบบจะตัดรายการซ้ำและตรวจสอบ ticker ก่อนบันทึก · Free ติดตามได้สูงสุด 5 หุ้น</div>
-      <button id="saveBtn">บันทึก Watchlist</button>
+      <div class="hint">Case-insensitive; duplicates removed; tickers validated · Free tier max 5 stocks</div>
+      <button id="saveBtn">Save Watchlist</button>
       <div id="saveMsg" class="msg"></div>
       <div id="wlList" style="margin-top:10px"></div>
-      <button id="allBtn" class="ghost">รับสัญญาณทุกหุ้น (Watch All)</button>
+      <button id="allBtn" class="ghost">Watch All (Receive all signals)</button>
     </div>
 
     <div class="panel">
-      <strong>แผนสมาชิก</strong>
+      <strong>Plans</strong>
       <table id="tierTable">
-        <thead><tr><th>แพ็กเกจ</th><th>หุ้นติดตาม</th><th>แจ้งเตือน/วัน</th></tr></thead>
+        <thead><tr><th>Package</th><th>Watchlist</th><th>Alerts/day</th></tr></thead>
         <tbody></tbody>
       </table>
-      <div class="hint">อัปเกรดแพ็กเกจติดต่อแอดมิน เพื่อปลดล็อก unlimited</div>
+      <div class="hint">Contact admin to upgrade for unlimited</div>
     </div>
   </div>
 
@@ -105,8 +105,8 @@ function setBar(barId, n, cap){
 }
 async function load(){
   const chat=el('chat').value.trim();
-  if(!chat){el('loadMsg').textContent='กรุณาใส่ Chat ID';el('loadMsg').className='msg err-msg';return}
-  el('loadMsg').textContent='กำลังโหลด...';el('loadMsg').className='msg';
+  if(!chat){el('loadMsg').textContent='Please enter Chat ID';el('loadMsg').className='msg err-msg';return}
+  el('loadMsg').textContent='Loading...';el('loadMsg').className='msg';
   try{
     const [me,tiers]=await Promise.all([
       fetch(`${API}/me?chat_id=${encodeURIComponent(chat)}`).then(r=>r.json()),
@@ -115,7 +115,7 @@ async function load(){
     render(me,tiers);
     el('dash').classList.remove('hidden');
     el('loadMsg').textContent='';
-  }catch(e){el('loadMsg').textContent='โหลดไม่ได้: '+e.message;el('loadMsg').className='msg err-msg'}
+  }catch(e){el('loadMsg').textContent='Failed to load: '+e.message;el('loadMsg').className='msg err-msg'}
 }
 function render(me,tiers){
   const tier=me.tier||'free';
@@ -130,14 +130,14 @@ function render(me,tiers){
   setBar('wlBar',me.symbols.length,wlCap);
   setBar('alBar',me.alerts_today||0,alCap);
   el('modeLine').textContent = me.watch_mode==='all'
-    ? 'โหมด: รับสัญญาณทุกหุ้น ✅'
-    : (me.watch_mode==='none'?'โหมด: ยังไม่ตั้งค่า':'โหมด: ติดตามเฉพาะหุ้นที่เลือก');
+    ? 'Mode: Watch All ✅'
+    : (me.watch_mode==='none'?'Mode: Not configured':'Mode: Watching selected stocks only');
   // watchlist
   const list=el('wlList'); list.innerHTML='';
   if(me.watch_mode==='all'){
-    list.innerHTML='<div class="hint">กำลังรับสัญญาณทุกหุ้น</div>';
+    list.innerHTML='<div class="hint">Receiving signals for all stocks</div>';
   } else if(me.symbols.length===0){
-    list.innerHTML='<div class="hint">ยังไม่มีหุ้นใน watchlist</div>';
+    list.innerHTML='<div class="hint">No stocks in watchlist yet</div>';
   } else {
     me.symbols.forEach(s=>{
       const row=document.createElement('div');row.className='row';
@@ -157,17 +157,17 @@ function render(me,tiers){
 async function save(){
   const chat=el('chat').value.trim();
   const raw=el('addSym').value.trim();
-  if(!raw && !confirm('ล้าง watchlist ทั้งหมดและรับสัญญาณทุกหุ้น?')) return;
+  if(!raw && !confirm('Clear watchlist and receive all signals?')) return;
   const syms=raw?raw.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean):[];
-  el('saveMsg').textContent='กำลังบันทึก...';el('saveMsg').className='msg';
+  el('saveMsg').textContent='Saving...';el('saveMsg').className='msg';
   try{
     const r=await fetch(`${API}/watch?chat_id=${encodeURIComponent(chat)}&symbols=${encodeURIComponent(syms.join(','))}`,{method:'POST'});
     const j=await r.json();
     if(!r.ok){el('saveMsg').textContent='✋ '+j.reason;el('saveMsg').className='msg err-msg';return}
-    el('saveMsg').textContent='✅ บันทึกแล้ว';el('saveMsg').className='msg ok-msg';
+    el('saveMsg').textContent='✅ Saved';el('saveMsg').className='msg ok-msg';
     el('addSym').value='';
     await refresh();
-  }catch(e){el('saveMsg').textContent='บันทึกไม่ได้: '+e.message;el('saveMsg').className='msg err-msg'}
+  }catch(e){el('saveMsg').textContent='Save failed: '+e.message;el('saveMsg').className='msg err-msg'}
 }
 async function allMode(){
   const chat=el('chat').value.trim();

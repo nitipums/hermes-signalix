@@ -150,7 +150,10 @@ class SnapshotFreshnessTests(unittest.TestCase):
 
     def test_loading_header_is_distinct_from_unknown_or_stale(self):
         from pathlib import Path
-        source = Path("build_dashboard.py").read_text(encoding="utf-8")
+        # DISPOSITION 2026-08-22 (t_918994ed): build_dashboard.py moved into
+        # backend/ — resolve relative to this test file so the suite runs from
+        # any CWD.
+        source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
         # The unknown/stale fallback label must exist as a distinct branch
         # from any live-loading path. The original 'Loading live snapshot…'
         # literal was removed in a later refactor, so assert the current

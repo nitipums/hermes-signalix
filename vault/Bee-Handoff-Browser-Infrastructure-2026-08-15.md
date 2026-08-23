@@ -1,5 +1,7 @@
 # Bee Handoff — Browser Infrastructure Fix (Level 4 → Level 3)
 
+> **STATUS: HISTORICAL** · Browser incident evidence. Reusable procedure belongs in the browser-fix skill.
+
 **Date:** 2026-08-15 UTC  
 **Owner:** Khim  
 **Promote to:** Bee → Level-3 `fact_store` after review

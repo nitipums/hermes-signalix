@@ -29,7 +29,11 @@ def test_item_exposes_setup_state_and_radar():
     assert item["setup_quality"]["pass"] is True
     assert item["setup_proximity"]["state"] == "near_trigger"
     assert item["radar"] is True
-    assert item["radarBadge"] == "WATCH"
+    # DISPOSITION (t_3ae98ae4 R2): legacy WATCH badge superseded by canonical
+    # v0.2.0 — serialize must NOT emit legacy display terms except under
+    # explicit legacy_alias.
+    assert item["radarBadge"] is None
+    assert item["legacy_alias"] == {"proximity_state": "NEAR TRIGGER"}
 
 
 def test_item_s3_radar_false():
@@ -54,7 +58,10 @@ def test_item_quality_pass_action_is_ready():
     row["daily_state"]["setup_proximity"]["state"] = "action"
     item = serialize("uptrend_pullback", row, {})
     assert item["radar"] is True
-    assert item["radarBadge"] == "READY"
+    # DISPOSITION (t_3ae98ae4 R2): legacy READY badge superseded by canonical
+    # action_queue vocabulary ("qualified_pullback" for this row).
+    assert item["radarBadge"] is None
+    assert item["action_queue"] == "qualified_pullback"
 
 
 def test_dashboard_sort_proximity_before_rs():

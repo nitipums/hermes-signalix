@@ -1,5 +1,7 @@
 # Phases & Open Gaps
 
+> **STATUS: CURRENT** · `CANONICAL_FOR: roadmap phase boundaries`. Individual task state belongs to the active work system, not this note.
+
 ## Phase status
 - **Phase 1 — Webhook ingestion + storage + Redis pub/sub** ✅
 - **Phase 2 — Deterministic screening (TT/VCP/RS/Position sizing)** ✅

@@ -1,5 +1,7 @@
 # Signalix Stage-First Dashboard Redesign — Handoff 2026-08-17
 
+> **STATUS: HISTORICAL** · Design/migration evidence. Current UI contract must be verified from source, served artifact, and browser.
+
 **Owner:** Arm (Nitipum.s) · **Executor:** Bee (lite)
 **Date:** 2026-08-17
 **Status:** DONE — verified on prod (universe 1,143, modal + candlestick chart working)

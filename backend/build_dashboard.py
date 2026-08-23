@@ -130,6 +130,101 @@ def dashboard_freshness(pg, now=None, last_valid_session=None):
         cur.close()
 
 
+def fetch_market_regime(pg):
+    """Fetch latest market regime from daily_market_regime table.
+
+    Returns dict with regime_state, inputs, reason_codes, policy_version, timestamps.
+    """
+    cur = pg.cursor()
+    try:
+        # Join with daily_scan_runs to get the latest canonical run
+        cur.execute("""
+            SELECT mr.regime_state, mr.atr_pct_20d, mr.median_spread_bps,
+                   mr.liquidity_event_flag, mr.breadth_pct_above_ma50,
+                   mr.benchmark_at_or_above_ma50, mr.liquidity_event_reason_codes,
+                   mr.reason_codes, mr.policy_version, mr.data_timestamp_utc,
+                   mr.computed_at_utc, mr.run_id
+            FROM daily_market_regime mr
+            JOIN daily_scan_runs dr ON dr.id = mr.run_id
+            JOIN daily_scan_run_selection_audit sa ON sa.run_id = dr.id
+            WHERE sa.selection_status = 'selected'
+            ORDER BY mr.data_timestamp_utc DESC NULLS LAST
+            LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            return {
+                "regime_state": "NORMAL",
+                "inputs": {
+                    "atr_pct_20d": None,
+                    "median_spread_bps": None,
+                    "liquidity_event_flag": None,
+                    "breadth_pct_above_ma50": None,
+                    "benchmark_at_or_above_ma50": None,
+                },
+                "reason_codes": ["NO_REGIME_DATA"],
+                "policy_version": "regime-v0.2.0",
+                "data_timestamp_utc": None,
+                "computed_at_utc": None,
+                "run_id": None,
+            }
+        return {
+            "regime_state": row[0],
+            "inputs": {
+                "atr_pct_20d": row[1],
+                "median_spread_bps": row[2],
+                "liquidity_event_flag": row[3],
+                "breadth_pct_above_ma50": row[4],
+                "benchmark_at_or_above_ma50": row[5],
+            },
+            "liquidity_event_reason_codes": row[6] or [],
+            "reason_codes": row[7] or [],
+            "policy_version": row[8],
+            "data_timestamp_utc": row[9],
+            "computed_at_utc": row[10],
+            "run_id": str(row[11]) if row[11] else None,
+        }
+    except Exception as e:
+        # If table doesn't exist or query fails, return default
+        return {
+            "regime_state": "NORMAL",
+            "inputs": {
+                "atr_pct_20d": None,
+                "median_spread_bps": None,
+                "liquidity_event_flag": None,
+                "breadth_pct_above_ma50": None,
+                "benchmark_at_or_above_ma50": None,
+            },
+            "reason_codes": [f"REGIME_FETCH_ERROR: {type(e).__name__}"],
+            "policy_version": "regime-v0.2.0",
+            "data_timestamp_utc": None,
+            "computed_at_utc": None,
+            "run_id": None,
+        }
+    finally:
+        cur.close()
+
+
+def _regime_badge_class(regime_state: str) -> str:
+    """CSS class for regime badge styling."""
+    return {
+        "HIGH_VOLATILITY": "regime-high-vol",
+        "LIQUIDITY_EVENT": "regime-liquidity-event",
+        "LOW_SPREAD": "regime-low-spread",
+        "NORMAL": "regime-normal",
+    }.get(regime_state, "regime-normal")
+
+
+def _regime_label(regime_state: str) -> str:
+    """English label for regime badge (launch-ready requirement)."""
+    return {
+        "HIGH_VOLATILITY": "High Volatility",
+        "LIQUIDITY_EVENT": "Liquidity Event",
+        "LOW_SPREAD": "Low Spread",
+        "NORMAL": "Normal",
+    }.get(regime_state, "Normal")
+
+
 def snapshots(pg, symbols):
     if not symbols:
         return {}
@@ -477,10 +572,12 @@ def intraday_event_evidence(snapshot, intraday_event=None):
     else:
         evidence["baseline_close"] = None
         evidence["baseline_date"] = None
-    # Freshness evidence: the newest stored intraday close + age
-    evidence["intraday_close"] = number(snapshot.get("close")) if snapshot else None
-    evidence["intraday_candle_at"] = snapshot.get("date") if snapshot else None
-    evidence["stale"] = bool(snapshot.get("stale")) if snapshot else False
+    # Freshness evidence: latest observation join from get_active_intraday_events
+    fresh = intraday_event.get("freshness") or {}
+    evidence["intraday_close"] = number(fresh.get("close"))
+    evidence["intraday_candle_at"] = fresh.get("candle_ts")
+    evidence["stale"] = bool(fresh.get("stale"))
+    evidence["freshness_status"] = fresh.get("status", "unknown")
     return evidence
 
 
@@ -562,7 +659,10 @@ def quality_flags(group, row, snapshot):
     if phase == "breakout_new":
         flags.append({"code": "fresh", "label": "FRESH", "note": "Fresh Daily breakout; wait for hold/retest confirmation."})
     if phase == "breakout_extended":
-        flags.append({"code": "extended", "label": "EXTENDED", "note": "Extended from trigger or RSI; do not chase."})
+        # label avoids the legacy proximity term EXTENDED (v0.2.0 isolation);
+        # the code field stays machine-canonical.
+        flags.append({"code": "extended", "label": "LATE STAGE",
+                      "note": "Extended from trigger or RSI; do not chase."})
     met = trend.get("conditions_met")
     if met is not None and met < 8:
         flags.append({"code": "weak_quality", "label": "WEAK QUALITY", "note": f"Trend Template {met}/8; not a fully qualified trend."})
@@ -761,13 +861,48 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
     daily_state = row.get("daily_state") or {}
     stage = daily_state.get("stage")
     phase = daily_state.get("phase")
+    # Retest Watch mapping reconciliation (t_c5694a25): scan files produced by
+    # the pre-t_3ae98ae4 classifier persist primary_state="breakout_retest"
+    # while phase stayed "breakout_new". primary_state is the canonical P0
+    # decision state, so when the two disagree on the retest label we trust the
+    # deterministic primary_state and promote phase — never the reverse. This
+    # does NOT broaden legacy labels: it only fires on the exact canonical
+    # primary_state value and keeps every other phase untouched.
+    if (daily_state.get("primary_state") == "breakout_retest"
+            and phase != "breakout_retest" and stage == "S2_uptrend"):
+        phase = "breakout_retest"
+        daily_state = {**daily_state, "phase": phase,
+                       "phase_label": "Breakout retest"}
     # Two-layer actionable setup state (quality gate + proximity timing).
     setup_q = daily_state.get("setup_quality") or {}
     setup_p = daily_state.get("setup_proximity") or {}
     radar_state = setup_p.get("state")
     radar = bool(setup_q.get("pass") and radar_state in ("near_trigger", "action"))
-    radar_badge = ("READY" if radar_state == "action"
-                   else "WATCH" if radar_state == "near_trigger" else None)
+    # P1 Action Queue Redesign (t_69ff91c2): canonical 7-queue projection.
+    # Deterministic; derived from stage/phase/quality/proximity + active event.
+    from action_queue import (assign_action_queue, queue_label,
+                              LEGACY_PROXIMITY_ALIASES,
+                              DATA_BLOCK_INSUFFICIENT, DATA_BLOCK_STALE)
+    _queue = assign_action_queue(
+        stage=stage, phase=phase,
+        quality_pass=bool(setup_q.get("pass")),
+        proximity_state=radar_state,
+        intraday_event=intraday_event,
+    )
+    # Insufficient-history rows are never actionable and carry an explicit
+    # data-block reason instead of a silent risk verdict.
+    _data_block = None
+    _daily_fresh = ((row.get("daily_state") or {}).get("data_freshness") or "fresh")
+    if readiness.get("status") == "INSUFFICIENT_HISTORY":
+        _queue = "monitor_only"
+        _data_block = DATA_BLOCK_INSUFFICIENT
+    elif stale or _daily_fresh == "stale":
+        _data_block = DATA_BLOCK_STALE
+    # Canonical v0.2.0: READY/WATCH-style proximity badges are legacy display
+    # terms. They survive ONLY under explicit legacy_alias for migration/audit.
+    legacy_alias = {"proximity_state": LEGACY_PROXIMITY_ALIASES.get(radar_state)} \
+        if radar_state else {}
+    radar_badge = None
     lifecycle = {
         "state": phase or "unclassified",
         "stage": stage or "none",
@@ -781,7 +916,7 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
     intraday_source = None if feed_unavailable else snapshot.get("price_source")
     # Stage-first canonical projection (Minervini S1-S4 + phase). The persisted
     # daily_state carries {stage, phase, ...}; legacy primary_state is gone.
-    canonical = dict(row.get("daily_state") or {})
+    canonical = dict(daily_state)  # already carries the retest reconciliation
     phase = canonical.get("phase")
     stage = canonical.get("stage")
     _fresh = phase == "breakout_new"
@@ -799,10 +934,12 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
                           "base_tight": "base_forming"}.get(phase, "pre_breakout"))
     canonical.setdefault("lifecycleState",
                          {"breakout_new": "fresh_breakout",
-                          "breakout_extended": "extended_breakout"}.get(phase, "none"))
+                          "breakout_extended": "extended_breakout",
+                          "breakout_retest": "retest"}.get(phase, "none"))
     canonical.setdefault("action",
                          {"breakout_new": "VALIDATE_FRESH",
                           "breakout_extended": "DO_NOT_CHASE",
+                          "breakout_retest": "WAIT_FOR_RETEST",
                           "uptrend_pullback": "HOLD_IF_SUPPORT_DEFENDS",
                           "declining": "NO_LONG_SETUP",
                           "broken": "NO_LONG_SETUP"}.get(phase, "WAIT"))
@@ -902,6 +1039,10 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "setup_quality": setup_q,
         "setup_proximity": setup_p,
         "radar": radar,
+        "action_queue": _queue,
+        "action_queue_label": queue_label(_queue),
+        "data_block": _data_block,
+        "legacy_alias": legacy_alias or None,
         "radarBadge": radar_badge,
         "liquidity": {"source": "Daily EOD", "turnover": number(snapshot.get("daily_turnover", snapshot.get("turnover")), 0),
                       "volumeRatio50": number(readiness.get("volume_ratio_50")),
@@ -961,6 +1102,8 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "layer3_qualifier": l3,
         # Retain the plural legacy key for existing dashboard consumers.
         "layer3_qualifiers": l3,
+        # Ranking (Contract v0.2.0 §5)
+        "ranking": row.get("ranking"),
     }
 
 
@@ -995,6 +1138,23 @@ def build(scanned=None):
         grouped = group_scan_results(scanned, events={})
         source_groups = grouped
         rows = [r for values in source_groups.values() for r in values]
+    
+    # Ensure ranking is computed for all rows (Contract v0.2.0 §5)
+    # This is needed for standalone rebuilds where group_scan_results wasn't called
+    if scanned is None:
+        from screening import compute_symbol_ranking
+        from build_dashboard import fetch_market_regime
+        pg = get_pg()
+        try:
+            market_regime = fetch_market_regime(pg)
+            regime_state = market_regime.get("regime_state") if market_regime else None
+            for row in rows:
+                compute_symbol_ranking(row, regime_state)
+        finally:
+            pg.close()
+    else:
+        # When scanned is provided, group_scan_results was already called
+        pass
     # Enrich all cards with one batched DB read. This is not a per-symbol
     # connection/query fan-out: snapshots() performs set-based lateral queries
     # for the complete universe, so EOD keeps the technical fields visible.
@@ -1025,6 +1185,17 @@ def build(scanned=None):
             active_events = get_active_intraday_events(pg)
         except Exception:
             pass
+        # Retest Watch provenance (t_c5694a25): the retest hard gate requires a
+        # persisted event with its original trigger price. Daily canonical
+        # breakout events are that provenance source (the same immutable events
+        # the scanner classified against); intraday emerging events stay a
+        # separate append-only lane and never qualify for retest_watch.
+        daily_events = {}
+        try:
+            from scan_history import active_breakout_events
+            daily_events = active_breakout_events(pg)
+        except Exception:
+            pass
     finally:
         pg.close()
     overlays = {}
@@ -1037,7 +1208,8 @@ def build(scanned=None):
         market_cap=latest.get(row["symbol"], {}).get("market_cap"),
         free_float_pct=latest.get(row["symbol"], {}).get("free_float_pct"),
         foreign_limit_pct=latest.get(row["symbol"], {}).get("foreign_limit_pct"),
-        intraday_event=active_events.get(row["symbol"]),
+        intraday_event=active_events.get(row["symbol"])
+        or daily_events.get(row["symbol"]),
     ) for key, values in source_groups.items() for row in values
       if row["symbol"] not in excluded]
     items = apply_projection(items)
@@ -1068,14 +1240,28 @@ def build(scanned=None):
                 ev.get("confidence", "emerging"), 0) + 1
     except Exception:
         pass
+    
+    # Fetch market regime (Contract v0.2.0 §3)
+    # Priority: 1) from scanned data (when called from app.py), 2) from DB
+    market_regime = None
+    if scanned:
+        for row in scanned:
+            if row.get("market_regime"):
+                market_regime = row["market_regime"]
+                break
+    if not market_regime:
+        pg_regime = get_pg()
+        try:
+            market_regime = fetch_market_regime(pg_regime)
+        finally:
+            pg_regime.close()
+
+    # Freshness computation
+    from provenance_contract import compute_freshness
+    _root_data_fetched = freshness.get("data_fetched_at")
+    _root_freshness_status = compute_freshness(_root_data_fetched)
+
     with open(SNAPSHOT_JSON, "w") as file:
-        # Root-level provenance fields are the canonical contract shared with
-        # the US watchlist payload (app.py).  data_fetched_at is the actual DB
-        # fetch timestamp; data_freshness_status is computed via the contract
-        # so "market_closed" never replaces a real freshness classification.
-        from provenance_contract import compute_freshness
-        _root_data_fetched = freshness.get("data_fetched_at")
-        _root_freshness_status = compute_freshness(_root_data_fetched)
         json.dump({"scan_time": scan_time, "market": "TH",
                    "build_timestamp": build_timestamp,
                    "data_fetched_at": _root_data_fetched,
@@ -1094,6 +1280,7 @@ def build(scanned=None):
                                       "market_session": freshness.get("market_session", {}),
                                       "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
                                       "intraday_event_counts": event_counts},
+                   "market_regime": market_regime,
                    "refresh": "progressive_cards", "items": items,
                    "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
                   separators=(",", ":"), default=_json_default)
@@ -1137,7 +1324,8 @@ def build(scanned=None):
                                                         "intraday_scan_time": intraday_scan_time,
                                                         "data_freshness_status": freshness.get("status"),
                                                         "data_freshness_source": freshness.get("source"),
-                                                        "market_session": freshness.get("market_session", {})}, separators=(",", ":"), default=_json_default)))
+                                                        "market_session": freshness.get("market_session", {}),
+                                                        "market_regime": market_regime}, separators=(",", ":"), default=_json_default)))
     with open(OUT_HTML, "w") as file:
         file.write(page)
     return {"securities": len(items), "groups": counts, "out": OUT_HTML}

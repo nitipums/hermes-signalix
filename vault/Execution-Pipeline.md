@@ -1,5 +1,7 @@
 # Signalix Execution Pipeline
 
+> **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`. Active work source is this Markdown pipeline plus linked focused plans; Kanban is audit/archive only.
+
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
 > This is the durable work-management source for Signalix. Do not reopen or create Kanban tasks for this project. Use this document for the active sequence, [[Decisions]] for durable choices, and focused implementation plans under `/root/signalix/.hermes/plans/` for executable detail.

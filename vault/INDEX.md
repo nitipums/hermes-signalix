@@ -2,7 +2,18 @@
 
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
-> Source of truth: โค้ดจริงใน `/root/signalix/` + DB + ตัว container
+> Governance: [[Documentation-Governance]]
+> Active work source: `Execution-Pipeline.md` + linked focused plans. Kanban is audit/archive only.
+
+## 0. Governance gate
+
+อ่าน `Documentation-Governance.md` ก่อนเพิ่มหรือแก้ note ใดๆ ทุกครั้ง
+
+- Product direction → `Product-Strategy-Market-to-Action.md`
+- Atomic decisions → `Decisions.md`
+- Current architecture/ops → `Architecture.md`, `Components.md`, `Deployment.md`, `Execution-Pipeline.md`
+- Historical evidence → dated handoffs / `Postmortems/`
+- Work status → owner decision required; do not mirror into notes/facts
 
 ## 1. วิธีการใช้
 
@@ -15,15 +26,17 @@
 
 | ไฟล์ | เรื่อง | สถานะ | หมายเหตุ |
 |---|---|---|---|
-| `README.md` | ภาพรวม project | ✅ active | |
-| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **อัปเดตแล้ว 2026-08-21: separate dashboard service + intraday fetch→DB→evaluator→dashboard E2E contract** |
+|| `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
+|| `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
+|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-23 |
+|| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **อัปเดตแล้ว 2026-08-21: separate dashboard service + intraday fetch→DB→evaluator→dashboard E2E contract** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Strategy: Market View → Action | ✅ active | plan หลัก |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; 2026-08-22 setup-first direction added** |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
@@ -31,6 +44,7 @@
 | `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 | `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
+| `2026-08-21-Intraday-Feed-Availability-Handoff.md` | 11 unavailable 60m feeds + COLOR boundary | ✅ current | feed-specific cooldown; Daily preserved |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -40,9 +54,10 @@
 | `2026-08-15-EOD-Scan-Optimization-Handoff.md` | Settrade EOD 30 workers/860 sym | 🟡 **HISTORICAL** (metric เก่า, architecture เปลี่ยน) |
 | `2026-08-15-Khim-End-to-End-Fix-Handoff.md` | Khim fix | 🟡 **HISTORICAL** |
 | `2026-08-15-Signalix-Taxonomy-Redesign-Handoff` | taxonomy 718 redesign | 🟡 **HISTORICAL — SUPERSEDED** (โดน stage-first ทับ; ดู `2026-08-17-Stage-First...`) |
-| `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | ✅ **current** — สถาปัตยกรรมปัจจุบัน (LAYER1/LAYER2) |
+| `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | 🟡 **HISTORICAL** — design/migration evidence; current UI contract verified from source/artifact/browser |
 | `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
-| `Roadmap-Kanban.md` | **Experimental Kanban board** (Markdown) | ✅ **current** — synced from all plans + actual verified 2026-08-19 |
+| `Roadmap-Kanban.md` | Archived Kanban mirror | 🟡 historical | Audit only; Markdown pipeline is active work source |
+| `Team-Operating-Model.md` | Team roles, providers, review loop | ✅ current | Bee final gate; provider allocation verified 2026-08-22 |
 
 ## 4. สถานะซิงค์กับ fact_store
 
@@ -62,8 +77,13 @@
 
 ## 6. Changelog
 
-- **2026-08-19**: P0-1 compact overview data contract `DONE` (commit 3906af1) — `/dashboard/cards/compact` + `/dashboard/overview` + `/dashboard/cards`; RED→GREEN 9/9; browser mobile verified (390px no h-scroll; refresh-failure retains compact cards)
-
+- **2026-08-22**: Added cross-team review resolution to `Product-Strategy-Market-to-Action.md` after independent Ploy, Prae, View, Mali, Nida, and Khim reviews; direction PASS, implementation readiness REVISE; added regime/state/ranking/lifecycle/acceptance clarifications.
+- **2026-08-22**: Added the approved **Decision-quality Setup Copilot** direction to the canonical `Product-Strategy-Market-to-Action.md`: experienced self-directed trader, setup-first, regime-aware queue, hard gates + quality ranking, immutable event-based outcomes, and explicit non-goals.
+- **2026-08-22**: Team/provider closeout: created Prae PM, revived View designer, verified local A2A/profile boundaries, and recorded the provider allocation in `Team-Operating-Model.md`.
+- **2026-08-22 (historical):** A live Kanban audit was recorded in `Roadmap-Kanban.md`; after the 2026-08-23 owner decision, Kanban remains audit/archive only and the Markdown execution pipeline is the active work source.
+- **2026-08-21**: Kanban board management — promoted 5 P0 contract tasks to `running` (4×khim, 1×lite), created `Roadmap-Kanban.md` auto-sync from live board, updated INDEX.md
+- **2026-08-21 (Intraday E2E)**: Fixed intraday-only path so every 60m fetch/evaluation rebuilds dashboard artifacts from the existing Daily scan; watchdog now tolerates expected partial-success, uses 90m candle / 30m evaluator thresholds, and morning no-agent monitor checks/self-heals served freshness. Commits `6ffb62e`, `d7b8a39`; 30 focused tests passed; live browser showed updated `Last Scanned`.
+- **2026-08-21 (Intraday feed availability)**: Added `intraday_feed_status` with 3-failure/24h cooldown policy for 11 Settrade-empty 60m symbols; preserved Daily/EOD eligibility; dashboard now explicitly shows `60m unavailable · Daily EOD`; COLOR remains instrument-master excluded. Verified active intraday universe 913, canonical scan/dashboard 898, verifier PASS, focused tests 27 passed.
 - **2026-08-19**: สร้าง INDEX นี้; เริ่มรีเฟรช Architecture.md ให้ตรง stage-first
 - **2026-08-19 (P0-4)**: intraday event boundary — `scan_history.py` ต่อ `resolved_daily_event_id`/`reconciled_at` + observation dedup ต่อ candle + append-only mutation triggers; `reconcile_intraday_events_at_eod` ลิงก์ lineage เมื่อ EOD ยืนยัน; endpoint `/intraday/events`; tests: `test_intraday_event_boundary.py` + integration บน test DB (Architecture.md อัปเดตแล้ว)
 

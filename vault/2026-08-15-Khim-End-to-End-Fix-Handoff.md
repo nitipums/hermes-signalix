@@ -1,5 +1,7 @@
 # Khim End-to-End Fix Handoff — last_valid_session + browser path
 
+> **STATUS: HISTORICAL** · Preserved implementation evidence. Current component behavior belongs in `Components.md` and current browser procedure belongs in the relevant skill.
+
 Date: 2026-08-15 UTC
 Owner: Khim
 Evidence level: live contract, served asset, rendered real-browser interaction

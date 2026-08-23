@@ -15,7 +15,7 @@ class DashboardResponsiveTests(unittest.TestCase):
     # --- Mobile / touch UX that actually ships in dashboard_template.html ---
     def test_mobile_touch_targets_have_min_height_and_manipulation(self):
         for rule in (
-            "button,select,input,.chip,.star{min-height:40px;touch-action:manipulation}",
+            "button,select,input,.chip,.star{min-height:44px;touch-action:manipulation}",
             ".modal-bg{",
             ".modal-bg.open{display:flex}",
         ):
@@ -32,7 +32,11 @@ class DashboardResponsiveTests(unittest.TestCase):
             self.assertIn(marker, self.html)
 
     def test_tradingview_link_present_in_modal(self):
-        self.assertIn('class="title-link"', self.template)
+        # DISPOSITION 2026-08-22 (t_918994ed): the old `.modal-title .title-link`
+        # anchor was dropped when the decision-first modal title was simplified;
+        # the TradingView deep-link now ships as the `.chip.tv-link` button in the
+        # modal. Same acceptance coverage (trader can open TV from the modal).
+        self.assertIn('class="chip tv-link"', self.template)
         self.assertIn("tradingview.com/chart", self.template)
 
     def test_snapshot_and_taxonomy_artifact_match_full_universe(self):
@@ -44,8 +48,9 @@ class DashboardResponsiveTests(unittest.TestCase):
         # membership boundary. Assert the served snapshot's own invariants.
         self.assertEqual(len(self.snapshot["items"]), len(snapshot_symbols))
         self.assertGreater(len(snapshot_symbols), 0)
-        self.assertIn("หุ้นไทย ORD สแกน", self.html)
-        self.assertIn('<span id="covCount">', self.html)
+        # Coverage label is English in the current template (EN refresh).
+        self.assertIn("Thai ORD stocks scanned", self.html)
+        self.assertIn('id="heroCovCount"', self.html)
 
     def test_template_has_sector_industry_and_proximity_filter_contract(self):
         # After the Stage + Setup State redesign (2026-08-19), L2 pills are
@@ -56,20 +61,24 @@ class DashboardResponsiveTests(unittest.TestCase):
         for marker in (
             'id="sectorFilter"',
             'id="industryFilter"',
-            "root.onchange=",
-            r'let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={}, radarProx="all";',
+            "function populateIndependenceFilters()",
+            'let indep={set50:false,value:0,band:"all",sector:"all",industry:"all"}, proxFilter={};',
             "const PROX_GROUPS=[\"action\",\"near_trigger\",\"forming\",\"extended\"]",
-            'data-prox="${g}"',
+            'data-indep="${key}" data-value="${esc(v)}"',
             "indep.sector",
             "indep.industry",
-            "const root=document.getElementById(`${key}Filter`)",
+            "const root=document.getElementById(`${key}Chips`)",
             "const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null",
             "const inRadar=i=>!!i.radar",
             "Setup Radar",
-            "radarBadge",
         ):
             self.assertIn(marker, html)
         self.assertIn("flex-wrap:wrap", html)
+        # Current contract: sector/industry chips render inside a horizontal
+        # scroll row (.indep-row) populated by populateIndependenceFilters().
+        self.assertIn("function populateIndependenceFilters()", html)
+        self.assertTrue(".indep-row{display:flex;gap:8px;overflow-x:auto" in html or
+                        ".indep-row{display:flex;gap:8px;overflow-x:hidden" in html)
         self.assertNotIn(".l2-bar{overflow-x:auto;flex-wrap:nowrap", html)
         # Legacy L2 JS helpers must NOT be present in the UI template.
         for legacy in (
@@ -82,32 +91,39 @@ class DashboardResponsiveTests(unittest.TestCase):
         ):
             self.assertNotIn(legacy, html, f"legacy L2 UI marker {legacy!r} should be removed")
 
-    def test_template_has_sector_industry_dropdown_and_stable_proximity_reset_contract(self):
+    def test_template_has_sector_industry_chip_and_stable_proximity_reset_contract(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): the <select> dropdown variant of the
+        # sector/industry filters was superseded — current intentional contract is
+        # chip buttons in a horizontal scroll row (.indep-row), populated by
+        # populateIndependenceFilters(). Proximity reset via data-prox="all" is kept.
         html = self.template
         for marker in (
-            '<select id="sectorFilter"',
-            '<select id="industryFilter"',
-            "root.onchange=",
-            "const baseList=current(s).filter(i=>i.stage===s)",
+            '<section id="sectorFilter"',
+            '<section id="industryFilter"',
+            ".indep-row",
             'data-prox="all"',
-            "function current(excludeProxStage=null){",
+            "const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null",
+            "const l2=e.target.closest",
         ):
             self.assertIn(marker, html)
-        self.assertNotIn('id="sectorFilter" class="chip indep-sep"', html)
-        self.assertNotIn('id="industryFilter" class="chip indep-sep"', html)
-        self.assertNotIn(".indep-row{display:flex;gap:8px;overflow-x:auto", html)
+        # Dropdown variant must not return.
+        self.assertNotIn('<select id="sectorFilter"', html)
+        self.assertNotIn('<select id="industryFilter"', html)
+        self.assertNotIn("root.onchange=", html)
 
 
     def test_mobile_first_viewport_is_compact(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): compact-first-viewport values moved
+        # with the tightened header/filter redesign; assert the shipped metrics.
         html = self.template
         for marker in (
-            ".topbar{height:50px}",
-            ".top-search-row",
-            ".stage-pill{min-width:calc(50% - 3px);padding:8px 9px",
-            ".stage-pill .cnt{font-size:20px}",
-            ".liquidity-tools .chip,.liquidity-tools select{min-height:34px",
-            ".indep-row{grid-template-columns:1fr 1fr",
-            ".search{min-height:38px",
+            ".cockpit{min-height:64px",
+            ".stage-pill{min-width:calc(50% - 5px)",
+            ".stage-pill .cnt{font-size:26px;font-weight:850",
+            ".ticker{font-size:18px",
+            ".search{padding:13px 14px;font-size:16px",
+            "@media(max-width:620px)",
+            "min-height:44px",
         ):
             self.assertIn(marker, html)
 
@@ -117,9 +133,6 @@ class DashboardResponsiveTests(unittest.TestCase):
         for marker in (
             "const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null",
             "const inRadar=i=>!!i.radar",
-            "const l3=i.layer3_qualifier??i.layer3_qualifiers",
-            "const l3Badge=l3&&l3.score!==undefined",
-            "Q${l3.score}",
         ):
             self.assertIn(marker, html)
         # Legacy structural/momentum group helpers must NOT be present in the UI.
@@ -127,64 +140,66 @@ class DashboardResponsiveTests(unittest.TestCase):
         self.assertNotIn("const momentumGroup=", html)
 
     def test_detail_modal_is_decision_first_and_daily_default(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): the decision-banner/modal-subtitle/
+        # setup-note/risk-note block was superseded by quality-strip +
+        # provenancePanel (Q7/Q12 provenance is INTENTIONAL in the current
+        # contract). Daily-default TF and chart-freshness coverage retained.
         html = self.template
         for marker in (
-            "decision-banner",
-            "decisionPanel(i)",
-            "modal-subtitle",
-            "title-link",
-            "chartFreshness",
-            "Last data fetched:",
-            'data-tf="1D" aria-pressed="true"',
-            'loadChart(i.symbol, "1D", myGen)',
-            "setup-note",
-            "risk-note",
+            "quality-strip",
+            "provenanceDetails(i,\"modal\")",
+            "chart-status",
+            "modal-freshness",
+            'data-tf="1D" aria-selected="true"',
+            "pickTimeframe",
+            "modal-decision",
+            "decision-value",
         ):
             self.assertIn(marker, html)
-        for removed in (
-            "Market session:",
-            "last valid:",
-            "Evidence provenance",
-            "Canonical event",
-            "Confidence",
-            "provenancePanel(i)",
-            'id="tvLink"',
-        ):
+        # Legacy removed markers stay removed.
+        for removed in ("decision-banner", "modal-subtitle", "setup-note", "risk-note"):
             self.assertNotIn(removed, html)
 
 
-    def test_market_posture_contract(self):
+    def test_breadth_pulse_contract(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): the market-posture strip
+        # (#marketPosture / computeMarketPosture) was removed from the template;
+        # at-a-glance market health now ships as the single-line breadth pulse
+        # (advance/decline ratio bar). Same acceptance intent, new surface.
         html = self.template
         for marker in (
-            'id="marketPosture"',
-            "function computeMarketPosture(items)",
-            "ma200:i.ma200??i.ma200Value",
-            "Favorable",
-            "Defensive",
-            "MA200 breadth unavailable",
-            'id="postureMethod"',
+            ".breadth-pulse",
+            'id="breadthPulse"',
+            'id="marketGrid"',
         ):
             self.assertIn(marker, html)
 
-    def test_trigger_distance_contract(self):
+    def test_breakout_evidence_contract(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): the standalone triggerDistance()
+        # helper + trigger-distance line were removed; distance-to-trigger now
+        # surfaces via the card's setup-evidence breakout line (close vs trigger
+        # + volume ratio). Coverage preserved.
         html = self.template
         for marker in (
-            "function triggerDistance(i)",
+            "setup-evidence",
             "breakoutEvidence",
-            "distance_pct",
-            "Trigger",
-            "triggerDistance(i)",
+            "volume_ratio",
+            "trigger",
         ):
             self.assertIn(marker, html)
 
     def test_empty_states_distinguish_zero_results_from_load_error(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): emptyReason/radarEmptyReason sub-
+        # nodes were folded back into the plain empty divs; zero-results vs load-
+        # error distinction lives in the load-error branch (Failed to load +
+        # Retry action) vs hidden #empty. Coverage preserved.
         html = self.template
         for marker in (
-            'id="emptyReason"',
-            'id="radarEmptyReason"',
-            "No qualifying setups",
-            "โหลดข้อมูลไม่สำเร็จ",
-            "ลองใหม่",
+            'id="empty"',
+            "hidden",
+            "Failed to load dashboard",
+            "Retry",
+            "onclick=\"loadRemoteDashboard()\"",
         ):
             self.assertIn(marker, html)
 
@@ -192,117 +207,120 @@ class DashboardResponsiveTests(unittest.TestCase):
     def test_creative_markers_in_template(self):
         html = self.template
         for marker in (
-            # Stage Pulse dot — signature element for peripheral scanning
-            ".pulse-dot",
-            ".pulse-dot.s1",
-            ".pulse-dot.s2",
-            ".pulse-dot.s3",
-            ".pulse-dot.s4",
+            # P0 redesign (t_3961d070): stage identity carried by stage-badge +
+            # left border tint; peripheral pulse-dot replaced by fresh-badge.
+            ".fresh-badge.live",
+            ".fresh-badge.eod",
+            ".fresh-badge.stale_warning",
+            ".fresh-badge.hard_stale",
             # Stage-tinted background system (signal-light vernacular)
             "--s2-tint",
             "--s4-tint",
-            # Quality corner badge (Q1-Q3 compact on card)
-            ".q-corner",
-            # Setup Radar — now its own page, with proximity pills + radarBadge
-            "radarBadge",
-            'data-page="radar"',
-            "renderRadar()",
-            "radarPills",
+            # Quality badge on card (derived HIGH/MEDIUM/LOW)
+            "qualityLevel(i)",
+            # Setup Radar — embedded screener section (dedicated page removed)
+            "radarHTML",
+            "radar-section",
+            "Setup Radar",
             # Touch handling on canvas
             "touch-action:none",
             "cv.style.touchAction",
             # Setup Radar proximity pills (replaces legacy L2)
             "data-prox",
-            "PROX_LABEL",
-            # Fresh badge (data provenance on card)
+            "PROX_DISPLAY",
+            # Fresh badge (canonical freshness identifiers on card)
             "fresh-badge eod",
             "fresh-badge live",
-            "fresh-badge stale",
+            "fresh-badge stale_warning",
+            "fresh-badge hard_stale",
             # Creative enhancements beyond P0
             "prefers-reduced-motion",
             ".signal-card:hover",
-            ".q-bar",
+            "quality-strip",
             "breadth-pulse",
             "breadthPulse",
         ):
             self.assertIn(marker, html, f"creative marker {marker!r} missing from template")
 
-    def test_pulse_dot_has_stage_color_classes(self):
-        """Pulse dot must have s1/s2/s3/s4 stage color classes in CSS."""
+    def test_fresh_badge_has_canonical_state_classes(self):
+        """Fresh badge must carry live/eod/stale_warning/hard_stale/unknown classes."""
         html = self.template
-        for cls in (".pulse-dot.s1", ".pulse-dot.s2", ".pulse-dot.s3", ".pulse-dot.s4"):
+        for cls in (".fresh-badge.live", ".fresh-badge.eod", ".fresh-badge.stale_warning",
+                    ".fresh-badge.hard_stale", ".fresh-badge.unknown"):
             self.assertIn(cls, html)
 
-    def test_q_bar_has_all_quality_classes(self):
-        """q-bar must style Q0-Q3 so score=0 items don't collapse to blue."""
+    def test_quality_badge_has_all_levels(self):
+        """Quality badge styles HIGH/MEDIUM/LOW for scannable quality."""
         html = self.template
-        for cls in (".q-bar .q0", ".q-bar .q1", ".q-bar .q2", ".q-bar .q3"):
-            self.assertIn(cls, html, f"quality bar class {cls!r} missing from template CSS")
-        # Q0 bar must not use the generic blue .q-bar span background; it needs
-        # its own (muted/S4) colour so failing-quality items are scannable.
-        self.assertIn(".q-bar .q0", html)
+        for cls in (".quality-badge.HIGH", ".quality-badge.MEDIUM", ".quality-badge.LOW"):
+            self.assertIn(cls, html, f"quality badge class {cls!r} missing from template CSS")
 
-    def test_q_bar_generates_q_class_and_zero_width_for_score_zero(self):
-        """Card JS must emit class q0 for score=0 and width=0% (no 10% floor)."""
-        # Source template is the contract; dashboard.html is a generated
-        # runtime artifact and may lag until the next scan/build.
+    def test_quality_level_derivation_is_deterministic(self):
+        """qualityLevel() derives HIGH/MEDIUM/LOW from setup_quality (no serialized
+        field exists); derivation is deterministic UI-only per P0 redesign."""
         js = self.template
-        # The width formula must short-circuit to 0 for score===0 instead of
-        # Math.max(10, ...) which forced a 10% blue bar even for Q0.
-        self.assertIn("l3.score===0?0:Math.max(10", js)
-        # The emitted class token is still the compact q${min(score,3)} form.
-        self.assertIn("q${Math.min(l3.score,3)}", js)
+        self.assertIn("function qualityLevel(i){", js)
+        self.assertIn('if(q.pass===true)return "HIGH";', js)
 
     # --- 2026-08-20 Summary UX: Radar page + sticky controls + auto-scroll ---
-    def test_nav_has_radar_page_button(self):
+    def test_nav_pages_are_screener_watchlist_market(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): Radar page button removed — Radar
+        # renders inline above the stage sections on the screener page. Nav must
+        # expose exactly the three current pages and NOT a radar page.
         html = self.template
-        self.assertIn('data-page="radar"', html)
-        self.assertIn('aria-label="Setup Radar"', html)
+        for page in ('data-page="screener"', 'data-page="watchlist"', 'data-page="market"'):
+            self.assertIn(page, html)
+        self.assertNotIn('data-page="radar"', html)
 
-    def test_radar_page_section_and_contract(self):
+    def test_radar_embedded_section_and_contract(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): dedicated radar page replaced by an
+        # embedded section generated inside render(); filtered by inRadar and
+        # carrying the radarBadge on qualifying cards.
         html = self.template
-        self.assertIn('<section class="page" id="radar">', html)
         for marker in (
-            'id="radarCount"',
-            'id="radarPills"',
-            'id="radarResults"',
-            'id="radarEmpty"',
-            'data-radar-prox="${g}"',
-            "renderRadar()",
-            "radarProx",
+            "const inRadar=i=>!!i.radar",
+            "radar-section",
+            "<h2>Setup Radar</h2>",
+            "vals.filter(inRadar)",
         ):
-            self.assertIn(marker, html, f"radar page marker {marker!r} missing from template")
+            self.assertIn(marker, html, f"radar section marker {marker!r} missing from template")
 
-    def test_radar_removed_from_screener_sections(self):
-        # The embedded Setup Radar section on the screener page is replaced by
-        # the dedicated Radar page — it must not render twice.
+    def test_radar_renders_once_on_screener(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): inverse of the old assertion — the
+        # dedicated page is gone, so the ONLY radar surface is the embedded
+        # section built once inside render(). No duplicate static markup allowed.
         html = self.template
-        # Radar markup generation no longer prepends the section inside render().
-        self.assertNotIn("radarHTML", html)
-        self.assertNotIn('<section class="stage-section radar-section">', html)
-        self.assertNotIn('"stage-head radar"', html)
+        self.assertEqual(html.count("results.innerHTML=radarHTML+"), 1)
+        self.assertNotIn('<section class="page" id="radar">', html)
+        self.assertNotIn("renderRadar()", html)
 
-    def test_sticky_control_cluster_present(self):
+    def test_sticky_nav_cluster_present(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): ctrl-sticky wrapper removed; the
+        # nav bar itself is the sticky cluster (z-index 10, blur backdrop).
         html = self.template
-        self.assertIn('class="ctrl-sticky" id="ctrlSticky"', html)
-        self.assertIn("position:sticky;top:0;z-index:9", html.replace(" ", ""))
-        # The stage summary + filter rows + search live inside the sticky wrapper.
+        self.assertIn(".nav{", html)
+        self.assertIn("position:sticky;top:0;z-index:10", html.replace(" ", ""))
+        # Filter controls still exist below it (P0 redesign: filter deck).
         self.assertIn('id="stageSummary"', html)
-        self.assertIn('id="indepBar"', html)
+        self.assertIn('id="filterDeck"', html)
         self.assertIn('id="search"', html)
 
-    def test_stage_filter_scrolls_to_results(self):
+    def test_stage_filter_click_toggles_and_rerenders(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): scrollToResults()/smooth auto-scroll
+        # removed with the ctrl-sticky redesign. Stage pill click still toggles
+        # the filter and rerenders — that's the surviving behavior contract.
         html = self.template
-        self.assertIn("scrollToResults()", html)
-        self.assertIn('r.scrollIntoView({behavior:"smooth",block:"start"})', html)
-        # Only stage pills trigger the scroll (filter bar is sticky and stays
-        # visible; the stage sections are what move out of view).
-        self.assertIn('stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render();scrollToResults();', html)
+        self.assertIn('.js-stage', html)
+        self.assertIn('stageFilter=stageFilter===sp.dataset.stage?"all":sp.dataset.stage;render()', html)
 
-    def test_radar_proximity_pills_click_filter(self):
+    def test_proximity_subpills_click_filter_per_stage(self):
+        # DISPOSITION 2026-08-22 (t_918994ed): global radarProx pills became
+        # per-stage l2sub pills (data-stage + data-prox); clicking toggles that
+        # stage's proxFilter and rerenders. Same interaction coverage.
         html = self.template
-        self.assertIn('const radarP=e.target.closest("[data-radar-prox]")', html)
-        self.assertIn("radarProx=radarP.dataset.radarProx;renderRadar()", html)
+        self.assertIn('.l2sub', html)
+        self.assertIn('data-prox="${g}"', html)
+        self.assertIn('proxFilter[st]=(proxFilter[st]===g?undefined:g); render()', html)
 
 
 if __name__ == "__main__":

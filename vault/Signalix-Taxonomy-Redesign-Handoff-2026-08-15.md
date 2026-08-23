@@ -1,5 +1,7 @@
 # Signalix Taxonomy Redesign Handoff — 2026-08-15
 
+> **STATUS: SUPERSEDED** · Replaced by the 2026-08-17 stage-first redesign. Retained for historical evidence only.
+
 ## Outcome
 Completed a full-universe review and presentation redesign for all 718 active TH ORD symbols.
 

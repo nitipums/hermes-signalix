@@ -1,5 +1,7 @@
 # Signalix Product Strategy — Market View to Action
 
+> **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
+
 _Last updated: 2026-08-12; curated from product discussion with Arm._
 
 ## Product thesis
@@ -427,4 +429,493 @@ human_review: pending / accepted / rejected
 4. Have Arm/Bee/Ploy review the shortlist.
 5. Test accepted changes with a real browser dogfood pass and record the result.
 
-MiroFish is therefore a **scenario-based UX critic and idea generator** around Signalix. It complements, but does not replace, real user testing, deterministic system tests, or the final implementation review.
+Signalix is therefore a **scenario-based UX critic and idea generator** around Signalix. It complements, but does not replace, real user testing, deterministic system tests, or the final implementation review.
+
+## 2026-08-22 — Decision-quality Setup Copilot (approved product direction)
+
+### Product thesis
+
+Signalix's primary new product direction is a **decision-quality copilot for experienced, self-directed traders**. It is setup-first: the product helps a trader find and assess new technical setups, separating trend quality, setup maturity, entry readiness, and risk. It is not a beginner education product, a generic scanner, or a portfolio manager in the first phase.
+
+```text
+FULL ORD scan
+→ Market-regime context
+→ Setup queue
+→ Entry readiness and risk review
+→ Trader decision
+→ Immutable outcome record
+```
+
+The scanner remains the deterministic engine/foundation. The user-facing product promise is not "find more tickers" but **reduce low-quality decisions and avoid chasing immature or structurally damaged setups**.
+
+### Beachhead user and first surface
+
+- Beachhead: experienced self-directed trader.
+- Primary job: identify which new setups deserve review today and what condition must be confirmed before action.
+- First surface: a daily, regime-aware **Setup Queue**.
+- Portfolio management (`HOLD`, `ADD`, `TRIM`, `CUT`, `SELL`) is a later Portfolio Companion phase, not the setup queue's primary vocabulary.
+- Beginner education and tutorial/quiz flows are explicit non-goals for this direction.
+
+`shortlist` is a presentation/ranking layer only. It must never reduce the FULL ORD scan universe or silently remove symbols from backend coverage.
+
+### Setup Queue contract
+
+The queue is separated by current market regime:
+
+```text
+Current regime
+├── SUPPORTIVE
+├── NEUTRAL
+└── DEFENSIVE
+```
+
+The landing view follows the current regime automatically. A Defensive regime emphasizes risk context before setups; other regimes lead with the setup queue. Other regime views remain accessible. Regime separation is presentation/context, not a hidden universe filter.
+
+Within each regime, the queue contains only the focused setup states:
+
+```text
+CONFIRMED READY
+PRE-READY
+DEVELOPING
+```
+
+Other states such as `DO NOT CHASE` and `INVALIDATED` remain available in deep dive/history/audit views but do not compete for the primary queue's attention.
+
+### Status engine and ranking
+
+Status is produced by deterministic hard gates; an explainable score only ranks items that pass the relevant gate. A high score cannot override an unmet gate.
+
+Hard-gate dimensions:
+
+- trend quality;
+- setup maturity/structure;
+- entry condition;
+- risk quality;
+- data freshness and provenance.
+
+Quality-first ranking weights for the focused queue:
+
+```text
+setup / structure  40%
+entry proximity    30%
+risk / reward      20%
+market alignment   10%
+```
+
+The ranking must expose the component dimensions. It must not collapse into an opaque score that users cannot audit.
+
+### Status meanings and lifecycle
+
+- `DEVELOPING`: trend/setup is interesting but needs more structure.
+- `PRE-READY`: setup is mature and near its trigger, but entry is not confirmed.
+- `CONFIRMED READY`: entry condition and risk gate are confirmed; this means ready for trader review, not an automatic order.
+- `BUY ZONE`: a setup/price area worth reviewing; not a personalized or automatic buy instruction.
+- `WAIT FOR CONFIRMATION`: the missing trigger is explicit.
+- `DO NOT CHASE`: extension, overhead supply, poor risk/reward, or other quality warning makes immediate pursuit unattractive.
+- `INVALIDATED`: structural/risk/data conditions no longer support the setup.
+
+Lifecycle is event-based rather than fixed-horizon:
+
+```text
+PUBLISHED → DEVELOPING → PRE-READY → CONFIRMED
+                         └──────────→ INVALIDATED
+```
+
+A setup that remains unresolved receives a **time-decay ranking penalty** rather than automatic invalidation. This preserves legitimate base-building while preventing stale setups from dominating the queue.
+
+### Decision card and deep dive
+
+The front-door card is decision-first. In the first few seconds it shows:
+
+- ticker and setup state;
+- action label;
+- why now / why not now;
+- trigger or confirmation condition;
+- stop/invalidation condition;
+- short explanation.
+
+Evidence is available through drill-down rather than hidden:
+
+- candlestick chart and structural levels;
+- Stage 1–4 and minor-trend state;
+- MA/RS/VCP evidence;
+- volume and liquidity context;
+- extension and overhead-supply warnings;
+- market regime;
+- source, timestamp, freshness, and limitations.
+
+Launch-ready UI copy remains English. Use process/setup labels for the setup surface: `BUY ZONE`, `WAIT FOR CONFIRMATION`, `DO NOT CHASE`, and `INVALIDATED`. Reserve portfolio labels such as `HOLD`, `ADD`, `TRIM`, `CUT`, and `SELL` for the later portfolio context.
+
+### Immutable decision and outcome record
+
+Record every system decision from day one. Do not infer a trade or user intent from passive behavior. Default telemetry may record setup opened, evidence expanded, chart/risk viewed, watchlist interaction, and return visits; it must not interpret an open as a buy or a non-click as a skip.
+
+At publication, preserve:
+
+- timestamp and data timestamp;
+- market regime;
+- setup state and ranking components;
+- evidence and policy/version;
+- displayed action, trigger, and invalidation;
+- source/freshness/provenance.
+
+Later append events for confirmation, invalidation, repair, expiry/decay, paper/live execution when explicitly available, and realized outcome. Do not rewrite the original recommendation after seeing the result.
+
+Outcome evaluation is primarily **event-based**: confirmed, invalidated, repaired, or still developing. Fixed 5D/20D/60D horizons may be added as secondary analytics later, but must not replace lifecycle outcomes.
+
+### North-star success measurement
+
+Primary product success is **decision quality plus outcome**, not raw win rate. Track at least:
+
+- setup confirmation quality;
+- invalidation discipline;
+- avoidance of chasing;
+- outcome after confirmation/invalidation;
+- evidence completeness and freshness;
+- time from full scan to useful review.
+
+Do not attribute market outcome to Signalix when the user did not act, and do not collapse system quality, user decision, execution, and market outcome into one number.
+
+### Roadmap boundary
+
+1. **Setup decision foundation:** preserve FULL ORD coverage, formalize regime/setup/entry/risk contracts, and ship the queue/card/deep-dive vertical slice.
+2. **Evidence and lifecycle:** immutable setup observations, confirmation/invalidation events, time-decay ranking, and outcome views.
+3. **Decision-quality analytics:** compare setup quality, entry readiness, risk gates, regime, and outcomes without hindsight rewriting.
+4. **Portfolio Companion:** add position-aware `HOLD`/`ADD`/`TRIM`/`CUT`/`SELL`, paper execution, and portfolio heat only after the setup-first foundation is trustworthy.
+5. **Research/content funnel:** publish selected confirmed setups as cited, visual research/education after the evidence and lifecycle contracts are stable.
+
+### Explicit non-goals for this product direction
+
+- No beginner-first curriculum, quiz, or tutorial product.
+- No automatic buy/sell instruction from a score.
+- No hidden price/volume/stale filter that reduces FULL ORD coverage.
+- No portfolio action labels without portfolio context.
+- No LLM ownership of indicator math, ranking, risk, or state transitions.
+- No outcome claims without immutable timestamped evidence and clear user/execution attribution.
+
+## 2026-08-22 — Cross-team review resolution (Ploy, Prae, View, Mali, Nida, Khim)
+
+### Review status
+
+The six independent reviews agree on the product direction but do not approve implementation readiness yet:
+
+```text
+product direction: PASS
+strategy foundation: PASS
+implementation readiness: REVISE
+```
+
+This section records review findings and proposed contract clarifications. It does not claim that the proposed contracts are implemented or verified.
+
+### Cross-team consensus
+
+The reviewers support:
+
+- experienced self-directed trader as the beachhead;
+- setup-first rather than beginner education, generic scanning, or portfolio management as the first product;
+- deterministic gates before ranking;
+- explicit separation of trend quality, setup maturity, entry readiness, risk, user decision, execution, and outcome;
+- regime-aware presentation without silently reducing FULL ORD scan coverage;
+- immutable, append-only outcome evidence and no hindsight rewriting;
+- portfolio labels (`HOLD`, `ADD`, `TRIM`, `CUT`, `SELL`) postponed to a later Portfolio Companion.
+
+### Required contract clarification before implementation
+
+#### 1. Separate lifecycle state, action label, and portfolio action
+
+The current strategy uses related terms that can be interpreted as the same thing. The implementation contract should separate them:
+
+```text
+Lifecycle state:
+DEVELOPING
+PRE-READY
+STRUCTURE CONFIRMED
+ENTRY CONFIRMED
+INVALIDATED
+
+Setup action/display label:
+BUY ZONE
+WAIT FOR CONFIRMATION
+DO NOT CHASE
+INVALIDATED
+
+Portfolio action (later phase only):
+HOLD
+ADD
+TRIM
+CUT
+SELL
+```
+
+`CONFIRMED READY` remains a product-facing concept only if its exact meaning is made explicit. It must not silently mean that a user should buy. `BUY ZONE` must display the trigger and disclaimer/context that it is a review area, not an automatic or personalized order instruction.
+
+#### 2. Define an observable market-regime contract
+
+`SUPPORTIVE`, `NEUTRAL`, and `DEFENSIVE` need deterministic, versioned criteria before they drive the landing experience. The contract should record:
+
+```text
+regime_state
+benchmark/index inputs
+breadth inputs
+volatility inputs
+leadership/participation inputs
+reason_codes
+policy_version
+data_timestamp
+```
+
+Regime should influence presentation, ranking, warnings, and confirmation policy, but must not silently remove symbols from FULL ORD coverage. A Defensive regime may emphasize risk context and prevent an item from reaching `ENTRY CONFIRMED`; it must still preserve the underlying scan observation and audit trail.
+
+#### 3. Define queue inclusion and exclusion explicitly
+
+The focused queue may show `CONFIRMED READY`, `PRE-READY`, and `DEVELOPING`, while `DO NOT CHASE` and `INVALIDATED` remain available in history/deep dive/audit views. The contract must state:
+
+- the exact hard gates required for each queue state;
+- whether regime affects state or only ranking/context;
+- why an item leaves the focused queue;
+- how full-scan coverage is reconciled against presentation counts;
+- how stale/error/provenance failures are shown.
+
+A queue is a presentation and review surface, not a second hidden scan universe.
+
+#### 4. Make ranking reproducible and inspectable
+
+The quality-first weights remain the approved working hypothesis:
+
+```text
+setup / structure  40%
+entry proximity    30%
+risk / reward      20%
+market alignment   10%
+```
+
+Before implementation, each component needs an observable value, unit/range, missing-data behavior, policy version, and persisted calculation snapshot. Ranking should be precomputed or pinned to a scan run, not silently recomputed differently on each API request. A displayed total must never hide the component scores or gate failures.
+
+#### 5. Define event transitions and time decay
+
+The event contract must distinguish structural progress from elapsed time:
+
+```text
+PUBLISHED → DEVELOPING → PRE-READY → STRUCTURE CONFIRMED → ENTRY CONFIRMED
+                                      └──────────────────→ INVALIDATED
+```
+
+Time decay is a ranking penalty, not automatic invalidation. Its inputs should be observable and versioned, such as lack of structural improvement, weakening participation, changed distance to pivot, regime change, or degraded data freshness. Legitimate base-building must not disappear without a reason code.
+
+### Current implementation gap reported by reviewers
+
+Khim reported that the existing code has useful foundations for FULL ORD scanning, setup quality/proximity, snapshots, and append-only lifecycle patterns, but that the new regime states and `SUPPORTIVE`/`NEUTRAL`/`DEFENSIVE` computation are not yet implemented. View reported that the current dashboard still presents legacy `Action`/`Near Trigger`/`Forming`/`Extended` vocabulary rather than the new setup-maturity model. Nida reported that the strategy requirements remain NOT VERIFIED until source→DB→ranking→served UI evidence exists.
+
+These are review inputs, not Bee's final acceptance claims. Bee must verify source code, DB contract, live API, served artifact, and real desktop/mobile journey before marking any item PASS.
+
+### Proposed next review gate
+
+Before creating implementation cards, revise and re-review this strategy section with:
+
+1. regime formula and reason-code contract;
+2. lifecycle/action vocabulary decision;
+3. queue hard-gate and coverage reconciliation matrix;
+4. ranking component and persistence contract;
+5. event/time-decay schema and transition fixtures;
+6. decision-card/UI contract aligned with the new vocabulary;
+7. acceptance matrix for full coverage, stale/error states, immutability, LLM boundary, and served desktop/mobile behavior.
+
+Only after this gate passes should the team create the first vertical slice:
+
+```text
+one scan run
+→ one pinned regime snapshot
+→ candidate queue
+→ hard-gate trace
+→ decision card
+→ read-only evidence review
+```
+
+No live portfolio action or automatic trading is part of this first slice.
+
+---
+
+# Canonical Contract — Setup Copilot v0.2.0 (Bee takeover)
+
+_Last updated: 2026-08-23 UTC. Contract owner: Lite/Bee. Source gate: parent Kanban task `t_7e1964f8`, review packet comment #222. This section is the normative contract for implementation and acceptance._
+
+## 1. Explicit supersession of legacy definitions
+
+This v0.2.0 section supersedes every earlier Setup Copilot definition in this file wherever wording conflicts. In particular:
+
+- The legacy three-regime vocabulary `SUPPORTIVE / NEUTRAL / DEFENSIVE` is superseded by the four-state observable regime enum below: `HIGH_VOLATILITY / LOW_SPREAD / LIQUIDITY_EVENT / NORMAL`.
+- `CONFIRMED READY` is not a lifecycle state. It is superseded by lifecycle `ENTRY CONFIRMED` and setup display label `BUY ZONE`.
+- `READY`, `ACTION`, `NEAR TRIGGER`, `FORMING`, and `EXTENDED` are legacy display terms and MUST NOT be emitted by the canonical Setup Queue API/UI. They remain historical aliases only for migration/audit.
+- `shortlist` and `queue` are presentation layers; neither may change FULL ORD scan coverage.
+- Portfolio labels `HOLD / ADD / TRIM / CUT / SELL` remain out of scope for Setup Copilot and belong only to Portfolio Companion.
+- Any implementation, fixture, or UI using a superseded term fails contract acceptance unless it is explicitly labelled `legacy_alias` in migration/audit data.
+
+## 2. Normative vocabulary and boundaries
+
+### 2.1 Lifecycle state
+
+The lifecycle state describes deterministic structural progress:
+
+`PUBLISHED → DEVELOPING → PRE-READY → STRUCTURE CONFIRMED → ENTRY CONFIRMED → INVALIDATED`
+
+`INVALIDATED` is terminal for the current setup instance. A repaired/new setup receives a new immutable setup instance and does not rewrite the old one.
+
+### 2.2 Setup action/display label
+
+Allowed labels are exactly:
+
+- `BUY ZONE`: review area; never a personalized or automatic order.
+- `WAIT FOR CONFIRMATION`: required trigger is absent.
+- `DO NOT CHASE`: extension, supply, poor risk/reward, or policy warning blocks pursuit.
+- `INVALIDATED`: structural, risk, or data conditions no longer support review.
+
+A label MUST show its trigger/confirmation condition, invalidation condition, timestamp, and provenance. No label is a portfolio instruction.
+
+### 2.3 Portfolio action boundary
+
+`HOLD / ADD / TRIM / CUT / SELL` MUST NOT be produced by Setup Copilot. They require Portfolio Companion context and a separate policy/version.
+
+### 2.4 LLM boundary
+
+Deterministic code owns scan coverage, regime, gates, state, ranking, risk, timestamps, and event transitions. LLM output may summarize already-structured fields only. LLM output MUST NOT create, alter, infer, or backfill a state, score, trigger, risk limit, user decision, or outcome.
+
+## 3. Deterministic market regime contract
+
+Policy version: `regime-v0.2.0`. All input values are from one pinned scan snapshot and use UTC timestamps. The regime is presentation/context and may change ranking, warning, and confirmation policy; it MUST NOT remove an instrument from FULL ORD coverage.
+
+### 3.1 Required inputs
+
+For each scan snapshot, persist:
+
+`regime_state`, `benchmark_id`, `benchmark_return_20d`, `benchmark_at_or_above_ma50`, `breadth_pct_above_ma50`, `atr_pct_20d`, `median_spread_bps`, `liquidity_event_flag`, `liquidity_event_reason_codes`, `input_snapshot_id`, `policy_version`, `data_timestamp_utc`, `computed_at_utc`.
+
+Missing input is represented as `NULL`, never as zero, empty string, `NaN`, `Infinity`, or a guessed value.
+
+### 3.2 Formula and precedence
+
+Let `V = atr_pct_20d`, `S = median_spread_bps`, `B = breadth_pct_above_ma50`, `M = benchmark_at_or_above_ma50`, and `L = liquidity_event_flag`.
+
+- `HIGH_VOLATILITY` iff `V IS NOT NULL AND V >= 4.0`.
+- Else `LIQUIDITY_EVENT` iff `L = true`.
+- Else `LOW_SPREAD` iff `S IS NOT NULL AND S <= 25.0`.
+- Else `NORMAL`.
+
+Precedence is exactly `HIGH_VOLATILITY > LIQUIDITY_EVENT > LOW_SPREAD > NORMAL`. `B` and `M` are recorded context inputs and may affect hard confirmation policy, but never change the enum formula. If any required regime input is missing, retain `NORMAL` with reason code `REGIME_INPUT_MISSING`; do not infer volatility, spread, or liquidity.
+
+Boundary behavior is deterministic: `V = 4.0` is HIGH_VOLATILITY; `S = 25.0` is LOW_SPREAD only when neither higher-precedence state applies; negative `V` or `S` is invalid input and yields `NORMAL` plus `INVALID_NEGATIVE_INPUT`; `NaN`, `Infinity`, malformed, or non-finite values yield `NORMAL` plus `INVALID_NONFINITE_INPUT`. Values outside provider-declared physical bounds are not clipped; they are invalid and retained in the provenance error list.
+
+## 4. FULL ORD coverage and queue contract
+
+Every active ORD instrument in the pinned instrument master MUST produce exactly one scan observation per scan run, including instruments with missing, stale, invalid, or error data. Required reconciliation invariant:
+
+`full_ord_count = covered_count + missing_count + stale_count + error_count`
+
+and every instrument ID MUST occur exactly once in those mutually exclusive buckets. A presentation queue is a ranked projection of observations, never a hidden backend filter.
+
+### 4.1 Default hard gates
+
+Default gate policy `setup-gates-v0.2.0`:
+
+- `DEVELOPING`: trend quality passes; setup maturity may be incomplete; data provenance must be present and not hard-error.
+- `PRE-READY`: trend quality and structure maturity pass; entry trigger not yet confirmed; fresh data required.
+- `STRUCTURE CONFIRMED`: trend and structure pass; risk inputs present and valid; fresh data required.
+- `ENTRY CONFIRMED`: all prior gates pass, entry condition is confirmed, risk/reward is valid, and no hard regime/data block applies.
+- `INVALIDATED`: explicit structural/risk/data invalidation reason; never inferred from elapsed time alone.
+
+Default hard blocks are `DATA_MISSING_REQUIRED`, `DATA_STALE`, `DATA_ERROR_PERMANENT`, `NEGATIVE_OR_NONFINITE_INPUT`, `INVALID_PROVENANCE`, `RISK_INPUT_MISSING`, `RISK_REWARD_BELOW_POLICY`, `REGIME_CONFIRMATION_BLOCK`, and `INSTRUMENT_INACTIVE`. A hard block prevents `ENTRY CONFIRMED`; it does not delete the scan observation.
+
+Freshness defaults: `<=15 minutes` is fresh for intraday input, `>15 and <=60 minutes` is stale-warning, and `>60 minutes` is hard-stale. Daily inputs use the declared trading-date/session freshness policy and MUST include `data_timestamp_utc`. Transient provider errors retry at most 3 times with bounded backoff; permanent errors are surfaced for manual remediation. Nightly reconciliation compares source, DB snapshot, scan, ranking, API, and served artifact counts.
+
+Focused queue default inclusion is `DEVELOPING`, `PRE-READY`, `STRUCTURE CONFIRMED`, and `ENTRY CONFIRMED` when their required gates pass. `DO NOT CHASE` and `INVALIDATED` remain queryable in deep dive/history/audit. Missing, stale, and error observations remain queryable with their blocking state and never silently appear as healthy candidates.
+
+## 5. Reproducible ranking contract
+
+Ranking policy `setup-ranking-v1.0.0` uses persisted component values and weights:
+
+- setup/structure: `40%`
+- entry proximity: `30%`
+- risk/reward: `20%`
+- market alignment: `10%`
+
+Each component is stored with value, unit/range, missing-data status, reason codes, policy version, and scan snapshot ID. Components are normalized to `[0,1]`; values outside the declared range are invalid, not clipped. A hard-gated item is excluded from focused ranking with an explicit exclusion reason; its observation remains in coverage reconciliation.
+
+Missing-data rules: a missing component is `NULL`, never zero. If a required hard-gate component is missing, the item cannot reach `ENTRY CONFIRMED`. If an optional ranking component is missing, the total is `NULL` and the item is ranked after complete-value items using deterministic tie-breakers `(complete_component_count DESC, lifecycle_state_order DESC, instrument_id ASC)`. No imputation, LLM completion, or request-time recalculation is allowed. Persist `total_score`, component snapshot, weights, policy version, and rank at scan time.
+
+## 6. Append-only event and time-decay contract
+
+Event policy `lifecycle-events-v0.2.0`. Events have immutable `event_id`, `setup_instance_id`, `instrument_id`, `event_type`, `from_state`, `to_state`, `action_label`, `reason_codes`, `source_snapshot_id`, `policy_version`, `occurred_at_utc`, `recorded_at_utc`, `idempotency_key`, and payload hash.
+
+Allowed event types are `PUBLISHED`, `STATE_TRANSITION`, `ACTION_LABEL_CHANGED`, `REGIME_SNAPSHOT`, `RANKING_SNAPSHOT`, `HARD_GATE_BLOCKED`, `HARD_GATE_CLEARED`, `INVALIDATED`, and `OUTCOME_RECORDED`. Events are insert-only: no UPDATE/DELETE, and corrections are compensating events linked by `corrects_event_id` with a new event ID.
+
+Idempotency: same `idempotency_key` plus same payload hash is a no-op returning the original event ID; same key with a different hash is rejected as `IDEMPOTENCY_CONFLICT`. Ordering is by `(occurred_at_utc, event_id)`; late events are retained and flagged `LATE_ARRIVAL`, never silently reordered or dropped. Duplicate identical events are not added twice. Corrections never mutate the original event.
+
+All timestamps MUST be ISO-8601 UTC with `Z` suffix. Naive timestamps, local timezone timestamps, malformed timestamps, `NULL` event time, and non-finite numeric payloads are rejected. Negative elapsed durations or negative price/volume/risk values are rejected with explicit validation errors; legitimate signed returns may be negative only in fields whose schema declares signed semantics.
+
+Time decay is a ranking penalty only. With `lambda = 0.05`, `decay_factor = exp(-lambda * elapsed_days)` where `elapsed_days >= 0` is computed from the last qualifying structural/participation/regime/freshness observation. Decay never auto-invalidates a setup. A decay reason code and source timestamps are required; legitimate base-building remains visible with its penalty.
+
+## 7. Valid and invalid fixtures
+
+### Valid fixtures
+
+- `FX-REGIME-001`: `atr_pct_20d=4.0`, finite spread, no liquidity event → `HIGH_VOLATILITY`.
+- `FX-REGIME-002`: volatility below 4, `liquidity_event_flag=true` → `LIQUIDITY_EVENT`.
+- `FX-REGIME-003`: volatility below 4, no liquidity event, spread exactly 25 → `LOW_SPREAD`.
+- `FX-REGIME-004`: all valid, volatility below 4, spread above 25 → `NORMAL`.
+- `FX-COVERAGE-001`: 100 active ORD instruments split into covered/missing/stale/error buckets summing to 100, each ID once.
+- `FX-RANK-001`: all four components present; persisted total equals `0.40*S + 0.30*E + 0.20*R + 0.10*M` under `setup-ranking-v1.0.0`.
+- `FX-EVENT-001`: replaying an identical event returns the original ID and creates no second row.
+- `FX-EVENT-002`: a correction creates a new compensating event and leaves the original byte-for-byte unchanged.
+
+### Invalid fixtures
+
+- `FX-REGIME-101`: `atr_pct_20d=NaN` → `NORMAL`, `INVALID_NONFINITE_INPUT`.
+- `FX-REGIME-102`: negative spread → invalid input, no LOW_SPREAD classification.
+- `FX-REGIME-103`: missing volatility → `NORMAL`, `REGIME_INPUT_MISSING`, never guessed.
+- `FX-RANK-101`: missing required risk component → cannot reach `ENTRY CONFIRMED`.
+- `FX-RANK-102`: negative/non-finite component → hard validation failure, no clipping.
+- `FX-EVENT-101`: same idempotency key with changed payload → reject `IDEMPOTENCY_CONFLICT`.
+- `FX-EVENT-102`: local/naive timestamp or negative elapsed duration → reject.
+- `FX-COVERAGE-101`: duplicate instrument or hidden filter → reconciliation FAIL.
+
+## 8. Acceptance matrix
+
+| ID | Boundary | Required evidence | Verdict condition |
+|---|---|---|---|
+| AC-REG-001 | source→DB→regime | pinned inputs, formula, reason codes, UTC | reproducible exact enum |
+| AC-REG-002 | regime→scan | all active ORD IDs retained | no silent coverage loss |
+| AC-QUEUE-001 | scan→queue | inclusion/exclusion and hard-gate trace | every omission explained |
+| AC-QUEUE-002 | stale/error/empty | API/UI fixtures | safe state, no false readiness |
+| AC-RANK-001 | ranking | component snapshot + v1.0.0 weights | replay gives same ranks |
+| AC-RANK-002 | missing/invalid | NULL/NaN/negative fixtures | no imputation or clipping |
+| AC-EVENT-001 | lifecycle | transition fixture/event log | append-only and immutable |
+| AC-EVENT-002 | replay/correction | duplicate/order/correction readback | idempotent, ordered, compensating |
+| AC-DATA-001 | source→DB | provenance/freshness reconciliation | counts and timestamps reconcile |
+| AC-API-001 | DB→API | schema and error responses | fields/blocks preserved |
+| AC-UI-001 | API→served UI desktop | real 1280px journey | English labels and evidence visible |
+| AC-UI-002 | API→served UI mobile | real 512px journey | no horizontal scroll, usable cards |
+| AC-UI-003 | empty/error/stale UI | rendered failure states | no misleading action label |
+| AC-LLM-001 | structured output→summary | boundary test | LLM cannot mutate deterministic fields |
+| AC-IMM-001 | recommendation→outcome | original row/event readback | no hindsight rewrite |
+
+Acceptance status at contract handoff: `NOT VERIFIED` for live source, DB, API, served artifact, and rendered desktop/mobile journey. This contract gate approves the specification only; implementation cards remain blocked until their own evidence satisfies the matrix.
+
+## 9. Signed review findings and open decisions
+
+Review packet recorded in parent gate comment #222, dated 2026-08-22 UTC. The following are signed role inputs to v0.2.0; Lite/Bee is the final decision owner:
+
+- **Ploy — trader/product challenge — signed 2026-08-22 UTC:** setup-first queue is decision-useful only with explicit trigger, invalidation, anti-chase label, and no automatic-buy implication. Accepted in v0.2.0.
+- **Khim — implementation feasibility — signed 2026-08-22 UTC:** FULL ORD scan/snapshot foundations are reusable; regime, ranking persistence, and event contracts require explicit versioned fields. Accepted with implementation readiness still evidence-gated.
+- **View — UI/UX — signed 2026-08-22 UTC:** queue/card hierarchy must use canonical lifecycle/setup vocabulary, expose trigger/risk/freshness, and work at 1280px and 512px without horizontal scroll. Accepted as AC-UI-001/002.
+- **Mali — retail comprehension — signed 2026-08-22 UTC:** labels must not imply an order; missing/stale/error states must be plain and visible; passive viewing is not a decision. Accepted as AC-QUEUE-002 and AC-IMM-001.
+- **Nida — QA/evidence — signed 2026-08-22 UTC:** readiness remains NOT VERIFIED until source→DB→ranking→API→served UI and lifecycle evidence reconcile. Accepted as the explicit status above.
+
+Resolved decisions: `OD-1` regime formula and precedence; `OD-2` lifecycle/setup/portfolio vocabulary separation; `OD-3` queue hard gates and FULL ORD reconciliation; `OD-4` 40/30/20/10 ranking persistence and missing-data behavior; `OD-5` append-only event/idempotency/order/correction semantics and decay; `OD-6` decision-card/UI and acceptance matrix boundaries. No unresolved decision is silently treated as approved.
+
+## 10. Gate verdict and downstream boundary
+
+Product direction: `PASS`.
+Strategy foundation: `PASS`.
+Implementation readiness: `REVISE` / `NOT VERIFIED` pending evidence matrix execution.
+Canonical contract gate: `PASS` for specification takeover by Lite/Bee.
+
+Dependent Action Queue, Outcome Log, and UI redesign cards MUST remain blocked until this canonical file is read back and this gate is explicitly accepted. No production implementation, live portfolio action, or automatic trading is authorized by this contract alone.

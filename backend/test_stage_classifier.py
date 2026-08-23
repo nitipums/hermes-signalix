@@ -135,7 +135,7 @@ class StageClassifierTests(unittest.TestCase):
                               volume_ratio_50=1.0, trend_template_conditions=8,
                               range_20d_pct=10.0),
                            event={"trigger_price": 9.8, "age_sessions": 2, "pivot_low": 9.4})
-        self.assertEqual(r["phase"], "breakout_new")
+        self.assertEqual(r["phase"], "breakout_retest")
         self.assertEqual(r["primary_state"], "breakout_retest")
 
     def test_S2_breakout_extended_is_extended(self):

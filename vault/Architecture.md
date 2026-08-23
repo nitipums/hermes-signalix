@@ -1,5 +1,7 @@
 # Architecture
 
+> **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`. Verify implementation/runtime when dates conflict.
+
 ## Data flow
 ```
             ┌─────────────────── EOD INGESTION ───────────────────┐
@@ -51,9 +53,9 @@ logs in the non-TTY container).
 - `backend/delivery.py` — `push_telegram()` + envelope formatting (shared by batch + consumer)
 - `backend/delivery_consumer.py` — Redis subscriber entrypoint
 - `backend/screening.py` — DB-backed Minervini engine
-- `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion
+- `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion; `intraday_feed_status` tracks per-symbol Settrade 60m availability without changing Daily eligibility
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence
-- Intraday E2E contract: fetch → `intraday_price_data` → evaluator → `build_dashboard.build()` from existing Daily scan → `dashboard_snapshot.json`/`dashboard.html` → served `:3001`
+- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → `build_dashboard.build()` from existing Daily scan → `dashboard_snapshot.json`/`dashboard.html` → served `:3001`
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
 - `backend/build_dashboard.py` — dashboard HTML shell + dynamic snapshot presentation
 - `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
@@ -66,13 +68,20 @@ See [[Components]] for detail, [[Deployment]] for ops.
 The active 60m path is:
 
 ```text
-Settrade full active ORD fetch
+Settrade full active ORD fetch (excluding feed-status cooldown symbols)
 → intraday_price_data upsert
+→ intraday_feed_status update (retry/unavailable/available)
 → intraday evaluator
 → dashboard rebuild from existing Daily scan
 → dashboard_snapshot.json + dashboard.html
 → separate dashboard server :3001
 ```
+
+Per-symbol intraday feed failure must not remove a symbol from Daily/EOD. When a
+60m feed is unavailable, the dashboard explicitly shows `60m unavailable · Daily
+EOD` and uses Daily EOD as the decision source. `COLOR` is the separate
+instrument-master exception: it remains excluded until official Settrade master
+sync reactivates it.
 
 It deliberately does not run a Daily scan. Daily membership/classification remains EOD-owned. A run may be `partial_success` when Settrade returns empty data for a bounded symbol tail; that is tolerated by the watchdog when data/evaluator freshness is healthy. Dashboard freshness must be proven at the served browser surface, not only by DB or HTTP 200.
 
