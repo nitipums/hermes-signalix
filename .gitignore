@@ -4,7 +4,17 @@ __pycache__/
 settradeupdated.env
 *.log
 venv/
-# ephemeral intraday healthcheck/update logs (rotated at runtime)
+.venv/
+# ephemeral runtime logs
 backend/intraday_*_log.jsonl
 backend/intraday_*_log.txt
 backend/intraday_update_log.txt
+backend/settradev2_log/
+# Generated release artifacts; created by fresh build, not source
+backend/dashboard.html
+backend/dashboard_snapshot.json
+backend/mvp_snapshot.json
+backend/scan_results.json
+backend/artifact_manifest.json
+# Release worktree/plan metadata
+.superpowers/sdd/

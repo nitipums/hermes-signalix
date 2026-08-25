@@ -808,7 +808,7 @@ def persist_breakout_lifecycle(pg, results, run_id, scanner_version):
                         INSERT INTO daily_breakout_event_stage_transitions
                         (id,event_id,from_stage,to_stage,observed_on,close,
                          distance_from_trigger_pct,scan_run_id,failure_reason,raw_evidence)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                         ON CONFLICT(event_id,to_stage,observed_on,scan_run_id) DO NOTHING
                     """, (str(uuid.uuid4()), event_id, from_stage, current_stage, scan_date,
                           float(row.get("close")), distance, run_id,
@@ -1066,7 +1066,7 @@ def reconcile_intraday_events_at_eod(pg, daily_run_id, scanner_version, symbols=
         cur.close()
 
 
-def get_active_intraday_events(pg, confidence=None):
+def get_active_intraday_events(pg, confidence=None, now=None):
     """Return active intraday events (for dashboard overlay)."""
     cur = pg.cursor()
     try:
@@ -1077,16 +1077,38 @@ def get_active_intraday_events(pg, confidence=None):
             params = [confidence]
         cur.execute(f"""
             SELECT DISTINCT ON (symbol)
-                id, symbol, origin, trigger_price, first_seen, first_candle_ts, interval,
-                confidence, failure_level, pre_break_pivot_low, intraday_run_id,
-                resolved_daily_event_id, reconciled_at
-            FROM intraday_events
+                ie.id, ie.symbol, ie.origin, ie.trigger_price, ie.first_seen, ie.first_candle_ts, ie.interval,
+                ie.confidence, ie.failure_level, ie.pre_break_pivot_low, ie.intraday_run_id,
+                ie.resolved_daily_event_id, ie.reconciled_at,
+                o.candle_ts AS obs_candle_ts, o.close AS obs_close
+            FROM intraday_events ie
+            LEFT JOIN LATERAL (
+                SELECT candle_ts, close
+                FROM intraday_event_observations o2
+                WHERE o2.event_id = ie.id
+                ORDER BY candle_ts DESC
+                LIMIT 1
+            ) o ON true
             WHERE {where}
-            ORDER BY symbol, first_candle_ts DESC
+            ORDER BY ie.symbol, ie.first_candle_ts DESC
         """, params)
         out = {}
         for row in cur.fetchall():
-            ev_id, symbol, origin, trigger, first_seen, first_candle, interval, conf, failure, pivot, run_id, resolved, reconciled = row
+            # Unpack row with observation join (15 columns)
+            (ev_id, symbol, origin, trigger, first_seen, first_candle, interval,
+             conf, failure, pivot, run_id, resolved, reconciled,
+             obs_candle_ts, obs_close) = row
+            # Build freshness dict
+            freshness = {"candle_ts": None, "close": None, "stale": False, "status": "unknown"}
+            if obs_candle_ts is not None and obs_close is not None:
+                freshness["candle_ts"] = obs_candle_ts.isoformat()
+                freshness["close"] = float(obs_close)
+                if now is not None:
+                    stale = (now - obs_candle_ts) > dt.timedelta(hours=24)
+                    freshness["stale"] = bool(stale)
+                    freshness["status"] = "stale" if stale else "fresh"
+                else:
+                    freshness["status"] = "fresh"
             out[symbol] = {
                 "event_id": str(ev_id), "origin": origin, "trigger_price": float(trigger),
                 "first_seen": first_seen.isoformat() if first_seen else None,
@@ -1097,6 +1119,7 @@ def get_active_intraday_events(pg, confidence=None):
                 "intraday_run_id": str(run_id) if run_id else None,
                 "resolved_daily_event_id": str(resolved) if resolved else None,
                 "reconciled_at": reconciled.isoformat() if reconciled else None,
+                "freshness": freshness,
             }
         return out
     finally:

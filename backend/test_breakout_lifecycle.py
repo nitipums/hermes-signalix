@@ -219,6 +219,29 @@ class PersistBreakoutLifecycleTests(unittest.TestCase):
         self.assertIn("observations_appended", result)
 
 
+class BreakoutLifecycleSqlShapeTests(unittest.TestCase):
+    def test_stage_transition_insert_placeholders_match_parameters(self):
+        from scan_history import persist_breakout_lifecycle
+        pg = MagicMock()
+        cur = pg.cursor.return_value
+        cur.fetchone.side_effect = [
+            ("2026-08-13",),
+            ("952c18c6-a816-4c9b-9ee7-a253507f0df1",),
+            (None,),
+        ]
+
+        def execute(sql, params=None):
+            if "daily_breakout_event_stage_transitions" in sql and "INSERT" in sql.upper():
+                self.assertEqual(sql.count("%s"), len(params))
+
+        cur.execute.side_effect = execute
+        persist_breakout_lifecycle(
+            pg, [_calibration_scan_results()[0]],
+            run_id="00000000-0000-0000-0000-000000000001",
+            scanner_version="signalix/daily-state-v2",
+        )
+
+
 class BreakoutEventLifecycleQueryTests(unittest.TestCase):
     def test_query_uses_three_tables(self):
         from scan_history import breakout_event_lifecycle

@@ -34,7 +34,26 @@ AGING = "aging"
 STALE = "stale"
 UNKNOWN = "unknown"
 
-# Display strings the UI/mobile layer reference by exact match
+# Canonical Daily decision-state values.
+DECISION_STATE_PROVISIONAL = "provisional"
+DECISION_STATE_OFFICIAL_DAILY = "official_daily"
+DECISION_STATES = (DECISION_STATE_PROVISIONAL, DECISION_STATE_OFFICIAL_DAILY)
+
+
+def resolve_decision_state(market_session=None, daily_as_of=None, last_valid_session=None):
+    """Return official_daily only for a closed, aligned Daily EOD session."""
+    if not daily_as_of:
+        return DECISION_STATE_PROVISIONAL
+    session = market_session or {}
+    if session.get("status") != "market_closed":
+        return DECISION_STATE_PROVISIONAL
+    anchor = last_valid_session if last_valid_session is not None else session.get("last_valid_session")
+    if anchor is None or str(daily_as_of) != str(anchor):
+        return DECISION_STATE_PROVISIONAL
+    return DECISION_STATE_OFFICIAL_DAILY
+
+
+# Display strings the UI/mobile layer reference by exact match.
 STATUS_DISPLAY = {
     FRESH: "Fresh",
     AGING: "Aging",

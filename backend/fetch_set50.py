@@ -4,7 +4,7 @@ import psycopg2
 
 PAGE_URL = "https://www.set.or.th/en/market/information/securities-list/constituents-list-set50-set100"
 FALLBACK_DIR = "/root/set50_financials"
-PG = dict(host=os.getenv("POSTGRES_HOST","127.0.0.1"), port=5432,
+PG = dict(host="127.0.0.1", port=5432,
           user="signalix", password="signalix_pass", dbname="signalix")
 
 def parse_set50_from_page(html: str) -> list[str]:

@@ -115,12 +115,10 @@ def startup():
         return
     init_db()
     try:
-        from users import init_user_schema
-        init_user_schema()
-        from portfolio import init_portfolio_schema
-        init_portfolio_schema(get_pg())
+        from deferred_runtime import init_deferred_schemas
+        init_deferred_schemas(get_pg)
     except Exception as e:
-        print(f"  ! schema init failed: {repr(e)[:120]}")
+        print(f"  ! deferred schema init failed: {repr(e)[:120]}")
 
 # ---------- Helpers ----------
 def dedupe_hash(payload: dict) -> str:
@@ -147,6 +145,30 @@ def readiness():
         return {"status": "ok", "db": "up", "redis": "up"}
     except Exception as e:
         return JSONResponse(status_code=503, content={"status": "degraded", "error": str(e)})
+
+
+@app.get("/api/risk-stop-target/{symbol}")
+def risk_stop_target(symbol: str, contract: str = "daily"):
+    """Deprecated compatibility alias for the canonical /risk-plan endpoint.
+
+    Keep one deterministic RST contract: legacy callers are delegated to
+    ``risk_plan`` rather than maintaining a second calculation path.
+    """
+    return risk_plan(symbol=symbol, contract=contract)
+
+
+def load_snapshot_items() -> list[dict]:
+    """Load serialized items from the latest snapshot for RST calculation."""
+    snap_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
+    if not os.path.exists(snap_path):
+        return []
+    try:
+        with open(snap_path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
 
 # ---------- User layer (multi-tenant routing) ----------
 from users import upsert_user, set_watch, _normalize_symbols  # noqa: E402
@@ -210,89 +232,9 @@ def tiers():
     }
 
 
-# ---------- Investment Co-pilot MVP (owner-only) ----------
-def _portfolio_owner(chat_id: str, owner_token: str) -> int:
-    expected = os.getenv("PORTFOLIO_OWNER_TOKEN", "")
-    # The bearer token is bound to the configured beta owner; never let callers
-    # select a portfolio merely by supplying a different chat_id.
-    bound_owner_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-    from portfolio import require_owner_identity
-    if not require_owner_identity(owner_token, expected, str(chat_id), bound_owner_chat_id):
-        raise HTTPException(status_code=403, detail="portfolio access denied")
-    pg = get_pg(); cur = pg.cursor()
-    cur.execute("SELECT id, tier FROM users WHERE telegram_chat_id=%s", (bound_owner_chat_id,))
-    row = cur.fetchone(); cur.close()
-    if not row or row[1] != "owner":
-        raise HTTPException(status_code=403, detail="portfolio owner account required")
-    return row[0]
-
-
-@app.post("/portfolio/documents")
-async def portfolio_document(
-    chat_id: str = Form(...), broker: str = Form(...), account_alias: str = Form(...),
-    pdf: UploadFile = File(...), pdf_password: str = Form(""),
-    x_portfolio_token: str = Header(default=""),
-):
-    """Owner-only PDF intake. Password is used in memory only and never persisted."""
-    user_id = _portfolio_owner(chat_id, x_portfolio_token)
-    if broker not in {"innovestx_derivatives", "krungsri_equity"}:
-        raise HTTPException(status_code=400, detail="unsupported broker parser")
-    if not account_alias or len(account_alias) > 64 or not re.fullmatch(r"[a-z0-9_-]+", account_alias):
-        raise HTTPException(status_code=400, detail="invalid account alias")
-    if not (pdf.filename or "").lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="PDF required")
-    data = await pdf.read()
-    if not data or len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="empty or oversized PDF")
-    from portfolio import document_hash, parse_document, persist_parsed
-    try:
-        parsed = parse_document(data, broker, account_alias, pdf_password or None)
-        result = persist_parsed(get_pg(), user_id, parsed, document_hash(data))
-        return {**result, "broker": parsed["broker"], "account_alias": account_alias,
-                "trade_date": parsed["trade_date"]}
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-
-@app.post("/portfolio/snapshots")
-async def portfolio_snapshot(request: Request, chat_id: str, x_portfolio_token: str = Header(default="")):
-    """Owner-only manual/screenshot holding snapshot intake.
-
-    Screenshots are observation snapshots, not ledger transactions; the payload
-    must already be reviewed by the owner/assistant before import.
-    """
-    user_id = _portfolio_owner(chat_id, x_portfolio_token)
-    payload = await request.json()
-    if not isinstance(payload, dict):
-        raise HTTPException(status_code=400, detail="snapshot payload required")
-    for key in ("broker", "account_alias", "account_type", "as_of", "holdings"):
-        if key not in payload:
-            raise HTTPException(status_code=400, detail=f"missing {key}")
-    if not re.fullmatch(r"[a-z0-9_-]{1,64}", payload["account_alias"]):
-        raise HTTPException(status_code=400, detail="invalid account alias")
-    if not isinstance(payload.get("holdings"), list) or len(payload["holdings"]) > 200:
-        raise HTTPException(status_code=400, detail="invalid holdings list")
-    from portfolio import persist_manual_snapshot
-    try:
-        return persist_manual_snapshot(user_id, payload)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=str(e))
-
-
-@app.get("/portfolio/me")
-def portfolio_me(chat_id: str, x_portfolio_token: str = Header(default="")):
-    """Owner-only safe summary; no raw account numbers or source documents are returned."""
-    user_id = _portfolio_owner(chat_id, x_portfolio_token)
-    from portfolio import portfolio_summary
-    return portfolio_summary(user_id)
-
-
-@app.get("/portfolio/health")
-def portfolio_health_route(chat_id: str, x_portfolio_token: str = Header(default="")):
-    """Owner-only Monitor/Inspect account-health contract for the cockpit."""
-    user_id = _portfolio_owner(chat_id, x_portfolio_token)
-    from portfolio import portfolio_health
-    return portfolio_health(user_id)
+# Deferred Portfolio/owner routes are isolated from the MVP app core.
+from portfolio_routes import create_portfolio_router
+app.include_router(create_portfolio_router(get_pg))
 
 
 @app.post("/webhook")
@@ -416,7 +358,7 @@ def get_instrument(symbol: str):
 
 
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
-from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results  # noqa: E402
+from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results, load_symbol_intraday  # noqa: E402
 from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, breakout_event_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
 # All senders + formatters live in delivery.py so the batch scan (here) and the
 # standalone Redis consumer format + push identically.
@@ -528,6 +470,110 @@ def screen_symbol(symbol: str):
     state["setup_proximity"] = _setup["proximity"]
     result["daily_state"] = state
     return result
+
+
+@app.get("/risk-plan/{symbol}")
+def risk_plan(
+    symbol: str,
+    contract: str = "daily",
+    account_size: float | None = None,
+    risk_percent: float | None = None,
+    planned_entry: float | None = None,
+    planned_stop: float | None = None,
+):
+    """On-demand Risk / Stop / Target Assistant.
+
+    Returns deterministic Fib 1.272/1.618 targets, system stop, planned stop,
+    and position sizing. User inputs are session-local only — never persisted.
+
+    Contracts:
+      daily    — derives swing anchors from analyze_symbol_db_ranked (DB archive)
+      intraday — derives swing anchors from stored 60m candles
+
+    All calculations are read-only and deterministic. NOT_VERIFIED is returned
+    when anchors are stale/invalid — never fabricated numbers.
+    """
+    import risk_stop_target as rst
+
+    symbol = symbol.upper().strip()
+    contract = contract.lower().strip()
+
+    if contract not in ("daily", "intraday"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"contract must be 'daily' or 'intraday', got '{contract}'",
+        )
+
+    user_inputs = {}
+    if account_size is not None and account_size > 0:
+        user_inputs["account_size"] = account_size
+    if risk_percent is not None and 0 < risk_percent <= 100:
+        user_inputs["risk_percent"] = risk_percent
+    if planned_entry is not None:
+        user_inputs["planned_entry"] = planned_entry
+    if planned_stop is not None:
+        user_inputs["planned_stop"] = planned_stop
+
+    if contract == "daily":
+        # Pre-baked: risk anchors are deterministic and computed at build time.
+        # Only user-input sizing is computed at request time.
+        try:
+            cache = _load_dashboard_cache()
+        except HTTPException:
+            raise HTTPException(status_code=503, detail="dashboard cache unavailable")
+        snapshot_items = {item["symbol"]: item for item in cache.get("items", [])}
+        snapshot_item = snapshot_items.get(symbol)
+        if snapshot_item is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"{symbol} not found or insufficient history",
+            )
+        # Reconstruct the base RST result from pre-baked fields
+        base = {
+            "symbol": symbol,
+            "contract": "daily",
+            "trigger": snapshot_item.get("rst_trigger"),
+            "system_stop": snapshot_item.get("rst_system_stop"),
+            "pivot_low": snapshot_item.get("rst_pivot_low"),
+            "swing_low": snapshot_item.get("rst_swing_low"),
+            "swing_high": snapshot_item.get("rst_swing_high"),
+            "planned_entry": snapshot_item.get("rst_planned_entry"),
+            "planned_stop": snapshot_item.get("rst_planned_stop"),
+            "fib_1272": snapshot_item.get("rst_fib_1272"),
+            "fib_1618": snapshot_item.get("rst_fib_1618"),
+            "freshness": snapshot_item.get("date") or snapshot_item.get("daily_eod_freshness", {}).get("as_of"),
+            "sizing": {"risk_budget": None, "risk_per_share": None,
+                       "shares": None, "status": "NOT_VERIFIED"},
+            "warnings": snapshot_item.get("rst_warnings", []),
+            "status": snapshot_item.get("rst_status", "NOT_VERIFIED"),
+        }
+        # Apply user inputs for sizing only
+        base["planned_entry"] = (user_inputs.get("planned_entry")
+                                  if user_inputs.get("planned_entry") is not None
+                                  else snapshot_item.get("rst_trigger"))
+        base["planned_stop"] = (user_inputs.get("planned_stop")
+                                 if user_inputs.get("planned_stop") is not None
+                                 else snapshot_item.get("rst_system_stop"))
+        if user_inputs:
+            sizing = rst.compute_position_size(
+                user_inputs.get("account_size"),
+                user_inputs.get("risk_percent"),
+                base["planned_entry"],
+                base["planned_stop"],
+            )
+            base["sizing"] = sizing
+            # Recompute warnings with user override
+            base["warnings"] = rst._compute_warnings(base["planned_stop"], base["system_stop"])
+            base["status"] = "OK" if not base["warnings"] else "OK_WITH_WARNINGS"
+        return base
+
+    # intraday contract
+    pg = get_pg()
+    try:
+        df = load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400)
+    finally:
+        pg.close()
+    return rst.compute_risk_stop_target("intraday", symbol, intraday_df=df, user_inputs=user_inputs or None)
 
 
 def dashboard_overview_payload(scan_path):
@@ -788,6 +834,101 @@ def _active_intraday_events(items):
     return out
 
 
+@app.get("/dashboard/shortlist")
+def dashboard_shortlist():
+    """Compact, cached Daily Shortlist — read-only, no scan/DB/chart/history.
+
+    Loads the persisted dashboard_snapshot.json artifact (via
+    ``_load_dashboard_cache``), projects each serialized card through
+    ``daily_shortlist.project_shortlist``, and returns only eligible READY /
+    PRE-READY candidates plus exact root freshness / market_session / policy /
+    total fields.
+
+    Never rescans, never queries the database, never fetches charts/history,
+    and never mutates snapshot data.  A missing or corrupt cache yields HTTP 503.
+    """
+    payload = _load_dashboard_cache()
+    from daily_shortlist import project_shortlist, POLICY_VERSION
+    candidates = project_shortlist(payload.get("items", []))
+    dashboard_meta = payload.get("dashboard_meta", {})
+    return {
+        "scan_time": payload.get("scan_time"),
+        "data_fetched_at": payload.get("data_fetched_at") or dashboard_meta.get("data_fetched_at"),
+        "data_freshness_source": payload.get("data_freshness_source") or dashboard_meta.get("data_freshness_source"),
+        "data_freshness_status": payload.get("data_freshness_status") or dashboard_meta.get("data_freshness_status"),
+        "market_session": payload.get("market_session") or dashboard_meta.get("market_session"),
+        "policy_version": POLICY_VERSION,
+        "total": len(candidates),
+        "candidates": candidates,
+    }
+
+
+@app.get("/dashboard/shortlist/compact")
+def dashboard_shortlist_compact(page: int = 1, page_size: int = 20,
+                                publication_state: str | None = None):
+    """Read-only, paginated compact shortlist for Explorer on-demand loading.
+
+    Returns a bounded page of shortlist candidates projected through the same
+    compact contract as /dashboard/shortlist, but paginated so the Explorer
+    never embeds the full universe on first paint.  Never rescans, never
+    queries the database, never fetches charts/history.  A missing or corrupt
+    cache yields HTTP 503.
+
+    ``publication_state`` may filter to READY or PRE_READY only.
+    """
+    if page < 1:
+        raise HTTPException(status_code=400, detail="page must be >= 1")
+    if page_size < 1 or page_size > 100:
+        raise HTTPException(status_code=400, detail="page_size must be between 1 and 100")
+    valid_states = {"READY", "PRE_READY", None}
+    if publication_state and publication_state not in {"READY", "PRE_READY"}:
+        raise HTTPException(status_code=400, detail=f"unsupported publication_state: {publication_state}")
+    payload = _load_dashboard_cache()
+    from daily_shortlist import (
+        project_shortlist, project_shortlist_lanes, POLICY_VERSION,
+        LANE_POLICY_VERSION,
+    )
+    candidates = project_shortlist(payload.get("items", []))
+    if publication_state:
+        candidates = [c for c in candidates if c["publication_state"] == publication_state]
+    start = (page - 1) * page_size
+    page_items = candidates[start:start + page_size]
+    dashboard_meta = payload.get("dashboard_meta", {})
+
+    # Lane projection (Task C): canonical three-lane contract. Extended names
+    # are visible in LEADERSHIP_EXTENDED only; never READY. When filtering to
+    # READY/PRE_READY, the extended lane is intentionally empty.
+    lanes = project_shortlist_lanes(payload.get("items", []))
+    if publication_state == "READY":
+        lanes["PREPARE"] = []
+        lanes["LEADERSHIP_EXTENDED"] = []
+    elif publication_state == "PRE_READY":
+        lanes["REVIEW_NOW"] = []
+        lanes["LEADERSHIP_EXTENDED"] = []
+    else:
+        # No filter: paginate per lane with the same page window.
+        for lane in lanes:
+            lanes[lane] = lanes[lane][start:start + page_size]
+    return {
+        "scan_time": payload.get("scan_time"),
+        "data_fetched_at": payload.get("data_fetched_at") or dashboard_meta.get("data_fetched_at"),
+        "data_freshness_source": payload.get("data_freshness_source") or dashboard_meta.get("data_freshness_source"),
+        "data_freshness_status": payload.get("data_freshness_status") or dashboard_meta.get("data_freshness_status"),
+        "market_session": payload.get("market_session") or dashboard_meta.get("market_session"),
+        "policy_version": POLICY_VERSION,
+
+        "lane_policy_version": LANE_POLICY_VERSION,
+        "publication_state": publication_state,
+        "page": page,
+        "page_size": page_size,
+        "total": len(candidates),
+        "count": len(page_items),
+        "candidates": page_items,
+
+        "lanes": lanes,
+    }
+
+
 @app.get("/dashboard/snapshot")
 def dashboard_snapshot():
     """Progressive refresh: return the complete persisted scan card contract.
@@ -832,6 +973,9 @@ def dashboard_snapshot():
                 payload["build_timestamp"] = saved_build_ts
             if saved_dashboard_meta is not None:
                 payload["dashboard_meta"] = saved_dashboard_meta
+            # Ensure market_regime is included in dashboard_meta for the template
+            if "market_regime" in payload and "dashboard_meta" in payload:
+                payload["dashboard_meta"]["market_regime"] = payload["market_regime"]
         except (OSError, ValueError, json.JSONDecodeError):
             # Safe fallback for a scan generated before the cache artifact was
             # introduced; normal deploys/builds never take this slow path.
@@ -1108,7 +1252,7 @@ def run_scan(
     else:
         try:
             import build_dashboard
-            build_dashboard.build(scanned=scanned)
+            build_dashboard.build(scanned=scanned, run_id=snapshot["run_id"])
         except Exception as e:
             print(f"  ! dashboard build failed: {repr(e)[:120]}")
     return {"status": "scanned", "min_conditions": min_conditions,

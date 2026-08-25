@@ -1,0 +1,162 @@
+{
+  "decision_state": "provisional",
+  "freshness": {
+    "status": "fresh",
+    "source": "settrade_openapi",
+    "as_of": "2026-08-24T16:00:00+07:00",
+    "data_fetched_at": "2026-08-24T16:00:05+07:00"
+  },
+  "ready": [
+    {
+      "symbol": "PTT",
+      "name": "PTT PUBLIC CO LTD",
+      "sector": "Energy",
+      "industry": "Oil & Gas",
+      "description": "Thai energy and petrochemical company.",
+      "market_cap": 1100000000000,
+      "trade_value": 120000000,
+      "index_membership": ["SET50", "SET100"],
+      "margin_pct": 50,
+      "target": 38.00,
+      "rr": 2.75,
+      "high52": 39.50,
+      "low52": 29.75,
+      "ath_high": 45.25,
+      "ath_low": 18.00,
+      "stage": "S2_uptrend",
+      "phase": "breakout_new",
+      "decision_state": "official_daily",
+      "action": "VALIDATE FRESH BREAKOUT",
+      "action_queue": "fresh_breakout",
+      "close": 35.25,
+      "change_pct": 2.3,
+      "change_amount": 0.79,
+      "volume": 18500000,
+      "avgDailyValue20": 52000000,
+      "setup_quality": {
+        "pass": true,
+        "score": 85,
+        "reasons": ["tight_consolidation", "volume_dry_up"]
+      },
+      "setup_proximity": {
+        "state": "action",
+        "pivot": 35.00,
+        "distance_pct": 0.007,
+        "zone": {"lo": 34.50, "hi": 36.00}
+      },
+      "trigger": "Break above 35.00 pivot on volume > 1.5x avg",
+      "invalidation": "Close below 34.00 or volume < 500K on breakout day",
+      "risk_stop": 34.00,
+      "risk_pct": 3.5,
+      "rs": 78,
+      "source": "settrade_openapi",
+      "data_freshness": "fresh",
+      "provenance": {
+        "scan_run_id": "scan-20260824-160000-a1b2c3",
+        "scan_time": "2026-08-24T16:00:15+07:00"
+      }
+    },
+    {
+      "symbol": "AOT",
+      "name": "AIRPORTS OF THAILAND PCL",
+      "sector": "Industrials",
+      "industry": "Airports",
+      "description": "Thailand airport operator.",
+      "market_cap": 890000000000,
+      "trade_value": 95000000,
+      "index_membership": ["SET50", "SET100"],
+      "margin_pct": 50,
+      "target": 68.00,
+      "rr": 2.20,
+      "high52": 67.50,
+      "low52": 54.25,
+      "ath_high": 76.00,
+      "ath_low": 25.00,
+      "stage": "S2_uptrend",
+      "phase": "pullback_to_support",
+      "decision_state": "official_daily",
+      "action": "QUALIFIED PULLBACK",
+      "action_queue": "qualified_pullback",
+      "close": 62.50,
+      "change_pct": -0.8,
+      "change_amount": -0.5,
+      "volume": 4200000,
+      "avgDailyValue20": 262000000,
+      "setup_quality": {
+        "pass": true,
+        "score": 72,
+        "reasons": ["above_rising_ma50", "volume_contracting"]
+      },
+      "setup_proximity": {
+        "state": "near",
+        "pivot": 61.50,
+        "distance_pct": 0.016,
+        "zone": {"lo": 61.00, "hi": 63.50}
+      },
+      "trigger": "Bounce off 61.50 support with bullish reversal candle",
+      "invalidation": "Close below 60.50 or failure to hold MA50",
+      "risk_stop": 60.50,
+      "risk_pct": 3.2,
+      "rs": 85,
+      "source": "settrade_openapi",
+      "data_freshness": "fresh",
+      "provenance": {
+        "scan_run_id": "scan-20260824-160000-a1b2c3",
+        "scan_time": "2026-08-24T16:00:15+07:00"
+      }
+    }
+  ],
+  "pre_ready": [
+    {
+      "symbol": "SCB",
+      "name": "SCB X PCL",
+      "sector": "Financials",
+      "industry": "Banks",
+      "description": "Thai financial services group.",
+      "market_cap": 380000000000,
+      "trade_value": 78000000,
+      "index_membership": ["SET50", "SET100"],
+      "margin_pct": 50,
+      "target": 125.00,
+      "rr": 2.60,
+      "high52": 120.00,
+      "low52": 88.50,
+      "ath_high": 145.00,
+      "ath_low": 42.00,
+      "stage": "S1_basing",
+      "phase": "tight_base",
+      "decision_state": "official_daily",
+      "action": "WAIT FOR CONFIRMATION",
+      "action_queue": "pre_breakout",
+      "close": 112.00,
+      "change_pct": 0.4,
+      "change_amount": 0.45,
+      "volume": 3100000,
+      "avgDailyValue20": 348000000,
+      "setup_quality": {
+        "pass": true,
+        "score": 68,
+        "reasons": ["volatility_contraction", "tight_range"]
+      },
+      "setup_proximity": {
+        "state": "setting_up",
+        "pivot": 115.00,
+        "distance_pct": 0.026,
+        "zone": {"lo": 110.00, "hi": 115.00}
+      },
+      "trigger": "Break above 115.00 on volume expansion",
+      "invalidation": "Close below 110.00 base low",
+      "risk_stop": 110.00,
+      "risk_pct": 1.8,
+      "rs": 65,
+      "source": "settrade_openapi",
+      "data_freshness": "fresh",
+      "provenance": {
+        "scan_run_id": "scan-20260824-160000-a1b2c3",
+        "scan_time": "2026-08-24T16:00:15+07:00"
+      }
+    }
+  ],
+  "scan_time": "2026-08-24T16:00:15+07:00",
+  "scan_run_id": "scan-20260824-160000-a1b2c3"
+}

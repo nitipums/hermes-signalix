@@ -1,16 +1,24 @@
-"""Minimal static file server for the Signalix dashboard.
+"""Signalix dashboard compatibility entrypoint.
 
-Serves /app/dashboard.html (and any other static asset in the backend dir)
-on port 3001. Run as a sidecar so the dashboard is always available alongside
-the FastAPI backend on port 8000.
+Route ownership is split:
+- ``mvp_routes`` owns /api/* projection routes.
+- ``legacy_routes`` owns /dashboard.html, /portal, and /portfolio files.
+- this module owns only HTTP server lifecycle and route dispatch.
 """
+from __future__ import annotations
+
 import os
 import http.server
 import socketserver
 from urllib.parse import urlsplit
 
+from legacy_routes import legacy_file_for_path, serve_file
+from mvp_routes import handle_mvp_api
+
 PORT = int(os.getenv("DASHBOARD_PORT", "3001"))
-DIR = "/app"
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+DIR = os.getenv("FRONTEND_DIR", os.path.join(_BACKEND_DIR, "frontend"))
+LEGACY_DIR = os.getenv("LEGACY_DIR", _BACKEND_DIR)
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -18,20 +26,30 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIR, **kwargs)
 
     def do_GET(self):
-        # serve friendly routes for the public Signalix portal and the private
-        # owner-only Investment Co-pilot cockpit. Strip the query string first
-        # so cache-busting URLs such as /portfolio?v=2 still resolve.
         parsed = urlsplit(self.path)
         path = parsed.path
         suffix = ("?" + parsed.query) if parsed.query else ""
-        if path in ("/portal", "/portal/", "/portal.html"):
-            self.path = "/portal.html" + suffix
-        elif path in ("/portfolio", "/portfolio/", "/portfolio.html"):
-            self.path = "/portfolio.html" + suffix
+
+        if path.startswith("/api/"):
+            if handle_mvp_api(self.path, self):
+                return
+            self.send_response(404)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Not Found")
+            return
+
+        legacy_file = legacy_file_for_path(path, LEGACY_DIR)
+        if legacy_file:
+            return serve_file(self, legacy_file)
+
+        if path in ("/mvp", "/mvp/"):
+            self.path = "/index.html" + suffix
+        elif path in ("/", "/index", "/index.html"):
+            self.path = "/index.html" + suffix
         return super().do_GET()
 
     def end_headers(self):
-        # allow clicking the dashboard link from Telegram/Bots
         self.send_header("Access-Control-Allow-Origin", "*")
         super().end_headers()
 

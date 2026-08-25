@@ -24,9 +24,8 @@ import psycopg2.extras
 import pandas as pd
 import numpy as np
 
-# Reuse the deterministic math from the existing scanner (no yfinance import
-# at module level, so importing this file never touches the network).
-from scanner import (
+# Pure deterministic math lives in signal_core; scanner.py remains transitional legacy.
+from signal_core import (
     compute_rs_rating,
     compute_rs_percentile,
     detect_vcp,

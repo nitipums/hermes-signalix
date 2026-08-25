@@ -1,0 +1,45 @@
+{
+  "decision_state": "official_daily",
+  "freshness": {
+    "status": "fresh",
+    "source": "settrade_openapi",
+    "as_of": "2026-08-24T16:00:00+07:00",
+    "data_fetched_at": "2026-08-24T16:00:05+07:00"
+  },
+  "items": [
+    {
+      "symbol": "ADVANC",
+      "name": "ADVANCED INFO SERVICE PCL",
+      "stage": "S3_distributing",
+      "phase": "declining",
+      "close": 285.00,
+      "change_pct": -1.2,
+      "volume": 1200000,
+      "avgDailyValue20": 342000000,
+      "rs": 45,
+      "source": "settrade_openapi",
+      "data_freshness": "fresh",
+      "decision_state": "official_daily"
+    },
+    {
+      "symbol": "BDMS",
+      "name": "BANGKOK DUSIT MEDICAL SERVICES PCL",
+      "stage": "S2_uptrend",
+      "phase": "extended",
+      "close": 28.75,
+      "change_pct": 0.9,
+      "volume": 8900000,
+      "avgDailyValue20": 255000000,
+      "rs": 62,
+      "source": "settrade_openapi",
+      "data_freshness": "fresh",
+      "decision_state": "official_daily"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total_pages": 3,
+  "total_items": 50,
+  "scan_time": "2026-08-24T16:00:15+07:00",
+  "scan_run_id": "scan-20260824-160000-a1b2c3"
+}

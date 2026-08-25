@@ -9,6 +9,8 @@ from zoneinfo import ZoneInfo
 
 import psycopg2
 from reconciled_projection import PRIMARY_GROUPS, PRIMARY_META, apply_projection, snapshot_payload
+from artifact_writer import atomic_write_json, atomic_write_text, write_artifact_manifest
+from mvp_snapshot import build_mvp_snapshot, daily_freshness_from_run
 from stage_classifier import STAGE_LABELS, PHASE_LABELS
 
 try:
@@ -819,6 +821,38 @@ def plan(group, readiness, trend, snapshot, phase=None):
     return "Setup status", "Awaiting confirmation", "RS", number(trend.get("rs_rating"), 0)
 
 
+# --- Task 3: explicit shortlist evidence helpers (serialize raw fields) ---
+def _shortlist_trigger(phase, group) -> str | None:
+    """Explainable Daily Shortlist trigger label (entry confirmation).
+
+    Mirrors daily_shortlist._trigger so the serialized card carries an explicit
+    trigger raw field.  Only the Daily EOD decision layer is considered.
+    """
+    if phase == "breakout_new":
+        return "Daily close >= breakout trigger with quality pass"
+    if phase == "uptrend_pullback":
+        return "Pullback holding support reference"
+    if phase == "breakout_retest":
+        return "Breakout retest at reference"
+    if group == "waiting_breakout":
+        return "Near trigger/pivot; confirm with close + volume"
+    return None
+
+
+def _shortlist_invalidation(stop_price) -> str | None:
+    """Explainable Daily Shortlist invalidation / system-stop boundary.
+
+    Mirrors daily_shortlist._invalidation so the serialized card carries an
+    explicit invalidation raw field.
+    """
+    if stop_price is not None:
+        try:
+            return f"Close <= risk stop {float(stop_price):.2f}"
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None,
               layer3=None, sector=None, industry=None, market_cap=None,
               free_float_pct=None, foreign_limit_pct=None,
@@ -964,7 +998,7 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
                 if group in {"waiting_breakout", "breakout_new"} or phase in {"waiting_breakout", "breakout_new", "breakout_extended"}
                 else None)
     pullback = pullback_reference_status(row, decision_snapshot) if phase == "uptrend_pullback" or group == "uptrend_pullback" else None
-    return {
+    result = {
         "symbol": row["symbol"], "group": effective_group, "baseGroup": group,
         "intent": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[2], "status": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[1],
                     "tone": GROUP_BY_KEY.get(effective_group, GROUP_BY_KEY["down_or_broken"])[3],
@@ -1104,7 +1138,46 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "layer3_qualifiers": l3,
         # Ranking (Contract v0.2.0 §5)
         "ranking": row.get("ranking"),
+        # --- Task 3: explicit raw shortlist evidence fields (where absent) ---
+        # These expose the Daily EOD provenance and entry/invalidation evidence
+        # as top-level raw fields so the Daily Shortlist API can consume them
+        # directly from the serialized card without re-deriving them.
+        "daily_as_of": daily_as_of,
+        "daily_source": snapshot.get("price_source") or "Daily EOD",
+        "trigger": _shortlist_trigger(phase, effective_group),
+        "invalidation": _shortlist_invalidation(risk.get("riskStop") or readiness.get("stop_loss") or readiness.get("suggested_stop")),
+        "lifecycle_state": lifecycle.get("state") or phase or "unclassified",
     }
+    # --- P1 Risk/Stop/Target Assistant: pre-baked deterministic RST fields ---
+    # Risk anchors (trigger, system_stop, pivots, fibs) are deterministic from
+    # Daily EOD data — they do NOT change between data pulls. Embedding them at
+    # build time avoids per-request DB scans; only user-input sizing is computed
+    # at request time. Intraday 60m contract is still on-demand (candles change).
+    try:
+        from risk_stop_target import compute_risk_stop_target
+        _rst = compute_risk_stop_target("daily", row["symbol"], item=row)
+        result.update({
+            "rst_contract": "daily",
+            "rst_trigger": _rst.get("trigger"),
+            "rst_system_stop": _rst.get("system_stop"),
+            "rst_pivot_low": _rst.get("pivot_low"),
+            "rst_swing_low": _rst.get("swing_low"),
+            "rst_swing_high": _rst.get("swing_high"),
+            "rst_planned_entry": _rst.get("planned_entry"),
+            "rst_planned_stop": _rst.get("planned_stop"),
+            "rst_fib_1272": _rst.get("fib_1272"),
+            "rst_fib_1618": _rst.get("fib_1618"),
+            "rst_risk_per_share": None,
+            "rst_position_size": None,
+            "rst_risk_budget": None,
+            "rst_account_size": None,
+            "rst_risk_percent": None,
+            "rst_warnings": _rst.get("warnings", []),
+            "rst_status": _rst.get("status"),
+        })
+    except Exception:
+        pass
+    return result
 
 
 def dashboard_sort_key(item):
@@ -1118,7 +1191,7 @@ def dashboard_sort_key(item):
             -rs)
 
 
-def build(scanned=None):
+def build(scanned=None, run_id=None):
     """Build the stage-first dashboard.
 
     If ``scanned`` (list of row dicts) is provided it is used directly — this is
@@ -1143,7 +1216,8 @@ def build(scanned=None):
     # This is needed for standalone rebuilds where group_scan_results wasn't called
     if scanned is None:
         from screening import compute_symbol_ranking
-        from build_dashboard import fetch_market_regime
+        # fetch_market_regime is module-level; keep the import-free fix so
+        # build(scanned=...) cannot create a function-local shadow.
         pg = get_pg()
         try:
             market_regime = fetch_market_regime(pg)
@@ -1261,29 +1335,58 @@ def build(scanned=None):
     _root_data_fetched = freshness.get("data_fetched_at")
     _root_freshness_status = compute_freshness(_root_data_fetched)
 
-    with open(SNAPSHOT_JSON, "w") as file:
-        json.dump({"scan_time": scan_time, "market": "TH",
-                   "build_timestamp": build_timestamp,
-                   "data_fetched_at": _root_data_fetched,
-                   "data_freshness_source": freshness.get("source"),
-                   "data_freshness_status": _root_freshness_status,
-                   "data_global_status": _root_freshness_status,
-                   "data_freshness_age_hours": freshness.get("age_hours"),
-                   "market_session": freshness.get("market_session", {}),
-                   "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
-                   "dashboard_meta": {"build_timestamp": build_timestamp,
-                                      "data_fetched_at": freshness.get("data_fetched_at"),
-                                      "data_freshness_source": freshness.get("source"),
-                                      "intraday_scan_time": intraday_scan_time,
-                                      "data_freshness_status": freshness.get("status"),
-                                      "data_freshness_source": freshness.get("source"),
-                                      "market_session": freshness.get("market_session", {}),
-                                      "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
-                                      "intraday_event_counts": event_counts},
-                   "market_regime": market_regime,
-                   "refresh": "progressive_cards", "items": items,
-                   "stage_meta": stage_meta, "stage_counts": stage_counts}, file,
-                  separators=(",", ":"), default=_json_default)
+    snapshot_doc = {"scan_time": scan_time, "market": "TH",
+                    "build_timestamp": build_timestamp,
+                    "data_fetched_at": _root_data_fetched,
+                    "data_freshness_source": freshness.get("source"),
+                    "data_freshness_status": _root_freshness_status,
+                    "data_global_status": _root_freshness_status,
+                    "data_freshness_age_hours": freshness.get("age_hours"),
+                    "market_session": freshness.get("market_session", {}),
+                    "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
+                    "dashboard_meta": {"build_timestamp": build_timestamp,
+                                       "data_fetched_at": freshness.get("data_fetched_at"),
+                                       "data_freshness_source": freshness.get("source"),
+                                       "intraday_scan_time": intraday_scan_time,
+                                       "data_freshness_status": freshness.get("status"),
+                                       "market_session": freshness.get("market_session", {}),
+                                       "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
+                                       "intraday_event_counts": event_counts},
+                    "market_regime": market_regime,
+                    "refresh": "progressive_cards", "items": items,
+                    "stage_meta": stage_meta, "stage_counts": stage_counts}
+    atomic_write_json(SNAPSHOT_JSON, snapshot_doc)
+    from provenance_contract import resolve_decision_state
+    mvp_freshness = {
+        "status": freshness.get("status") or _root_freshness_status,
+        "source": freshness.get("source"),
+        "as_of": (freshness.get("market_session") or {}).get("last_valid_session"),
+        "data_fetched_at": _root_data_fetched,
+    }
+    if run_id:
+        pg_daily = get_pg()
+        try:
+            cur_daily = pg_daily.cursor()
+            cur_daily.execute("SELECT run_timestamp, scan_date, source_lineage FROM daily_scan_runs WHERE id=%s", (run_id,))
+            daily_run = cur_daily.fetchone()
+            cur_daily.close()
+            if daily_run:
+                mvp_freshness = daily_freshness_from_run(
+                    daily_run[0], daily_run[1], daily_run[2], freshness.get("market_session")
+                )
+        finally:
+            pg_daily.close()
+    mvp_doc = build_mvp_snapshot(
+        items,
+        run_id=run_id,
+        scan_time=scan_time,
+        freshness=mvp_freshness,
+        decision_state=resolve_decision_state(
+            freshness.get("market_session"),
+            (freshness.get("market_session") or {}).get("last_valid_session"),
+        ),
+    )
+    atomic_write_json(os.path.join(HERE, "mvp_snapshot.json"), mvp_doc)
     counts = {key: sum(1 for item in items if item["primary_group"] == key) for key, *_ in PRIMARY_GROUPS}
     meta = {key: {"title": v["label"], "action": v["action"], "intent": "presentation", "tone": "neutral", "description": v["action"], "count": counts[key]}
             for key, v in PRIMARY_META.items()}
@@ -1316,8 +1419,14 @@ def build(scanned=None):
     template_path = os.path.join(HERE, "dashboard_template.html")
     with open(template_path, encoding="utf-8") as tf:
         template = tf.read()
+    # First-paint artifact: embed only the compact Daily Shortlist candidates
+    # (READY + PRE_READY) as __ITEMS__, NOT the full ~900-item universe.
+    # The Explorer/Radar/Market pages lazy-load bounded pages from
+    # /dashboard/cards/compact instead, keeping the initial HTML slim.
+    from daily_shortlist import project_shortlist as _project_shortlist
+    shortlist_items = _project_shortlist(items)
     page = (template
-            .replace("__ITEMS__", json.dumps(items, separators=(",", ":"), default=_json_default))
+            .replace("__ITEMS__", json.dumps(shortlist_items, separators=(",", ":"), default=_json_default))
             .replace("__STAGE_META__", json.dumps(stage_meta, separators=(",", ":"), default=_json_default))
             .replace("__DASHBOARD_META__", json.dumps({"build_timestamp": build_timestamp,
                                                         "data_fetched_at": freshness.get("data_fetched_at"),
@@ -1326,9 +1435,10 @@ def build(scanned=None):
                                                         "data_freshness_source": freshness.get("source"),
                                                         "market_session": freshness.get("market_session", {}),
                                                         "market_regime": market_regime}, separators=(",", ":"), default=_json_default)))
-    with open(OUT_HTML, "w") as file:
-        file.write(page)
-    return {"securities": len(items), "groups": counts, "out": OUT_HTML}
+    atomic_write_text(OUT_HTML, page)
+    write_artifact_manifest(os.path.join(HERE, "artifact_manifest.json"), run_id, SNAPSHOT_JSON, OUT_HTML)
+    return {"securities": len(items), "shortlist": len(shortlist_items),
+            "groups": counts, "out": OUT_HTML}
 
 if __name__ == "__main__":
     print(build())
