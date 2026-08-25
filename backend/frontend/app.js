@@ -31,6 +31,8 @@
     slStale:       $("#shortlist-stale"),
     slStaleTime:   $("#shortlist-stale-time"),
     slStaleRetry:  $("#shortlist-stale-retry"),
+    slMarginable: $("#shortlist-marginable"),
+    slMarginableMeta: $("#shortlist-marginable-meta"),
     slRising:      $("#shortlist-rising"),
     slRisingCards: $("#shortlist-rising-cards"),
     slCaution:     $("#shortlist-caution"),
@@ -50,6 +52,7 @@
     exPageInfo:    $("#explorer-page-info"),
     exStage:       $("#explorer-stage"),
     exSearch:      $("#explorer-search"),
+    exMarginable:  $("#explorer-marginable"),
 
     // drawer
     drawer:        $("#drawer"),
@@ -81,6 +84,7 @@
     drawerRR:       $("#drawer-rr"),
     drawerMembership: $("#drawer-membership"),
     drawerMargin:   $("#drawer-margin"),
+    drawerMarginRights: $("#drawer-margin-rights"),
     drawer52W:      $("#drawer-52w"),
     drawerATH:      $("#drawer-ath"),
     drawerProv:     $("#drawer-provenance"),
@@ -92,6 +96,7 @@
   let explorerTotalPages = 1;
   let explorerStage = "";
   let explorerSearch = "";
+  let marginableFilter = "krungsri";
   let shortlistData = null;
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
@@ -183,6 +188,30 @@
     return value == null || value === "" ? "NOT_VERIFIED" : value;
   }
 
+  function marginBadge(item) {
+    var rate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
+    return rate == null ? "" : '<span class="marginable-badge">Krungsri ' + Number(rate).toFixed(0) + '%</span>';
+  }
+
+  function marginPermissions(item) {
+    var m = item.marginable || {};
+    if (!m.is_marginable) return "Not on current Krungsri list";
+    var permissions = [];
+    if (m.can_buy) permissions.push("Buy");
+    if (m.can_add_collateral) permissions.push("Collateral");
+    if (m.can_short) permissions.push("Short");
+    return permissions.length ? permissions.join(" · ") : "NOT_VERIFIED";
+  }
+
+  function marginFilterMeta(data) {
+    var source = data && data.marginable_source || {};
+    var total = source.total == null ? "–" : source.total;
+    var ord = source.ord_total == null ? "–" : source.ord_total;
+    var dr = source.dr_total == null ? "–" : source.dr_total;
+    var date = source.effective_date || "NOT_VERIFIED";
+    return "Krungsri list · " + total + " securities (" + ord + " ORD + " + dr + " DR) · effective " + date;
+  }
+
   function formatRange(high, low) {
     if (high == null && low == null) return "NOT_VERIFIED";
     return (high == null ? "–" : Number(high).toFixed(2)) + " / " + (low == null ? "–" : Number(low).toFixed(2));
@@ -223,6 +252,7 @@
           '<span>Stop ' + (item.risk_stop != null ? item.risk_stop.toFixed(2) : "–") + '</span>' +
           '<span>RS ' + (item.rs != null ? Math.round(item.rs) : "–") + '</span>' +
           '<span>Vol ' + fmtNum(item.avgDailyValue20) + '</span>' +
+          marginBadge(item) +
         '</div>' +
       '</div>';
   }
@@ -235,6 +265,7 @@
           '<span class="explorer-card__symbol">' + escapeHTML(item.symbol) + '</span>' +
           '<span class="explorer-card__name">' + escapeHTML(item.name || "") + '</span>' +
           '<span class="explorer-card__stage explorer-card__stage--' + stageClass(item.stage) + '">' + escapeHTML(shortStage(item.stage)) + '</span>' +
+          marginBadge(item) +
           '<span class="explorer-card__price ' + (chg[1] !== "flat" ? "decision-card__change--" + chg[1] : "") + '">' +
             (item.close != null ? item.close.toFixed(2) : "–") +
           '</span>' +
@@ -260,7 +291,12 @@
     dom.drawerTarget.textContent = displayValue(item.target != null ? Number(item.target).toFixed(2) : null);
     dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
     dom.drawerMembership.textContent = displayValue((item.index_membership || []).join(" · "));
-    dom.drawerMargin.textContent = displayValue(item.margin_pct != null ? Number(item.margin_pct).toFixed(0) + "%" : null);
+    var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
+    var margin = item.marginable || {};
+    dom.drawerMargin.textContent = marginRate != null
+      ? Number(marginRate).toFixed(0) + "% · effective " + (margin.effective_date || "NOT_VERIFIED")
+      : "NOT_VERIFIED";
+    dom.drawerMarginRights.textContent = marginPermissions(item);
     dom.drawer52W.textContent = formatRange(item.high52, item.low52);
     dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low);
     var prov = item.provenance || {};
@@ -542,13 +578,14 @@
     hide(dom.slStale);
     show(dom.slLoading);
 
-    fetch("/api/daily-shortlist")
+    fetch("/api/daily-shortlist?marginable=" + encodeURIComponent(marginableFilter))
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function(data) {
         shortlistData = data;
+        if (dom.slMarginableMeta) dom.slMarginableMeta.textContent = marginFilterMeta(data);
         hide(dom.slLoading);
 
         var freshness = data.freshness || {};
@@ -628,6 +665,7 @@
     hide($("#explorer-content"));
 
     var params = "page=" + page + "&page_size=20";
+    params += "&marginable=" + encodeURIComponent(marginableFilter);
     if (explorerStage) params += "&stage=" + encodeURIComponent(explorerStage);
     if (explorerSearch) params += "&search=" + encodeURIComponent(explorerSearch);
     fetch("/api/explorer?" + params)
@@ -669,6 +707,16 @@
   });
   dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
+  });
+  dom.slMarginable.addEventListener("change", function() {
+    marginableFilter = dom.slMarginable.value || "krungsri";
+    dom.exMarginable.value = marginableFilter;
+    loadShortlist();
+  });
+  dom.exMarginable.addEventListener("change", function() {
+    marginableFilter = dom.exMarginable.value || "krungsri";
+    dom.slMarginable.value = marginableFilter;
+    loadExplorer(1);
   });
   dom.exStage.addEventListener("change", function() {
     explorerStage = dom.exStage.value;

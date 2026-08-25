@@ -59,6 +59,16 @@
       </section>
 
       <!-- decision_state, freshness, trigger, invalidation, quality, source exposed in card data -->
+      <div class="marginable-filter-row" aria-label="Marginable securities filter">
+        <label class="explorer-control">Credit Balance list
+          <select id="shortlist-marginable" aria-label="Filter shortlist by marginable securities">
+            <option value="krungsri" selected>Krungsri · default</option>
+            <option value="all">All stocks</option>
+            <option value="non_marginable">Not on Krungsri list</option>
+          </select>
+        </label>
+        <span id="shortlist-marginable-meta" class="marginable-filter-meta">Loading list…</span>
+      </div>
       <section id="shortlist-rising" class="shortlist-section shortlist-section--rising state--hidden" data-lane="rising-movers">
         <h2 class="section-head section-head--rising">RISING MOVERS <span class="section-subhead">WATCH ONLY · not actionable</span></h2>
         <div id="shortlist-rising-cards" class="card-list"></div>
@@ -106,6 +116,13 @@
       <section id="explorer-content">
         <p class="explorer-note">Research view only — not trade advice.</p>
         <div class="explorer-controls" aria-label="Explorer filters">
+          <label class="explorer-control">Credit Balance list
+            <select id="explorer-marginable" aria-label="Filter explorer by marginable securities">
+              <option value="krungsri" selected>Krungsri · default</option>
+              <option value="all">All stocks</option>
+              <option value="non_marginable">Not on Krungsri list</option>
+            </select>
+          </label>
           <label class="explorer-control">Stage
             <select id="explorer-stage" aria-label="Filter by Stage">
               <option value="">All stages</option>
@@ -188,7 +205,8 @@
             <div class="drawer-field"><dt>Target</dt><dd id="drawer-target">–</dd></div>
             <div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>
             <div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div>
-            <div class="drawer-field"><dt>%Margin</dt><dd id="drawer-margin">–</dd></div>
+            <div class="drawer-field"><dt>Krungsri Credit Balance</dt><dd id="drawer-margin">–</dd></div>
+            <div class="drawer-field"><dt>Margin permissions</dt><dd id="drawer-margin-rights">–</dd></div>
             <div class="drawer-field"><dt>52W High / Low</dt><dd id="drawer-52w">–</dd></div>
             <div class="drawer-field"><dt>ATH High / Low</dt><dd id="drawer-ath">–</dd></div>
             <div class="drawer-field"><dt>Provenance</dt><dd id="drawer-provenance">–</dd></div>

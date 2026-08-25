@@ -30,6 +30,7 @@
 || `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
 || `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP `3ec48f7` |
 || `Canonical-Source-of-Truth-2026-08-25.md` | Current repo/worktree/runtime authority | ✅ current | Sole source authority after cutover |
+|| `Krungsri-Credit-Balance-Marginable-2026-08-25.md` | Owner-selected marginable list, rates, permissions, refresh policy | ✅ current | PDF effective 2026-08-25; dataset in `backend/marginable_securities.json` |
 | `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |

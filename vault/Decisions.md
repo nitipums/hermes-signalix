@@ -4,6 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
+## 2026-08-25 — Krungsri Credit Balance marginable filter
+Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. Daily Shortlist and All Stocks Explorer default to the Krungsri list, with explicit `All stocks` and `Not on Krungsri list` options. Cards show the verified initial-margin percentage; drawer shows effective date and PDF permissions (`Buy`, `Collateral`, `Short`).
+Reason: Arm normally trades through this Credit Balance list and wants the decision surface pre-filtered to usable collateral/shorting context. Margin metadata is presentation/filter-only and must not mutate canonical scan eligibility or Daily state. Owner workflow checks for a new PDF monthly; each PDF's effective date is authoritative.
+
 ## 2026-08-25 — Canonical MVP source and worktree cutover
 Decision: Treat GitHub `nitipums/hermes-signalix`, branch `release/signalix-mvp-stable`, as the current Signalix MVP source. The canonical local worktree is `/root/signalix`; it is the only registered worktree and is the production Docker bind-mount source. Former feature/release worktrees are retired; their dirty scope is preserved only in `/root/signalix-cleanup-audit-20260825/` for audit/recovery and must not be treated as current implementation.
 Reason: Multiple dirty worktrees and stale vault notes caused source confusion. One clean stable worktree is now the release authority; generated artifacts remain runtime outputs and secrets remain host-only.

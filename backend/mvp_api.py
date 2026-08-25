@@ -24,6 +24,7 @@ from provenance_contract import (
     resolve_decision_state,
     compute_freshness,
 )
+from marginable import enrich_item, filter_items, metadata as marginable_metadata, normalize_filter
 
 
 def _number(value, default=None):
@@ -157,6 +158,7 @@ def _resolve_description(item: dict) -> str | None:
 
 def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str | None) -> dict:
     """Map one serialized card to the frontend shortlist item contract."""
+    item = enrich_item(item)
     sp = item.get("setup_proximity") or {}
     sq = item.get("setup_quality") or {}
     daily_fresh = item.get("daily_eod_freshness") or {}
@@ -179,10 +181,12 @@ def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str 
         "trade_value": _number(item.get("tradeValue") or item.get("turnover")),
         "index_membership": _resolve_index_membership(item),
         "margin_pct": _number(item.get("margin_pct") or item.get("marginPct")),
-        # NOT_VERIFIED: No authoritative data source for margin_pct exists
-        # in the current data pipeline.  Value is null (None) unless a
-        # future Settrade / Exchange feed provides verified margin rates.
-        # Do NOT fabricate or hardcode margin values.
+        "margin_rate_pct": _number(item.get("margin_rate_pct")),
+        "margin_marker": item.get("margin_marker"),
+        "margin_can_buy": item.get("margin_can_buy"),
+        "margin_can_add_collateral": item.get("margin_can_add_collateral"),
+        "margin_can_short": item.get("margin_can_short"),
+        "marginable": dict(item.get("marginable") or {}),
         "target": _resolve_target(item),
         "rr": _resolve_rr(item),
         "high52": _number(item.get("high52")),
@@ -359,12 +363,17 @@ def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
 
 # ── Public API ────────────────────────────────────────────────────────
 
-def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None) -> dict:
+def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,
+                               marginable_filter: str = "krungsri") -> dict:
     """Build the GET /api/daily-shortlist response from serialized cards.
 
     Uses daily_shortlist.project_shortlist() for eligibility/ranking,
-    then maps to frontend contract shape.
+    then maps to frontend contract shape. The default surface is the
+    owner-selected Krungsri Credit Balance marginable list.
     """
+    marginable_filter = normalize_filter(marginable_filter)
+    items = filter_items(items, marginable_filter)
+    margin_meta = marginable_metadata()
     if not items:
         return {
             "decision_state": DECISION_STATE_PROVISIONAL,
@@ -380,6 +389,9 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
             "caution": [],
             "scan_time": None,
             "scan_run_id": None,
+            "marginable_filter": marginable_filter,
+            "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "marginable_source": margin_meta,
         }
 
     # Normalize the explicit Daily EOD contract before classification. The
@@ -457,6 +469,9 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         "caution": caution_items,
         "scan_time": scan_time,
         "scan_run_id": root_run_id or scan_run_id or "",
+        "marginable_filter": marginable_filter,
+        "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "marginable_source": margin_meta,
     }
 
 
@@ -467,12 +482,16 @@ def project_explorer_response(
     search: str | None = None,
     stage: str | None = None,
     snapshot_meta: dict | None = None,
+    marginable_filter: str = "krungsri",
 ) -> dict:
     """Build the GET /api/explorer response from serialized cards.
 
     Returns paginated, filterable list of all symbols in research-only format.
-    No shortlist eligibility filter — explorer shows full universe.
+    The default view is limited to the owner-selected Krungsri list.
     """
+    marginable_filter = normalize_filter(marginable_filter)
+    items = filter_items(items, marginable_filter)
+    margin_meta = marginable_metadata()
     page = max(1, page)
     page_size = max(1, min(page_size, 100))
 
@@ -492,6 +511,9 @@ def project_explorer_response(
             "total_items": 0,
             "scan_time": None,
             "scan_run_id": None,
+            "marginable_filter": marginable_filter,
+            "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "marginable_source": margin_meta,
         }
 
     # Filter
@@ -536,6 +558,10 @@ def project_explorer_response(
                 or daily_fresh.get("status"),
             "decision_state": item.get("decision_state")
                 or DECISION_STATE_PROVISIONAL,
+            "margin_pct": _number(item.get("margin_pct")),
+            "margin_rate_pct": _number(item.get("margin_rate_pct")),
+            "margin_marker": item.get("margin_marker"),
+            "marginable": dict(item.get("marginable") or {}),
         }
 
     result_items = [to_explorer_item(it) for it in page_items]
@@ -551,6 +577,9 @@ def project_explorer_response(
         "total_items": total_items,
         "scan_time": scan_time,
         "scan_run_id": root_run_id or scan_run_id or "",
+        "marginable_filter": marginable_filter,
+        "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "marginable_source": margin_meta,
     }
 
 
@@ -572,7 +601,7 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
     # Drawer must use the same shortlist projection as the card; otherwise raw
     # producer action can disagree with the publication/action queue shown in
     # Daily Shortlist.
-    projected = project_shortlist_response(items)
+    projected = project_shortlist_response(items, marginable_filter="all")
     projected_by_symbol = {
         entry.get("symbol"): entry
         for lane in ("ready", "pre_ready")

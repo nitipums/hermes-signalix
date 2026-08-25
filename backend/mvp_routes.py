@@ -63,7 +63,10 @@ def handle_mvp_api(path, handler) -> bool:
         return True
 
     if route in ("/api/daily-shortlist", "/api/daily-shortlist/"):
-        json_response(handler, mvp_api.project_shortlist_response(items, snapshot_meta=payload)); return True
+        marginable_filter = qs.get("marginable", ["krungsri"])[0] or "krungsri"
+        json_response(handler, mvp_api.project_shortlist_response(
+            items, snapshot_meta=payload, marginable_filter=marginable_filter
+        )); return True
     if route in ("/api/explorer", "/api/explorer/"):
         result = mvp_api.project_explorer_response(
             items,
@@ -72,6 +75,7 @@ def handle_mvp_api(path, handler) -> bool:
             search=qs.get("search", [None])[0],
             stage=qs.get("stage", [None])[0],
             snapshot_meta=payload,
+            marginable_filter=(qs.get("marginable", ["krungsri"])[0] or "krungsri"),
         )
         json_response(handler, result); return True
     if route.startswith("/api/symbol/"):
