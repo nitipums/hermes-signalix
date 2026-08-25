@@ -6,7 +6,8 @@
 
 - GitHub repository: `https://github.com/nitipums/hermes-signalix`
 - Current branch: `release/signalix-mvp-stable`
-- Current release commit at cutover: `3ec48f7` — `fix: preserve Daily run lineage in EOD dashboard build`
+- Code release commit at cutover: `3ec48f7` — `fix: preserve Daily run lineage in EOD dashboard build`
+- Current branch HEAD: `6fe6564` — source-of-truth documentation cutover
 - Canonical local worktree: `/root/signalix`
 - Registered worktrees: exactly one (`/root/signalix`)
 - Production Docker bind mount: `/root/signalix/backend`
