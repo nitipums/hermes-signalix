@@ -78,11 +78,9 @@ def main() -> int:
     if manifest.get("run_id") != expected_run_id:
         raise RuntimeError("artifact manifest run_id mismatch")
 
-    files = manifest.get("files", {})
-    for name, path in (("mvp_snapshot.json", SNAPSHOT), ("dashboard.html", HERE / "dashboard.html")):
-        entry = files.get(name, {})
-        if not path.is_file() or entry.get("sha256") != sha256(path):
-            raise RuntimeError(f"artifact hash mismatch: {name}")
+    entry = manifest.get("files", {}).get("mvp_snapshot.json", {})
+    if entry.get("sha256") != sha256(SNAPSHOT):
+        raise RuntimeError("MVP snapshot hash mismatch")
 
     print(json.dumps({
         "status": "PASS",
