@@ -92,6 +92,11 @@ official decision provenance, while `60m updated` comes from the latest
 completed `intraday_ingestion_runs.fetch_completed_at`. Intraday refresh must
 never overwrite the Daily decision timestamp.
 
+Chart timeframe changes use an abortable request generation guard so an older
+1D/1W/60M response cannot overwrite the currently selected timeframe. Missing
+60m data returns an explicit unavailable state; it never silently replaces the
+selected timeframe with Daily candles.
+
 See [[Components]] for detail, [[Deployment]] for ops.
 
 ## Current intraday E2E reliability contract (2026-08-21)
