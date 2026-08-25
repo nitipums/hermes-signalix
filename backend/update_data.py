@@ -1071,17 +1071,44 @@ def trigger_scan():
 
 
 def refresh_dashboard_from_existing_scan():
-    """Rebuild the served dashboard from the last Daily scan plus fresh 60m data.
+    """Rebuild artifacts from the latest canonical Daily run plus fresh 60m data.
 
-    Intraday-only intentionally does not run a Daily scan, but the static
-    dashboard still needs its cards/provenance refreshed after the upsert.
-    ``build()`` reads the existing scan artifact and set-based DB snapshots;
-    it does not change Daily membership or classification.
+    Intraday-only never runs a Daily scan. It must preserve the latest canonical
+    Daily run_id when rebuilding artifacts; otherwise it can overwrite the MVP
+    artifact with run_id=None and break lineage verification.
     """
     import build_dashboard
 
-    result = build_dashboard.build()
-    print("  dashboard refreshed from existing Daily scan: " + json.dumps(result, sort_keys=True))
+    pg = get_pg()
+    try:
+        cur = pg.cursor()
+        cur.execute("""
+            SELECT r.id
+            FROM daily_scan_runs r
+            WHERE r.scanner_version = 'signalix/daily-state-v2'
+              AND r.source_lineage->>'source' = 'price_data'
+              AND COALESCE(r.source_lineage->>'mode', '') <> 'historical_backfill'
+            ORDER BY r.run_timestamp DESC, r.id DESC
+            LIMIT 1
+        """)
+        run_row = cur.fetchone()
+        if not run_row:
+            raise RuntimeError("no canonical Daily run available for intraday artifact refresh")
+        daily_run_id = str(run_row[0])
+        cur.execute("""
+            SELECT raw_payload
+            FROM daily_scan_observations
+            WHERE run_id = %s
+            ORDER BY symbol
+        """, (daily_run_id,))
+        scanned = [row[0] for row in cur.fetchall() if isinstance(row[0], dict)]
+    finally:
+        pg.close()
+    if not scanned:
+        raise RuntimeError("canonical Daily run has no raw scan observations")
+
+    result = build_dashboard.build(scanned=scanned, run_id=daily_run_id)
+    print("  dashboard refreshed from canonical Daily run " + daily_run_id + ": " + json.dumps(result, sort_keys=True))
     return result
 
 

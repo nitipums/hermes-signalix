@@ -29,7 +29,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/root/signalix/backend
+WorkingDirectory=/root/signalix-release-candidate/backend
 Environment=POSTGRES_HOST=127.0.0.1
 Environment=POSTGRES_PORT=5432
 Environment=POSTGRES_USER=signalix
@@ -37,8 +37,8 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 EnvironmentFile=/root/signalix/settradeupdated.env
 Environment=SETTRADE_DAILY_WORKERS=30
-ExecStart=/root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --scan --flush-batch 100
-ExecStartPost=/root/.venv_img/bin/python /root/signalix/backend/verify_scan_dashboard.py
+ExecStart=/root/.venv_img/bin/python /root/signalix-release-candidate/backend/update_data.py --source settrade --scan --flush-batch 100
+ExecStartPost=/root/.venv_img/bin/python /root/signalix-release-candidate/backend/verify_mvp_release.py
 StandardOutput=append:/root/signalix/update_log.txt
 StandardError=append:/root/signalix/update_log.txt
 TimeoutStartSec=3600

@@ -1436,7 +1436,7 @@ def build(scanned=None, run_id=None):
                                                         "market_session": freshness.get("market_session", {}),
                                                         "market_regime": market_regime}, separators=(",", ":"), default=_json_default)))
     atomic_write_text(OUT_HTML, page)
-    write_artifact_manifest(os.path.join(HERE, "artifact_manifest.json"), run_id, SNAPSHOT_JSON, OUT_HTML)
+    write_artifact_manifest(os.path.join(HERE, "artifact_manifest.json"), run_id, os.path.join(HERE, "mvp_snapshot.json"), OUT_HTML)
     return {"securities": len(items), "shortlist": len(shortlist_items),
             "groups": counts, "out": OUT_HTML}
 
