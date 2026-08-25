@@ -31,6 +31,8 @@
     slStale:       $("#shortlist-stale"),
     slStaleTime:   $("#shortlist-stale-time"),
     slStaleRetry:  $("#shortlist-stale-retry"),
+    slRising:      $("#shortlist-rising"),
+    slRisingCards: $("#shortlist-rising-cards"),
     slReadyCards:  $("#shortlist-ready-cards"),
     slPreCards:    $("#shortlist-pre-ready-cards"),
 
@@ -44,6 +46,9 @@
     exPrev:        $("#explorer-prev"),
     exNext:        $("#explorer-next"),
     exPageInfo:    $("#explorer-page-info"),
+    exStage:       $("#explorer-stage"),
+    exSearch:      $("#explorer-search"),
+    exApply:       $("#explorer-apply"),
 
     // drawer
     drawer:        $("#drawer"),
@@ -84,7 +89,10 @@
   let currentTab = "shortlist";
   let explorerPage = 1;
   let explorerTotalPages = 1;
+  let explorerStage = "";
+  let explorerSearch = "";
   let shortlistData = null;
+  const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -121,6 +129,10 @@
 
   function shortStage(value) {
     return ({S2_uptrend: "S2 Uptrend", S1_basing: "S1 Base", S3_distributing: "S3 Distribution", S4_down: "S4 Down"})[value] || value || "–";
+  }
+
+  function stageClass(value) {
+    return ({S1_basing: "s1", S2_uptrend: "s2", S3_distributing: "s3", S4_down: "s4"})[value] || "unknown";
   }
 
   function shortAction(value) {
@@ -197,7 +209,7 @@
           '</div>' +
         '</div>' +
         '<div class="decision-card__mid">' +
-          '<span class="decision-card__stage">' + escapeHTML(stage) + '</span>' +
+          '<span class="decision-card__stage decision-card__stage--' + stageClass(item.stage) + '">' + escapeHTML(stage) + '</span>' +
           '<span class="decision-card__action">' + escapeHTML(action) + '</span>' +
         '</div>' +
         '<div class="decision-card__meta">' +
@@ -215,7 +227,7 @@
         '<div class="explorer-card__row">' +
           '<span class="explorer-card__symbol">' + escapeHTML(item.symbol) + '</span>' +
           '<span class="explorer-card__name">' + escapeHTML(item.name || "") + '</span>' +
-          '<span class="explorer-card__stage">' + escapeHTML(item.stage || "–") + '</span>' +
+          '<span class="explorer-card__stage explorer-card__stage--' + stageClass(item.stage) + '">' + escapeHTML(shortStage(item.stage)) + '</span>' +
           '<span class="explorer-card__price ' + (chg[1] !== "flat" ? "decision-card__change--" + chg[1] : "") + '">' +
             (item.close != null ? item.close.toFixed(2) : "–") +
           '</span>' +
@@ -285,7 +297,8 @@
       dom.drawerChartPH.style.display = "none";
       if (dom.drawerCanvas) {
         dom.drawerCanvas.style.display = "block";
-        drawCandles(chart.candles);
+        window.__signalixLastChart = chart;
+        drawChart(chart);
       }
     } else {
       // No candle series available — keep placeholder honest.
@@ -295,27 +308,58 @@
     }
   }
 
-  function drawCandles(candles) {
+  function drawChart(chart) {
     var canvas = dom.drawerCanvas;
-    if (!canvas) return;
+    if (!canvas || !chart || !chart.candles || chart.candles.length < 2) return;
     var ctx = canvas.getContext("2d");
     var w = canvas.width, h = canvas.height;
     ctx.clearRect(0, 0, w, h);
-    var closes = candles.map(function(c) { return Number(c.close); }).filter(function(n) { return !isNaN(n); });
-    if (closes.length < 2) return;
-    var min = Math.min.apply(null, closes);
-    var max = Math.max.apply(null, closes);
+    var candles = chart.candles.slice(-120);
+    var start = chart.candles.length - candles.length;
+    var left = 34, right = 8, top = 28, priceH = 205, volH = 62, rsiH = 62;
+    var plotW = w - left - right;
+    var closes = candles.map(function(c) { return Number(c.close); });
+    var highs = candles.map(function(c) { return Number(c.high); });
+    var lows = candles.map(function(c) { return Number(c.low); });
+    var min = Math.min.apply(null, lows.filter(function(v){return Number.isFinite(v);}));
+    var max = Math.max.apply(null, highs.filter(function(v){return Number.isFinite(v);}));
     var range = (max - min) || 1;
-    var pad = 8;
-    ctx.strokeStyle = "#c9a84c";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (var i = 0; i < closes.length; i++) {
-      var x = pad + (i / (closes.length - 1)) * (w - pad * 2);
-      var y = h - pad - ((closes[i] - min) / range) * (h - pad * 2);
-      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    var xFor = function(i) { return left + (i / Math.max(1, candles.length - 1)) * plotW; };
+    var yPrice = function(v) { return top + priceH - ((v - min) / range) * priceH; };
+    var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#c9a84c", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#f472b6" };
+    ctx.font = "11px sans-serif";
+    ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
+    [top, top + priceH, top + priceH + volH, top + priceH + volH + rsiH].forEach(function(y){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});
+    ctx.fillStyle = colors.text; ctx.fillText("PRICE", 4, top + 10); ctx.fillText("VOL", 8, top + priceH + 16); ctx.fillText("RSI", 10, top + priceH + volH + 16);
+    if (chartLayers.candles) {
+      var candleW = Math.max(2, Math.min(8, plotW / candles.length * 0.64));
+      candles.forEach(function(c, i) {
+        var o=Number(c.open), cl=Number(c.close), hi=Number(c.high), lo=Number(c.low);
+        if (![o,cl,hi,lo].every(Number.isFinite)) return;
+        var x=xFor(i), up=cl>=o, color=up?colors.up:colors.down;
+        ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(x,yPrice(hi));ctx.lineTo(x,yPrice(lo));ctx.stroke();
+        var y1=yPrice(Math.max(o,cl)), y2=yPrice(Math.min(o,cl));
+        ctx.fillRect(x-candleW/2,y1,candleW,Math.max(1,y2-y1));
+      });
     }
-    ctx.stroke();
+    function overlay(values, color) {
+      if (!Array.isArray(values)) return;
+      ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.beginPath();var started=false;
+      values.slice(start, start+candles.length).forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=yPrice(Number(v));if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);});
+      if(started)ctx.stroke();
+    }
+    if (chartLayers.ma) { overlay(chart.ma20, colors.ma20); overlay(chart.ma50, colors.ma50); overlay(chart.ma200, colors.ma200); }
+    if (chartLayers.volume) {
+      var vols=candles.map(function(c){return Number(c.volume)||0;}), vmax=Math.max.apply(null,vols)||1;
+      vols.forEach(function(v,i){ctx.fillStyle=Number(candles[i].close)>=Number(candles[i].open)?colors.up:colors.down;var bh=(v/vmax)*volH;ctx.fillRect(xFor(i)-2,top+priceH+volH-bh,4,bh);});
+    }
+    if (chartLayers.rsi) {
+      var rsi=Array.isArray(chart.rsi)?chart.rsi.slice(start,start+candles.length):[];
+      ctx.strokeStyle=colors.rsi;ctx.lineWidth=1.5;ctx.beginPath();var rs=false;
+      rsi.forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=top+priceH+volH+rsiH-(Number(v)/100)*rsiH;if(!rs){ctx.moveTo(x,y);rs=true;}else ctx.lineTo(x,y);});if(rs)ctx.stroke();
+      ctx.strokeStyle=colors.grid;ctx.setLineDash([3,3]);[30,70].forEach(function(v){var y=top+priceH+volH+rsiH-(v/100)*rsiH;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});ctx.setLineDash([]);
+    }
   }
 
   function openDrawer(item, symbol) {
@@ -369,6 +413,16 @@
   function closeDrawer() {
     dom.drawer.classList.add("drawer--hidden");
     document.body.style.overflow = "";
+  }
+
+  function isRising(item) {
+    var transition = item.stage_transition || item.stageTransition || item.previous_stage || item.previousStage;
+    if (transition && /S1.*S2|promotion|uptrend/i.test(String(transition))) return true;
+    var prox = item.setup_proximity || {};
+    return item.stage === "S2_uptrend" && (
+      item.phase === "breakout_new" || item.action_queue === "fresh_breakout" ||
+      (item.phase === "uptrend_pullback" && ["action", "near_trigger"].indexOf(prox.state) >= 0)
+    );
   }
 
   /* ── card click delegation ── */
@@ -479,12 +533,20 @@
 
         var ready = data.ready || [];
         var preReady = data.pre_ready || [];
+        var rising = ready.filter(isRising);
+        ready = ready.filter(function(item) { return !isRising(item); });
 
-        if (ready.length === 0 && preReady.length === 0) {
+        if (ready.length === 0 && preReady.length === 0 && rising.length === 0) {
           show(dom.slEmpty);
           return;
         }
         hide(dom.slEmpty);
+
+        if (rising.length > 0) {
+          show(dom.slRising);
+          dom.slRisingCards.innerHTML = "";
+          rising.forEach(function(item) { dom.slRisingCards.insertAdjacentHTML("beforeend", buildDecisionCard(item)); });
+        }
 
         // render READY
         if (ready.length > 0) {
@@ -513,41 +575,7 @@
         show(dom.slError);
         dom.slErrorMsg.textContent = "Unable to load: " + err.message;
         setFreshness("error");
-        // fallback: try fixture
-        tryFixtureShortlist();
       });
-  }
-
-  /* ── fixture fallback for development ── */
-  function tryFixtureShortlist() {
-    fetch("fixtures/daily_shortlist.json?v=mvp4")
-      .then(function(res) { return res.ok ? res.json() : Promise.reject("no fixture"); })
-      .then(function(data) {
-        shortlistData = data;
-        hide(dom.slLoading);
-        hide(dom.slError);
-        hide(dom.slEmpty);
-        setFreshness("fresh", data.freshness.data_fetched_at || data.freshness.as_of);
-
-        var ready = data.ready || [];
-        var preReady = data.pre_ready || [];
-
-        if (ready.length > 0) {
-          show($("#shortlist-ready"));
-          dom.slReadyCards.innerHTML = "";
-          ready.forEach(function(item) {
-            dom.slReadyCards.insertAdjacentHTML("beforeend", buildDecisionCard(item));
-          });
-        }
-        if (preReady.length > 0) {
-          show($("#shortlist-pre-ready"));
-          dom.slPreCards.innerHTML = "";
-          preReady.forEach(function(item) {
-            dom.slPreCards.insertAdjacentHTML("beforeend", buildDecisionCard(item));
-          });
-        }
-      })
-      .catch(function() { /* fixture also failed, error state prevails */ });
   }
 
   /* ── fetch explorer ── */
@@ -559,7 +587,10 @@
     hide(dom.exEmpty);
     hide($("#explorer-content"));
 
-    fetch("/api/explorer?page=" + page + "&page_size=20")
+    var params = "page=" + page + "&page_size=20";
+    if (explorerStage) params += "&stage=" + encodeURIComponent(explorerStage);
+    if (explorerSearch) params += "&search=" + encodeURIComponent(explorerSearch);
+    fetch("/api/explorer?" + params)
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -589,31 +620,7 @@
         hide(dom.exLoading);
         show(dom.exError);
         dom.exErrorMsg.textContent = "Unable to load: " + err.message;
-        // fallback to fixture
-        tryFixtureExplorer(page);
       });
-  }
-
-  function tryFixtureExplorer(page) {
-    fetch("fixtures/explorer_page1.json")
-      .then(function(res) { return res.ok ? res.json() : Promise.reject("no fixture"); })
-      .then(function(data) {
-        hide(dom.exLoading);
-        hide(dom.exError);
-        show($("#explorer-content"));
-
-        var items = data.items || [];
-        dom.exCards.innerHTML = "";
-        items.forEach(function(item) {
-          dom.exCards.insertAdjacentHTML("beforeend", buildExplorerCard(item));
-        });
-
-        explorerTotalPages = data.total_pages || 1;
-        dom.exPageInfo.textContent = "Page " + page + " of " + explorerTotalPages;
-        dom.exPrev.disabled = page <= 1;
-        dom.exNext.disabled = page >= explorerTotalPages;
-      })
-      .catch(function() { /* fixture also failed */ });
   }
 
   /* ── pagination controls ── */
@@ -622,6 +629,20 @@
   });
   dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
+  });
+  dom.exApply.addEventListener("click", function() {
+    explorerStage = dom.exStage.value;
+    explorerSearch = dom.exSearch.value.trim();
+    loadExplorer(1);
+  });
+  dom.exSearch.addEventListener("keydown", function(e) { if (e.key === "Enter") dom.exApply.click(); });
+  $$(".chart-toggle").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      var layer = btn.getAttribute("data-layer");
+      chartLayers[layer] = !chartLayers[layer];
+      btn.classList.toggle("is-active", chartLayers[layer]);
+      if (window.__signalixLastChart) drawChart(window.__signalixLastChart);
+    });
   });
 
   /* ── retry buttons ── */

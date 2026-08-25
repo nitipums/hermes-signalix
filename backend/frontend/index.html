@@ -59,6 +59,10 @@
       </section>
 
       <!-- decision_state, freshness, trigger, invalidation, quality, source exposed in card data -->
+      <section id="shortlist-rising" class="shortlist-section shortlist-section--rising state--hidden" data-lane="rising">
+        <h2 class="section-head section-head--rising">RISING SETUPS <span class="section-subhead">S2 momentum / pullback exit</span></h2>
+        <div id="shortlist-rising-cards" class="card-list"></div>
+      </section>
       <!-- ready cards -->
       <section id="shortlist-ready" class="shortlist-section" data-decision-state="ready">
         <h2 class="section-head section-head--ready">READY</h2>
@@ -97,6 +101,21 @@
       <!-- explorer list -->
       <section id="explorer-content">
         <p class="explorer-note">Research view only — not trade advice.</p>
+        <div class="explorer-controls" aria-label="Explorer filters">
+          <label class="explorer-control">Stage
+            <select id="explorer-stage" aria-label="Filter by Stage">
+              <option value="">All stages</option>
+              <option value="S1_basing">S1 Base</option>
+              <option value="S2_uptrend">S2 Uptrend</option>
+              <option value="S3_distributing">S3 Distribution</option>
+              <option value="S4_down">S4 Down</option>
+            </select>
+          </label>
+          <label class="explorer-control explorer-search">Search
+            <input id="explorer-search" type="search" inputmode="search" placeholder="Symbol / name" aria-label="Search symbol or name">
+          </label>
+          <button id="explorer-apply" class="btn btn--filter" type="button">Apply</button>
+        </div>
         <div id="explorer-cards" class="card-list card-list--explorer"></div>
 
         <!-- pagination -->
@@ -136,8 +155,14 @@
 
           <!-- chart area: overlays are supplied by the real API contract -->
           <div id="drawer-chart" class="drawer-chart">
-            <canvas id="drawer-canvas" width="480" height="240"></canvas>
+            <canvas id="drawer-canvas" width="720" height="420"></canvas>
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
+            <div class="chart-controls" aria-label="Chart layers">
+              <button type="button" class="chart-toggle is-active" data-layer="candles">OHLC</button>
+              <button type="button" class="chart-toggle is-active" data-layer="volume">VOL</button>
+              <button type="button" class="chart-toggle is-active" data-layer="ma">MA</button>
+              <button type="button" class="chart-toggle is-active" data-layer="rsi">RSI</button>
+            </div>
             <div class="drawer-indicator-legend" aria-label="Chart overlays">
               <span>MA20 <em id="ind-ma20">–</em></span>
               <span>MA50 <em id="ind-ma50">–</em></span>

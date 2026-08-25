@@ -21,6 +21,10 @@
   --red:        #ef5350;
   --ready-bg:   rgba(38, 166, 154, 0.08);
   --pre-bg:     rgba(255, 167, 38, 0.08);
+  --s1:         #a78bfa;
+  --s2:         #26a69a;
+  --s3:         #ffa726;
+  --s4:         #ef5350;
   --radius:     6px;
   --touch:      44px;
 }
@@ -141,6 +145,8 @@ body {
 }
 .section-head--ready   { color: var(--green); }
 .section-head--pre-ready { color: var(--amber); }
+.section-head--rising { color: var(--s2); display:flex; justify-content:space-between; gap:8px; }
+.section-subhead { font-size:10px; letter-spacing:0; font-weight:500; color:var(--text-3); text-transform:none; }
 
 /* ── shortlist section wrapper ── */
 .shortlist-section { margin-bottom: 16px; }
@@ -190,6 +196,10 @@ body {
   display: flex; align-items: center; gap: 6px; margin-top: 6px;
 }
 .decision-card__stage { font-size: 11px; color: var(--text-2); white-space: nowrap; }
+.decision-card__stage--s1 { color: var(--s1); }
+.decision-card__stage--s2 { color: var(--s2); }
+.decision-card__stage--s3 { color: var(--s3); }
+.decision-card__stage--s4 { color: var(--s4); }
 .decision-card__action {
   font-size: 12px; font-weight: 600; color: var(--accent);
   flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -234,11 +244,20 @@ body {
 .explorer-card__symbol { font-weight: 700; font-size: 14px; color: var(--text); }
 .explorer-card__name  { font-size: 12px; color: var(--text-2); flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .explorer-card__stage { font-size: 10px; color: var(--text-3); padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; flex-shrink: 0; }
+.explorer-card__stage--s1 { color:var(--s1); border-color:var(--s1); }
+.explorer-card__stage--s2 { color:var(--s2); border-color:var(--s2); }
+.explorer-card__stage--s3 { color:var(--s3); border-color:var(--s3); }
+.explorer-card__stage--s4 { color:var(--s4); border-color:var(--s4); }
 .explorer-card__price { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .explorer-note {
   font-size: 11px; color: var(--text-3); margin-bottom: 8px; font-style: italic;
 }
+.explorer-controls { display:flex; align-items:end; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.explorer-control { display:flex; flex-direction:column; gap:3px; color:var(--text-3); font-size:10px; font-weight:600; }
+.explorer-control select, .explorer-control input { min-height:38px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text); padding:0 9px; font:inherit; }
+.explorer-search { flex:1; min-width:150px; }
+.btn--filter { min-height:38px; padding:0 12px; }
 
 /* ── pagination ── */
 .pagination {
@@ -302,7 +321,7 @@ body {
 .drawer-meta  { font-size: 12px; color: var(--text-3); margin-bottom: 12px; }
 
 .drawer-chart { position:relative;
-  width: 100%; height: 240px; background: var(--bg); border-radius: var(--radius);
+  width: 100%; height: 360px; background: var(--bg); border-radius: var(--radius);
   margin-bottom: 8px; display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
@@ -310,6 +329,9 @@ body {
 .drawer-chart .drawer-indicator-legend span { background:rgba(10,14,23,.82); border:1px solid var(--border); border-radius:3px; padding:2px 5px; }
 .drawer-chart canvas { width: 100%; height: 100%; }
 .chart-placeholder { font-size: 13px; color: var(--text-3); }
+.chart-controls { position:absolute; left:8px; top:8px; display:flex; gap:4px; z-index:2; }
+.chart-toggle { min-height:28px; padding:0 7px; border:1px solid var(--border); border-radius:3px; background:rgba(10,14,23,.82); color:var(--text-3); font-size:10px; cursor:pointer; }
+.chart-toggle.is-active { color:var(--accent); border-color:var(--accent); }
 
 .drawer-fields { display: flex; flex-direction: column; gap: 6px; }
 .drawer-field { display: flex; justify-content: space-between; gap: 10px; }
