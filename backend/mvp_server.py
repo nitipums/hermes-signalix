@@ -1,27 +1,23 @@
-"""Signalix dashboard compatibility entrypoint.
+"""MVP-only dashboard server.
 
-Route ownership is split:
-- ``mvp_routes`` owns /api/* projection routes.
-- ``legacy_routes`` owns /dashboard.html, /portal, and /portfolio files.
-- this module owns only HTTP server lifecycle and route dispatch.
+This entrypoint deliberately has no import or route dependency on legacy_routes,
+legacy_server, dashboard.html, portal.html, portfolio.html, or legacy snapshots.
 """
 from __future__ import annotations
 
-import os
 import http.server
+import os
 import socketserver
 from urllib.parse import urlsplit
 
-from legacy_routes import legacy_file_for_path, serve_file
 from mvp_routes import handle_mvp_api
 
 PORT = int(os.getenv("DASHBOARD_PORT", "3001"))
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR = os.getenv("FRONTEND_DIR", os.path.join(_BACKEND_DIR, "frontend"))
-LEGACY_DIR = os.getenv("LEGACY_DIR", _BACKEND_DIR)
 
 
-class Handler(http.server.SimpleHTTPRequestHandler):
+class MVPHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIR, **kwargs)
 
@@ -29,24 +25,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         suffix = ("?" + parsed.query) if parsed.query else ""
-
         if path.startswith("/api/"):
             if handle_mvp_api(self.path, self):
                 return
-            self.send_response(404)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"Not Found")
+            self.send_error(404, "MVP API route not found")
             return
-
-        legacy_file = legacy_file_for_path(path, LEGACY_DIR)
-        if legacy_file:
-            return serve_file(self, legacy_file)
-
         if path in ("/mvp", "/mvp/"):
             self.path = "/index.html" + suffix
         elif path in ("/", "/index", "/index.html"):
             self.path = "/index.html" + suffix
+        else:
+            # No compatibility route is exposed by the MVP server.
+            if path in ("/dashboard.html", "/portal", "/portfolio"):
+                self.send_error(404, "legacy route unavailable")
+                return
         return super().do_GET()
 
     def end_headers(self):
@@ -56,7 +48,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(DIR)
-    with socketserver.ThreadingTCPServer(("0.0.0.0", PORT), Handler) as httpd:
+    with socketserver.ThreadingTCPServer(("0.0.0.0", PORT), MVPHandler) as httpd:
         httpd.daemon_threads = True
-        print(f"Serving dashboard on 0.0.0.0:{PORT}")
+        print(f"Serving MVP dashboard on 0.0.0.0:{PORT}")
         httpd.serve_forever()

@@ -62,7 +62,7 @@ services:
     container_name: signalix_dashboard
     restart: unless-stopped
     env_file: .env
-    command: ["python", "-u", "dashboard_server.py"]
+    command: ["python", "-u", "mvp_server.py"]
     depends_on:
       backend:
         condition: service_healthy
@@ -71,7 +71,7 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/dashboard.html', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/mvp', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
