@@ -496,7 +496,8 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
 
     scan_time = None
     for it in items:
-        ts = it.get("daily_eod_freshness", {}).get("as_of") or it.get("date")
+        provenance_ts = (it.get("provenance") or {}).get("scan_time")
+        ts = provenance_ts or it.get("daily_eod_freshness", {}).get("as_of") or it.get("date")
         if ts and (scan_time is None or str(ts) > str(scan_time)):
             scan_time = str(ts)
     scan_run_id = items[0].get("provenance", {}).get("scan_run_id") if items else None
