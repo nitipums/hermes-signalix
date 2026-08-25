@@ -370,12 +370,12 @@ from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 
-def build_and_push_summary(cands, near, scan_time, scanned):
+def build_and_push_summary(cands, near, scan_time, scanned, run_id=None):
     """Build the dashboard HTML, then push a summary + link to Telegram."""
     # build dashboard (runs build_dashboard.build in-process)
     try:
         import build_dashboard
-        info = build_dashboard.build(scanned)
+        info = build_dashboard.build(scanned=scanned, run_id=run_id)
         vcp_n = info["vcp"]
     except Exception as e:
         print(f"  ! dashboard build failed: {repr(e)[:120]}")
@@ -1248,7 +1248,7 @@ def run_scan(
     url = None
     if push:
         from datetime import datetime as _dt
-        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned)
+        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned, run_id=snapshot["run_id"])
     else:
         try:
             import build_dashboard
