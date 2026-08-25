@@ -27,9 +27,13 @@ Curated product/user-testing feedback for Signalix.
 4. `ATH` must mean full available archive, while `52W` means 252 recent sessions; show history/provenance in a later polish pass.
 5. UI acceptance cannot stop at API/backend success. Inspect served HTML/JS and use a true mobile visual test when browser infrastructure is repaired.
 
-### Open tester checks
-- Mobile: open detail → change 1M/1W/1D/60m → scroll detail → close; ensure sticky header and no clipped/overlapping company summary.
-- Failure state: simulate chart 404/API snapshot timeout; verify clear error/retry copy and retained last-good cards.
-- Filter: verify low-value toggle affects all cards and Top Gainers, without hiding Watchlist unexpectedly.
-- Check profile fallback for symbols without cached metadata: must show `Company profile pending`, not blank/broken layout.
+### Resolved MVP checks — stable candidate `595eb49`
+- Mobile detail: verified real drawer scroll, no horizontal overflow/overlap; timeframe controls are below the plot.
+- Chart timeframes: `1D`, `1W`, and `60M` return real candles; retired `15M` returns HTTP 400.
+- Explorer Stage/Search: filters apply immediately without an Apply button.
+- Failure state: simulated shortlist API outage keeps the explicit error + Retry state and does not fall back to fixtures.
+
+### Remaining tester checks
+- Profile fallback for symbols without cached metadata: must show `Company profile pending`, not blank/broken layout.
+- Verify 1M UI control when the owner wants monthly exposure; the MVP API already supports `1M` aggregation.
 

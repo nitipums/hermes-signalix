@@ -36,7 +36,9 @@ The product must let a user answer, quickly and honestly:
 - Breakout lifecycle has immutable trigger/pivot/invalidation evidence and retry lineage.
 - Intraday is a 60-minute stored overlay; it must never overwrite historical Daily classification.
 - Thai and curated US AI Buildout use shared market-scoped scanner logic. US remains a research watchlist with explicitly labelled bootstrap data quality.
-- Dashboard overview is progressive: persisted cards render first; detail/chart is requested per symbol. Thai and US AI Buildout are linked through dashboard navigation.
+- Owner-only MVP is the served decision surface: Daily Shortlist (`READY`/`PRE_READY`), separate `RISING MOVERS` (`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) lanes, plus full-ORD All Stocks Explorer.
+- Explorer Stage/Search filters apply immediately. Detail charts use real `1D`, `1W`, `60M`, and `1M` contracts; controls/indicator values stay below the plot.
+- Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
 - The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
 
 ## Current reliability status — 2026-08-21
@@ -52,7 +54,7 @@ Only pull one tightly scoped implementation item at a time. Bee is the final evi
 
 | Order | Deliverable | Outcome / acceptance gate | Origin of migrated Kanban work |
 |---|---|---|---|
-| 1 | **Daily Shortlist decision contract + compact artifact** | Default surface publishes only `READY`/`PRE_READY` Thai Daily swing candidates from the complete ORD scan. Require 20D average traded value ≥ THB 10m, deterministic hard gates, trigger/invalidation/provenance/rank components, compact first paint, and explicit empty/stale/error states. Regime is context only. No all-market payload or profile fan-out. | Owner-approved 2026-08-23 Daily Shortlist + All Stocks Explorer design |
+| 1 | **Daily Shortlist decision contract + compact artifact** | **Stable candidate verified at `595eb49`:** default publishes only `READY`/`PRE_READY`; separate non-actionable mover/caution lanes preserve strong price moves without weakening gates. Immediate Explorer filters, real 1D/1W/60M charts, canonical artifact sanitizer, full tests and served browser evidence complete. | Owner-approved 2026-08-23 Daily Shortlist + All Stocks Explorer design |
 | 2 | **Active ORD instrument master** | An authoritative, active-ORD-only instrument record with symbol, venue, asset class, currency, timezone, session, source, freshness, and active state. No guessed universe expansion. | `signalix-p0-instrument-master` |
 | 3 | **Provenance and freshness contract** | Canonical `data_fetched_at`, source, as-of market date, freshness status, and limitations appear consistently in API/UI; never substitute candle timestamp or page-render time. Add regression tests for stale/unknown. | `signalix-p0-provenance-freshness`, timestamp-fix lineage |
 | 4 | **Daily vs intraday event boundary** | Persist intraday emerging events append-only against an official Daily baseline. Full EOD scan alone owns the final daily class and reconciles earlier events as confirmed/expired/invalidated/not-confirmed. | `signalix-p0-intraday-emerging-event-ledger`, `signalix-p0-eod-scan-reconciliation` |

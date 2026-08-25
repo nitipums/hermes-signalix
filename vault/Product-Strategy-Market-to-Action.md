@@ -931,5 +931,7 @@ Owner approved a product reset to a **Daily Shortlist** as Signalix's default de
 - FULL active ORD coverage remains the scan/data foundation. A 20-day average daily traded-value gate of **THB 10,000,000** determines Daily Shortlist eligibility only; it must not delete or hide symbols from the full scan or Explorer.
 - Ranking is deterministic and explainable: structure 40%, entry readiness 30%, risk/reward 20%, with liquidity as a hard gate and tie-breaker. Market regime remains visible context only and does not alter eligibility or rank.
 - All Stocks Explorer is research-only, remains secondary navigation, and must clearly state that its full-universe results are not trade suggestions.
+- Strong price/volume moves that fail actionability remain visible in separate context lanes: `RISING MOVERS / WATCH ONLY` for S1/S2 evidence and `CAUTION / DO NOT CHASE` for S3/S4/topping/extended evidence. These lanes never receive shortlist rank or entry permission.
+- Explorer Stage/Search filters apply immediately. Detail charts use real stored-data `1D`, `1W`, and `60M` views; timeframe/layer controls stay below the plot.
 
-Implementation readiness remains `REVISE` / `NOT VERIFIED`. This approved design does not authorize implementation until the owner reviews the written design and accepts a focused execution plan.
+Implementation readiness for the owner-only MVP stable candidate is `PASS` at commit `595eb49`: full tests, served API, and desktop/mobile browser evidence are recorded in `vault/Execution-Pipeline.md` and `vault/Postmortems/Chart-and-60m-Stabilization-2026-08-25.md`. Future Action Queue/Outcome Log work remains separately deferred.

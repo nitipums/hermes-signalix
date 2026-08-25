@@ -6,23 +6,24 @@
 
 ```text
 branch: release/signalix-mvp-stable
-tag: signalix-mvp-stable-20260825.9
+release candidate: 595eb49 (`fix: improve explorer filters and chart timeframes`)
 source: /root/signalix-release-candidate
 MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-The release tree is the production bind mount. `/root/signalix` remains rollback-only and must not be used as the active service source.
+The release tree is the production bind mount. `/root/signalix` remains rollback-only and must not be used as the active service source. The stable candidate is served by `signalix_dashboard` from `/root/signalix-release-candidate/backend`.
 
 
 ## Reload after edits (CRITICAL)
-`docker compose restart` does **NOT** re-read `/root/signalix/.env` and does
-**NOT** pick up `backend/*.py` changes. After any edit to `.env` or backend code:
+For this bind-mounted release candidate, a dashboard-only Python/UI change is
+reloaded with:
 ```bash
-cd /root/signalix && docker compose up -d --force-recreate delivery backend
+docker restart signalix_dashboard
 ```
-(Build first with `docker compose build backend` only if `requirements.txt`
-changed — never needed for pure `.py`/`.env` edits since the image copies `./backend`.)
+Use `docker compose up -d --force-recreate` only when compose configuration,
+image dependencies, or environment wiring changes. Verify the served endpoint
+after the restart; a successful restart alone is not acceptance evidence.
 
 ## Environment (`/root/signalix/.env`)
 | Var | Purpose |
@@ -44,6 +45,7 @@ changed — never needed for pure `.py`/`.env` edits since the image copies `./b
 - `signalix-intraday-watchdog.timer` — independent freshness monitor. It tolerates expected `partial_success`, checks `intraday_price_data` at a cadence-aware 90-minute threshold, checks evaluator state at 30 minutes, and writes structured JSONL evidence.
 - `signalix-profile-refresh.timer` — low-frequency weekday Yahoo fallback metadata cache refresh; `refresh_company_profiles.py` is constrained to active `ORD` rows and records failures/backoff in PostgreSQL. It is context-only and must not feed signal calculations.
 - `signalix-factsheet-refresh.timer` — bounded weekday SET factsheet refresh, active ORD only, 20 symbols per run, persisted JSONL progress, upserts `set_factsheet` fields without overwriting stronger existing evidence. It is the authoritative profile-source refresh; Yahoo remains fallback.
+- MVP chart contract — `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`; `1D` reads Daily OHLCV, `1W`/`1M` aggregate Daily bars, and `60M` reads stored intraday 60m bars. Unsupported `15M` returns HTTP 400.
 - `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
 
 ## Verify realtime push

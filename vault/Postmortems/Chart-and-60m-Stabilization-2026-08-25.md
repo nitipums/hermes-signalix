@@ -1,6 +1,6 @@
 # Chart Latency and 60m Feed Stabilization — 2026-08-25
 
-> **STATUS: CURRENT** · Stable release `signalix-mvp-stable-20260825.9` · commit `e53c17c`
+> **STATUS: CURRENT** · Stable candidate `release/signalix-mvp-stable` · commit `595eb49` (chart/filter follow-up)
 
 ## Chart latency
 
@@ -98,5 +98,13 @@ redis: healthy
 delivery: healthy
 MVP API: HTTP 200
 ```
+
+## MVP follow-up acceptance — `595eb49`
+
+- Explorer Stage/Search filters apply immediately; no Apply button remains.
+- Chart controls and indicator values moved below the plot so they do not cover candles.
+- `1D` Daily, `1W` aggregate Daily, and `60M` stored intraday chart responses return HTTP 200 with candles; retired `15M` returns HTTP 400.
+- Mobile drawer browser review passed with candlestick, volume, MA, RSI, scroll, and no horizontal overflow.
+- Full release-candidate suite: 246 passed.
 
 No Daily symbols or historical data were deleted. Only feed-status cooldown rows and the chart index were changed.

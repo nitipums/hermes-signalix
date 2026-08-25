@@ -28,15 +28,15 @@
 |---|---|---|---|
 || `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
 || `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
-|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-23 |
-|| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **อัปเดตแล้ว 2026-08-21: separate dashboard service + intraday fetch→DB→evaluator→dashboard E2E contract** |
+| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP candidate `595eb49` |
+| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; Daily Shortlist default + All Stocks Explorer retained, owner-approved 2026-08-23** |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; Daily Shortlist default + Explorer + separate watch/caution context lanes** |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
@@ -45,6 +45,7 @@
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 | `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
 | `2026-08-21-Intraday-Feed-Availability-Handoff.md` | 11 unavailable 60m feeds + COLOR boundary | ✅ current | feed-specific cooldown; Daily preserved |
+| `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | ✅ current | stable candidate `595eb49` |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -76,6 +77,9 @@
 6. *(ว่าง — reopen เมื่อเจองานใหม่)*
 
 ## 6. Changelog
+
+- **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
+- **2026-08-25 (MVP watch lanes `195a090`)**: added `RISING MOVERS / WATCH ONLY` and `CAUTION / DO NOT CHASE` without weakening READY/PRE_READY; sanitized legacy projection labels at the canonical artifact boundary.
 
 - **2026-08-23**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; canonical design: `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`. Implementation remains pending written-design review and focused plan approval.
 - **2026-08-22**: Added cross-team review resolution to `Product-Strategy-Market-to-Action.md` after independent Ploy, Prae, View, Mali, Nida, and Khim reviews; direction PASS, implementation readiness REVISE; added regime/state/ranking/lifecycle/acceptance clarifications.

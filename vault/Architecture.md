@@ -36,7 +36,7 @@
 | `signalix_postgres` | postgres:16-alpine | 5432 | price archive |
 | `signalix_redis` | redis:7-alpine | 6379 | pub/sub bus |
 | `signalix_backend` | builds `./backend` | 8000 | FastAPI API |
-| `signalix_dashboard` | builds `./backend` | 3001 | Separate static dashboard server, same bind-mounted `./backend` |
+| `signalix_dashboard` | builds `./backend` | 3001 | MVP-only dashboard server (`mvp_server.py`), same bind-mounted `./backend`; legacy routes return 404 |
 | `signalix_delivery` | builds `./backend` | — | Redis consumer → Telegram |
 
 Backend and delivery share the **same image** (redis + requests preinstalled).
@@ -57,9 +57,35 @@ logs in the non-TTY container).
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence
 - Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → `build_dashboard.build()` from existing Daily scan → `dashboard_snapshot.json`/`dashboard.html` → served `:3001`
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
-- `backend/build_dashboard.py` — dashboard HTML shell + dynamic snapshot presentation
+- `backend/build_dashboard.py` — legacy dashboard artifact builder; not the MVP entrypoint
+- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher
+- `backend/mvp_snapshot.py` — canonical `signalix.mvp.v1` artifact loader/sanitizer
+- `backend/mvp_api.py` — Daily Shortlist, watch-only mover/caution lanes, Explorer projection
+- `backend/mvp_chart_db.py` — SELECT-only `1D`/`1W`/`60M`/`1M` OHLCV + indicators
 - `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
 - `docker-compose.yml` — 4 services
+
+## Current MVP surface contract — 2026-08-25
+
+The served owner-only MVP is intentionally separate from the legacy dashboard:
+
+```text
+/mvp
+  ├─ Daily Shortlist       READY / PRE_READY only
+  ├─ Rising Movers         WATCH ONLY; never actionable
+  ├─ Caution               DO NOT CHASE; never actionable
+  └─ All Stocks Explorer   full-ORD research, immediate Stage/Search filters
+```
+
+Daily Shortlist hard gates are unchanged. `Rising Movers` uses explicit Daily
+price/volume evidence for S1/S2 context; `Caution` exposes strong moves in
+S3/S4/topping/extended structures. Neither lane receives shortlist rank,
+trigger permission, or READY styling.
+
+Chart contract is `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`:
+`1D` reads Daily bars, `1W`/`1M` aggregate Daily bars, and `60M` reads stored
+intraday 60m bars. Chart controls and indicator legends are below the plot so
+they cannot obscure candles, volume, MA, or RSI panes.
 
 See [[Components]] for detail, [[Deployment]] for ops.
 

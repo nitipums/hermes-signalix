@@ -54,8 +54,20 @@ upsert/evaluation; they do not rerun Daily classification. The active feed is
 filtered by `intraday_feed_status`: after three consecutive Settrade empty/fail
 responses a symbol is `unavailable` for a 24-hour cooldown. This filter is
 intraday-only; Daily/EOD membership and historical data remain intact. Cards
-show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD` rather
-than relabelling an old Daily value as 60m.
+Cards show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD`
+rather than relabelling an old Daily value as 60m.
+
+## MVP owner-only surface — current
+`mvp_server.py` serves `/mvp` from the bind-mounted release tree. `mvp_routes.py`
+owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
+`mvp_api.py` keeps Daily `READY`/`PRE_READY` publication separate from
+`RISING MOVERS` (`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) context lanes.
+Explorer Stage/Search filters reload immediately; there is no Apply step.
+
+`mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:
+`1D` Daily, `1W`/`1M` aggregate Daily, and `60M` stored intraday bars. The
+frontend renders candlestick OHLC, volume, MA, and RSI; timeframe/layer controls
+and indicator values sit below the chart plot.
 
 ## `dashboard_server.py` — static server (separate dashboard service)
 Serves `/dashboard.html` on :3001 from the bind-mounted `/root/signalix/backend`
@@ -69,7 +81,7 @@ Routes:
 - `POST /webhook` — store + publish (auth-gated, see [[Architecture]])
 - `GET /signals` — list stored signals
 - `GET /screen/{symbol}` — run pipeline for one symbol, publish
-- `GET /chart/{symbol}?timeframe=` — bounded OHLCV (1W/1D/60M/15M), never live
+- `GET /chart/{symbol}?timeframe=` — backend bounded OHLCV (`1W/1D/60M/1M`); MVP uses the separate `/api/chart-db/{symbol}` contract, and 15m is retired
 - `POST /scan` — scan universe, publish candidates, rebuild dashboard, push summary
 
 Imports `push_telegram` + `DASHBOARD_PUBLIC_URL` from `delivery.py`.

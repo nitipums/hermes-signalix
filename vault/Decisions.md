@@ -119,3 +119,24 @@ Decision: Make **Daily Shortlist** the default Signalix surface for trustworthy 
 Daily Shortlist eligibility: all active Thai ORD are scanned, while publication requires 20-day average daily traded value of at least **THB 10,000,000**. Publish only `READY` and `PRE_READY`; exclude developing/base-building, broken, invalidated, low-liquidity, and `DO NOT CHASE` names. Ranking is deterministic and explainable: structure 40%, entry readiness 30%, risk/reward 20%, liquidity as hard gate/tie-breaker. Market regime is visible context only and must not suppress, rank-penalize, or otherwise modify candidates.
 
 Reason: Owner confirmed the next version must be a trustworthy daily shortlist, not a filter-heavy full-market terminal. Keeping Explorer preserves broad research and FULL ORD coverage without diluting the decision surface.
+
+## 2026-08-25 — Watch-only movers and canonical MVP cleanup
+Decision: Keep `READY`/`PRE_READY` gates unchanged. Add separate `RISING MOVERS`
+(`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) lanes for strong Daily price/volume
+moves that are not actionable setups. S1/S2 context can enter Rising Movers;
+S3/S4, topping, or extended structures enter Caution. Neither lane receives
+shortlist rank or entry permission.
+
+Decision: Explorer Stage and Search filters apply immediately without an Apply
+step. The owner-only MVP chart exposes real `1D`, `1W`, and `60M` views (plus
+`1M` API support); 1W/1M aggregate stored Daily bars and 60M reads stored
+intraday 60m bars. Chart controls/indicator values must remain below the plot.
+
+Decision: Remove legacy projection labels (`evidence_summary`,
+`old_group_mapping`, `lifecycle_badge`) at the canonical MVP artifact boundary.
+Current Stage/Phase/provenance is the only decision-facing state.
+
+Reason: A price move is not equivalent to an actionable setup, while hidden
+movers reduce decision quality. Separate watch/caution lanes preserve both
+truthful context and a trustworthy shortlist; canonical sanitization prevents
+old dates/groups from contradicting current Daily evidence.
