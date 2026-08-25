@@ -502,4 +502,18 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
             scan_time = str(ts)
     scan_run_id = items[0].get("provenance", {}).get("scan_run_id") if items else None
 
-    return _card_to_shortlist_item(item, scan_time, scan_run_id)
+    detail = _card_to_shortlist_item(item, scan_time, scan_run_id)
+    # Drawer must use the same shortlist projection as the card; otherwise raw
+    # producer action can disagree with the publication/action queue shown in
+    # Daily Shortlist.
+    projected = project_shortlist_response(items)
+    projected_by_symbol = {
+        entry.get("symbol"): entry
+        for lane in ("ready", "pre_ready")
+        for entry in projected.get(lane, [])
+    }
+    shortlist_item = projected_by_symbol.get(symbol.upper())
+    if shortlist_item:
+        detail["action"] = shortlist_item.get("action") or detail.get("action")
+        detail["action_queue"] = shortlist_item.get("action_queue") or detail.get("action_queue")
+    return detail
