@@ -1,9 +1,17 @@
 [Unit]
-Description=Refresh Signalix full ORD 60m candles every 15 minutes during SET hours
+Description=Refresh Signalix full ORD 60m candles every 30 minutes during SET hours
 
 [Timer]
-# Service applies the exact requested guard (10:00–16:45 BKK).
-OnCalendar=Mon..Fri *-*-* *:00/15 Asia/Bangkok
+# Data/evaluation owner: 30-minute cadence; service applies the 10:00–16:45 BKK guard.
+OnCalendar=Mon..Fri *-*-* 10:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 10:45:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 11:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 11:45:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 12:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 14:45:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 15:15:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 15:45:00 Asia/Bangkok
+OnCalendar=Mon..Fri *-*-* 16:15:00 Asia/Bangkok
 Persistent=true
 Unit=signalix-intraday.service
 
