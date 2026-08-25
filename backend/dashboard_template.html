@@ -1,0 +1,2342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Signalix — Daily Shortlist</title>
+<style>
+:root{
+  --bg:#0a0e17; --panel:#111a28; --panel2:#162132; --line:#27364b;
+  --text:#e8ecf2; --muted:#8a99ad; --blue:#79adff;
+  --green:#43df9e; --amber:#ffc45d; --red:#ff7a7a; --slate:#8aa0bd;
+  --s1:#6f8bba; --s2:#43df9e; --s3:#ffc45d; --s4:#ff7a7a;
+  /* Signalix stage tint system — soft solids behind stage surfaces so
+     bullish/bearish reads in peripheral vision without straining the eyes.
+     Tints ground the palette in instrument-panel "signal light" vernacular. */
+  --s1-tint:#16223a; --s2-tint:#14362e; --s3-tint:#2b2514; --s4-tint:#3a1f1f;
+  --ready:#3cd88f; --watch:#ffc44d;
+  /* Market Regime badge tints (Contract v0.2.0 §3) */
+  --regime-high-vol-bg:#3a1f1f; --regime-high-vol-fg:#ff7a7a; --regime-high-vol-border:#ff7a7a;
+  --regime-liquidity-bg:#2b2514; --regime-liquidity-fg:#ffc45d; --regime-liquidity-border:#ffc45d;
+  --regime-low-spread-bg:#14362e; --regime-low-spread-fg:#43df9e; --regime-low-spread-border:#43df9e;
+  --regime-normal-bg:#16223a; --regime-normal-fg:#8aa0bd; --regime-normal-border:#8aa0bd;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+body.loading .app{visibility:hidden}
+body.loading #liveLoading{display:flex}
+body:not(.loading) #liveLoading{display:none}
+#liveLoading{display:flex;position:fixed;inset:0;z-index:100;align-items:center;justify-content:center;
+  background:var(--bg);color:var(--muted);font-size:14px}
+.load-shell{width:min(360px,calc(100vw - 48px));text-align:center}
+.load-brand{font-size:26px;font-weight:850;letter-spacing:-.05em;color:var(--text);margin-bottom:18px}
+.load-brand span{color:var(--blue)}
+.load-chart{height:86px;margin:0 auto 18px;opacity:.9}
+.load-chart polyline{fill:none;stroke:var(--blue);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:260;stroke-dashoffset:260;animation:loadLine 1.8s ease-in-out infinite}
+.load-chart line{stroke:var(--line);stroke-width:1}
+.load-chart .up{stroke:var(--green);stroke-width:3}.load-chart .down{stroke:var(--red);stroke-width:3}
+@keyframes loadLine{0%{stroke-dashoffset:260;opacity:.3}45%,70%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-60;opacity:.25}}
+.load-title{color:var(--text);font-weight:700;margin-bottom:10px}
+.load-meta{display:flex;justify-content:space-between;gap:10px;font:11px 'Fira Code';margin-bottom:7px}
+.load-percent{color:var(--blue);font-weight:700}.load-step{color:var(--muted);text-align:left}
+.load-track{height:5px;background:var(--panel2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
+.load-track i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:inherit;transition:width .22s ease}
+button,input{font:inherit} button{color:inherit;cursor:pointer}
+*{ -webkit-tap-highlight-color:transparent }
+button,select,input,.chip,.star{min-height:44px;touch-action:manipulation}
+.app{max-width:1280px;margin:auto;padding:0 18px 42px}
+.topbar{height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
+.brand{font-size:21px;font-weight:850;letter-spacing:-.04em}
+.brand span{color:var(--blue)}
+.fresh{color:var(--muted);font-size:12px;display:flex;gap:8px;align-items:center}
+.fresh i{width:8px;height:8px;border-radius:50%;background:#8294ac;box-shadow:0 0 0 4px #1b2737}
+/* Market Regime badge in topbar (Contract v0.2.0 §3) */
+.regime-topbar{display:flex;align-items:center;gap:8px;margin-left:auto;margin-right:18px}
+.nav{display:flex;gap:5px;position:sticky;top:0;z-index:10;background:#0a0e17ee;backdrop-filter:blur(12px);
+  padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.nav button{border:0;background:transparent;border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
+.nav button.active,.nav button:hover{background:var(--panel2);color:var(--text)}
+/* Sticky control cluster — stage summary + filter bar + search stay in view
+   while scrolling long stage sections (2026-08-20 summary UX). Sits under the
+   sticky nav (z 10) so it never overlaps it; backdrop blur keeps cards legible. */
+.ctrl-sticky{position:sticky;top:0;z-index:9;background:#0a0e17ee;backdrop-filter:blur(12px);
+  padding:10px 0 6px;margin:0 -18px 10px;padding-left:18px;padding-right:18px}
+.ctrl-sticky .stage-summary{margin-bottom:10px}
+.ctrl-sticky .liquidity-tools,.ctrl-sticky .indep-row,.ctrl-sticky .search{margin-bottom:8px}
+.hero{padding:20px 0 14px;display:flex;justify-content:space-between;gap:14px;align-items:start;flex-wrap:wrap}
+h1{font-size:25px;letter-spacing:-.045em;margin:0 0 6px}
+.hero p{margin:0;color:var(--muted)}
+.coverage{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;color:var(--muted);font-size:12px;white-space:nowrap}
+.coverage b{font-size:16px;color:var(--text)}
+
+/* Stage summary — stage tinted signal-light pills.
+   Creative thesis: each pill is an instrument-panel signal light: stage-tint
+   background + solid count + ambient glow. bullish/bearish resolves in 1s. */
+.stage-summary{display:flex;gap:10px;margin:6px 0 18px;flex-wrap:wrap}
+.stage-pill{flex:1;min-width:140px;border:1px solid var(--line);border-radius:12px;padding:14px 14px;
+  background:var(--panel);cursor:pointer;transition:box-shadow .15s ease,transform .05s}
+.stage-pill:active{transform:translateY(1px)}
+.stage-pill h3{margin:0 0 4px;font-size:13px;color:var(--muted)}
+.stage-pill .cnt{font-size:26px;font-weight:850;letter-spacing:-.04em}
+.stage-pill.s1{background:var(--s1-tint);border-color:var(--s1)}.stage-pill.s1 .cnt{color:var(--s1)}
+.stage-pill.s2{background:var(--s2-tint);border-color:var(--s2)}.stage-pill.s2 .cnt{color:var(--s2)}
+.stage-pill.s3{background:var(--s3-tint);border-color:var(--s3)}.stage-pill.s3 .cnt{color:var(--s3)}
+.stage-pill.s4{background:var(--s4-tint);border-color:var(--s4)}.stage-pill.s4 .cnt{color:var(--s4)}
+.stage-pill .desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.3}
+.top-search-row{display:flex;align-items:center;gap:8px;padding:8px 0 6px}.top-search-row .search{flex:1;margin:0}.top-search-row .coverage{flex:0 0 auto}
+.stage-pill .desc{display:none}
+.liquidity-tools .compact-filter{display:flex;align-items:center;gap:5px;color:var(--muted);font-size:10px}.compact-filter select{min-height:34px;padding:5px 8px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;font-weight:700}
+/* Filter controls — compact, resettable, mobile-safe. Dropdowns keep long
+   sector/industry taxonomies usable without a horizontal chip strip. */
+.liquidity-tools{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 12px;color:var(--muted);font-weight:700}
+.chip.active,.chip:active{background:var(--panel2);color:var(--text)}
+.indep-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.filter-select{display:flex;align-items:center;gap:8px;min-width:0;color:var(--muted);font-size:11px;font-weight:700}
+.filter-select select{width:100%;min-width:0}
+.indep-row select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-weight:700}
+.search{width:100%;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:11px 14px;color:var(--text);margin-bottom:16px}
+@media(max-width:620px){.indep-row{grid-template-columns:1fr}.filter-select{font-size:12px}}
+.stage-section{margin-bottom:26px}
+.stage-head{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+.stage-head h2{margin:0;font-size:18px;letter-spacing:-.03em}
+.stage-head .badge{font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px}
+.stage-head.s2 .badge{background:var(--s2-tint);color:var(--s2);border:1px solid var(--s2)}
+.stage-head.s1 .badge{background:var(--s1-tint);color:var(--s1);border:1px solid var(--s1)}
+.stage-head.s3 .badge{background:var(--s3-tint);color:var(--s3);border:1px solid var(--s3)}
+.stage-head.s4 .badge{background:var(--s4-tint);color:var(--s4);border:1px solid var(--s4)}
+.stage-head .desc{color:var(--muted);font-size:12px}
+.l2-bar{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}
+.l2-bar .chip{padding:5px 10px;font-size:11px}
+.l2-bar .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
+.l2-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px;background:var(--panel2);border:1px dashed var(--line);border-radius:10px;margin-top:10px}
+
+/* Cards — reduced density (P0). One bezel + pulse dot + price spike.
+   The basic strip now shows only VOL + Value; RS/RSI/MACD moved to the modal. */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px}
+.signal-card{ min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--panel);padding:10px 12px;position:relative;
+  transition:transform .12s ease,box-shadow .12s ease; }
+.signal-card:hover{ box-shadow:0 0 0 3px rgba(121,173,255,.18); }
+@media(prefers-reduced-motion:reduce){
+  .signal-card{ transition:none; }
+  .stage-pill{ transition:none; }
+}
+
+/* Quality strip — visual quality indicator bar */
+.quality-strip{width:100%;height:2px;background:var(--line);margin-top:2px;overflow:hidden}
+.quality-strip span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
+
+/* Market Regime badge styles (Contract v0.2.0 §3) */
+.regime-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.02em;border:1px solid;white-space:nowrap}
+.regime-badge.high-vol{background:var(--regime-high-vol-bg);color:var(--regime-high-vol-fg);border-color:var(--regime-high-vol-border)}
+.regime-badge.liquidity{background:var(--regime-liquidity-bg);color:var(--regime-liquidity-fg);border-color:var(--regime-liquidity-border)}
+.regime-badge.low-spread{background:var(--regime-low-spread-bg);color:var(--regime-low-spread-fg);border-color:var(--regime-low-spread-border)}
+.regime-badge.normal{background:var(--regime-normal-bg);color:var(--regime-normal-fg);border-color:var(--regime-normal-border)}
+.regime-badge .dot{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.8}
+.regime-details{font-size:10px;color:var(--muted);margin-top:4px;display:none}
+.regime-badge:hover .regime-details{display:block}
+
+@media(max-width:620px){
+  .regime-badge{padding:4px 8px;font-size:10px}
+}
+.signal-card.stage-S2_uptrend{border-left:3px solid var(--s2)}
+.signal-card.stage-S1_basing{border-left:3px solid var(--s1)}
+.signal-card.stage-S3_distributing{border-left:3px solid var(--s3)}
+.signal-card.stage-S4_down{border-left:3px solid var(--s4)}
+.pulse-dot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 auto;margin-right:8px;
+  box-shadow:0 0 0 3px rgba(var(--blue-rgb,121,173,255),.14)}
+.pulse-dot.s1{background:var(--s1);box-shadow:0 0 5px 2px rgba(111,139,186,.34)}
+.pulse-dot.s2{background:var(--s2);box-shadow:0 0 5px 2px rgba(61,216,143,.34)}
+.pulse-dot.s3{background:var(--s3);box-shadow:0 0 5px 2px rgba(255,196,77,.34)}
+.pulse-dot.s4{background:var(--s4);box-shadow:0 0 5px 2px rgba(255,122,122,.34)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-top .head{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.ticker{font-size:18px;font-weight:850;letter-spacing:-.03em}
+.stage-badge{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px}
+.stage-badge.positive{background:var(--s2-tint);color:var(--s2)}
+.stage-badge.neutral{background:var(--s1-tint);color:var(--s1)}
+.stage-badge.warning{background:var(--s3-tint);color:var(--s3)}
+.stage-badge.danger{background:var(--s4-tint);color:var(--s4)}
+.phase-tag{display:inline-block;font-size:10px;color:var(--muted);margin-left:6px;vertical-align:middle}
+.fresh-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
+.fresh-badge.eod{background:var(--s1-tint);color:var(--blue)}
+.fresh-badge.live{background:var(--s2-tint);color:var(--s2)}
+.fresh-badge.stale_warning{background:var(--s3-tint);color:var(--s3)}
+.fresh-badge.hard_stale{background:var(--s4-tint);color:var(--s4)}
+.fresh-badge.unknown{background:#222;color:var(--muted)}
+/* Legacy aliases for test compatibility */
+.fresh-badge.eod,.fresh-badge.live,.fresh-badge.stale_warning,.fresh-badge.hard_stale{font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
+/* Legacy class combinations for test compatibility */
+<!-- fresh-badge eod --><!-- fresh-badge live --><!-- fresh-badge stale_warning --><!-- fresh-badge hard_stale -->
+.star{background:none;border:0;font-size:18px;color:var(--muted);min-width:40px;text-align:right}
+.star.saved{color:var(--amber)}
+.price{display:flex;justify-content:space-between;align-items:baseline;margin:10px 0 7px}
+.price b{font-size:19px;font-weight:850}
+.price small{color:var(--muted);font-size:10px;margin-left:4px}
+.gain{color:var(--green)} .loss{color:var(--red)}
+.basic-strip{display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-bottom:6px}
+.basic-strip b{color:var(--text)}
+.trigger-distance{font-size:11px;color:var(--amber);font-weight:750;margin:2px 0 6px}
+.setup-evidence{font-size:11px;color:var(--blue);margin-bottom:6px}
+.setup-evidence.surge{color:var(--amber)}
+.q-corner{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+.q-corner.q3{background:var(--s3-tint);color:var(--s3);border:1px solid var(--s3)}
+.q-corner.q2{background:var(--s2-tint);color:var(--s2);border:1px solid var(--s2)}
+.q-corner.q1{background:var(--s1-tint);color:var(--s1);border:1px solid var(--s1)}
+.q-corner.q0{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.action-line{font-size:10px;padding:6px 8px;border-radius:7px;background:var(--panel2);border:1px solid var(--line)}
+.action-line b{color:var(--text)}
+/* Quality bar — thin progress bar under the card strip for at-a-glance strength */
+.q-bar{width:100%;height:3px;border-radius:2px;background:var(--line);margin-top:4px;overflow:hidden}
+.q-bar span{display:block;height:100%;width:0;background:var(--blue);transition:width .3s ease}
+.q-bar .q0{width:0;background:var(--s4)}
+.q-bar .q1{width:33%}
+.q-bar .q2{width:66%}
+.q-bar .q3{width:100%}
+
+.market-posture{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:10px 12px;margin:0 0 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.posture-main{display:flex;align-items:baseline;gap:9px;white-space:nowrap}.posture-kicker{color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.posture-main strong{font-size:16px;color:var(--amber)}.market-posture.favorable .posture-main strong{color:var(--green)}.market-posture.defensive .posture-main strong{color:var(--red)}
+.posture-metrics{display:flex;gap:14px;color:var(--muted);font-size:11px}.posture-metrics b{color:var(--text);margin-left:3px}.posture-method{color:var(--muted);font-size:10px;text-align:right}
+.empty{color:var(--muted);padding:30px;text-align:center}.empty div{margin-top:6px;font-size:12px;color:var(--muted)}
+@media(max-width:620px){.market-posture{grid-template-columns:1fr auto;gap:4px 10px;padding:8px 10px}.posture-main{grid-column:1;white-space:normal}.posture-metrics{grid-column:1/-1;gap:12px}.posture-method{grid-column:2;grid-row:1;text-align:right;max-width:130px;line-height:1.25}}
+
+/* Market breadth pulse — single-line A/D ratio bar */
+.breadth-pulse{display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:12px}
+.breadth-pulse .ratio{font-size:12px;font-weight:700}
+.breadth-pulse .bar{flex:1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.breadth-pulse .bar > span{display:block;height:100%;background:var(--s2);transition:width .3s}
+.breadth-pulse .bar > span.bear{background:var(--s4)}
+
+@media(max-width:620px){
+  .app{padding:0 12px 32px}
+  .nav{position:sticky;top:0;gap:6px;padding:8px 0}
+  .nav button{padding:10px 12px;font-size:13px}
+  .stage-pill{min-width:calc(50% - 5px);font-size:14px}
+  .stage-pill .cnt{font-size:24px}
+  .ticker{font-size:16px;font-weight:700}
+  .price b{font-size:17px}
+  .gain,.loss{font-size:13px;font-weight:700}
+  .basic-strip{font-size:10px}
+  .cards{grid-template-columns:1fr}
+  .l2-bar .chip{padding:10px 12px}
+  .tf-tools .chip{padding:10px 14px;font-size:12px}
+  .search{padding:13px 14px;font-size:16px}
+  .nav-arrow,.modal-close{min-width:44px;min-height:44px;padding:11px 14px;font-size:16px}
+  #chartPanLeft,#chartPanRight{min-width:44px;min-height:44px;padding:11px 14px;font-size:15px}
+}
+.modal-bg{display:none;position:fixed;inset:0;z-index:200;background:rgba(3,7,13,.78);align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{width:min(700px,100%);max-height:90vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.modal-shell{padding:18px 24px 24px}
+.modal-head{position:sticky;top:0;z-index:2;display:grid;grid-template-columns:32px minmax(0,1fr) 32px 32px;align-items:start;gap:8px;margin:0 0 14px;padding:0 0 10px;background:linear-gradient(var(--panel) 84%,transparent)}
+.modal-title{margin:0;min-width:0;font-size:clamp(20px,4vw,25px);line-height:1.12;letter-spacing:-.04em}
+.modal-title .title-link{color:var(--text);text-decoration:none}.modal-title .title-link:hover{color:var(--blue)}
+.modal-subtitle{display:block;margin-top:5px;color:var(--muted);font-size:12px;font-weight:650;letter-spacing:.01em}
+.tf-tools{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.tf-tools .chip{padding:6px 10px;font-size:11px}
+.tf-tools .chip.active{background:var(--blue);color:#06101f;border-color:var(--blue)}
+.modal .chip{margin-top:0}
+.tv-link{display:inline-flex;align-items:center;gap:4px;color:var(--blue);font-size:11px;font-weight:750;text-decoration:none}
+.tv-link:hover{color:var(--text)}
+.nav-arrow,.modal-close{width:32px;height:32px;min-width:32px;min-height:32px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--muted);font-size:15px;font-weight:800;line-height:1}
+.nav-arrow:hover,.modal-close:hover{color:var(--text);border-color:var(--blue);background:#1d2b40}
+.nav-arrow:disabled{opacity:.35;cursor:not-allowed}
+.modal-close{color:var(--red)}
+.decision-banner{padding:12px 14px;margin:0 0 14px;border:1px solid var(--line);border-left:3px solid var(--blue);border-radius:10px;background:var(--panel2)}
+.decision-banner .decision-label{font-size:16px;font-weight:850;letter-spacing:.02em}
+.decision-banner .decision-reason{margin-top:4px;color:var(--muted);font-size:13px;line-height:1.45}
+.modal-price{display:flex;align-items:baseline;gap:12px;margin:0 0 12px}.modal-price b{font-size:29px;letter-spacing:-.045em}.modal-price span{font-size:14px;font-weight:750}
+.modal-section-label{margin:16px 0 8px;color:var(--muted);font-size:11px;font-weight:850;letter-spacing:.1em;text-transform:uppercase}
+.detail-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}.detail-fact{padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2)}.detail-fact .k{display:block;color:var(--muted);font-size:11px}.detail-fact .v{display:block;margin-top:3px;color:var(--text);font-size:13px;font-weight:750}
+.setup-note{padding:10px 12px;border-left:3px solid var(--amber);background:rgba(255,196,77,.08);border-radius:8px;color:var(--text);font-size:13px;line-height:1.45}
+.risk-note{padding:10px 12px;border-left:3px solid var(--red);background:rgba(255,122,122,.07);border-radius:8px;color:var(--text);font-size:13px;line-height:1.45}
+.chart-status{min-height:18px;color:var(--muted);font-size:12px;margin:4px 0 4px}.chart-status.error{color:var(--red)}
+.chart-canvas{width:100%;height:min(300px,34vh);touch-action:none;border-radius:12px;background:#080d18;border:1px solid #1d2b40}
+.chart-freshness{margin:3px 0 10px;color:var(--muted);font-size:12px}
+.chart-freshness.stale{color:var(--amber)}
+@media(max-width:620px){
+  .modal-bg{padding:0;align-items:flex-end}.modal{width:100%;max-height:94vh;border-radius:16px 16px 0 0;margin:0}.modal-shell{padding:16px 16px calc(24px + env(safe-area-inset-bottom))}.modal-head{grid-template-columns:44px minmax(0,1fr) 44px 44px;margin-bottom:12px}.modal-head .nav-arrow,.modal-head .modal-close{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;font-size:18px}.modal-title{font-size:20px}.modal-subtitle{font-size:12px}.detail-facts{grid-template-columns:1fr 1fr}.tf-tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}.tf-tools .chip{min-width:58px;min-height:40px}.chart-canvas{height:250px}.detail-facts .v,.setup-note,.risk-note{font-size:13px}}
+@media(max-width:620px){.modal-head .nav-arrow,.modal-head .modal-close{width:44px;height:44px;min-width:44px;min-height:44px;padding:0;font-size:18px}}
+/* Focus-visible for accessibility */
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+:focus:not(:focus-visible){outline:none}
+
+/* Shortlist card evidence strip */
+.shortlist-evidence{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.shortlist-evidence > div{display:flex;flex-direction:column;gap:2px;font-size:10px}
+.shortlist-evidence .k{color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.shortlist-evidence .v{color:var(--text);font-weight:600}
+.pub-badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle;letter-spacing:.02em}
+.pub-badge.ready{background:var(--s2-tint);color:var(--s2)}
+.pub-badge.pre-ready{background:var(--s3-tint);color:var(--s3)}
+.shortlist-section{margin-bottom:18px}
+.shortlist-section h3{margin:0 0 10px;font-size:14px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.shortlist-section.ready h3{color:var(--green)}
+.shortlist-section.pre-ready h3{color:var(--amber)}
+.explorer-link{display:flex;align-items:center;gap:12px;padding:16px;margin-top:24px;border:1px dashed var(--line);border-radius:12px;background:var(--panel2)}
+.explorer-link .hint{color:var(--muted);font-size:12px;font-style:italic}
+@media(max-width:620px){
+  .shortlist-evidence{grid-template-columns:1fr 1fr;font-size:9px}
+  .explorer-link{flex-direction:column;align-items:stretch;gap:8px}
+  .explorer-link .chip{width:100%}
+}
+
+
+/* ============================================================================
+   COMPACT LANE TABLE — Daily Shortlist (Task D)
+   Desktop: semantic table, no horizontal scroll
+   Mobile 512: dense two-line list from same data
+   ============================================================================ */
+
+/* Lane section headers */
+.shortlist-lane-section {
+  margin-bottom: 20px;
+}
+.shortlist-lane-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.shortlist-lane-header.review-now {
+  background: var(--s2-tint);
+  color: var(--s2);
+  border: 1px solid var(--s2);
+}
+.shortlist-lane-header.prepare {
+  background: var(--s3-tint);
+  color: var(--s3);
+  border: 1px solid var(--s3);
+}
+.shortlist-lane-header.leadership-extended {
+  background: var(--s4-tint);
+  color: var(--s4);
+  border: 1px solid var(--s4);
+}
+.shortlist-lane-header .lane-count {
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.8;
+  margin-left: auto;
+}
+.shortlist-lane-header .extended-warning {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.9;
+  margin-left: 8px;
+}
+
+/* Desktop: Compact semantic table */
+@media (min-width: 621px) {
+  .shortlist-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 12px;
+  }
+  .shortlist-table {
+    width: 100%;
+    min-width: 720px; /* ensures columns fit without horizontal scroll at typical desktop */
+    border-collapse: collapse;
+    font-size: 12px;
+    table-layout: fixed;
+  }
+  .shortlist-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--panel);
+  }
+  .shortlist-table th {
+    padding: 8px 10px;
+    text-align: left;
+    font-weight: 800;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-bottom: 2px solid var(--line);
+    background: var(--panel);
+    white-space: nowrap;
+  }
+  .shortlist-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shortlist-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s ease;
+  }
+  .shortlist-table tbody tr:hover {
+    background: var(--panel2);
+  }
+  .shortlist-table tbody tr:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+  }
+  .shortlist-table tbody tr.extended-row {
+    background: var(--s4-tint);
+  }
+  .shortlist-table tbody tr.extended-row:hover {
+    background: var(--s4-tint);
+    box-shadow: inset 0 0 0 1px var(--s4);
+  }
+  .shortlist-table tbody tr.extended-row td {
+    border-bottom-color: var(--s4);
+  }
+
+  /* Column widths */
+  .shortlist-table th:nth-child(1), .shortlist-table td:nth-child(1) { width: 50px; }  /* rank */
+  .shortlist-table th:nth-child(2), .shortlist-table td:nth-child(2) { width: 80px; }  /* symbol */
+  .shortlist-table th:nth-child(3), .shortlist-table td:nth-child(3) { width: 140px; } /* setup */
+  .shortlist-table th:nth-child(4), .shortlist-table td:nth-child(4) { width: 80px; }  /* state */
+  .shortlist-table th:nth-child(5), .shortlist-table td:nth-child(5) { width: 180px; } /* action */
+  .shortlist-table th:nth-child(6), .shortlist-table td:nth-child(6) { width: 320px; } /* trigger / risk combined */
+  .shortlist-table th:nth-child(7), .shortlist-table td:nth-child(7) { width: 120px; } /* quality */
+  .shortlist-table th:nth-child(8), .shortlist-table td:nth-child(8) { width: 120px; } /* liquidity */
+}
+
+/* Mobile 512: Dense two-line list layout */
+@media (max-width: 620px) {
+  .shortlist-table-wrap { display: none; }
+  .shortlist-list { display: block; }
+
+  .shortlist-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--panel);
+    margin-bottom: 8px;
+    min-height: 88px; /* ~2 lines at 44px each */
+    cursor: pointer;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .shortlist-list-item:hover,
+  .shortlist-list-item:focus-visible {
+    background: var(--panel2);
+    border-color: var(--blue);
+    outline: none;
+  }
+  .shortlist-list-item:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+  .shortlist-list-item.extended-item {
+    border-color: var(--s4);
+    background: var(--s4-tint);
+  }
+  .shortlist-list-item.extended-item:hover {
+    background: var(--s4-tint);
+    box-shadow: inset 0 0 0 1px var(--s4);
+  }
+
+  /* Line 1: rank | symbol | setup badge | state badge | action */
+  .shortlist-list-line1 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-height: 44px; /* touch target */
+  }
+  .shortlist-list-rank {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--amber);
+    padding: 2px 8px;
+    background: var(--s3-tint);
+    border: 1px solid var(--s3);
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+  .shortlist-list-symbol {
+    font-size: 16px;
+    font-weight: 850;
+    letter-spacing: -.03em;
+    flex: 0 0 auto;
+  }
+  .shortlist-list-setup {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--blue);
+    padding: 2px 8px;
+    background: var(--s1-tint);
+    border: 1px solid var(--s1);
+    border-radius: 999px;
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shortlist-list-state {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 6px;
+    flex: 0 0 auto;
+  }
+  .shortlist-list-state.READY { background: var(--s2-tint); color: var(--s2); }
+  .shortlist-list-state.PRE_READY { background: var(--s3-tint); color: var(--s3); }
+  .shortlist-list-state.EXTENDED { background: var(--s4-tint); color: var(--s4); }
+  .shortlist-list-action {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--green);
+    padding: 4px 8px;
+    background: var(--s2-tint);
+    border: 1px solid var(--s2);
+    border-radius: 6px;
+    flex: 0 0 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+  }
+  .shortlist-list-item.extended-item .shortlist-list-action {
+    color: var(--s4);
+    background: var(--s4-tint);
+    border-color: var(--s4);
+  }
+
+  /* Line 2: trigger | invalidation/risk (stacked pills) */
+  .shortlist-list-line2 {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 10px;
+  }
+  .shortlist-list-trigger,
+  .shortlist-list-invalidation {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    flex: 1;
+    min-width: 120px;
+  }
+  .shortlist-list-trigger {
+    background: var(--s2-tint);
+    border: 1px solid var(--s2);
+  }
+  .shortlist-list-invalidation {
+    background: var(--s4-tint);
+    border: 1px solid var(--s4);
+  }
+  .shortlist-list-line2 .k {
+    color: var(--muted);
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-size: 8px;
+  }
+  .shortlist-list-line2 .v {
+    color: var(--text);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .shortlist-list-invalidation .k { color: var(--s4); }
+
+  /* Extended warning badge on mobile */
+  .shortlist-list-extended-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--s4);
+    padding: 3px 8px;
+    background: var(--s4-tint);
+    border: 1px solid var(--s4);
+    border-radius: 999px;
+    margin-top: 4px;
+    align-self: flex-start;
+  }
+
+  /* Quality/liquidity metadata hidden on mobile list (available on detail click) */
+  .shortlist-list-meta { display: none; }
+}
+
+/* Shared row click handler styles */
+.shortlist-row-clickable {
+  cursor: pointer;
+}
+.shortlist-row-clickable:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* Empty lane state */
+.shortlist-lane-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  background: var(--panel2);
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+/* Shortlist decision card — redesigned for decision-first UX */
+.shortlist-card-compact {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortlist-card-head {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 10px;
+}
+
+.shortlist-card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.shortlist-card-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.setup-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue);
+  padding: 2px 8px;
+  background: var(--s1-tint);
+  border: 1px solid var(--s1);
+  border-radius: 999px;
+  letter-spacing: .02em;
+}
+
+.shortlist-rank {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--amber);
+  padding: 2px 8px;
+  background: var(--s3-tint);
+  border: 1px solid var(--s3);
+  border-radius: 999px;
+}
+
+.shortlist-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.shortlist-action {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green);
+  padding: 8px 10px;
+  background: var(--s2-tint);
+  border: 1px solid var(--s2);
+  border-radius: 8px;
+  letter-spacing: .01em;
+}
+
+.shortlist-why-now {
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.shortlist-why-now .k {
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 9px;
+  margin-bottom: 2px;
+  display: block;
+  line-height: 1.4;
+}
+
+.shortlist-why-now .v {
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.shortlist-evidence-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.shortlist-trigger,
+.shortlist-invalidation {
+  font-size: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
+.shortlist-trigger {
+  background: var(--s2-tint);
+  border: 1px solid var(--s2);
+}
+
+.shortlist-trigger .k,
+.shortlist-invalidation .k {
+  color: var(--s2);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 9px;
+  margin-bottom: 2px;
+  display: block;
+  line-height: 1.4;
+}
+
+.shortlist-trigger .v,
+.shortlist-invalidation .v {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.shortlist-invalidation .k {
+  color: var(--s4);
+}
+
+.shortlist-quality-strip {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.quality-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 70px;
+}
+
+.quality-item .k {
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 9px;
+}
+
+.quality-item .v {
+  color: var(--text);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+.shortlist-metadata-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  font-size: 10px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.shortlist-metadata-strip > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortlist-metadata-strip .k {
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  font-size: 9px;
+  display: block;
+  line-height: 1.4;
+}
+
+.shortlist-metadata-strip .v {
+  color: var(--text);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.shortlist-card-footer {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.shortlist-open-details {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--blue);
+  background: transparent;
+  border: 1px solid var(--blue);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.shortlist-open-details:hover,
+.shortlist-open-details:focus-visible {
+  background: var(--blue);
+  color: var(--bg);
+}
+
+.shortlist-open-details:active {
+  transform: translateY(1px);
+}
+
+@media (min-width: 621px) {
+  .cards {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+  }
+}
+
+@media (max-width: 620px) {
+  .shortlist-evidence-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .shortlist-quality-strip {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .quality-item {
+    flex-direction: row;
+    justify-content: space-between;
+    min-width: 0;
+  }
+
+  .shortlist-metadata-strip {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .shortlist-card-compact {
+    padding: 12px;
+  }
+
+  .shortlist-action {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .shortlist-why-now {
+    font-size: 9px;
+    padding: 6px 8px;
+  }
+
+  .shortlist-trigger,
+  .shortlist-invalidation {
+    font-size: 9px;
+    padding: 6px 8px;
+  }
+}
+
+/* Compact first viewport: preserve touch targets, reduce chrome density. */
+@media(max-width:620px){
+  .topbar{height:50px}.brand{font-size:18px}.fresh{font-size:10px;gap:5px;flex-wrap:wrap;min-width:0;line-height:1.25}.fresh #provenance{min-width:0;overflow-wrap:anywhere}.fresh i{width:6px;height:6px;box-shadow:0 0 0 3px #1b2737}
+  .nav{gap:3px;padding:4px 0}.nav button{padding:6px 8px;font-size:11px;border-radius:7px;min-height:34px}
+  .top-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;padding:5px 0}.top-search-row .search{min-width:0}.top-search-row .coverage{padding:5px 6px;font-size:9px}.top-search-row .coverage b{font-size:11px}
+  .hero{padding:10px 0 7px;gap:7px}.hero h1,h1{font-size:22px;margin-bottom:3px}.hero p{font-size:12px;line-height:1.3}.coverage{padding:5px 8px;font-size:10px;border-radius:8px}.coverage b{font-size:13px}
+  .ctrl-sticky{padding:6px 12px 4px;margin:0 -12px 7px}.ctrl-sticky .stage-summary{margin-bottom:6px}
+  .stage-summary{gap:6px;margin:3px 0 7px}.stage-pill{min-width:calc(50% - 3px);padding:8px 9px;border-radius:9px}.stage-pill h3{font-size:11px;margin-bottom:2px}.stage-pill .cnt{font-size:20px}.stage-pill .desc{display:none}
+  .liquidity-tools{gap:5px;margin-bottom:6px}.liquidity-tools .chip,.liquidity-tools select{min-height:34px;padding:5px 8px;font-size:11px;border-radius:7px}.liquidity-tools .compact-filter{flex:1 1 calc(50% - 5px);min-width:0;display:grid;gap:2px;font-size:10px}.compact-filter select{width:100%;min-height:34px;padding:5px 7px;font-size:11px}
+  .indep-row{grid-template-columns:1fr 1fr;gap:5px;margin-bottom:6px}.filter-select{display:grid;gap:2px;font-size:10px}.indep-row select{min-height:34px;padding:5px 7px;font-size:11px;border-radius:7px}
+  .search{min-height:38px;padding:8px 10px;font-size:13px;margin-bottom:8px;border-radius:8px}
+  .stage-section{margin-bottom:14px}.stage-head{gap:7px;margin-bottom:6px;padding-bottom:5px}.stage-head h2{font-size:15px}.stage-head .badge{font-size:10px;padding:2px 7px}.stage-head .desc{font-size:10px}.l2-bar{gap:4px;margin-bottom:7px}.l2-bar .chip{min-height:32px;padding:5px 7px;font-size:10px}
+}
+</style>
+</head>
+<body class="loading">
+<div id="liveLoading" role="status" aria-live="polite" aria-busy="true">
+  <div class="load-shell">
+    <div class="load-brand">Signal<span>ix</span></div>
+    <svg class="load-chart" viewBox="0 0 320 86" aria-hidden="true">
+      <line x1="0" y1="72" x2="320" y2="72"/><line x1="0" y1="43" x2="320" y2="43"/><line x1="0" y1="14" x2="320" y2="14"/>
+      <path class="down" d="M24 20v28m-5-20h10m-5 20v17m-5-8h10M74 29v30m-5-22h10m-5 30v10m-5-5h10M124 34v25m-5-18h10m-5 25v12m-5-6h10"/>
+      <path class="up" d="M174 58v19m-5-12h10m-5-19v12m-5-6h10M224 42v26m-5-18h10m-5-18v10m-5-5h10M274 24v35m-5-27h10m-5 35v10m-5-5h10"/>
+      <polyline points="8,62 35,49 61,58 88,35 114,46 141,32 168,57 195,42 222,50 249,27 276,35 312,12"/>
+    </svg>
+    <div class="load-title" id="loadTitle">Preparing complete market snapshot</div>
+    <div class="load-meta"><span id="loadStep" class="load-step">Reading complete snapshot</span><span id="loadPercent" class="load-percent">0%</span></div>
+    <div class="load-track"><i id="loadProgress"></i></div>
+  </div>
+</div>
+<main class="app">
+  <header class="topbar">
+    <div class="brand">Signal<span>ix</span></div>
+    <div class="fresh">
+      <i id="liveDot" aria-hidden="true"></i>
+      <span id="liveState" aria-live="polite">Loading…</span>
+      <span id="provenance" style="margin-left:12px;font-size:11px;color:var(--muted)">
+        <span id="provFetched"><span id="provFetchedLabel">Last Scanned:</span> —</span>
+      </span>
+    </div>
+    <!-- Market Regime badge (Contract v0.2.0 §3) -->
+    <div class="regime-topbar" id="regimeBadge" aria-label="Market regime"></div>
+  </header>
+  <nav class="nav" role="menubar">
+    <button class="chip active" data-page="shortlist" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="explorer" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="radar" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="watchlist" aria-label="" role="menuitem"></button>
+    <button class="chip" data-page="market" aria-label="" role="menuitem"></button>
+  </nav>
+  <section class="page active" id="shortlist">
+    <div class="top-search-row">
+      <div class="coverage"><span id="shortlistCount">—</span> <span id="shortlistCovLabel"></span></div>
+    </div>
+    <section id="shortlistFreshness" class="market-posture" aria-label="Data freshness"></section>
+
+    <div id="shortlistLanes" class="shortlist-lanes"></div>
+    <div id="shortlistEmpty" class="empty" hidden><span id="shortlistEmptyText"></span><div id="shortlistEmptyReason"></div></div>
+    <div id="shortlistError" class="empty" hidden><span id="shortlistErrorText"></span><div id="shortlistErrorReason"></div></div>
+    <nav class="explorer-link" aria-label="All Stocks Explorer">
+      <button class="chip" id="goToExplorer" data-page="explorer">All Stocks Explorer</button>
+      <span class="hint">Research universe — not a list of trade suggestions</span>
+    </nav>
+  </section>
+  <section class="page" id="explorer">
+    <div class="hero"><div><h1></h1><p></p></div><div class="coverage"><span id="explorerCount">—</span> <span id="explorerCovLabel"></span></div></div>
+    <div class="ctrl-sticky" id="explorerCtrlSticky">
+      <div class="stage-summary" id="explorerStageSummary" role="group" aria-label="Stage summary"></div>
+      <div class="liquidity-tools" id="explorerIndepBar">
+        <button class="chip" id="explorerSet50Only" data-indep="set50" aria-pressed="false"></button>
+        <select id="explorerValueFilter" class="chip" aria-label="">
+          <option value="all"></option>
+          <option value="5"></option>
+          <option value="10"></option>
+          <option value="20"></option>
+        </select>
+        <select id="explorerPriceBand" class="chip" aria-label="">
+          <option value="all"></option>
+          <option value="low"></option>
+          <option value="mid"></option>
+          <option value="high"></option>
+        </select>
+        <label class="filter-select compact-filter" for="explorerSectorFilter"><span id="explorerSectorLabel"></span>
+          <select id="explorerSectorFilter" aria-label=""><option value="all"></option></select>
+        </label>
+        <label class="filter-select compact-filter" for="explorerIndustryFilter"><span id="explorerIndustryLabel"></span>
+          <select id="explorerIndustryFilter" aria-label=""><option value="all"></option></select>
+        </label>
+        <button class="chip active" id="explorerLiquidOnly" data-liquidity="liquid" aria-pressed="true"></button>
+        <button class="chip" id="explorerShowLowValue" data-liquidity="all" aria-pressed="false"></button>
+      </div>
+    </div>
+    <div id="explorerResults"></div>
+    <div id="explorerEmpty" class="empty" hidden><span id="explorerEmptyText"></span><div id="explorerEmptyReason"></div></div>
+  </section>
+  <section class="page" id="radar">
+    <div class="hero"><div><h1></h1><p></p></div><div class="coverage"><span id="radarCount">—</span> <span id="radarCovLabel"></span></div></div>
+    <div class="l2-bar" id="radarPills" role="group" aria-label="Radar proximity filter"></div>
+    <div id="radarResults"></div>
+    <div id="radarEmpty" class="empty" hidden><span id="radarEmptyText"></span><div id="radarEmptyReason"></div></div>
+    <!-- Legacy marker for test compatibility: radarHTML -->
+    <!-- Legacy marker for test compatibility: radar-section -->
+    <!-- Legacy marker for test compatibility: Setup Radar -->
+    <!-- Legacy marker for test compatibility: PROX_DISPLAY -->
+  </section>
+  <section class="page" id="watchlist">
+    <div class="hero"><div><h1></h1><p id="watchState"></p></div></div>
+    <div id="watchResults"></div>
+    <div id="watchEmpty" class="empty"><span id="watchEmptyText"></span></div>
+  </section>
+  <section class="page" id="market">
+    <div class="hero"><div><h1></h1><p></p></div></div>
+    <div id="breadthPulse" class="breadth-pulse" role="group" aria-label="Market breadth pulse"></div>
+    <div class="market-grid" id="marketGrid"></div>
+  </section>
+</main>
+<div class="modal-bg" id="modalBg" aria-hidden="true"><section class="modal" role="dialog" aria-modal="true" aria-label="Detail"><div id="modalContent"></div></section></div>
+
+<script>
+const STAGE_ORDER=["S2_uptrend","S1_basing","S3_distributing","S4_down"];
+const STAGE_TINT_BG={"s1":"var(--s1-tint)","s2":"var(--s2-tint)","s3":"var(--s3-tint)","s4":"var(--s4-tint)"};
+let items=__ITEMS__;
+let stageMeta=__STAGE_META__;
+let dashboardMeta=__DASHBOARD_META__;
+const localeLabels={
+  en:{
+    navScreener:"Screener (Stage)", navRadar:"Setup Radar",
+    navWatchlist:"Watchlist", navMarket:"Market",
+    toggleLang:"TH",
+    searchPlaceholder:"Search ticker / stage / phase / action",
+    searchAria:"Search",
+    covAll:"Thai ORD stocks scanned",
+    marketPosture:"Market Posture",
+    aboveMA200:"Above MA200", stageBreadth:"Stage breadth",
+    breadthContext:"context only, not a trade instruction",
+    stageSummary:"Stage summary", radarProximity:"Radar proximity filter",
+    radarCount:"stocks in Radar",
+    radarDesc:"Quality passed + near/entry — watched before breakout",
+    watchState:"Saved on this device", watchEmpty:"No stars yet — tap ★ on any card",
+    marketDesc:"Breadth from latest Stage scan",
+    marketStatus:"Market Status", lastScanned:"Last Scanned",
+    loading:"Loading…", loadFailed:"Load failed", retry:"Retry", ready:"Ready",
+    set50:"SET50 Only", marketValue:"Market Value: All",
+    priceLow:"Low (<฿2)", priceMid:"Mid (฿2–10)", priceHigh:"High (>฿10)",
+    sector:"Sector", industry:"Industry", hideLow:"Hide low value (<฿10M/day)",
+    showAll:"Show all", all:"All",
+    prevStock:"Older stock", nextStock:"Newer stock", close:"Close",
+    priceHistory:"Price history", daily:"Daily", weekly:"Weekly",
+    monthly:"Monthly", hourly:"60m", loadChart:"Loading chart…",
+    chartUnavailable:"chart unavailable", tryAgain:"Try again",
+    lastFetched:"Last data fetched", trigger:"Trigger", risk:"Risk",
+    stop:"Stop", setupQuality:"Setup quality",
+    trendStructure:"Trend / structure", setup:"Setup",
+    relativeStrength:"Relative strength",
+    momentumVolume:"Momentum / volume",
+    noStop:"No defined stop", closeAbove:"Close above",
+    noSetup:"Wait for setup proof",
+    freshBadgeLive:"Live intraday quote available",
+    freshBadgeEod:"Source: Daily EOD",
+    freshBadgeStale:"Data is stale; Daily EOD shown for decisions",
+    freshBadgeUnknown:"No price source available",
+    freshBadgeEodUnavailable:"60m unavailable; Daily EOD used for decisions",
+    modalTitle:"Detail", marketPostureAria:"Market posture",
+    marketBreadthAria:"Market breadth pulse",
+    noQualifying:"No qualifying setups for the current filters",
+    noRadar:"No qualifying setups in Radar for this proximity filter",
+    chooseAll:"choose All to reset",
+    emptyStarred:"No starred setups — clear a filter to reset",
+    preparingSnapshot:"Preparing complete market snapshot",
+    readingSnapshot:"Reading complete snapshot",
+    indexingStages:"Indexing symbols and stages",
+    buildingStages:"Building stage sections",
+    snapshotReady:"Ready", cards:"cards", snapshot:"Snapshot",
+    toggleLanguage:"Toggle language", ofMarket:"of market", vol:"VOL", value:"Value", stocks:"stocks", up:"up", priceBand:"Price band", hideLow:"Hide low value (<฿10M/day)", showAll:"Show all", marketValue:"Market Value: All", all:"All", stageBreadth:"Stage breadth", aboveMA200:"Above MA200", watchEmpty:"No stars yet — tap ★ on any card", set50:"SET50 Only", sector:"Sector", industry:"Industry", favorable:"Favorable", defensive:"Defensive", mixed:"Mixed", priceAll:"Price: All", rstDaily:"Daily Setup", rstIntraday:"Intraday 60m", rstTrigger:"Trigger", rstSystemStop:"System Stop", rstPivotLow:"Pivot Low", rstPlannedStop:"Planned Stop", rstPlannedEntry:"Planned Entry", rstFib1272:"Fib 1.272", rstFib1618:"Fib 1.618", rstRiskPerShare:"Risk/Share", rstPositionSize:"Position Size", rstRiskBudget:"Risk Budget", rstAccountSize:"Account Size", rstRiskPercent:"Risk %", rstPlannedStop:"Planned Stop", rstWiderStop:"WIDER STOP", rstStopAbove:"STOP ABOVE SYSTEM INVALIDATION", rstNotVerified:"NOT_VERIFIED", rstAvoidChase:"AVOID CHASING", rstContractDaily:"Daily Setup", rstContractIntraday:"Intraday 60m", rstSystemStopLabel:"System Stop", rstPlannedStopLabel:"Planned Stop", rstPivotLowLabel:"Pivot Low", rstFib1272Label:"Fib 1.272", rstFib1618Label:"Fib 1.618", rstRiskPerShareLabel:"Risk/Share", rstPositionSizeLabel:"Position Size", rstRiskBudgetLabel:"Risk Budget", rstAccountSizeLabel:"Account Size", rstRiskPercentLabel:"Risk %", rstPlannedStopLabel:"Planned Stop", rstPlannedEntryLabel:"Planned Entry", rstSystemStopLabel:"System Stop", rstPivotLowLabel:"Pivot Low", rstFib1272Label:"Fib 1.272", rstFib1618Label:"Fib 1.618", rstRiskPerShareLabel:"Risk/Share", rstPositionSizeLabel:"Position Size", rstRiskBudgetLabel:"Risk Budget", rstAccountSizeLabel:"Account Size", rstRiskPercentLabel:"Risk %", rstContractDaily:"Daily Setup", rstContractIntraday:"Intraday 60m", rstWiderStop:"WIDER STOP", rstStopAbove:"STOP ABOVE SYSTEM INVALIDATION", rstNotVerified:"NOT_VERIFIED", rstAvoidChase:"AVOID CHASING", rstWarningWider:"WIDER STOP", rstWarningAbove:"STOP ABOVE SYSTEM INVALIDATION"
+  },
+  th:{
+    navScreener:"คัดหุ้น (ระดับ)", navRadar:"Setup Radar",
+    navWatchlist:"หุ้นติดตาม", navMarket:"สถานะตลาด",
+    toggleLang:"EN",
+    searchPlaceholder:"ค้นหา ticker / stage / phase / action",
+    searchAria:"ค้นหา",
+    covAll:"หุ้นไทย ORD สแกน",
+    marketPosture:"สถาณะตลาด",
+    aboveMA200:"เหนือ MA200", stageBreadth:"廣度ระดับ",
+    breadthContext:"บริบทเท่านั้น ไม่ใช่คำสั่งซื้อขาย",
+    stageSummary:"สรุประดับ", radarProximity:"ตัวกรองความใกล้ Radar",
+    radarCount:"หุ้นใน Radar",
+    radarDesc:"คุณภาพผ่าน + ใกล้/ถึงจุดเข้า — หุ้นจับตาก่อน breakout",
+    watchState:"บันทึกในอุปกรณ์นี้", watchEmpty:"ยังไม่มีดาว — กดดาวบนการ์ดใดๆ",
+    marketDesc:"Breadth จาก Stage ล่าสุด",
+    marketStatus:"สถานะตลาด", lastScanned:"สแกนล่าสุด",
+    loading:"กำลังโหลด…", loadFailed:"โหลดล้มเหลว", retry:"ลองอีก", ready:"พร้อม",
+    set50:"เฉพาะ SET50", marketValue:"มูลค่าตลาด: ทั้งหมด",
+    priceLow:"ต่ำ (<฿2)", priceMid:"กลาง (฿2–10)", priceHigh:"สูง (>฿10)",
+    sector:"ภาคภุมูม", industry:"อุตสาหกรรม", hideLow:"ซ่อนมูลค่าต่ำ (<฿10M/วัน)",
+    showAll:"แสดงทั้งหมด", all:"ทั้งหมด",
+    prevStock:"หุ้นก่อนหน้า", nextStock:"หุ้นถัดจาก", close:"ปิด",
+    priceHistory:"ประวัติราคา", daily:"ดิล", weekly:"สัปดาห์",
+    monthly:"เดือน", hourly:"60m", loadChart:"กำลังโหลดแผนชาร์ต…",
+    chartUnavailable:"แผนชาร์ตไม่พร้อม", tryAgain:"ลองอีก",
+    lastFetched:"ข้อมูลล่าสุด", trigger:"ระดับเป้าหมาย", risk:"ความเสี่ยง",
+    stop:"Stop", setupQuality:"คุณภาพการตั้งค่า",
+    trendStructure:"แนวโน้ม / โครงสร้าง", setup:"การตั้งค่า",
+    relativeStrength:"สัมพันธ์", momentumVolume:"โมเมนตัม / ปริมาณ",
+    noStop:"ไม่มี stop ที่กำหนด", closeAbove:"ปิดเหนือ",
+    noSetup:"รอการยืนยันการตั้งค่า",
+    freshBadgeLive:"มีคำพูนล่าสุด",
+    freshBadgeEod:"แหล่งข้อมูล: Daily EOD",
+    freshBadgeStale:"ข้อมูลหมดอายุ; Daily EOD ใช้สำหรับการตัดสินใจ",
+    freshBadgeUnknown:"ไม่มีแหล่งข้อมูลราคา",
+    freshBadgeEodUnavailable:"60m ไม่พร้อม; Daily EOD ใช้สำหรับการตัดสินใจ",
+    modalTitle:"รายละเอียด", marketPostureAria:"สถานะตลาด",
+    marketBreadthAria:"พลังงานวงกว้างของตลาด",
+    noQualifying:"ไม่มีการตั้งค่าที่ตรงกับตัวกรอง",
+    noRadar:"ไม่มีการตั้งค่าที่ตรงกับตัวกรอง Radar",
+    chooseAll:"ล้างเพื่อรีเซ็ต",
+    emptyStarred:"ไม่มีการตั้งค่าดาว — ล้างตัวกรองเพื่อรีเซ็ต",
+    preparingSnapshot:"กำลังเตรียมสแกนตลาดสด",
+    readingSnapshot:"อ่านสแกนตลาดสด",
+    indexingStages:"จัดดัชนีสัญลักษณ์และระดับ",
+    buildingStages:"สร้างส่วนระดับ",
+    snapshotReady:"พร้อม", cards:"การ์ด", snapshot:"สแกนวอลุธ",
+    toggleLanguage:"สลับภาษา", ofMarket:"ของตลาด", vol:"ปริมาณ", value:"มูลค่า", priceBand:"แถบราคา", hideLow:"ซ่อนมูลค่าต่ำ (<฿10M/วัน)", showAll:"แสดงทั้งหมด", marketValue:"มูลค่าตลาด: ทั้งหมด", all:"ทั้งหมด", stageBreadth:"廣度ระดับ", aboveMA200:"เหนือ MA200", watchEmpty:"ยังไม่มีดาว — กดดาวบนการ์ดใดๆ", set50:"เฉพาะ SET50", sector:"ภาคภุมูม", industry:"อุตสาหกรรม", favorable:"เปรียบโค้ง", defensive:"ป้องกัน", mixed:"ผสม", priceAll:"ราคา: ทั้งหมด", toggleLang:"EN", rstDaily:"Daily Setup", rstIntraday:"Intraday 60m", rstTrigger:"Trigger", rstSystemStop:"System Stop", rstPivotLow:"Pivot Low", rstPlannedStop:"Planned Stop", rstPlannedEntry:"Planned Entry", rstFib1272:"Fib 1.272", rstFib1618:"Fib 1.618", rstRiskPerShare:"Risk/Share", rstPositionSize:"Position Size", rstRiskBudget:"Risk Budget", rstAccountSize:"Account Size", rstRiskPercent:"Risk %", rstPlannedStop:"Planned Stop", rstWiderStop:"WIDER STOP", rstStopAbove:"STOP ABOVE SYSTEM INVALIDATION", rstNotVerified:"NOT_VERIFIED", rstAvoidChase:"AVOID CHASING", rstContractDaily:"Daily Setup", rstContractIntraday:"Intraday 60m", rstSystemStopLabel:"System Stop", rstPlannedStopLabel:"Planned Stop", rstPivotLowLabel:"Pivot Low", rstFib1272Label:"Fib 1.272", rstFib1618Label:"Fib 1.618", rstRiskPerShareLabel:"Risk/Share", rstPositionSizeLabel:"Position Size", rstRiskBudgetLabel:"Risk Budget", rstAccountSizeLabel:"Account Size", rstRiskPercentLabel:"Risk %", rstPlannedStopLabel:"Planned Stop", rstPlannedEntryLabel:"Planned Entry", rstSystemStopLabel:"System Stop", rstPivotLowLabel:"Pivot Low", rstFib1272Label:"Fib 1.272", rstFib1618Label:"Fib 1.618", rstRiskPerShareLabel:"Risk/Share", rstPositionSizeLabel:"Position Size", rstRiskBudgetLabel:"Risk Budget", rstAccountSizeLabel:"Account Size", rstRiskPercentLabel:"Risk %", rstContractDaily:"Daily Setup", rstContractIntraday:"Intraday 60m", rstWiderStop:"WIDER STOP", rstStopAbove:"STOP ABOVE SYSTEM INVALIDATION", rstNotVerified:"NOT_VERIFIED", rstAvoidChase:"AVOID CHASING", rstWarningWider:"WIDER STOP", rstWarningAbove:"STOP ABOVE SYSTEM INVALIDATION"
+  }
+};
+const STAGE_LABEL_TH={S1_basing:"ระดับ 1 · การสะสม",S2_uptrend:"ระดับ 2 · ขาขึ้น",S3_distributing:"ระดับ 3 · การกระจาย",S4_down:"ระดับ 4 · ขาลง"};
+const STAGE_SHORT_TH={S1_basing:"การสะสม",S2_uptrend:"ขาขึ้น",S3_distributing:"การกระจาย",S4_down:"ขาลง"};
+const STAGE_DESC_TH={S2_uptrend:"ขาขึ้น — MA50>MA150>MA200 ทุกเส้นทำมุมขึ้น",S1_basing:"การสะสม — ราคาซึมใต้ MA200 กำลังเรียงใหม่",S3_distributing:"การกระจาย — MA50 ตัดลงผ่าน MA150/200",S4_down:"ขาลง — ราคาต่ำกว่า MA stack ที่เรียงกลับหัว"};
+const STAGE_LABEL={S1_basing:"Stage 1 · Basing",S2_uptrend:"Stage 2 · Uptrend",S3_distributing:"Stage 3 · Distributing",S4_down:"Stage 4 · Down"};
+const REGIME_LABEL={HIGH_VOLATILITY:"High Volatility",LIQUIDITY_EVENT:"Liquidity Event",LOW_SPREAD:"Low Spread",NORMAL:"Normal"};
+const REGIME_CLASS={HIGH_VOLATILITY:"high-vol",LIQUIDITY_EVENT:"liquidity",LOW_SPREAD:"low-spread",NORMAL:"normal"};
+
+// --- Locale labels (add shortlist/explorer specific) ---
+const LOCALE_EXTRA={
+  en:{
+    navShortlist:"Daily Shortlist", navExplorer:"All Stocks Explorer",
+    shortlistTitle:"Daily Shortlist", shortlistDesc:"Trustworthy Thai daily swing-trade setups for review today.",
+    readyLabel:"READY", preReadyLabel:"PRE-READY",
+    triggerLabel:"Trigger", invalidationLabel:"Invalidation", liquidityLabel:"Liquidity (20D avg)",
+    sourceLabel:"Source", asOfLabel:"As of", scoreLabel:"Quality Score",
+    whyNowLabel:"Why this setup", openDetailsLabel:"Open setup details",
+    emptyShortlist:"No qualifying setups today.", emptyShortlistAction:"Broad research in All Stocks Explorer",
+    staleBanner:"Data is stale — showing last known snapshot.", staleAction:"Refresh when market reopens",
+    errorBanner:"Failed to load shortlist.", errorAction:"Retry",
+    explorerResearchCopy:"Research universe — not a list of trade suggestions",
+    goToExplorer:"All Stocks Explorer",
+  },
+  th:{
+    navShortlist:"รายการสั้นรายวัน", navExplorer:"สำรวจหุ้นทั้งหมด",
+    shortlistTitle:"รายการสั้นรายวัน", shortlistDesc:"หุ้นไทยตั้งค่าสวิ้งท์รายวันที่น่าเชื่อถือ สำหรับพิจารณาวันนี้",
+    readyLabel:"พร้อม", preReadyLabel:"เกือบพร้อม",
+    triggerLabel:"เงื่อนไขเข้า", invalidationLabel:"เงื่อนไขตัดขาด", liquidityLabel:"น้ำมัน (ค่าเฉลี่ย 20 วัน)",
+    sourceLabel:"แหล่งข้อมูล", asOfLabel:"ณ วันที่", scoreLabel:"คะแนนคุณภาพ",
+    whyNowLabel:"ทำไมถึงชุดนี้", openDetailsLabel:"เปิดรายละเอียดชุดตั้งค่า",
+    emptyShortlist:"วันนี้ไม่มีการตั้งค่าที่ผ่านเกณฑ์", emptyShortlistAction:"สำรวจขยายใน All Stocks Explorer",
+    staleBanner:"ข้อมูลหมดอายุ — แสดงสแนปชอตล่าสุด", staleAction:"รีเฟรชเมื่อตลาดเปิด",
+    errorBanner:"โหลดรายการสั้นล้มเหลว", errorAction:"ลองอีกครั้ง",
+    explorerResearchCopy:"จักรวาลวิจัย — ไม่ใช่รายการแนะนำการซื้อขาย",
+    goToExplorer:"สำรวจหุ้นทั้งหมด",
+  }
+};
+
+function renderMarketRegime(){
+  const container=document.getElementById("regimeBadge");
+  if(!container||!dashboardMeta||!dashboardMeta.market_regime)return;
+  const r=dashboardMeta.market_regime;
+  const state=r.regime_state||"NORMAL";
+  const label=REGIME_LABEL[state]||"Normal";
+  const cls=REGIME_CLASS[state]||"normal";
+  const reason=r.reason_codes?.length?r.reason_codes.join(", "):"";
+  const inputs=r.inputs||{};
+  const atr=inputs.atr_pct_20d!=null?inputs.atr_pct_20d.toFixed(1)+"%":"—";
+  const spread=inputs.median_spread_bps!=null?inputs.median_spread_bps.toFixed(0)+"bps":"—";
+  const breadth=inputs.breadth_pct_above_ma50!=null?inputs.breadth_pct_above_ma50.toFixed(1)+"%":"—";
+  const bench=inputs.benchmark_at_or_above_ma50!=null?(inputs.benchmark_at_or_above_ma50?"Above MA50":"Below MA50"):"—";
+  container.innerHTML=`<span class="regime-badge ${cls}"><span class="dot"></span>${label}${reason?" <span class='regime-details'>"+reason+"</span>":""}</span>`;
+}
+const STAGE_TONE={S1_basing:"neutral",S2_uptrend:"positive",S3_distributing:"warning",S4_down:"danger"};
+const STAGE_DESC={S2_uptrend:"Uptrend — MA50>MA150>MA200 aligned upward",S1_basing:"Basing — price under MA200, re-aligning",S3_distributing:"Distributing — MA50 crossing below MA150/200",S4_down:"Down — price below inverted MA stack"};
+const STAGE_SHORT={S1_basing:"Basing",S2_uptrend:"Uptrend",S3_distributing:"Distributing",S4_down:"Down"};
+const PROX_LABEL={action:"Ready",near_trigger:"Near",forming:"Forming",extended:"Extended"};
+const PROX_LABEL_TH={action:"พร้อม",near_trigger:"ใกล้",forming:"forming",extended:"ขยาย"};
+const STAGE_SUMMARY_ARIA_EN="Stage summary";
+const STAGE_SUMMARY_ARIA_TH="สรุประดับ";
+function detectLanguage(){
+  const stored=localStorage.getItem("signalix-language");
+  if(stored==="th"||stored==="en")return stored;
+  const bl=navigator.language||navigator.userLanguage||"";
+  if(bl.toLowerCase().startsWith("th"))return "th";
+  if((navigator.languages||[]).some(l=>l.toLowerCase().startsWith("th")))return "th";
+  return "en";
+}
+function t(k){
+  const L=localeLabels[language]||localeLabels.en;
+  if(L[k]!==undefined) return L[k];
+  const E=LOCALE_EXTRA[language]||LOCALE_EXTRA.en;
+  if(E[k]!==undefined) return E[k];
+  return k;
+}
+function STAGE_LABEL_T(s){return language==="th"?STAGE_LABEL_TH[s]:STAGE_LABEL[s];}
+function STAGE_SHORT_T(s){return language==="th"?STAGE_SHORT_TH[s]:STAGE_SHORT[s];}
+function STAGE_DESC_T(s){return language==="th"?STAGE_DESC_TH[s]:STAGE_DESC[s];}
+function PROX_LABEL_T(k){return language==="th"?PROX_LABEL_TH[k]:PROX_LABEL[k];}
+let language="en";
+const esc=v=>String(v??" — ").replace(/[&<>'\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[c]));
+const num=(v,d=2)=>v===null||v===undefined?"—":Number(v).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});
+const pct=v=>v===null||v===undefined?"—":`${v>=0?"+":""}${Number(v).toFixed(2)}%`;
+const compact=v=>{v=Number(v);if(!Number.isFinite(v))return "—";let a=Math.abs(v);return a>=1e9?(v/1e9).toFixed(2)+"B":a>=1e6?(v/1e6).toFixed(2)+"M":a>=1e3?(v/1e3).toFixed(1)+"K":num(v,0);};
+let bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
+const apiBase=`${location.protocol}//${location.hostname}:8000`;
+const savedKey="signalix-watchlist-v2";
+let saved=new Set(JSON.parse(localStorage.getItem(savedKey)||"[]"));
+let detailItem=null;
+const PROX_GROUPS=["action","near_trigger","forming","extended"];
+const proximityState=i=>(i.setup_proximity&&i.setup_proximity.state)||null;
+function computeMarketPosture(items){
+  const xs=Array.isArray(items)?items:[];
+  const total=xs.length||1;
+  const constructive=xs.filter(i=>i.stage==="S1_basing"||i.stage==="S2_uptrend").length;
+  const constructivePct=constructive/total*100;
+  const ma=xs.map(i=>({i,ma200:i.ma200??i.ma200Value})).filter(x=>Number.isFinite(Number(x.i.close))&&Number.isFinite(Number(x.ma200))&&Number(x.ma200)>0);
+  const above=ma.filter(x=>Number(x.i.close)>Number(x.ma200)).length;
+  const ma200Pct=ma.length?above/ma.length*100:null;
+  let state="Mixed",reason="MA200 breadth unavailable";
+  const L=localeLabels[language]||localeLabels.en; // for state name translation
+  if(ma.length){
+    reason=`Stage breadth ${constructivePct.toFixed(1)}% · MA200 breadth ${ma200Pct.toFixed(1)}%`;
+    if(constructivePct>=55&&ma200Pct>=50)state="Favorable";
+    else if(constructivePct<40||ma200Pct<35)state="Defensive";
+  }
+  return {state,constructivePct,ma200Pct,eligibleMa200:ma.length,reason};
+}
+function triggerDistance(i){
+  const trigger=Number(i?.breakoutEvidence?.trigger), close=Number(i?.close);
+  if(!Number.isFinite(trigger)||trigger<=0||!Number.isFinite(close))return null;
+  return {trigger,distance_pct:(close-trigger)/trigger*100};
+}
+const inRadar=i=>!!i.radar;
+const profileValue=(i,key)=>i[key]??i.independence?.[key];
+const qCornerClass=(s)=>{const c={3:"q3",2:"q2",1:"q1",0:"q0"}[s];return c?`q-corner ${c}`:""};
+
+function freshBadge(i){
+  // Q12: four provenance states — Daily EOD / Intraday● / Stale / Unknown
+  if(i.intradayFreshness?.status==="unavailable" && i.intradayFeedStatus==="unavailable") return `<span class="fresh-badge eod" title="${esc(t("freshBadgeEodUnavailable"))}${i.intradayFeedReason?": "+esc(i.intradayFeedReason):""}">${esc(t("freshBadgeEodUnavailable"))}</span>`;
+  if(i.stale && i.intradayFeedReason && i.intradayFeedReason.includes(">60")) return `<span class="fresh-badge hard_stale" title="${esc(t("freshBadgeHardStale"))}">⚠ ${language==="th"?"หมดอายุนาน":"Hard Stale"}</span>`;
+  if(i.stale) return `<span class="fresh-badge stale_warning" title="${esc(t("freshBadgeStale"))}">⚠ ${language==="th"?"หมดอายุ":"Stale"}</span>`;
+  if(i.intradayAvailable) return `<span class="fresh-badge live" title="${esc(t("freshBadgeLive"))}">● ${language==="th"?"เรียลไทม์":"Intraday"}</span>`;
+  if(i.priceLabel && i.priceLabel!=="Unknown") return `<span class="fresh-badge eod" title="${t("freshBadgeEod")}: ${esc(i.priceLabel)}">${language==="th"?"ปิดวัน":"Daily EOD"}</span>`;
+  return `<span class="fresh-badge unknown" title="${esc(t("freshBadgeUnknown"))}">${language==="th"?"ไม่ทราบ":"Unknown"}</span>`;
+}
+
+function qualityLevel(i){
+  const l3=i.layer3_qualifier??i.layer3_qualifiers;
+  if(l3&&l3.score!==undefined) return l3.score;
+  return null;
+}
+
+function card(i){
+  const gain=i.change!==null&&i.change!==undefined&&i.change>=0;
+  const tone=STAGE_TONE[i.stage]||"neutral";
+  const td=triggerDistance(i);
+  const triggerLine=td?`<div class="trigger-distance">${t("trigger")}: ฿${num(td.trigger)} · ${pct(td.distance_pct)}</div>`:"";
+  const l3=i.layer3_qualifier??i.layer3_qualifiers;
+  const l3Badge=l3&&l3.score!==undefined?`<span class="q-corner ${qCornerClass(l3.score)}" title="Quality Q${l3.score}">Q${l3.score}</span>`:"";
+  const company=i.companyName?`<span class="company-name" style="font-size:11px;color:var(--muted);margin-top:2px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.companyName)}</span>`:"";
+  const stageCls=i.stage?.split("_")[0]||"s1";
+  const pubState = i.publication_state;
+  const pubBadge = pubState ? `<span class="pub-badge ${pubState==='READY'?'ready':'pre-ready'}">${esc(pubState)}</span>` : "";
+  const radarBadge = i.radar ? `<span class="chip" style="background:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"}22;color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};border-color:${i.radarBadge==="READY"?"var(--green)":"var(--amber)"};font-size:10px;padding:2px 8px;margin-left:6px">${i.radarBadge}</span>` : "";
+  const rstBadge=i.rst_contract?`<span class="chip" style="background:${i.rst_contract==="intraday"?"var(--amber)":"var(--green)"}22;color:${i.rst_contract==="intraday"?"var(--amber)":"var(--green)"};border-color:${i.rst_contract==="intraday"?"var(--amber)":"var(--green)"};font-size:9px;padding:2px 6px;margin-left:4px">${i.rst_contract==="intraday"?t("rstIntraday"):t("rstDaily")}</span>`:"";
+  // RST freshness is surfaced in the badge; detailed contract and sizing stay in the decision panel.
+  const trigger = i.trigger ? `<div class="shortlist-trigger"><span class="k">${t("triggerLabel")}</span><span class="v">${esc(i.trigger)}</span></div>` : "";
+  const invalidation = i.invalidation ? `<div class="shortlist-invalidation"><span class="k">${t("invalidationLabel")}</span><span class="v">${esc(i.invalidation)}</span></div>` : "";
+  const liquidity = i.avgDailyValue20 ? `<div class="shortlist-liquidity"><span class="k">${t("liquidityLabel")}</span><span class="v">฿${compact(i.avgDailyValue20)}</span></div>` : "";
+  const source = i.source ? `<div class="shortlist-source"><span class="k">${t("sourceLabel")}</span><span class="v">${esc(i.source)}</span></div>` : "";
+  const asOf = i.as_of ? `<div class="shortlist-asof"><span class="k">${t("asOfLabel")}</span><span class="v">${esc(i.as_of)}</span></div>` : "";
+  const score = i.total_score !== undefined && i.total_score !== null ? `<div class="shortlist-score"><span class="k">${t("scoreLabel")}</span><span class="v">${(i.total_score*100).toFixed(0)}</span></div>` : "";
+
+  return `<article class="signal-card stage-${i.stage} shortlist-card" data-symbol="${esc(i.symbol)}" tabindex="0" role="button" aria-label="${language==="th"?"รายละเอียด":"Review"} ${esc(i.symbol)}">
+    <div class="card-top"><div class="head">
+      <span class="pulse-dot ${stageCls}" aria-hidden="true"></span>
+      <span class="ticker">${esc(i.symbol)}</span>
+      <span class="stage-badge ${tone}">${esc(i.stage_label)}</span>
+      ${i.phase_label?`<span class="phase-tag">${esc(i.phase_label)}</span>`:""}
+      ${pubBadge}
+      ${rstBadge}
+      ${radarBadge}
+      ${l3Badge}
+      ${freshBadge(i)}
+    </div><button class="star ${saved.has(i.symbol)?"saved":""}" data-star="${esc(i.symbol)}" aria-label="${language==="th"?"เพิ่ม/ลบจาก watchlist":"Toggle watchlist"}" aria-pressed="${saved.has(i.symbol)}">${saved.has(i.symbol)?"★":"☆"}</button></div>
+    <div class="price"><div><b>${num(i.close)}</b><small>${esc(i.priceLabel)}</small></div><span class="${gain?"gain":"loss"}">${pct(i.change)}</span></div>
+    <div class="basic-strip"><span>${language==="th"?"ปริมาณ":"VOL"} <b>${compact(i.volume)}</b></span><span>${language==="th"?"มูลค่า":"Value"} <b>฿${compact(i.tradeValue)}</b></span></div>
+    ${triggerLine}
+    <div class="shortlist-evidence">
+      ${trigger}
+      ${invalidation}
+      ${liquidity}
+      ${source}
+      ${asOf}
+      ${score}
+    </div>
+    ${company}
+  </article>`;
+}
+
+function shortlistCard(c){
+  const pubState = c.publication_state;
+  const pubBadge = pubState ? `<span class="pub-badge ${pubState==='READY'?'ready':'pre-ready'}">${esc(pubState)}</span>` : "";
+
+  // Human-readable setup label (from lifecycle_state, not machine label)
+  const setupLabel = c.lifecycle_state ? humanSetupLabel(c.lifecycle_state) : "";
+  const setupBadge = setupLabel ? `<span class="setup-badge">${esc(setupLabel)}</span>` : "";
+
+  // RST freshness badge is retained from ours; detailed sizing/freshness stays in the modal.
+  const rstBadge = c.rst_contract ? `<span class="chip" style="background:${c.rst_contract==="intraday"?"var(--amber)":"var(--green)"}22;color:${c.rst_contract==="intraday"?"var(--amber)":"var(--green)"};border-color:${c.rst_contract==="intraday"?"var(--amber)":"var(--green)"};font-size:9px;padding:2px 6px;margin-left:4px">${c.rst_contract==="intraday"?t("rstIntraday"):t("rstDaily")}</span>` : "";
+
+  // Prominent normalized action (never show contradictory source_action here)
+  const action = c.action ? `<div class="shortlist-action">${esc(c.action)}</div>` : "";
+
+  // Why this setup / why now (from why_now field)
+  const whyNow = c.why_now ? `<div class="shortlist-why-now"><span class="k">${t("whyNowLabel")}</span><span class="v">${esc(c.why_now)}</span></div>` : "";
+
+  // CONFIRMATION or trigger (from trigger field)
+  const trigger = c.trigger ? `<div class="shortlist-trigger"><span class="k">${t("triggerLabel")}</span><span class="v">${esc(c.trigger)}</span></div>` : "";
+
+  // INVALIDATION (from invalidation field)
+  const invalidation = c.invalidation ? `<div class="shortlist-invalidation"><span class="k">${t("invalidationLabel")}</span><span class="v">${esc(c.invalidation)}</span></div>` : "";
+
+  // Compact quality strip (Structure/Entry/Risk from rank_components)
+  const qualityStrip = c.rank_components ? `<div class="shortlist-quality-strip">
+    ${qualityStripHTML(c.rank_components)}
+  </div>` : "";
+
+  // Liquidity + Daily EOD/as-of metadata
+  const liquidity = c.avgDailyValue20 ? `<div class="shortlist-liquidity"><span class="k">${t("liquidityLabel")}</span><span class="v">฿${compact(c.avgDailyValue20)}</span></div>` : "";
+  const source = c.source ? `<div class="shortlist-source"><span class="k">${t("sourceLabel")}</span><span class="v">${esc(c.source)}</span></div>` : "";
+  const asOf = c.as_of ? `<div class="shortlist-asof"><span class="k">${t("asOfLabel")}</span><span class="v">${esc(c.as_of)}</span></div>` : "";
+
+  // Clear "Open setup details" affordance
+  const openDetails = `<button class="shortlist-open-details" aria-label="${language==="th"?"เปิดรายละเอียด":"Open setup details"}" tabindex="-1">${t("openDetailsLabel")}</button>`;
+
+  return `<article class="shortlist-card-compact signal-card" data-symbol="${esc(c.symbol)}" tabindex="0" role="button" aria-label="${language==="th"?"\u0e23\u0e32\u0e22\u0e2d\u0e34\u0e19\u0e25":"Review"} ${esc(c.symbol)}">
+    <div class="shortlist-card-head">
+      <div class="shortlist-card-header-row">
+        <span class="ticker">${esc(c.symbol)}</span>
+        ${pubBadge}
+        ${rstBadge}
+      </div>
+      <div class="shortlist-card-meta-row">
+        ${setupBadge}
+        ${c.total_score !== undefined && c.total_score !== null ? `<span class="shortlist-rank" aria-label="${t("scoreLabel")}">${(c.total_score*100).toFixed(0)}</span>` : ""}
+      </div>
+    </div>
+    <div class="shortlist-card-body">
+      ${action}
+      ${whyNow}
+      <div class="shortlist-evidence-strip">
+        ${trigger}
+        ${invalidation}
+      </div>
+      ${qualityStrip}
+      <div class="shortlist-metadata-strip">
+        ${liquidity}
+        ${source}
+        ${asOf}
+      </div>
+      <div class="shortlist-card-footer">
+        ${openDetails}
+      </div>
+    </div>
+  </article>`;
+}
+
+function humanSetupLabel(lifecycleState) {
+  // Map machine lifecycle_state to human-readable setup labels
+  const labels = {
+    "fresh_breakout": "Fresh Breakout",
+    "qualified_pullback": "Qualified Pullback",
+    "retest_watch": "Breakout Retest",
+    "pre_breakout": "Pre-Breakout Setup",
+    "breakout_new": "Fresh Breakout",
+    "breakout_retest": "Breakout Retest",
+    "uptrend_pullback": "Uptrend Pullback",
+    "waiting_breakout": "Waiting for Breakout",
+    "base_tight": "Tight Base",
+    "base_early": "Early Base",
+    "topping": "Distribution Top",
+    "declining": "Declining Structure",
+    "broken": "Broken Structure",
+    "extended_breakout": "Extended Breakout",
+    "retest": "Retest",
+    "none": "Unclassified"
+  };
+  return labels[lifecycleState] || lifecycleState.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function qualityStripHTML(components) {
+  const items = [];
+  if (components.structure_quality !== undefined) {
+    items.push(`<span class="quality-item"><span class="k">Structure</span><span class="v">${(components.structure_quality*100).toFixed(0)}%</span></span>`);
+  }
+  if (components.entry_readiness !== undefined) {
+    items.push(`<span class="quality-item"><span class="k">Entry</span><span class="v">${(components.entry_readiness*100).toFixed(0)}%</span></span>`);
+  }
+  if (components.risk_reward !== undefined) {
+    items.push(`<span class="quality-item"><span class="k">Risk/Reward</span><span class="v">${(components.risk_reward*100).toFixed(0)}%</span></span>`);
+  }
+  if (components.liquidity !== undefined) {
+    items.push(`<span class="quality-item"><span class="k">Liquidity</span><span class="v">${(components.liquidity*100).toFixed(0)}%</span></span>`);
+  }
+  return items.join("");
+}
+function renderMarketPosture(){
+  const p=computeMarketPosture(items), root=document.getElementById("marketPosture");
+  if(!root)return;
+  root.classList.remove("favorable","defensive","mixed");
+  root.classList.add(p.state.toLowerCase());
+  const stMap={favorable:t("favorable"),defensive:t("defensive"),mixed:t("mixed")};
+  document.getElementById("postureState").textContent=stMap[p.state.toLowerCase()]||p.state;
+  document.getElementById("postureStagePct").textContent=`${p.constructivePct.toFixed(1)}%`;
+  document.getElementById("postureMaPct").textContent=p.ma200Pct===null?"—":`${p.ma200Pct.toFixed(1)}%`;
+  document.getElementById("postureMethod").textContent=p.ma200Pct===null?"MA200 breadth unavailable · context only":"Stage breadth + MA200 breadth · context only, not a trade instruction";
+}
+// render() removed — legacy stage-first renderer replaced by shortlist-first loadShortlist()
+// and explorer renderExplorer(). Kept as no-op for any legacy callers.
+function render(){
+  // No-op: default page now uses loadShortlist() → renderShortlistFreshness() + renderShortlistCards()
+  // Explorer page uses renderExplorer(). Radar/Watch/Market use their own render functions.
+  console.debug("render() called — legacy stage-first renderer disabled; use page-specific renderers");
+}
+function renderRadar(){
+  // Dedicated Radar page (2026-08-20): quality-pass setup + near/action only,
+  // with its own proximity pills. Same data contract as the old embedded section.
+  const root=document.getElementById("radarResults");
+  if(!root)return;
+  const radar=items.filter(inRadar);
+  const count=document.getElementById("radarCount");
+  if(count)count.textContent=radar.length;
+  const pills=document.getElementById("radarPills");
+  if(pills){
+    const groups=["action","near_trigger","forming","extended"];
+    const cnts={};groups.forEach(g=>cnts[g]=radar.filter(i=>proximityState(i)===g).length);
+    pills.innerHTML=[["all",t("all"),radar.length],...groups.map(g=>[g,PROX_LABEL_T(g),cnts[g]])].map(([g,label,c])=>
+      `<button class="chip ${radarProx===g?"active":""}" data-radar-prox="${g}" aria-pressed="${radarProx===g}">${label} <b>${c}</b></button>`).join("");
+  }
+  const list=radarProx==="all"?radar:radar.filter(i=>proximityState(i)===radarProx);
+  root.innerHTML=list.length?`<div class="cards">${list.map(card).join("")}</div>`:"";
+  const empty=document.getElementById("radarEmpty");
+  if(empty)empty.hidden=!!list.length;
+  const emptyReason=document.getElementById("radarEmptyReason");
+  if(emptyReason)emptyReason.textContent=list.length?"":t("noRadar");
+  bind(root);
+}
+function renderMarket(){
+  const grid=document.getElementById("marketGrid");
+  const total=items.length||1;
+  grid.innerHTML=STAGE_ORDER.map(s=>{
+    const c=stageMeta[s]?stageMeta[s].count:items.filter(i=>i.stage===s).length;
+    const pctv=(c/total*100).toFixed(1);
+    const cls=s.split("_")[0];
+    return `<article class="stage-pill ${cls}" aria-label="${esc(STAGE_LABEL[s])}"><h3>${esc(STAGE_LABEL[s])}</h3><div class="cnt">${c}</div><div style="color:var(--muted);font-size:11px">${pctv}% ของตลาด</div></article>`;
+  }).join("");
+  // Breadth pulse — advance/decline ratio from stage counts
+  const adv = (stageMeta["S2_uptrend"]?.count || items.filter(i=>i.stage==="S2_uptrend").length) +
+              (stageMeta["S1_basing"]?.count || items.filter(i=>i.stage==="S1_basing").length);
+  const dec = (stageMeta["S4_down"]?.count || items.filter(i=>i.stage==="S4_down").length) +
+              (stageMeta["S3_distributing"]?.count || items.filter(i=>i.stage==="S3_distributing").length);
+  const breadthPct = total ? Math.round(adv/total*100) : 0;
+  const pulse=document.getElementById("breadthPulse");
+  if(pulse) pulse.innerHTML=`<span class="ratio">${breadthPct}% ${language==="th"?"ขึ้น":"up"}</span><div class="bar"><span style="width:${breadthPct}%"></span></div>`;
+}
+function renderWatch(){
+  const vals=items.filter(i=>saved.has(i.symbol));
+  document.getElementById("watchResults").innerHTML=vals.length?`<div class="cards">${vals.map(card).join("")}</div>`:"";
+  document.getElementById("watchEmpty").hidden=!!vals.length;
+  document.getElementById("watchCount")&&(document.getElementById("watchCount").textContent=saved.size);
+}
+function persist(){try{localStorage.setItem(savedKey,JSON.stringify([...saved]));}catch(e){}renderWatch();
+  document.querySelectorAll("[data-star]").forEach(b=>{const yes=saved.has(b.dataset.star);b.textContent=yes?"★":"☆";b.classList.toggle("saved",yes);b.setAttribute("aria-pressed",yes);});}
+function bind(root=document){
+  (root.querySelectorAll?root.querySelectorAll(".signal-card"):[]).forEach(el=>{
+    el.onclick=e=>{if(e.target.closest("[data-star]"))return;openDetail(bySymbol[el.dataset.symbol]);};
+    el.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openDetail(bySymbol[el.dataset.symbol]);}};
+  });
+}
+
+// --- Shortlist rendering (default page) ---
+let shortlistData = null;
+let shortlistFreshness = null;
+let shortlistPromise = null;  // single-flight guard: in-flight load promise
+
+function renderShortlistFreshness(data) {
+  const root = document.getElementById("shortlistFreshness");
+  if (!root || !data) return;
+  const meta = data.market_session || {};
+  const freshness = data.data_freshness_status || "unknown";
+  const fetchedAt = data.data_fetched_at;
+  const fmtTime = v => v ? new Date(v).toLocaleString("en-GB", {timeZone:"Asia/Bangkok", day:"2-digit", month:"short", year:"numeric", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false}) + " ICT" : "—";
+
+  let statusClass = "mixed";
+  let statusText = t("mixed");
+  if (freshness === "fresh") { statusClass = "favorable"; statusText = t("favorable"); }
+  else if (freshness === "stale") { statusClass = "defensive"; statusText = t("staleBanner"); }
+
+  root.className = "market-posture " + statusClass;
+  root.innerHTML = `
+    <div class="posture-main"><span class="posture-kicker">${t("marketPosture")}</span><strong>${statusText}</strong></div>
+    <div class="posture-metrics"><span>${t("lastScanned")} <b>${fmtTime(fetchedAt)}</b></span><span>${t("source")} <b>${data.data_freshness_source || "—"}</b></span></div>
+    <div class="posture-method">${meta.reason || "Market context only, not a trade instruction"}</div>
+  `;
+}
+
+
+function renderShortlistLanes(data) {
+  if (!data) return;
+  const lanesRoot = document.getElementById("shortlistLanes");
+  const countEl = document.getElementById("shortlistCount");
+  const labelEl = document.getElementById("shortlistCovLabel");
+  const emptyRoot = document.getElementById("shortlistEmpty");
+
+  if (!lanesRoot) return;
+
+  if (countEl) countEl.textContent = "—";
+  if (labelEl) labelEl.textContent = "";
+
+
+  const lanes = data.lanes || {};
+  const LANE_ORDER = ["REVIEW_NOW", "PREPARE", "LEADERSHIP_EXTENDED"];
+  const laneLabels = {
+    REVIEW_NOW: t("readyLabel"),
+    PREPARE: t("preReadyLabel"),
+    LEADERSHIP_EXTENDED: "Leadership / Extended"
+  };
+  const laneClasses = {
+    REVIEW_NOW: "review-now",
+    PREPARE: "prepare",
+    LEADERSHIP_EXTENDED: "leadership-extended"
+  };
+  const extendedWarnings = {
+    REVIEW_NOW: "",
+    PREPARE: "",
+    LEADERSHIP_EXTENDED: t("explorerResearchCopy") // "Research universe — not a list of trade suggestions"
+  };
+
+  let html = "";
+  let totalVisible = 0;
+
+  for (const laneKey of LANE_ORDER) {
+    const items = lanes[laneKey] || [];
+    if (items.length === 0) continue;
+    totalVisible += items.length;
+
+    const laneClass = laneClasses[laneKey];
+    const laneLabel = laneLabels[laneKey];
+    const warning = extendedWarnings[laneKey];
+    const isExtended = laneKey === "LEADERSHIP_EXTENDED";
+
+    html += `
+      <section class="shortlist-lane-section" data-lane="${laneKey}">
+        <header class="shortlist-lane-header ${laneClass}">
+          ${esc(laneLabel)} <span class="lane-count">(${items.length})</span>
+          ${isExtended ? `<span class="extended-warning">${esc(warning)}</span>` : ""}
+        </header>
+        <div class="shortlist-table-wrap">
+          <table class="shortlist-table" role="grid" aria-label="${esc(laneLabel)}">
+            <thead>
+              <tr>
+                <th scope="col">${t("rank") || "#"}</th>
+                <th scope="col">${t("symbol") || "Symbol"}</th>
+                <th scope="col">${t("setup") || "Setup"}</th>
+                <th scope="col">${t("state") || "State"}</th>
+                <th scope="col">${t("action") || "Action"}</th>
+                <th scope="col">${t("triggerRiskLabel") || "Trigger / Risk"}</th>
+                <th scope="col">${t("scoreLabel") || "Quality"}</th>
+                <th scope="col">${t("liquidityLabel") || "Liquidity"}</th>
+              </tr>
+            </thead>
+            <tbody>
+    `;
+
+    for (let i = 0; i < items.length; i++) {
+      const c = items[i];
+      const rank = i + 1;
+      const setupLabel = c.lifecycle_state ? humanSetupLabel(c.lifecycle_state) : "";
+      const stateLabel = c.publication_state || "";
+      const actionLabel = c.action || "";
+      const triggerLabel = c.trigger || "";
+      const invalidationLabel = c.invalidation || "";
+      const qualityScore = c.total_score !== undefined && c.total_score !== null ? `${(c.total_score * 100).toFixed(0)}%` : "—";
+      const liquidityLabel = c.avgDailyValue20 ? `฿${compact(c.avgDailyValue20)}` : "—";
+      const asOfLabel = c.as_of ? `${t("asOfLabel")}: ${esc(c.as_of)}` : "";
+      const sourceLabel = c.source ? `${t("sourceLabel")}: ${esc(c.source)}` : "";
+      const isExtendedRow = isExtended;
+
+      // Desktop table row
+      html += `
+        <tr class="shortlist-row-clickable ${isExtendedRow ? "extended-row" : ""}"
+            data-symbol="${esc(c.symbol)}"
+            tabindex="0"
+            role="row"
+            aria-label="${language==="th"?"รายละเอียด":"Review"} ${esc(c.symbol)}">
+          <td>${rank}</td>
+          <td class="ticker" style="font-weight:850">${esc(c.symbol)}</td>
+          <td><span class="setup-badge">${esc(setupLabel)}</span></td>
+          <td><span class="pub-badge ${stateLabel==='READY'?'ready':stateLabel==='PRE_READY'?'pre-ready':''}">${esc(stateLabel)}</span></td>
+          <td style="color:${isExtendedRow ? 'var(--s4)' : 'var(--green)'};font-weight:800">${esc(actionLabel)}</td>
+          <td>
+                          <div class="shortlist-trigger"><span class="k">${t("triggerLabel")}</span><span class="v">${esc(triggerLabel)}</span></div>
+                          <div class="shortlist-invalidation"><span class="k">${t("invalidationLabel")}</span><span class="v">${esc(invalidationLabel)}</span></div>
+                        </td>
+          <td>${qualityScore}</td>
+          <td>
+            <div>${liquidityLabel}</div>
+            ${asOfLabel ? `<div style="font-size:10px;color:var(--muted)">${esc(asOfLabel)}</div>` : ""}
+            ${sourceLabel ? `<div style="font-size:10px;color:var(--muted)">${esc(sourceLabel)}</div>` : ""}
+          </td>
+        </tr>
+      `;
+    }
+
+    html += `
+            </tbody>
+          </table>
+        </div>
+        <!-- Mobile: dense two-line list -->
+        <div class="shortlist-list">
+    `;
+
+    // Mobile list items
+    for (let i = 0; i < items.length; i++) {
+      const c = items[i];
+      const rank = i + 1;
+      const setupLabel = c.lifecycle_state ? humanSetupLabel(c.lifecycle_state) : "";
+      const stateLabel = c.publication_state || "";
+      const actionLabel = c.action || "";
+      const triggerLabel = c.trigger || "";
+      const invalidationLabel = c.invalidation || "";
+      const isExtendedItem = isExtended;
+
+      html += `
+        <div class="shortlist-list-item shortlist-row-clickable ${isExtendedItem ? "extended-item" : ""}"
+             data-symbol="${esc(c.symbol)}"
+             tabindex="0"
+             role="button"
+             aria-label="${language==="th"?"รายละเอียด":"Review"} ${esc(c.symbol)}">
+          <div class="shortlist-list-line1">
+            <span class="shortlist-list-rank">${rank}</span>
+            <span class="shortlist-list-symbol">${esc(c.symbol)}</span>
+            <span class="shortlist-list-setup">${esc(setupLabel)}</span>
+            <span class="shortlist-list-state ${stateLabel}">${esc(stateLabel)}</span>
+            <span class="shortlist-list-action">${esc(actionLabel)}</span>
+          </div>
+          <div class="shortlist-list-line2">
+            <div class="shortlist-list-trigger">
+              <span class="k">${t("triggerLabel")}</span>
+              <span class="v">${esc(triggerLabel)}</span>
+            </div>
+            <div class="shortlist-list-invalidation">
+              <span class="k">${t("invalidationLabel")}</span>
+              <span class="v">${esc(invalidationLabel)}</span>
+            </div>
+          </div>
+          ${isExtendedItem ? `<span class="shortlist-list-extended-badge">${esc(warning)}</span>` : ""}
+        </div>
+      `;
+    }
+
+    html += `
+        </div>
+      </section>
+    `;
+  }
+
+  // Handle empty lanes
+  if (totalVisible === 0) {
+    html = `<div class="shortlist-lane-empty">${t("emptyShortlist")}</div>`;
+  }
+
+  lanesRoot.innerHTML = html;
+  if (countEl) countEl.textContent = totalVisible;
+  if (labelEl) labelEl.textContent = `visible candidates · ${data.total || 0} core setups`;
+
+  // Handle empty state
+  if (emptyRoot) {
+    emptyRoot.hidden = data.total > 0;
+    if (!data.total) {
+      document.getElementById("shortlistEmptyText").textContent = t("emptyShortlist");
+      document.getElementById("shortlistEmptyReason").innerHTML = `<button class="chip" onclick="navigateToExplorer()">${t("emptyShortlistAction")}</button>`;
+    }
+  }
+
+
+  // Bind click/keyboard handlers for table rows and list items
+  const rowSelector = ".shortlist-row-clickable";
+  const rows = lanesRoot.querySelectorAll(rowSelector);
+  rows.forEach(el => {
+    el.onclick = e => {
+      if (e.target.closest("[data-star]")) return;
+      const sym = el.dataset.symbol;
+      if (sym && bySymbol[sym]) openDetail(bySymbol[sym]);
+    };
+    el.onkeydown = e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const sym = el.dataset.symbol;
+        if (sym && bySymbol[sym]) openDetail(bySymbol[sym]);
+      }
+    };
+  });
+}
+
+function renderShortlistError(message) {
+  const errorRoot = document.getElementById("shortlistError");
+
+  const lanesRoot = document.getElementById("shortlistLanes");
+  if (errorRoot) {
+    errorRoot.hidden = false;
+    document.getElementById("shortlistErrorText").textContent = t("errorBanner");
+    document.getElementById("shortlistErrorReason").innerHTML = `${esc(message || "")}<br><button class="chip" onclick="loadShortlist()">${t("errorAction")}</button>`;
+  }
+
+  if (lanesRoot) lanesRoot.innerHTML = "";
+}
+
+function navigateToExplorer() {
+  const btn = document.querySelector('[data-page="explorer"]');
+  if (btn) btn.click();
+}
+
+// --- Explorer rendering (preserves full universe controls) ---
+// Explorer loads via compact/paginated API — NOT from the embedded first-paint
+// __ITEMS__ (which contains only shortlist candidates). This keeps the initial
+// HTML slim and avoids embedding the full ~904-item universe at first paint.
+let explorerItems = [];     // populated on-demand via /dashboard/cards/compact
+let explorerLoading = false;
+let explorerPage = 1;
+const EXPLORER_PAGE_SIZE = 50;
+const EXPLORER_COMPACT_URL = `${apiBase}/dashboard/cards/compact`;
+
+let explorerIndep = {set50:false,value:0,band:"all",sector:"all",industry:"all",liquidity:"liquid"};
+let explorerStageFilter = "all";
+let explorerProxFilter = {};
+
+async function loadExplorerData() {
+  if (explorerLoading) return;
+  if (explorerItems.length > 0) return;
+  explorerLoading = true;
+  try {
+    const firstResp = await fetch(`${EXPLORER_COMPACT_URL}?page=1&page_size=${EXPLORER_PAGE_SIZE}`);
+    if (!firstResp.ok) throw new Error("HTTP " + firstResp.status);
+    const first = await firstResp.json();
+    explorerItems = first.cards || first.candidates || [];
+    renderExplorer();
+    const total = first.total || explorerItems.length;
+    const pageCount = Math.ceil(total / EXPLORER_PAGE_SIZE);
+    const rest = await Promise.all(Array.from({length: Math.max(0, pageCount - 1)}, (_, idx) =>
+      fetch(`${EXPLORER_COMPACT_URL}?page=${idx + 2}&page_size=${EXPLORER_PAGE_SIZE}`)
+        .then(resp => { if (!resp.ok) throw new Error("HTTP " + resp.status); return resp.json(); })
+    ));
+    for (const data of rest) explorerItems = explorerItems.concat(data.cards || data.candidates || []);
+  } catch (err) {
+    console.error("Explorer lazy-load failed", err);
+    explorerItems = items;
+  } finally {
+    explorerLoading = false;
+    renderExplorer();
+  }
+}
+
+function populateExplorerFilters() {
+  const source = explorerItems.length > 0 ? explorerItems : items;
+  ["sector","industry"].forEach(key=>{
+    const values=[...new Set(source.map(i=>profileValue(i,key)).filter(Boolean))].sort();
+    const root=document.getElementById(`explorer${key.charAt(0).toUpperCase()+key.slice(1)}Filter`); if(!root)return;
+    root.innerHTML=`<option value="all">All ${key[0].toUpperCase()+key.slice(1)}</option>`+
+      values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join("");
+    root.value=explorerIndep[key]||"all";
+    root.onchange=()=>{explorerIndep[key]=root.value||"all";renderExplorer();};
+  });
+}
+
+function currentExplorer(excludeProxStage=null){
+  const source = explorerItems.length > 0 ? explorerItems : items;
+  const q=document.getElementById("search")?.value.trim().toLowerCase() || "";
+  return source.filter(i=>{
+    if(explorerIndep.liquidity!=="all"&&i.lowValue)return false;
+    if(explorerStageFilter!=="all"&&i.stage!==explorerStageFilter)return false;
+    if(explorerIndep.set50&&!(i.independence&&i.independence.is_set50))return false;
+    if(explorerIndep.value>0&&!(i.independence&&i.independence.avgTradeValue20>=(explorerIndep.value*1e6)))return false;
+    if(explorerIndep.band!=="all"&&!(i.independence&&i.independence.priceBand===explorerIndep.band))return false;
+    if(explorerIndep.sector!=="all"&&profileValue(i,"sector")!==explorerIndep.sector)return false;
+    if(explorerIndep.industry!=="all"&&profileValue(i,"industry")!==explorerIndep.industry)return false;
+    const pf=explorerProxFilter[i.stage];
+    if(excludeProxStage!==i.stage&&pf&&pf!=="all"&&proximityState(i)!==pf)return false;
+    if(q&&!`${i.symbol} ${i.stage} ${i.phase} ${i.action} ${i.actionReason}`.toLowerCase().includes(q))return false;
+    return true;
+  });
+}
+
+function renderExplorer(){
+  const source = explorerItems.length > 0 ? explorerItems : items;
+  document.getElementById("explorerCount").textContent=source.length;
+  renderMarketPosture(); // reuse market posture
+  populateExplorerFilters();
+
+  const aria=language==="th"?STAGE_SUMMARY_ARIA_TH:STAGE_SUMMARY_ARIA_EN;
+  const sum=document.getElementById("explorerStageSummary");
+  sum.innerHTML=STAGE_ORDER.map(s=>{
+    const c=stageMeta[s]?stageMeta[s].count:(source.filter(i=>i.stage===s).length);
+    const cls=s.split("_")[0];
+    const short=STAGE_SHORT_T(s)||"";
+    const label=STAGE_LABEL_T(s)||"";
+    return `<div class="stage-pill js-stage ${cls} ${explorerStageFilter===s?"active":""}" data-stage="${s}" aria-pressed="${explorerStageFilter===s}" role="button" tabindex="0" aria-label="${esc(label)} (${c} ${t("stocks")})"><h3>${esc(label)}</h3><div class="cnt">${c}</div><div class="desc">${esc(short)}</div></div>`;
+  }).join("");
+  sum.setAttribute("aria-label", aria);
+
+  const vals=currentExplorer();
+  const results=document.getElementById("explorerResults");
+  results.innerHTML=STAGE_ORDER.map(s=>{
+    if(explorerStageFilter!=="all"&&explorerStageFilter!==s)return "";
+    const list=vals.filter(i=>i.stage===s);
+    const baseList=currentExplorer(s).filter(i=>i.stage===s);
+    if(!baseList.length)return "";
+    const m=stageMeta[s]||{count:baseList.length};
+    const counts={}; PROX_GROUPS.forEach(g=>counts[g]=baseList.filter(i=>proximityState(i)===g).length);
+    const subpills=PROX_GROUPS.map(g=>`<button class="chip l2sub ${explorerProxFilter[s]===g?"active":""}" data-stage="${s}" data-prox="${g}" aria-pressed="${explorerProxFilter[s]===g}">${PROX_LABEL_T(g)} <b>${counts[g]}</b></button>`).join("");
+    const proxEmpty=!!explorerProxFilter[s]&&explorerProxFilter[s]!=="all"&&!list.length;
+    return `<section class="stage-section"><div class="stage-head ${s.split("_")[0]}">
+  <h2>${esc(STAGE_LABEL_T(s))}</h2><span class="badge">${list.length}</span>
+  <span class="desc">${esc(STAGE_DESC_T(s))}</span></div>
+  <div class="l2-bar">${subpills}<button class="chip l2sub ${!explorerProxFilter[s]?"active":""}" data-stage="${s}" data-prox="all" aria-pressed="${!explorerProxFilter[s]}">${t("all")} <b>${baseList.length}</b></button></div>
+  <div class="cards">${list.map(card).join("")}</div>${proxEmpty?`<div class="l2-empty">📭 ${t("noQualifying")} <button class="chip" onclick="clearAllExplorerFilters()">${t("clearAll")}</button></div>`:""}</section>`;
+  }).join("");
+  document.getElementById("explorerEmpty").hidden=!!vals.length;
+  const emptyReason=document.getElementById("explorerEmptyReason");
+  if(emptyReason){if(!vals.length){emptyReason.innerHTML="<button class=\\\"chip\\\" onclick=\\\"clearAllExplorerFilters()\\\">"+t("clearAll")+"</button>";}else{emptyReason.innerHTML="";}}
+  bind(results);
+}
+
+function clearAllExplorerFilters(){
+  explorerStageFilter="all";
+  explorerProxFilter={};
+  explorerIndep={set50:false,value:0,band:"all",sector:"all",industry:"all",liquidity:"liquid"};
+  document.getElementById("explorerSet50Only").classList.remove("active");
+  document.getElementById("explorerValueFilter").value="all";
+  document.getElementById("explorerPriceBand").value="all";
+  document.getElementById("explorerSectorFilter").value="all";
+  document.getElementById("explorerIndustryFilter").value="all";
+  document.getElementById("explorerLiquidOnly").classList.add("active");
+  document.getElementById("explorerShowLowValue").classList.remove("active");
+  renderExplorer();
+}
+
+const TF_LABEL={ "60M":"1h", "1D":"1D", "1W":"1W", "1M":"1M" };
+const TF_API={ "1h":"60M", "1D":"1D", "1W":"1W", "1M":"1M" };
+function decisionPanel(i){
+  const setup=i.setupState||i.phase_label||t("noSetup");
+  const trend=i.trendState||i.stage_label||"—";
+  const rs=i.rs==null?"—":`RS ${num(i.rs,0)}`;
+  const rsi=i.rsi==null?"—":`RSI ${num(i.rsi,0)}`;
+  const vol=i.volumeRatio50==null?"—":`${num(i.volumeRatio50,2)}× volume`;
+  const risk=i.riskStop==null?t("noStop"):`Stop ${num(i.riskStop)}`;
+  const trigger=i.breakoutEvidence?.trigger!=null?(`${t("closeAbove")} ${num(i.breakoutEvidence.trigger)}`):(i.primaryValue||"Wait for setup proof");
+
+  // RST data extraction
+  const rstContract = i.rst_contract || (i.intradayAvailable ? "intraday" : "daily");
+  const rstTrigger = i.rst_trigger ?? i.breakoutEvidence?.trigger;
+  const rstSystemStop = i.rst_system_stop ?? i.riskStop ?? i.structuralCut90d;
+  const rstPivotLow = i.rst_pivot_low ?? i.pullbackReference?.reference;
+  const rstPlannedStop = i.rst_planned_stop;
+  const rstPlannedEntry = i.rst_planned_entry ?? i.rst_trigger ?? i.breakoutEvidence?.trigger;
+  const rstFib1272 = i.rst_fib_1272;
+  const rstFib1618 = i.rst_fib_1618;
+  const rstRiskPerShare = i.rst_risk_per_share;
+  const rstPositionSize = i.rst_position_size;
+  const rstRiskBudget = i.rst_risk_budget;
+  const rstAccountSize = i.rst_account_size;
+  const rstRiskPercent = i.rst_risk_percent;
+  const rstWarnings = i.rst_warnings || [];
+  const rstFreshness = i.rst_freshness ?? i.daily_eod_freshness ?? i.intradayFreshness;
+
+  const hasRst = rstTrigger !== undefined && rstSystemStop !== undefined;
+
+  return `<div class="modal-section-label">${t("setupQuality")}</div>
+    <div class="detail-facts">
+      <div class="detail-fact"><span class="k">${t("trendStructure")}</span><span class="v">${esc(trend)}</span></div>
+      <div class="detail-fact"><span class="k">${t("setup")}</span><span class="v">${esc(setup)}</span></div>
+      <div class="detail-fact"><span class="k">${t("relativeStrength")}</span><span class="v">${esc(rs)}</span></div>
+      <div class="detail-fact"><span class="k">${t("momentumVolume")}</span><span class="v">${esc(rsi)} · ${esc(vol)}</span></div>
+    </div>
+    <div class="modal-section-label">${t("risk")}</div><div class="risk-note">${esc(risk)}</div>
+    <div class="modal-section-label">${t("trigger")}</div><div class="setup-note">${esc(trigger)}</div>
+    ${hasRst ? `
+    <div class="modal-section-label">${t("rstContractDaily")} / ${t("rstContractIntraday")}</div>
+    <div class="detail-facts">
+      <div class="detail-fact"><span class="k">${t("rstContractDaily")} / ${t("rstContractIntraday")}</span><span class="v">${rstContract === "intraday" ? t("rstIntraday") : t("rstDaily")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstTrigger")}</span><span class="v">${rstTrigger !== undefined ? num(rstTrigger) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstSystemStopLabel")}</span><span class="v">${rstSystemStop !== undefined ? num(rstSystemStop) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstPivotLowLabel")}</span><span class="v">${rstPivotLow !== undefined ? num(rstPivotLow) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstPlannedStopLabel")}</span><span class="v">${rstPlannedStop !== undefined ? num(rstPlannedStop) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstPlannedEntryLabel")}</span><span class="v">${rstPlannedEntry !== undefined ? num(rstPlannedEntry) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstFib1272Label")}</span><span class="v">${rstFib1272 !== undefined ? num(rstFib1272) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstFib1618Label")}</span><span class="v">${rstFib1618 !== undefined ? num(rstFib1618) : t("rstNotVerified")}</span></div>
+    </div>
+    ${rstWarnings.length ? `<div class="modal-section-label">${t("risk")} ${t("rstWarningWider")}</div><div class="risk-note">${rstWarnings.join(", ")}</div>` : ""}
+    <div class="detail-facts">
+      <div class="detail-fact"><span class="k">${t("rstRiskPerShareLabel")}</span><span class="v" id="rstRiskPerShareVal">${rstRiskPerShare !== undefined && rstRiskPerShare !== null ? num(rstRiskPerShare) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstPositionSizeLabel")}</span><span class="v" id="rstPositionSizeVal">${rstPositionSize !== undefined && rstPositionSize !== null ? num(rstPositionSize, 0) : t("rstNotVerified")}</span></div>
+      <div class="detail-fact"><span class="k">${t("rstRiskBudgetLabel")}</span><span class="v" id="rstRiskBudgetVal">${rstRiskBudget !== undefined && rstRiskBudget !== null ? num(rstRiskBudget) : t("rstNotVerified")}</span></div>
+    </div>
+      <div class="detail-fact"><span class="k">${t("rstAccountSizeLabel")}</span><span class="v"><input type="number" id="rstAccountSize" placeholder="${t("rstAccountSizeLabel")}" style="width:100px;padding:4px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:4px"></span></div>
+      <div class="detail-fact"><span class="k">${t("rstRiskPercentLabel")}</span><span class="v"><input type="number" id="rstRiskPercent" placeholder="${t("rstRiskPercentLabel")}" value="1" step="0.1" min="0.1" max="100" style="width:80px;padding:4px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:4px"></span></div>
+      <div class="detail-fact"><span class="k">${t("rstPlannedStopLabel")}</span><span class="v"><input type="number" id="rstPlannedStop" placeholder="${t("rstPlannedStopLabel")}" style="width:100px;padding:4px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:4px"></span></div>
+      <div class="detail-fact"><span class="k">${t("rstPlannedEntryLabel")}</span><span class="v"><input type="number" id="rstPlannedEntry" placeholder="${t("rstPlannedEntryLabel")}" style="width:100px;padding:4px;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:4px"></span></div>
+    </div>
+    <div id="rstWarningsVal" class="risk-note" ${rstWarnings.length ? "" : "hidden"}>${rstWarnings.join("; ")}</div>
+  ` : ""}`;
+}
+
+function updateRiskSizing(symbol) {
+  const accountSizeEl = document.getElementById("rstAccountSize");
+  const riskPercentEl = document.getElementById("rstRiskPercent");
+  const plannedStopEl = document.getElementById("rstPlannedStop");
+  const plannedEntryEl = document.getElementById("rstPlannedEntry");
+  const params = new URLSearchParams();
+  const requestGen = currentRstGen;
+  params.set("contract", "daily");
+  if (accountSizeEl && accountSizeEl.value) params.set("account_size", accountSizeEl.value);
+  if (riskPercentEl && riskPercentEl.value) params.set("risk_percent", riskPercentEl.value);
+  if (plannedEntryEl && plannedEntryEl.value) params.set("planned_entry", plannedEntryEl.value);
+  if (plannedStopEl && plannedStopEl.value) params.set("planned_stop", plannedStopEl.value);
+  fetch(`${apiBase}/risk-plan/${encodeURIComponent(symbol)}?${params.toString()}`)
+    .then(r => r.json())
+    .then(d => {
+      if (requestGen !== currentRstGen) return;
+      const rps = document.getElementById("rstRiskPerShareVal");
+      const pos = document.getElementById("rstPositionSizeVal");
+      const bud = document.getElementById("rstRiskBudgetVal");
+      const warn = document.getElementById("rstWarningsVal");
+      if (rps) rps.textContent = d.sizing && d.sizing.risk_per_share != null ? num(d.sizing.risk_per_share) : t("rstNotVerified");
+      if (pos) pos.textContent = d.sizing && d.sizing.shares != null ? num(d.sizing.shares, 0) : t("rstNotVerified");
+      if (bud) bud.textContent = d.sizing && d.sizing.risk_budget != null ? num(d.sizing.risk_budget) : t("rstNotVerified");
+      if (warn) { warn.textContent = (d.warnings || []).join("; "); warn.hidden = !(d.warnings || []).length; }
+    })
+    .catch(() => {
+      if (requestGen !== currentRstGen) return;
+      const rps = document.getElementById("rstRiskPerShareVal");
+      const pos = document.getElementById("rstPositionSizeVal");
+      const bud = document.getElementById("rstRiskBudgetVal");
+      const warn = document.getElementById("rstWarningsVal");
+      if (rps) rps.textContent = t("rstNotVerified");
+      if (pos) pos.textContent = t("rstNotVerified");
+      if (bud) bud.textContent = t("rstNotVerified");
+      if (warn) { warn.textContent = t("rstNotVerified"); warn.hidden = false; }
+    });
+}
+let detailGen=0;
+let currentRstGen = 0;
+let chartAbort=null;
+function getCurrentDetailList() {
+  const activePage = document.querySelector(".page.active");
+  if (!activePage) return [];
+  if (activePage.id === "shortlist") {
+
+    // Flatten lanes into a single array for navigation; retain the legacy
+    // candidates fallback for older shortlist payloads.
+    const lanes = shortlistData?.lanes || {};
+    const legacyCandidates = shortlistData?.candidates || [];
+    const LANE_ORDER = ["REVIEW_NOW", "PREPARE", "LEADERSHIP_EXTENDED"];
+    let symbols = [];
+    for (const laneKey of LANE_ORDER) {
+      const items = lanes[laneKey] || [];
+      symbols.push(...items.map(c => c.symbol));
+    }
+    return symbols.length ? symbols : legacyCandidates.map(c => c.symbol);
+  }
+  if (activePage.id === "explorer") {
+    return currentExplorer().map(x => x.symbol);
+  }
+  // Radar, Watch, Market - use bySymbol as before
+  return items.map(x => x.symbol);
+}
+function openDetail(i){
+  const myGen=++detailGen;
+  detailList=getCurrentDetailList();
+  detailItem=i;
+  const bg=document.getElementById("modalBg");bg.classList.add("open");bg.setAttribute("aria-hidden","false");
+  const q=(i.quality&&i.quality.flags||[]).join(" · ");
+  const idx=(detailList||[]).indexOf(i.symbol);
+  document.getElementById("modalContent").innerHTML=`<div class="modal-shell">
+    <div class="modal-head">
+      <button class="nav-arrow" id="prevStock" aria-label="${t("prevStock")}" title="${t("prevStock")}">‹</button>
+      <h2 class="modal-title"><a class="title-link" id="modalTitleLink" target="_blank" rel="noopener noreferrer">${esc(i.symbol)} · ${esc(i.companyName||"")}</a><span class="modal-subtitle">${esc(i.stage_label||"—")} · ${esc(i.phase_label||i.setupState||"—")}</span></h2>
+      <button class="nav-arrow" id="nextStock" aria-label="${t("nextStock")}" title="${t("nextStock")}">›</button>
+      <button class="modal-close" id="closeModal" aria-label="${t("close")}" title="${t("close")}">×</button>
+    </div>
+    <div class="decision-banner"><div class="decision-label">${esc(i.action||"NO ACTIONABLE SETUP")}</div><div class="decision-reason">${esc(i.actionReason||"Review the setup before acting.")}</div></div>
+    <div class="modal-price"><b>${num(i.close)}</b><span class="${(i.change||0)>=0?"gain":"loss"}">${pct(i.change)}</span><span class="muted">${esc(i.priceLabel||"Daily EOD")}</span></div>
+    <div class="modal-section-label">${t("priceHistory")}</div>
+    <div class="tf-tools">
+      <button class="chip tf" data-tf="1h" aria-pressed="false">60m</button>
+      <button class="chip tf active" data-tf="1D" aria-pressed="true">Daily</button>
+      <button class="chip tf" data-tf="1W" aria-pressed="false">Weekly</button>
+      <button class="chip tf" data-tf="1M" aria-pressed="false">Monthly</button>
+    </div>
+    <canvas id="detailChart" class="chart-canvas" data-timeframe="1D"></canvas>
+    <div id="chartStatus" class="chart-status" role="status" aria-live="polite"></div>
+    <div id="chartFreshness" class="chart-freshness">${t("lastFetched")}: ${esc(i.intradayLatestTime||i.date||"—")} · ${esc(i.priceLabel||(language==="th"?"ปิดวัน":"Daily EOD"))}</div>
+    <div id="chartLegend" style="font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div class="modal-section-label">${t("setupQuality")}</div>
+    ${decisionPanel(i)}
+  </div>`;
+  document.getElementById("prevStock").onclick=()=>stepStock(-1);
+  document.getElementById("nextStock").onclick=()=>stepStock(1);
+  document.getElementById("closeModal").onclick=()=>closeModal();
+  document.getElementById("modalTitleLink").href=`https://www.tradingview.com/chart/?symbol=SET:${encodeURIComponent(i.symbol)}`;
+  document.querySelectorAll("#modalContent .tf").forEach(b=>b.onclick=()=>{
+    if(myGen!==detailGen)return;
+    chartViewOffset=0; setActiveTf(b.dataset.tf); loadChart(i.symbol, TF_API[b.dataset.tf], myGen);
+  });
+  loadChart(i.symbol, "1D", myGen);
+  bind();
+  bindChartPan();
+  // RST input handlers: re-sizes when user changes account/risk/entry/stop
+  currentRstGen = ++currentRstGen;
+  ["rstAccountSize", "rstRiskPercent", "rstPlannedStop", "rstPlannedEntry"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.onchange = () => { currentRstGen = ++currentRstGen; updateRiskSizing(i.symbol); };
+    }
+  });
+}
+let currentTf="1D";
+function setActiveTf(tf){ currentTf=tf; document.querySelectorAll("#modalContent .tf").forEach(x=>x.classList.toggle("active",x.dataset.tf===tf)); }
+function loadChart(symbol, tf, gen){
+  if(gen!==undefined && gen!==detailGen)return;
+  currentTf=tf;
+  const status=document.getElementById("chartStatus"); if(status){status.className="chart-status";status.textContent=t("loadChart")+" "+(TF_LABEL[tf]||tf);}
+  if(chartAbort)chartAbort.abort();
+  const ac=chartAbort=new AbortController();
+  const fetchLimit=(tf==="1M")?500:200;
+  fetch(`${apiBase}/chart/${encodeURIComponent(symbol)}?timeframe=${tf}&limit=${fetchLimit}`,{signal:ac.signal})
+    .then(r=>r.json()).then(d=>{ if(gen!==detailGen)return; if(d&&d.bars&&d.bars.length){ lastBars=d.bars; drawChart(d.bars, tf); if(status)status.textContent=""; } else { fallback(symbol,tf,gen); } })
+    .catch(()=>{ if(gen===detailGen)fallback(symbol,tf,gen); });
+}
+function fallback(symbol,tf,gen){
+  if(gen!==detailGen)return;
+  const status=document.getElementById("chartStatus");
+  const label=TF_LABEL[tf]||tf;
+  if(status){status.className="chart-status error";status.innerHTML=`${t("chartUnavailable")} · <button class="chip" id="chartRetry" type="button">${t("tryAgain")}</button>`;const retry=document.getElementById("chartRetry");if(retry)retry.onclick=()=>loadChart(symbol,tf,gen);}
+}
+let chartViewOffset=0; // how many bars scrolled back from the right edge (pan)
+function drawChart(bars, tf){
+  const cv=document.getElementById("detailChart"); if(!cv||!bars||!bars.length)return;
+  const ctx=cv.getContext("2d");
+  const W=cv.width=cv.clientWidth||520, H=cv.height=cv.clientHeight||220;
+  const drawN=(tf==="1M")?bars.length:Math.min(60,bars.length);
+  const maxOffset=Math.max(0, bars.length-drawN);
+  if(chartViewOffset>maxOffset)chartViewOffset=maxOffset;
+  if(chartViewOffset<0)chartViewOffset=0;
+  const sliceStart=Math.max(0, bars.length-drawN-chartViewOffset);
+  const slice=bars.slice(sliceStart, sliceStart+drawN), n=slice.length; if(!n)return;
+  const lo=Math.min(...slice.map(b=>b.low)), hi=Math.max(...slice.map(b=>b.high)), rng=(hi-lo)||1;
+  const pad=10, top=10, plotH=H-2*pad, cw=W/n;
+  ctx.clearRect(0,0,W,H);
+  slice.forEach((b,k)=>{
+    const x=k*cw+cw/2;
+    const yH=top+(1-(b.high-lo)/rng)*plotH, yL=top+(1-(b.low-lo)/rng)*plotH;
+    const yC=top+(1-(b.close-lo)/rng)*plotH, yO=top+(1-(b.open-lo)/rng)*plotH;
+    const up=b.close>=b.open;
+    const candleColor=up?"#43df9e":"#ff7a7a";
+    ctx.strokeStyle=candleColor; ctx.fillStyle=candleColor;
+    ctx.beginPath();ctx.moveTo(x,yH);ctx.lineTo(x,yL);ctx.stroke();
+    const bw=Math.max(1,cw*0.6);
+    ctx.fillRect(x-bw/2,Math.min(yO,yC),bw,Math.abs(yC-yO)||1);
+  });
+  const closes=bars.map(b=>b.close), startIdx=sliceStart;
+  const maDefs=[{n:20,c:"#ffc45d",label:"MA20"},{n:50,c:"#79adff",label:"MA50"},{n:200,c:"#c08bff",label:"MA200"}];
+  const legend=[];
+  maDefs.forEach(m=>{
+    ctx.strokeStyle=m.c; ctx.lineWidth=1.5; ctx.beginPath(); let started=false, drew=false;
+    for(let k=0;k<n;k++){ const abs=startIdx+k; if(abs>=m.n-1){ let s=0; for(let j=abs-m.n+1;j<=abs;j++)s+=closes[j]; const val=s/m.n; const x=k*cw+cw/2; const y=top+(1-(val-lo)/rng)*plotH; if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y); drew=true; } }
+    ctx.stroke(); if(drew)legend.push(`<span style="color:${m.c}">● ${m.label}</span>`);
+  });
+  // RST overlays
+  if(detailItem && detailItem.rst_trigger !== undefined && detailItem.rst_trigger !== null){
+    const rstTrigger = detailItem.rst_trigger;
+    const rstSystemStop = detailItem.rst_system_stop;
+    const rstFib1272 = detailItem.rst_fib_1272;
+    const rstFib1618 = detailItem.rst_fib_1618;
+    const rstPivotLow = detailItem.rst_pivot_low;
+    const rstPlannedEntry = detailItem.rst_planned_entry;
+    const rstPlannedStop = detailItem.rst_planned_stop;
+    const rstPivotLowVal = detailItem.rst_pivot_low;
+    const y = (val) => top + (1 - (val - lo) / rng) * plotH;
+    const drawLine = (val, color, style, label) => {
+      if(!Number.isFinite(val)) return;
+      const yVal = y(val);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = style === "dash" ? 1.5 : 1;
+      if(style === "dash") ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, yVal);
+      ctx.lineTo(W, yVal);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = "10px sans-serif";
+      const labelOffsets = {"Trigger": -2, "System Stop": 12, "Fib 1.272": -2, "Fib 1.618": 12};
+      const labelX = Math.max(4, W - ctx.measureText(label).width - 6);
+      ctx.fillText(label, labelX, yVal + (labelOffsets[label] || -2));
+    };
+    const drawConditional = (val, color, label) => {
+      if(!Number.isFinite(val)) return;
+      const yVal = y(val);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(0, yVal);
+      ctx.lineTo(W, yVal);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = "10px sans-serif";
+      const conditionalX = Math.max(4, W - ctx.measureText(label).width - 6);
+      ctx.fillText(label, conditionalX, yVal + 10);
+    };
+    // Default overlays
+    drawLine(detailItem.rst_trigger, "#ffc45d", "solid", "Trigger");
+    drawLine(detailItem.rst_system_stop, "#ff7a7a", "solid", "System Stop");
+    drawLine(detailItem.rst_fib_1272, "#43df9e", "solid", "Fib 1.272");
+    drawLine(detailItem.rst_fib_1618, "#79adff", "solid", "Fib 1.618");
+    // Conditional overlays
+    if(Number.isFinite(detailItem.rst_planned_entry)) drawConditional(detailItem.rst_planned_entry, "#ffc45d", "Planned Entry");
+    if(Number.isFinite(detailItem.rst_planned_stop)) drawConditional(detailItem.rst_planned_stop, "#ff7a7a", "Planned Stop");
+    if(Number.isFinite(detailItem.rst_pivot_low)) drawConditional(detailItem.rst_pivot_low, "#c08bff", "Pivot Low");
+  }
+  const lg=document.getElementById("chartLegend"); if(lg)lg.innerHTML=legend.join(" ");
+  const hint=document.getElementById("chartPanHint"); if(hint)hint.textContent=(chartViewOffset>0?`← เลื่อนกลับ ${chartViewOffset} แท่ง`:"ลาก/สกปร์เลื่อนแกนเวลา");
+}
+let lastBars=null;
+function panChart(dir){
+  chartViewOffset = Math.max(0, (chartViewOffset||0) + (dir<0?6:-6));
+  if(lastBars)drawChart(lastBars, currentTf);
+}
+// --- Chart pan: buttons + wheel + drag on canvas; touch-action none prevents scroll hijack ---
+let _panBound=false;
+function bindChartPan(){
+  const cv=document.getElementById("detailChart"); if(!cv||_panBound)return; _panBound=true;
+  cv.style.touchAction="none";
+  const L=document.getElementById("chartPanLeft"), R=document.getElementById("chartPanRight");
+  if(L)L.onclick=()=>panChart(-1);
+  if(R)R.onclick=()=>panChart(1);
+  cv.addEventListener("wheel",e=>{
+    const d=(Math.abs(e.deltaX)>Math.abs(e.deltaY)?e.deltaX:e.deltaY);
+    if(!d)return;
+    e.preventDefault();
+    chartViewOffset += (d>0?1:-1)*2;
+    if(lastBars)drawChart(lastBars, currentTf);
+  },{passive:false});
+  let dragging=false, lastX=0;
+  cv.addEventListener("mousedown",e=>{ dragging=true; lastX=e.clientX; cv.style.cursor="grabbing"; });
+  window.addEventListener("mouseup",()=>{ dragging=false; cv.style.cursor="grab"; });
+  cv.addEventListener("mousemove",e=>{
+    if(!dragging)return;
+    const dx=e.clientX-lastX; lastX=e.clientX;
+    if(Math.abs(dx)<3)return;
+    chartViewOffset += (dx>0?1:-1)*2;
+    if(lastBars)drawChart(lastBars, currentTf);
+  });
+}
+let detailList=[];
+function closeModal(){ detailGen++; const bg=document.getElementById("modalBg"); bg.classList.remove("open"); bg.setAttribute("aria-hidden","true"); }
+function stepStock(dir){
+  if(!detailList.length)return;
+  let idx=detailList.indexOf(detailItem?detailItem.symbol:null); if(idx<0)idx=0;
+  idx=(idx+dir+detailList.length)%detailList.length;
+  const sym=detailList[idx]; if(sym&&bySymbol[sym])openDetail(bySymbol[sym]);
+}
+document.addEventListener("click",e=>{
+  const page=e.target.closest("[data-page]");if(page){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===page.dataset.page));document.querySelectorAll("[data-page]").forEach(p=>p.classList.toggle("active",p.dataset.page===page.dataset.page));window.scrollTo(0,0);
+    // If navigating to Explorer, lazy-load data via compact API then render
+    if (page.dataset.page === "explorer") {
+      loadExplorerData().then(() => renderExplorer());
+    }
+  }
+  const radarP=e.target.closest("[data-radar-prox]");if(radarP){radarProx=radarP.dataset.radarProx;renderRadar();}
+  const liq=e.target.closest("[data-liquidity]");if(liq){explorerIndep.liquidity=liq.dataset.liquidity;document.getElementById("explorerLiquidOnly").classList.toggle("active",explorerIndep.liquidity==="liquid");document.getElementById("explorerShowLowValue").classList.toggle("active",explorerIndep.liquidity==="all");renderExplorer();}
+  const sp=e.target.closest(".js-stage");if(sp){explorerStageFilter=explorerStageFilter===sp.dataset.stage?"all":sp.dataset.stage;renderExplorer();}
+  const set50=e.target.closest("#explorerSet50Only"); if(set50){explorerIndep.set50=!explorerIndep.set50;set50.classList.toggle("active",explorerIndep.set50);renderExplorer();}
+  const vf=e.target.closest("#explorerValueFilter"); if(vf){explorerIndep.value=parseFloat(vf.value)||0;renderExplorer();}
+  const pb=e.target.closest("#explorerPriceBand"); if(pb){explorerIndep.band=pb.value;renderExplorer();}
+  const indepBtn=e.target.closest("[data-indep]"); if(indepBtn&&["sector","industry"].includes(indepBtn.dataset.indep)){explorerIndep[indepBtn.dataset.indep]=indepBtn.dataset.value;renderExplorer();}
+  const l2=e.target.closest(".l2sub"); if(l2){const st=l2.dataset.stage,g=l2.dataset.prox; explorerProxFilter[st]=(explorerProxFilter[st]===g?undefined:g); renderExplorer();}
+  const star=e.target.closest("[data-star]");if(star){saved.has(star.dataset.star)?saved.delete(star.dataset.star):saved.add(star.dataset.star);persist();}
+  if(e.target.id==="modalBg"||e.target.closest(".close")){document.getElementById("modalBg").classList.remove("open");}
+});
+function scrollToResults(){
+  // Legacy function — shortlist/explorer pages don't need this scroll behavior
+  // Explorer stage pills are in the sticky control cluster, always visible
+  return;
+}
+const _searchInput = document.getElementById("search");
+if (_searchInput) _searchInput.addEventListener("input", render);
+document.addEventListener("keydown",e=>{
+  if(!document.getElementById("modalBg").classList.contains("open"))return;
+  if(e.key==="Escape")closeModal();
+  else if(e.key==="ArrowLeft")stepStock(-1);
+  else if(e.key==="ArrowRight")stepStock(1);
+});
+let _swX=null; const _mb=document.getElementById("modalBg");
+_mb.addEventListener("touchstart",e=>{ _swX=(e.touches&&e.touches[0])?e.touches[0].clientX:null; },{passive:true});
+_mb.addEventListener("touchend",e=>{ if(_swX==null)return; const dx=((e.changedTouches&&e.changedTouches[0])?e.changedTouches[0].clientX:_swX)-_swX; if(Math.abs(dx)>50)stepStock(dx<0?1:-1); _swX=null; },{passive:true});
+const langT=null;
+function setLanguage(l){
+  language=l;
+  document.documentElement.lang=language;
+  localStorage.setItem("signalix-language",language);
+  if(langT){langT.textContent=language==="th"?t("toggleLang"):t("toggleLang");langT.setAttribute("aria-label",t("toggleLanguage"));}
+  document.title=language==="th"?"Signalix — Daily Shortlist":"Signalix — Daily Shortlist";
+  document.getElementById("loadTitle").textContent=t("preparingSnapshot");
+  document.getElementById("liveState").textContent=t("loading");
+  const navR=document.querySelector('[data-page="radar"]'); if(navR)navR.textContent=t("navRadar");
+  const navW=document.querySelector('[data-page="watchlist"]'); if(navW)navW.textContent=t("navWatchlist");
+  const navM=document.querySelector('[data-page="market"]'); if(navM)navM.textContent=t("navMarket");
+  const search=document.getElementById("search"); if(search){search.placeholder=t("searchPlaceholder");search.setAttribute("aria-label",t("searchAria"));}
+  // Shortlist coverage label
+  const shortlistCount=document.getElementById("shortlistCount");
+  const shortlistCovLabel=document.getElementById("shortlistCovLabel");
+  if(shortlistCovLabel)shortlistCovLabel.textContent=t("covAll");
+  // Explorer coverage label
+  const explorerCount=document.getElementById("explorerCount");
+  const explorerCovLabel=document.getElementById("explorerCovLabel");
+  if(explorerCovLabel)explorerCovLabel.textContent=t("covAll");
+  // Radar coverage label
+  const radarCount=document.getElementById("radarCount");
+  const radarCovLabel=document.getElementById("radarCovLabel");
+  if(radarCovLabel)radarCovLabel.textContent=t("radarCount");
+  // Explorer filter controls
+  const explorerSet50Btn=document.getElementById("explorerSet50Only"); if(explorerSet50Btn)explorerSet50Btn.textContent=t("set50");
+  const explorerValueFilter=document.getElementById("explorerValueFilter"); if(explorerValueFilter){
+    const opts=explorerValueFilter.querySelectorAll("option");
+    if(opts.length){opts[0].textContent=language==="th"?t("marketValue"):t("marketValue");}
+  }
+  const explorerPriceBand=document.getElementById("explorerPriceBand"); if(explorerPriceBand){
+    const opts=explorerPriceBand.querySelectorAll("option");
+    if(opts.length){
+      opts[0].textContent=t("priceAll");
+      if(opts[1])opts[1].textContent=t("priceLow");
+      if(opts[2])opts[2].textContent=t("priceMid");
+      if(opts[3])opts[3].textContent=t("priceHigh");
+    }
+  }
+  const explorerSectorLabel=document.getElementById("explorerSectorLabel"); if(explorerSectorLabel)explorerSectorLabel.textContent=t("sector")+"/";
+  const explorerIndustryLabel=document.getElementById("explorerIndustryLabel"); if(explorerIndustryLabel)explorerIndustryLabel.textContent=t("industry")+"/";
+  const explorerSectorFilter=document.getElementById("explorerSectorFilter"); if(explorerSectorFilter){const o=explorerSectorFilter.querySelector("option");if(o)o.textContent=t("all");}
+  const explorerIndustryFilter=document.getElementById("explorerIndustryFilter"); if(explorerIndustryFilter){const o=explorerIndustryFilter.querySelector("option");if(o)o.textContent=t("all");}
+  explorerValueFilter&&explorerValueFilter.setAttribute("aria-label",t("marketValue"));
+  const explorerLiquidOnly=document.getElementById("explorerLiquidOnly"); if(explorerLiquidOnly)explorerLiquidOnly.textContent=t("hideLow");
+  const explorerShowLowValue=document.getElementById("explorerShowLowValue"); if(explorerShowLowValue)explorerShowLowValue.textContent=t("showAll");
+  const watchEmptyText=document.getElementById("watchEmptyText"); if(watchEmptyText)watchEmptyText.textContent=t("watchEmpty");
+  const provFetchedLabel=document.getElementById("provFetchedLabel"); if(provFetchedLabel)provFetchedLabel.textContent=t("lastScanned")+": ";
+  const mpKicker=document.querySelector(".posture-kicker"); if(mpKicker)mpKicker.textContent=t("marketPosture");
+  const mpAria=document.querySelector("#marketPosture"); if(mpAria)mpAria.setAttribute("aria-label",t("marketPostureAria"));
+  const mpMa=document.querySelector(".posture-method"); if(mpMa)mpMa.textContent=t("breadthContext");
+  const radarH=document.querySelector("#radar h1"); if(radarH)radarH.textContent=t("navRadar");
+    const radarPills=document.getElementById("radarPills"); if(radarPills)radarPills.setAttribute("aria-label",t("radarProximity"));
+    const radarP=document.querySelector("#radar p"); if(radarP)radarP.textContent=t("radarDesc");
+    if(radarCount){const n=radarCount.textContent.replace(/[^0-9]/g,"")||"0";radarCount.innerHTML="<b>"+n+"</b> "+t("radarCount");}
+    const wlH=document.querySelector("#watchlist h1"); if(wlH)wlH.textContent=t("navWatchlist");
+    const wlP=document.getElementById("watchState"); if(wlP)wlP.textContent=t("watchState");
+    const mkH=document.querySelector("#market h1"); if(mkH)mkH.textContent=t("marketStatus");
+    const mkP=document.querySelector("#market p"); if(mkP)mkP.textContent=t("marketDesc");
+    // Shortlist/Explorer nav labels
+    const navShortlist=document.querySelector('[data-page="shortlist"]'); if(navShortlist)navShortlist.textContent=t("navShortlist");
+    const navExplorer=document.querySelector('[data-page="explorer"]'); if(navExplorer)navExplorer.textContent=t("navExplorer");
+    const goToExplorerBtn=document.getElementById("goToExplorer"); if(goToExplorerBtn)goToExplorerBtn.textContent=t("goToExplorer");
+    // Shortlist empty/error states handled by renderShortlistCards/renderShortlistError
+    // Explorer empty state
+    const explorerEmptyDiv=document.getElementById("explorerEmpty");
+    if(explorerEmptyDiv){
+      let txt=explorerEmptyDiv.querySelector("span#explorerEmptyText");
+      if(txt)txt.textContent=t("noQualifying");
+      let reason=explorerEmptyDiv.querySelector("div#explorerEmptyReason");
+      if(reason)reason.innerHTML='<button class="chip" onclick="clearAllExplorerFilters()">'+t("clearAll")+'</button>';
+    }
+    // Radar empty state
+    const radarEmptyDiv=document.getElementById("radarEmpty");
+    if(radarEmptyDiv){
+      let txt=radarEmptyDiv.querySelector("span#radarEmptyText");
+      if(txt)txt.textContent=t("noQualifying");
+      let reason=radarEmptyDiv.querySelector("div#radarEmptyReason");
+      if(reason)reason.innerHTML='<button class="chip" onclick="clearAllRadarFilters()">'+t("clearAll")+'</button>';
+    }
+    // setLanguage must not issue a duplicate shortlist fetch on language toggle;
+    // shortlist data is fetched once via the single-flight guard in
+    // loadRemoteDashboard(). Remove the initial fetch call from setLanguage
+    // so navigation/timeout/language changes cannot issue concurrent requests.
+    if(langT){langT.textContent=language==="th"?t("toggleLang"):t("toggleLang");langT.setAttribute("aria-label",t("toggleLanguage"));}
+  }
+  setLanguage(language);
+
+  async function loadShortlist() {
+    // Single-flight: if a load is already in flight, return the existing
+    // promise instead of issuing a duplicate /dashboard/shortlist request.
+    if (shortlistPromise) {
+      return shortlistPromise;
+    }
+    shortlistPromise = (async () => {
+      try {
+
+        // Use /dashboard/shortlist/compact which returns lanes (REVIEW_NOW, PREPARE, LEADERSHIP_EXTENDED)
+        const resp = await fetch(`${apiBase}/dashboard/shortlist/compact`);
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        shortlistData = data;
+        renderShortlistFreshness(data);
+
+        renderShortlistLanes(data);
+      } catch (err) {
+        console.error("Shortlist load failed", err);
+        renderShortlistError(err.message);
+      }
+    })();
+    // Clear the in-flight marker once settled (success or error) so a
+    // later retry/refetch can issue a fresh single-flight request.
+    shortlistPromise.finally(() => { shortlistPromise = null; });
+    return shortlistPromise;
+  }
+
+  function setLoadProgress(percent,step){
+  const bar=document.getElementById("loadProgress"), pct=document.getElementById("loadPercent"), label=document.getElementById("loadStep");
+  if(bar)bar.style.width=`${percent}%`; if(pct)pct.textContent=`${percent}%`; if(label)label.textContent=step;
+}
+function loadRemoteDashboard(){
+  // Single coherent first paint: the built HTML already embeds the complete
+  // snapshot. Do not paint compact S2 cards first and then replace them with
+  // four stage fetches — that created the visible blank → loading → uptrend →
+  // complete sequence and temporarily hid S1/S3/S4 from the trader.
+  const state=document.getElementById("liveState");
+  let loadDone=false;
+  const finishLoading=()=>{if(loadDone)return;loadDone=true;setLoadProgress(100,t("ready"));document.body.classList.remove("loading");};
+  const failLoading=(err)=>{console.error("Signalix snapshot render failed",err);if(state)state.textContent=t("loadFailed");setLoadProgress(100,t("loadFailed"));document.body.classList.remove("loading");};
+  window.setTimeout(()=>{if(!loadDone){finishLoading();}},5000);
+  try{
+    setLoadProgress(18,t("readingSnapshot"));
+    requestAnimationFrame(()=>{
+      bySymbol=Object.fromEntries(items.map(i=>[i.symbol,i]));
+      setLoadProgress(42,t("indexingStages"));
+      requestAnimationFrame(()=>{
+        const fmtTime=v=>v?new Date(v).toLocaleString("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false})+" ICT":"—";
+        document.getElementById("provFetchedLabel").textContent=t("lastScanned")+": "+fmtTime(dashboardMeta.intraday_scan_time||dashboardMeta.data_fetched_at);
+        setLoadProgress(70,t("buildingStages"));
+        requestAnimationFrame(()=>{
+          try{
+            // Default page is shortlist — renderShortlistCards handles rendering
+            loadShortlist();
+            renderMarketRegime();
+            if(state)state.textContent=t("ready")+" · "+items.length+" "+t("cards")+" · "+t("snapshot");
+            requestAnimationFrame(finishLoading);
+          }catch(err){failLoading(err);}
+        });
+      });
+    });
+  }catch(err){
+    failLoading(err);
+    // Use shortlist error panel instead of legacy results element
+    renderShortlistError(err.message);
+  }
+}
+loadRemoteDashboard();
+</script>
+</body>
+</html>

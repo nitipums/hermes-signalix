@@ -460,7 +460,7 @@
           : (freshness.status === "market_closed") ? "market_closed"
           : (freshness.status === "fresh" || freshness.status === "latest_available") ? "fresh"
           : "stale";
-        setFreshness(fStatus, freshness.as_of || freshness.data_fetched_at);
+        setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of);
 
         // stale state
         if (fStatus === "stale") {
