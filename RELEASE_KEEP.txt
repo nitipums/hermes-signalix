@@ -73,8 +73,6 @@ backend/signalix-settrade-master.timer
 backend/frontend/index.html
 backend/frontend/app.js
 backend/frontend/styles.css
-backend/frontend/fixtures/daily_shortlist.json
-backend/frontend/fixtures/explorer_page1.json
 backend/test_signalix_contracts.py
 backend/test_dashboard_route_separation.py
 backend/test_mvp_snapshot.py
