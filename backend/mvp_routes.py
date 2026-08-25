@@ -14,6 +14,17 @@ from mvp_snapshot import load_mvp_artifact
 
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _MVP_SNAPSHOT_PATH = os.getenv("MVP_SNAPSHOT_PATH", os.path.join(_BACKEND_DIR, "mvp_snapshot.json"))
+
+
+def _vcp_pg():
+    import psycopg2
+    return psycopg2.connect(
+        host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        user=os.getenv("POSTGRES_USER", "signalix"),
+        password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
+        dbname=os.getenv("POSTGRES_DB", "signalix"),
+    )
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
@@ -50,6 +61,32 @@ def handle_mvp_api(path, handler) -> bool:
     parsed = urlsplit(path)
     route = parsed.path
     qs = parse_qs(parsed.query or "")
+
+    if route in ("/api/vcp-finder", "/api/vcp-finder/"):
+        interval = (qs.get("interval", ["60m"])[0] or "60m").lower()
+        market = (qs.get("market", ["TH"])[0] or "TH").upper()
+        if interval != "60m" or market != "TH":
+            json_response(handler, {"error": "vcp_finder_60m supports interval=60m and market=TH only"}, status=400)
+            return True
+        try:
+            from vcp_finder_db import load_latest_vcp_run
+            pg = _vcp_pg()
+            try:
+                symbol = (qs.get("symbol", [""])[0] or "").upper() or None
+                state = (qs.get("state", [""])[0] or "").upper() or None
+                limit = int(qs["limit"][0]) if qs.get("limit") else None
+                payload = load_latest_vcp_run(pg, market=market, state=state, symbol=symbol, limit=limit)
+            finally:
+                pg.close()
+            if payload is None:
+                json_response(handler, {"error": "vcp_finder_not_run"}, status=503)
+                return True
+            json_response(handler, payload)
+        except (ValueError, TypeError) as exc:
+            json_response(handler, {"error": str(exc)}, status=400)
+        except Exception as exc:
+            json_response(handler, {"error": "vcp_finder_unavailable", "detail": str(exc)[:200]}, status=503)
+        return True
     try:
         payload = load_payload()
         items = payload["items"]
