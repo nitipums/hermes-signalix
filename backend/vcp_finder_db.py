@@ -40,17 +40,19 @@ def init_vcp_schema(pg):
     cur.close()
 
 
-def load_vcp_60m_rows(pg, symbols, lookback=400):
+def load_vcp_60m_rows(pg, symbols, lookback=400, as_of=None):
     if not symbols:
         return {}
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    cur.execute(
-        """SELECT symbol, ts, open, high, low, close, volume
+    query = """SELECT symbol, ts, open, high, low, close, volume
            FROM intraday_price_data
-           WHERE symbol=ANY(%s) AND interval='60m'
-           ORDER BY symbol, ts DESC""",
-        (symbols,),
-    )
+           WHERE symbol=ANY(%s) AND interval='60m'"""
+    params = [symbols]
+    if as_of is not None:
+        query += " AND ts <= %s"
+        params.append(as_of)
+    query += " ORDER BY symbol, ts DESC"
+    cur.execute(query, tuple(params))
     grouped = {s: [] for s in symbols}
     for row in cur.fetchall():
         if len(grouped[row["symbol"]]) < int(lookback):
@@ -66,13 +68,28 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     if market.upper() != "TH":
         raise ValueError("vcp_finder_60m currently supports market=TH only")
     eligible = sorted(set(symbols or active_ord_symbols(pg)))
-    rows = load_vcp_60m_rows(pg, eligible)
-    run_id = new_run_id()
     observed_as_of = as_of or datetime.now(timezone.utc)
+    rows = load_vcp_60m_rows(pg, eligible, as_of=observed_as_of)
+    feed_status = {}
+    if eligible:
+        cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute(
+            """SELECT symbol,status,reason,retry_at,last_success_at
+               FROM intraday_feed_status
+               WHERE feed='settrade_intraday_60m' AND symbol=ANY(%s)""",
+            (eligible,),
+        )
+        feed_status = {r["symbol"]: dict(r) for r in cur.fetchall()}
+        cur.close()
+    run_id = new_run_id()
     results = []
     for symbol in eligible:
         result = find_vcp_60m(rows.get(symbol), as_of=observed_as_of, config=cfg)
         result["symbol"] = symbol
+        result["data"]["feed_status"] = feed_status.get(symbol, {}).get("status", "unknown")
+        result["data"]["feed_reason"] = feed_status.get(symbol, {}).get("reason")
+        result["data"]["feed_retry_at"] = str(feed_status.get(symbol, {}).get("retry_at")) if feed_status.get(symbol, {}).get("retry_at") else None
+        result["data"]["feed_last_success_at"] = str(feed_status.get(symbol, {}).get("last_success_at")) if feed_status.get(symbol, {}).get("last_success_at") else None
         result["provenance"]["run_id"] = run_id
         result["provenance"]["market"] = market.upper()
         results.append(result)

@@ -27,7 +27,42 @@
       <button id="tab-explorer" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-explorer">
         All Stocks Explorer
       </button>
+      <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
+        VCP Finder · 60m
+      </button>
     </nav>
+
+    <!-- ── VCP Finder panel ── -->
+    <main id="panel-vcp" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-vcp">
+      <section id="vcp-loading" class="state state--hidden" aria-live="polite">
+        <div class="state-icon">⌛</div><p class="state-text">Loading 60m VCP finder…</p>
+      </section>
+      <section id="vcp-error" class="state state--hidden" aria-live="assertive">
+        <div class="state-icon">⚠️</div><p id="vcp-error-msg" class="state-text">Unable to load VCP Finder.</p>
+        <button id="vcp-retry" class="btn btn--retry">Retry</button>
+      </section>
+      <section id="vcp-content">
+        <p class="explorer-note">Intraday 60m candidate finder · no Daily fallback · not an automatic buy signal.</p>
+        <div class="explorer-controls" aria-label="VCP Finder filters">
+          <label class="explorer-control">View
+            <select id="vcp-state" aria-label="VCP state filter">
+              <option value="actionable" selected>Actionable review</option>
+              <option value="ALL">All states</option>
+              <option value="READY">Ready · wait for breakout</option>
+              <option value="NEAR_TRIGGER">Near trigger</option>
+              <option value="CONFIRMED">Confirmed breakout</option>
+              <option value="EXTENDED">Extended · do not chase</option>
+              <option value="FORMING">Forming</option>
+              <option value="FAILED">Failed</option>
+              <option value="STALE">Stale</option>
+              <option value="NOT_VERIFIED">Not verified</option>
+            </select>
+          </label>
+          <span id="vcp-meta" class="marginable-filter-meta">Loading…</span>
+        </div>
+        <div id="vcp-cards" class="card-list card-list--explorer"></div>
+      </section>
+    </main>
 
     <!-- ── Daily Shortlist panel ── -->
     <main id="panel-shortlist" class="panel panel--active" role="tabpanel" aria-labelledby="tab-shortlist">

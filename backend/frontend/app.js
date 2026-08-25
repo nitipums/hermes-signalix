@@ -21,6 +21,16 @@
     tabExplorer:     $("#tab-explorer"),
     panelShortlist:  $("#panel-shortlist"),
     panelExplorer:   $("#panel-explorer"),
+    tabVcp:          $("#tab-vcp"),
+    panelVcp:        $("#panel-vcp"),
+    vcpLoading:      $("#vcp-loading"),
+    vcpError:        $("#vcp-error"),
+    vcpErrorMsg:     $("#vcp-error-msg"),
+    vcpRetry:        $("#vcp-retry"),
+    vcpContent:      $("#vcp-content"),
+    vcpCards:        $("#vcp-cards"),
+    vcpState:        $("#vcp-state"),
+    vcpMeta:         $("#vcp-meta"),
 
     // shortlist states
     slLoading:     $("#shortlist-loading"),
@@ -612,6 +622,47 @@
     if (e.key === "Escape" && !dom.drawer.classList.contains("drawer--hidden")) closeDrawer();
   });
 
+  function vcpStateLabel(state) {
+    return ({READY: "SETUP READY · WAIT FOR BREAKOUT", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", CONFIRMED: "CONFIRMED BREAKOUT", EXTENDED: "DO NOT CHASE", FORMING: "FORMING", FAILED: "FAILED", STALE: "STALE 60m DATA", NOT_VERIFIED: "NOT VERIFIED"})[state] || state || "NOT VERIFIED";
+  }
+
+  function vcpCard(result) {
+    var price = result.price || {}, pattern = result.pattern || {}, volume = result.volume || {}, data = result.data || {};
+    var state = result.state || "NOT_VERIFIED";
+    var cls = state.toLowerCase().replace(/_/g, "-");
+    var reason = (result.reasons || result.reason_codes || []).join(" · ");
+    var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
+    return '<article class="vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
+      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + '</span></div>' +
+      '<div class="vcp-card__grid">' +
+        '<span>Close <b>' + displayValue(price.last_close) + '</b></span>' +
+        '<span>Pivot <b>' + displayValue(price.pivot_high) + '</b></span>' +
+        '<span>Distance <b>' + (price.distance_to_pivot_pct == null ? "NOT_VERIFIED" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</b></span>' +
+        '<span>Invalidation <b>' + displayValue(price.invalidation) + '</b></span>' +
+        '<span>Contractions <b>' + (pattern.contractions_pct || []).map(function(x){return Number(x).toFixed(1) + "%";}).join(" → ") + '</b></span>' +
+        '<span>Breakout vol <b>' + (volume.breakout_volume_ratio == null ? "NOT_VERIFIED" : Number(volume.breakout_volume_ratio).toFixed(2) + "x") + '</b></span>' +
+      '</div>' +
+      '<div class="vcp-card__evidence">' + escapeHTML(reason || "No qualifying 60m structure") + '</div>' +
+      '<div class="vcp-card__provenance">' + escapeHTML(feed) + ' · ' + escapeHTML(data.freshness || "NOT_VERIFIED") + ' · no Daily fallback</div>' +
+    '</article>';
+  }
+
+  function loadVcp() {
+    show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
+    fetch("/api/vcp-finder?interval=60m&market=TH&limit=5000")
+      .then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function(data) {
+        hide(dom.vcpLoading); show(dom.vcpContent);
+        var selected = dom.vcpState.value || "actionable";
+        var results = data.results || [];
+        if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0; });
+        else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
+        dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
+        dom.vcpCards.innerHTML = results.length ? results.map(vcpCard).join("") : '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+      })
+      .catch(function(err) { hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
+  }
+
   /* ── tab switching ── */
   function switchTab(tab) {
     currentTab = tab;
@@ -619,17 +670,25 @@
     dom.tabShortlist.setAttribute("aria-selected", tab === "shortlist");
     dom.tabExplorer.classList.toggle("nav-tab--active", tab === "explorer");
     dom.tabExplorer.setAttribute("aria-selected", tab === "explorer");
+    dom.tabVcp.classList.toggle("nav-tab--active", tab === "vcp");
+    dom.tabVcp.setAttribute("aria-selected", tab === "vcp");
 
     dom.panelShortlist.classList.toggle("panel--active", tab === "shortlist");
     dom.panelShortlist.classList.toggle("panel--hidden", tab !== "shortlist");
     dom.panelExplorer.classList.toggle("panel--active", tab === "explorer");
     dom.panelExplorer.classList.toggle("panel--hidden", tab !== "explorer");
+    dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
+    dom.panelVcp.classList.toggle("panel--hidden", tab !== "vcp");
 
     if (tab === "explorer") loadExplorer(1);
+    if (tab === "vcp") loadVcp();
   }
 
   dom.tabShortlist.addEventListener("click", function() { switchTab("shortlist"); });
   dom.tabExplorer.addEventListener("click", function() { switchTab("explorer"); });
+  dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
+  dom.vcpState.addEventListener("change", loadVcp);
+  dom.vcpRetry.addEventListener("click", loadVcp);
 
   function marginRateQuery() {
     return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";

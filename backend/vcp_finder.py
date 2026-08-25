@@ -10,6 +10,7 @@ from datetime import datetime, timezone, timedelta
 import math
 import uuid
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -37,7 +38,7 @@ class VCP60Config:
     breakout_atr_fraction: float = 0.10
     extension_limit_pct: float = 3.0
     failure_atr_fraction: float = 0.10
-    freshness_days: int = 3
+    freshness_sessions: int = 2
 
 
 def _plain(value: Any):
@@ -167,6 +168,37 @@ def _sequence(pivots):
     return None
 
 
+def _set_session_open(local_dt):
+    if local_dt.weekday() >= 5:
+        return False
+    minutes = local_dt.hour * 60 + local_dt.minute
+    return 615 <= minutes < 750 or 885 <= minutes < 990
+
+
+def _session_age(start_date, end_date):
+    try:
+        from set_market_day_guard import SET_CLOSED_DATES
+    except ImportError:
+        SET_CLOSED_DATES = {}
+    if start_date > end_date:
+        return 0
+    days = 0
+    cursor = start_date
+    while cursor < end_date:
+        cursor += timedelta(days=1)
+        if cursor.weekday() < 5 and cursor.isoformat() not in SET_CLOSED_DATES:
+            days += 1
+    return days
+
+
+def _closed_bar_context(latest_dt, as_of_dt):
+    bkk = ZoneInfo("Asia/Bangkok")
+    latest_local = latest_dt.astimezone(bkk)
+    as_of_local = as_of_dt.astimezone(bkk)
+    latest_may_be_open = latest_local.date() == as_of_local.date() and _set_session_open(as_of_local)
+    return latest_local, as_of_local, latest_may_be_open
+
+
 def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None = None) -> dict:
     cfg = config or VCP60Config()
     try:
@@ -178,22 +210,24 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         result["data"] = {"bar_count": 0, "valid_bar_count": 0, "invalid_rows": invalid_rows, "duplicate_rows": duplicate_rows}
         return result
     latest = df.iloc[-1]["ts"].to_pydatetime()
-    observed_as_of = as_of or latest.to_pydatetime() if hasattr(latest, "to_pydatetime") else (as_of or latest)
+    observed_as_of = as_of or datetime.now(timezone.utc)
     if observed_as_of.tzinfo is None:
         observed_as_of = observed_as_of.replace(tzinfo=timezone.utc)
-    age = observed_as_of - latest
-    freshness = "fresh" if age <= timedelta(days=cfg.freshness_days) else "stale"
+    latest_local, as_of_local, latest_may_be_open = _closed_bar_context(latest, observed_as_of)
+    session_age = _session_age(latest_local.date(), as_of_local.date())
+    freshness = "fresh" if session_age <= cfg.freshness_sessions else "stale"
     data = {
         "bar_count": int(len(frame)), "valid_bar_count": int(len(df)),
         "invalid_rows": invalid_rows, "duplicate_rows": duplicate_rows,
         "first_bar_ts": _plain(df.iloc[0]["ts"]), "last_bar_ts": _plain(df.iloc[-1]["ts"]),
         "max_gap_hours": max([((df.iloc[i]["ts"] - df.iloc[i-1]["ts"]).total_seconds() / 3600) for i in range(1, len(df))] or [0]),
-        "freshness": freshness, "latest_bar_may_be_open": True,
-        "in_progress_bar_excluded": True,
+        "freshness": freshness, "freshness_session_age": session_age,
+        "session_timezone": "Asia/Bangkok", "latest_bar_may_be_open": latest_may_be_open,
+        "in_progress_bar_excluded": latest_may_be_open,
     }
     if len(df) < cfg.min_bars:
         return {**_empty_result("NOT_VERIFIED", ["insufficient_history"], data=data, as_of=observed_as_of, config=cfg), "data": data}
-    work = df.iloc[:-1].reset_index(drop=True)
+    work = df.iloc[:-1].reset_index(drop=True) if latest_may_be_open else df.reset_index(drop=True)
     close = work["close"].astype(float)
     ema20 = close.ewm(span=20, adjust=False).mean()
     ema_slope = float((ema20.iloc[-1] / ema20.iloc[-11] - 1) * 100) if len(ema20) >= 11 and ema20.iloc[-11] else None
@@ -227,11 +261,17 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     latest_contraction = depths[-1]
     contraction_pass = len(depths) >= 2 and all(r is not None and r <= cfg.contraction_ratio for r in ratios)
     base_pass = cfg.base_depth_min_pct <= (base_depth or 0) <= cfg.base_depth_max_pct and latest_contraction <= cfg.latest_contraction_max_pct
-    failure = seq[3]["price"] - (cfg.failure_atr_fraction * atr if atr else 0)
+    failure = seq[3]["price"]
     pivot = seq[-1]["price"]
     required_close = pivot * (1 + max(cfg.breakout_buffer_pct, cfg.breakout_atr_fraction * atr / pivot if atr else 0))
     distance_pct = (last_close / pivot - 1) * 100 if pivot else None
     volume = work["volume"].astype(float).tolist()
+    leg_average_volume = []
+    for high_p, low_p in zip(seq[0::2], seq[1::2]):
+        leg_average_volume.append(sum(volume[high_p["idx"]:low_p["idx"] + 1]) / max(1, low_p["idx"] - high_p["idx"] + 1))
+    leg_volume_pass = len(leg_average_volume) >= 2 and all(
+        leg_average_volume[i] <= leg_average_volume[i - 1] for i in range(1, len(leg_average_volume))
+    )
     recent = sum(volume[-5:]) / 5 if len(volume) >= 5 else 0
     baseline = sum(volume[-20:-5]) / 15 if len(volume) >= 20 else 0
     dryup = recent / baseline if baseline > 0 else None
@@ -239,7 +279,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     breakout_volume = volume[-1] / (sum(volume[-20:-1]) / 19) if len(volume) >= 20 and sum(volume[-20:-1]) > 0 else None
     close_pass = last_close > required_close
     volume_confirmed = breakout_volume is not None and breakout_volume >= cfg.breakout_volume_ratio
-    structure_pass = bool(contraction_pass and base_pass)
+    structure_pass = bool(contraction_pass and base_pass and leg_volume_pass)
     if last_close < failure:
         state = "FAILED"
     elif structure_pass and close_pass and volume_confirmed:
@@ -261,6 +301,8 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if base_pass: reasons.append("base_depth_and_latest_contraction_pass")
     if volume_pass: reasons.append("recent_volume_dryup")
     if not volume_pass: reasons.append("volume_dryup_not_confirmed")
+    if leg_volume_pass: reasons.append("leg_volume_non_increasing")
+    if not leg_volume_pass: reasons.append("leg_volume_not_contracted")
     if close_pass and not volume_confirmed: reasons.append("breakout_close_without_volume_confirmation")
     if state == "FAILED": reasons.append("below_structural_invalidation")
     result_base.update({
@@ -269,9 +311,9 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         "reasons": reasons,
         "price": {"last_close": last_close, "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},
         "pattern": {"pivots": [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in seq], "base_depth_pct": _plain(base_depth), "contractions_pct": [_plain(x) for x in depths], "contraction_ratios": [_plain(x) for x in ratios], "latest_contraction_pct": _plain(latest_contraction)},
-        "volume": {"recent_5_avg": _plain(recent), "baseline_15_avg": _plain(baseline), "dryup_ratio": _plain(dryup), "volume_dryup": bool(volume_pass), "breakout_volume_ratio": _plain(breakout_volume)},
+        "volume": {"leg_average_volume": [_plain(x) for x in leg_average_volume], "leg_volume_non_increasing": bool(leg_volume_pass), "recent_5_avg": _plain(recent), "baseline_15_avg": _plain(baseline), "dryup_ratio": _plain(dryup), "volume_dryup": bool(volume_pass), "breakout_volume_ratio": _plain(breakout_volume)},
         "breakout": {"pivot_level": pivot, "required_close": required_close, "close_confirmed": bool(close_pass), "volume_confirmed": bool(volume_confirmed)},
-        "evidence": {"prior_trend_pass": bool(trend_pass), "price_contraction_pass": bool(contraction_pass), "base_pass": bool(base_pass), "volume_contraction_pass": bool(volume_pass), "breakout_close_pass": bool(close_pass), "breakout_volume_pass": bool(volume_confirmed)},
+        "evidence": {"prior_trend_pass": bool(trend_pass), "price_contraction_pass": bool(contraction_pass), "base_pass": bool(base_pass), "leg_volume_pass": bool(leg_volume_pass), "volume_contraction_pass": bool(volume_pass), "breakout_close_pass": bool(close_pass), "breakout_volume_pass": bool(volume_confirmed)},
     })
     return result_base
 
