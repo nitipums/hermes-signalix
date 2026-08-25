@@ -408,4 +408,8 @@ body {
 .vcp-card__grid b { color:var(--text); font-weight:700; }
 .vcp-card__evidence { font-size:.78rem; line-height:1.45; color:var(--text-2); overflow-wrap:anywhere; }
 .vcp-card__provenance { margin-top:9px; font-size:.7rem; color:var(--text-3); line-height:1.4; overflow-wrap:anywhere; }
-@media (max-width: 640px) { .vcp-card__grid { grid-template-columns:1fr; } .vcp-card__state { max-width:52%; } }
+@media (max-width: 767px) {
+  #panel-vcp .card-list { display:flex; flex-direction:column; gap:8px; }
+  #panel-vcp .vcp-card__grid { grid-template-columns:1fr; }
+  #panel-vcp .vcp-card__state { max-width:52%; }
+}
