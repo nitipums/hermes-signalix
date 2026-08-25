@@ -96,6 +96,8 @@
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
   let chartSymbol = null;
+  let chartRequestSeq = 0;
+  let chartAbort = null;
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -297,18 +299,18 @@
     dom.indStop.textContent = chart.stop != null ? Number(chart.stop).toFixed(2) : "NOT_VERIFIED";
     dom.indTarget.textContent = chart.target != null ? Number(chart.target).toFixed(2) : "NOT_VERIFIED";
 
+    window.__signalixLastChart = chart;
     if (chart.candles && chart.candles.length > 0) {
       // A real OHLCV series is present — draw it (basic canvas line render).
       dom.drawerChartPH.style.display = "none";
       if (dom.drawerCanvas) {
         dom.drawerCanvas.style.display = "block";
-        window.__signalixLastChart = chart;
         drawChart(chart);
       }
     } else {
       // No candle series available — keep placeholder honest.
       dom.drawerChartPH.style.display = "block";
-      dom.drawerChartPH.textContent = "No chart data available (candles NOT_VERIFIED)";
+      dom.drawerChartPH.textContent = (chart.provenance && chart.provenance.note) || (chart.timeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "No chart data available (candles NOT_VERIFIED)");
       if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
     }
   }
@@ -369,6 +371,11 @@
 
   function openDrawer(item, symbol) {
     chartSymbol = symbol;
+    var requestSeq = ++chartRequestSeq;
+    var requestedTimeframe = chartTimeframe;
+    if (chartAbort) chartAbort.abort();
+    var chartController = new AbortController();
+    chartAbort = chartController;
     // Immediate render from local card data (fast path).
     renderDrawerDetail(item);
 
@@ -396,27 +403,42 @@
       .catch(function() { /* keep card-local detail on failure */ });
 
     // Fetch DB-backed candles first; snapshot overlay is fallback only.
-    fetch("/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(chartTimeframe))
+    fetch("/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal})
       .then(function(res) {
         if (!res.ok) throw new Error("DB chart HTTP " + res.status);
         return res.json();
       })
-      .catch(function() {
-        return fetch("/api/chart/" + encodeURIComponent(symbol)).then(function(res) {
+      .catch(function(err) {
+        if (err && err.name === "AbortError") throw err;
+        return fetch("/api/chart/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal}).then(function(res) {
           if (!res.ok) throw new Error("snapshot chart HTTP " + res.status);
           return res.json();
         });
       })
       .then(function(chart) {
-        if (chart && chart.symbol) renderDrawerChart(chart);
+        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe) return;
+        if (chart && chart.symbol) {
+          if (!Array.isArray(chart.candles) || chart.candles.length < 2) {
+            chart.candles = [];
+            chart.provenance = chart.provenance || {};
+            chart.provenance.note = chart.provenance.note || (requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source." : "Chart candles NOT_VERIFIED.");
+          }
+          renderDrawerChart(chart);
+        }
       })
-      .catch(function() {
+      .catch(function(err) {
+        if (err && err.name === "AbortError") return;
+        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
         dom.drawerChartPH.style.display = "block";
-        dom.drawerChartPH.textContent = "Chart data unavailable";
+        dom.drawerChartPH.textContent = requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "Chart data unavailable";
+        if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
       });
   }
 
   function closeDrawer() {
+    chartRequestSeq += 1;
+    if (chartAbort) chartAbort.abort();
+    chartAbort = null;
     dom.drawer.classList.add("drawer--hidden");
     document.body.style.overflow = "";
   }

@@ -44,6 +44,14 @@ def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     assert "60m " in js
 
 
+def test_unavailable_hour_chart_is_explicit_not_blank():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "60m unavailable · Daily EOD remains the decision source" in js
+    assert 'chart.provenance && chart.provenance.note' in js
+    assert "AbortController" in js
+    assert "chartRequestSeq" in js
+
+
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -53,3 +61,10 @@ def test_chart_contract_has_real_layers_and_fail_closed_runtime():
         assert marker in js
     assert "tryFixtureShortlist" not in js
     assert "tryFixtureExplorer" not in js
+
+
+def test_mobile_interactive_targets_are_touch_safe():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
+    assert ".chart-toggle { min-height:44px; min-width:44px;" in css
+    assert ".explorer-control select, .explorer-control input { min-height:44px;" in css

@@ -101,7 +101,7 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
                     p[3] = min(p[3], low)
                     p[4] = close
                     p[5] += float(volume or 0)
-            rows = list(reversed(sorted(periods.values(), key=lambda r: r[0])))[:limit]
+            rows = sorted(periods.values(), key=lambda r: r[0])[-limit:]
     candles: list[dict] = []
     for row in rows:
         candles.append({
@@ -287,7 +287,26 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             pass
 
     if not candles:
-        return None  # symbol not found
+        if timeframe == "60M":
+            return {
+                "symbol": symbol.upper(),
+                "timeframe": timeframe,
+                "candles": [],
+                "ma20": None,
+                "ma50": None,
+                "ma200": None,
+                "macd": None,
+                "rsi": None,
+                "source": None,
+                "as_of": None,
+                "availability": "unavailable",
+                "provenance": {
+                    "source": None,
+                    "as_of": None,
+                    "note": "60m unavailable · Daily EOD remains the decision source.",
+                },
+            }
+        return None  # Daily/aggregated symbol not found
 
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
