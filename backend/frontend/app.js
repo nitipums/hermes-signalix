@@ -370,6 +370,7 @@
   }
 
   function openDrawer(item, symbol) {
+    var sameSymbolOpen = chartSymbol === symbol && !dom.drawer.classList.contains("drawer--hidden");
     chartSymbol = symbol;
     var requestSeq = ++chartRequestSeq;
     var requestedTimeframe = chartTimeframe;
@@ -384,9 +385,15 @@
     dom.indMa200.textContent = "…"; dom.indMacd.textContent = "…";
     dom.indRsi.textContent = "…"; dom.indTrigger.textContent = "…";
     dom.indStop.textContent = "…"; dom.indTarget.textContent = "…";
-    dom.drawerChartPH.style.display = "block";
-    dom.drawerChartPH.textContent = "Chart loading…";
-    if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
+    if (sameSymbolOpen && window.__signalixLastChart && Array.isArray(window.__signalixLastChart.candles) && window.__signalixLastChart.candles.length >= 2) {
+      // Keep the last-good plot visible while a new timeframe request is in flight.
+      dom.drawerChartPH.style.display = "none";
+      if (dom.drawerCanvas) dom.drawerCanvas.style.display = "block";
+    } else {
+      dom.drawerChartPH.style.display = "block";
+      dom.drawerChartPH.textContent = "Chart loading…";
+      if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
+    }
 
     dom.drawer.classList.remove("drawer--hidden");
     document.body.style.overflow = "hidden";

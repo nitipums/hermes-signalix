@@ -106,6 +106,7 @@ MVP API: HTTP 200
 - `1D` Daily, `1W` aggregate Daily, and `60M` stored intraday chart responses return HTTP 200 with candles; retired `15M` returns HTTP 400.
 - Mobile drawer browser review passed with candlestick, volume, MA, RSI, scroll, and no horizontal overflow.
 - Rapid Day→Week→Hour→Day chart switching passed with final-state request guard; no stale response overwrote the selected timeframe.
+- During a timeframe request, the last-good chart remains visible until the new response arrives; unavailable 60m then transitions to explicit state.
 - Unavailable 60m feed returns explicit `60m unavailable · Daily EOD remains the decision source`; it does not silently blank the chart.
 - Mobile chart/filter controls are 44px touch targets.
 - Full release-candidate suite: 249 passed.
