@@ -187,11 +187,11 @@
   }
 
   /* ── freshness ── */
-  function setFreshness(status, asOf) {
+  function setFreshness(status, asOf, intradayAt) {
     dom.freshnessDot.className = "freshness-dot freshness-dot--" + status;
     dom.freshnessLabel.textContent = status === "loading" ? "Loading…"
       : status === "fresh" ? "Fresh · " + timeAgo(asOf)
-      : status === "market_closed" ? "Market closed · Daily EOD"
+      : status === "market_closed" ? "Daily EOD · " + timeAgo(asOf) + " · 60m " + (intradayAt ? timeAgo(intradayAt) : "NOT_VERIFIED")
       : status === "stale" ? "Stale · " + timeAgo(asOf)
       : "Error";
   }
@@ -527,7 +527,7 @@
           : (freshness.status === "market_closed") ? "market_closed"
           : (freshness.status === "fresh" || freshness.status === "latest_available") ? "fresh"
           : "stale";
-        setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of);
+        setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of, freshness.intraday_fetched_at);
 
         // stale state
         if (fStatus === "stale") {

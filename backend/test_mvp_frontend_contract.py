@@ -36,6 +36,14 @@ def test_chart_timeframes_are_real_controls_not_labels_only():
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
+def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
+    assert "intraday_fetched_at" in source
+    assert "setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of, freshness.intraday_fetched_at)" in js
+    assert "60m " in js
+
+
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")

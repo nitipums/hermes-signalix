@@ -1362,6 +1362,9 @@ def build(scanned=None, run_id=None):
         "source": freshness.get("source"),
         "as_of": (freshness.get("market_session") or {}).get("last_valid_session"),
         "data_fetched_at": _root_data_fetched,
+        "intraday_fetched_at": intraday_scan_time,
+        "intraday_source": "settrade_intraday_60m" if intraday_scan_time else None,
+        "intraday_status": "fresh" if intraday_scan_time else "unknown",
     }
     if run_id:
         pg_daily = get_pg()
@@ -1374,6 +1377,9 @@ def build(scanned=None, run_id=None):
                 mvp_freshness = daily_freshness_from_run(
                     daily_run[0], daily_run[1], daily_run[2], freshness.get("market_session")
                 )
+                mvp_freshness["intraday_fetched_at"] = intraday_scan_time
+                mvp_freshness["intraday_source"] = "settrade_intraday_60m" if intraday_scan_time else None
+                mvp_freshness["intraday_status"] = "fresh" if intraday_scan_time else "unknown"
         finally:
             pg_daily.close()
     mvp_scan_time = scan_time

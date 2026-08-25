@@ -87,6 +87,11 @@ Chart contract is `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`:
 intraday 60m bars. Chart controls and indicator legends are below the plot so
 they cannot obscure candles, volume, MA, or RSI panes.
 
+Freshness display keeps ownership explicit: `Daily EOD` timestamp is the
+official decision provenance, while `60m updated` comes from the latest
+completed `intraday_ingestion_runs.fetch_completed_at`. Intraday refresh must
+never overwrite the Daily decision timestamp.
+
 See [[Components]] for detail, [[Deployment]] for ops.
 
 ## Current intraday E2E reliability contract (2026-08-21)
