@@ -37,6 +37,23 @@ def normalize_filter(value: str | None) -> str:
     return value if value in FILTERS else DEFAULT_FILTER
 
 
+def normalize_rates(values) -> list[int]:
+    """Normalize multi-select initial-margin rates; empty means all rates."""
+    if values is None or values == "":
+        return []
+    if isinstance(values, str):
+        values = values.split(",")
+    result = []
+    for value in values:
+        try:
+            rate = int(str(value).strip().rstrip("%"))
+        except (TypeError, ValueError):
+            continue
+        if rate in {50, 60, 70, 80, 100} and rate not in result:
+            result.append(rate)
+    return sorted(result)
+
+
 def metadata() -> dict:
     data = load_marginable_data()
     securities = data["securities"]
@@ -117,5 +134,16 @@ def matches(record_or_item: dict, filter_value: str | None) -> bool:
     return is_marginable
 
 
-def filter_items(items: list[dict], filter_value: str | None) -> list[dict]:
-    return [enrich_item(item) for item in items if matches(item, filter_value)]
+def filter_items(items: list[dict], filter_value: str | None,
+                 margin_rates=None) -> list[dict]:
+    rates = set(normalize_rates(margin_rates))
+    result = []
+    for item in items:
+        enriched = enrich_item(item)
+        if not matches(enriched, filter_value):
+            continue
+        rate = (enriched.get("marginable") or {}).get("margin_rate_pct")
+        if rates and rate not in rates:
+            continue
+        result.append(enriched)
+    return result

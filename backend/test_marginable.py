@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from marginable import filter_items, load_marginable_data, lookup
+from marginable import filter_items, load_marginable_data, lookup, normalize_rates
 from mvp_api import project_explorer_response
 
 
@@ -33,6 +33,13 @@ def test_filter_default_is_krungsri_and_all_is_explicit():
     assert len(filter_items(items, "all")) == 2
 
 
+def test_multiple_margin_rates_are_normalized_and_applied():
+    assert normalize_rates("60,50,60,invalid") == [50, 60]
+    items = [{"symbol": "ADVANC"}, {"symbol": "CREDIT"}, {"symbol": "AIE"}]
+    result = filter_items(items, "krungsri", "50,60")
+    assert [x["symbol"] for x in result] == ["ADVANC", "CREDIT"]
+
+
 def test_explorer_response_exposes_margin_fields_and_filter_metadata():
     items = [{"symbol": "ADVANC", "stage": "S2_uptrend", "close": 100}]
     result = project_explorer_response(items, marginable_filter="krungsri")
@@ -49,6 +56,9 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     js = (ROOT / "frontend/app.js").read_text(encoding="utf-8")
     assert 'id="shortlist-marginable"' in html
     assert 'id="explorer-marginable"' in html
-    assert 'id="drawer-margin-rights"' in html
+    assert 'class="margin-rate-toggle"' in html
+    assert '<dt>Marginable</dt>' in html
+    assert 'drawer-margin-rights' not in html
     assert 'marginable=' in js
-    assert "marginPermissions" in js
+    assert "margin_rates=" in js
+    assert "%Margin " in js

@@ -84,7 +84,6 @@
     drawerRR:       $("#drawer-rr"),
     drawerMembership: $("#drawer-membership"),
     drawerMargin:   $("#drawer-margin"),
-    drawerMarginRights: $("#drawer-margin-rights"),
     drawer52W:      $("#drawer-52w"),
     drawerATH:      $("#drawer-ath"),
     drawerProv:     $("#drawer-provenance"),
@@ -97,6 +96,7 @@
   let explorerStage = "";
   let explorerSearch = "";
   let marginableFilter = "krungsri";
+  let marginRates = [];
   let shortlistData = null;
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
@@ -190,17 +190,7 @@
 
   function marginBadge(item) {
     var rate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
-    return rate == null ? "" : '<span class="marginable-badge">Krungsri ' + Number(rate).toFixed(0) + '%</span>';
-  }
-
-  function marginPermissions(item) {
-    var m = item.marginable || {};
-    if (!m.is_marginable) return "Not on current Krungsri list";
-    var permissions = [];
-    if (m.can_buy) permissions.push("Buy");
-    if (m.can_add_collateral) permissions.push("Collateral");
-    if (m.can_short) permissions.push("Short");
-    return permissions.length ? permissions.join(" · ") : "NOT_VERIFIED";
+    return rate == null ? "" : '<span class="marginable-badge">%Margin ' + Number(rate).toFixed(0) + '%</span>';
   }
 
   function marginFilterMeta(data) {
@@ -292,11 +282,7 @@
     dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
     dom.drawerMembership.textContent = displayValue((item.index_membership || []).join(" · "));
     var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
-    var margin = item.marginable || {};
-    dom.drawerMargin.textContent = marginRate != null
-      ? Number(marginRate).toFixed(0) + "% · effective " + (margin.effective_date || "NOT_VERIFIED")
-      : "NOT_VERIFIED";
-    dom.drawerMarginRights.textContent = marginPermissions(item);
+    dom.drawerMargin.textContent = marginRate != null ? Number(marginRate).toFixed(0) + "%" : "NOT_VERIFIED";
     dom.drawer52W.textContent = formatRange(item.high52, item.low52);
     dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low);
     var prov = item.provenance || {};
@@ -569,6 +555,10 @@
   dom.tabShortlist.addEventListener("click", function() { switchTab("shortlist"); });
   dom.tabExplorer.addEventListener("click", function() { switchTab("explorer"); });
 
+  function marginRateQuery() {
+    return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";
+  }
+
   /* ── fetch shortlist ── */
   function loadShortlist() {
     setFreshness("loading");
@@ -578,7 +568,7 @@
     hide(dom.slStale);
     show(dom.slLoading);
 
-    fetch("/api/daily-shortlist?marginable=" + encodeURIComponent(marginableFilter))
+    fetch("/api/daily-shortlist?marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery())
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -665,7 +655,7 @@
     hide($("#explorer-content"));
 
     var params = "page=" + page + "&page_size=20";
-    params += "&marginable=" + encodeURIComponent(marginableFilter);
+    params += "&marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery();
     if (explorerStage) params += "&stage=" + encodeURIComponent(explorerStage);
     if (explorerSearch) params += "&search=" + encodeURIComponent(explorerSearch);
     fetch("/api/explorer?" + params)
@@ -707,6 +697,20 @@
   });
   dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
+  });
+  function updateMarginRates(surface) {
+    marginRates = Array.from(document.querySelectorAll('.margin-rate-toggle[data-surface="' + surface + '"]:checked'))
+      .map(function(input) { return Number(input.value); }).sort(function(a, b) { return a - b; });
+    $$(".margin-rate-toggle").forEach(function(input) {
+      input.checked = marginRates.indexOf(Number(input.value)) >= 0;
+    });
+    if (surface === "shortlist") loadShortlist();
+    else loadExplorer(1);
+  }
+  $$(".margin-rate-toggle").forEach(function(input) {
+    input.addEventListener("change", function() {
+      updateMarginRates(input.getAttribute("data-surface") || "explorer");
+    });
   });
   dom.slMarginable.addEventListener("change", function() {
     marginableFilter = dom.slMarginable.value || "krungsri";

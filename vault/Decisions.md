@@ -5,7 +5,7 @@
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
 ## 2026-08-25 — Krungsri Credit Balance marginable filter
-Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. Daily Shortlist and All Stocks Explorer default to the Krungsri list, with explicit `All stocks` and `Not on Krungsri list` options. Cards show the verified initial-margin percentage; drawer shows effective date and PDF permissions (`Buy`, `Collateral`, `Short`).
+Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. Daily Shortlist and All Stocks Explorer default to the Krungsri list, with explicit `All stocks` and `Not on Krungsri list` options plus multi-select initial-margin rates (for example `50% + 60%`). Cards show compact `%Margin X%`; drawer shows only `Marginable: X%`.
 Reason: Arm normally trades through this Credit Balance list and wants the decision surface pre-filtered to usable collateral/shorting context. Margin metadata is presentation/filter-only and must not mutate canonical scan eligibility or Daily state. Owner workflow checks for a new PDF monthly; each PDF's effective date is authoritative.
 
 ## 2026-08-25 — Canonical MVP source and worktree cutover

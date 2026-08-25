@@ -24,7 +24,13 @@ from provenance_contract import (
     resolve_decision_state,
     compute_freshness,
 )
-from marginable import enrich_item, filter_items, metadata as marginable_metadata, normalize_filter
+from marginable import (
+    enrich_item,
+    filter_items,
+    metadata as marginable_metadata,
+    normalize_filter,
+    normalize_rates,
+)
 
 
 def _number(value, default=None):
@@ -364,7 +370,8 @@ def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
 # ── Public API ────────────────────────────────────────────────────────
 
 def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,
-                               marginable_filter: str = "krungsri") -> dict:
+                               marginable_filter: str = "krungsri",
+                               margin_rates=None) -> dict:
     """Build the GET /api/daily-shortlist response from serialized cards.
 
     Uses daily_shortlist.project_shortlist() for eligibility/ranking,
@@ -372,7 +379,8 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
     owner-selected Krungsri Credit Balance marginable list.
     """
     marginable_filter = normalize_filter(marginable_filter)
-    items = filter_items(items, marginable_filter)
+    margin_rates = normalize_rates(margin_rates)
+    items = filter_items(items, marginable_filter, margin_rates)
     margin_meta = marginable_metadata()
     if not items:
         return {
@@ -391,6 +399,7 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
             "scan_run_id": None,
             "marginable_filter": marginable_filter,
             "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "margin_rates": margin_rates,
             "marginable_source": margin_meta,
         }
 
@@ -471,6 +480,7 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         "scan_run_id": root_run_id or scan_run_id or "",
         "marginable_filter": marginable_filter,
         "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "margin_rates": margin_rates,
         "marginable_source": margin_meta,
     }
 
@@ -483,6 +493,7 @@ def project_explorer_response(
     stage: str | None = None,
     snapshot_meta: dict | None = None,
     marginable_filter: str = "krungsri",
+    margin_rates=None,
 ) -> dict:
     """Build the GET /api/explorer response from serialized cards.
 
@@ -490,7 +501,8 @@ def project_explorer_response(
     The default view is limited to the owner-selected Krungsri list.
     """
     marginable_filter = normalize_filter(marginable_filter)
-    items = filter_items(items, marginable_filter)
+    margin_rates = normalize_rates(margin_rates)
+    items = filter_items(items, marginable_filter, margin_rates)
     margin_meta = marginable_metadata()
     page = max(1, page)
     page_size = max(1, min(page_size, 100))
@@ -513,6 +525,7 @@ def project_explorer_response(
             "scan_run_id": None,
             "marginable_filter": marginable_filter,
             "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "margin_rates": margin_rates,
             "marginable_source": margin_meta,
         }
 
@@ -579,6 +592,7 @@ def project_explorer_response(
         "scan_run_id": root_run_id or scan_run_id or "",
         "marginable_filter": marginable_filter,
         "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "margin_rates": margin_rates,
         "marginable_source": margin_meta,
     }
 
