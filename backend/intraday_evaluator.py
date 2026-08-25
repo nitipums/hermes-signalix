@@ -84,12 +84,31 @@ def classify(base_group: str, row: dict, price: float | None) -> tuple[str, str,
     return base_group, "WATCH", "Daily structure retained; intraday price has not crossed a defined action level."
 
 
-def _scan_rows(mode):
-    scan = json.loads(SCAN_JSON.read_text())
+def _scan_rows(pg, mode):
+    """Load the latest canonical Daily scan from PostgreSQL, not legacy JSON."""
+    cur = pg.cursor()
+    cur.execute("""
+        SELECT o.raw_payload
+        FROM daily_scan_observations o
+        JOIN daily_scan_runs r ON r.id=o.run_id
+        WHERE r.id = (
+            SELECT latest.id
+            FROM daily_scan_runs latest
+            WHERE latest.scanner_version='signalix/daily-state-v2'
+              AND latest.source_lineage->>'source'='price_data'
+              AND COALESCE(latest.source_lineage->>'mode','') <> 'historical_backfill'
+            ORDER BY latest.run_timestamp DESC, latest.id DESC
+            LIMIT 1
+        )
+    """)
     rows = []
-    for group, values in (scan.get("groups") or {}).items():
+    for (payload,) in cur.fetchall():
+        if not isinstance(payload, dict):
+            continue
+        group = payload.get("scan_group") or (payload.get("daily_state") or {}).get("group")
         if group in INTENT_GROUPS[mode]:
-            rows += [(group, v) for v in values]
+            rows.append((group, payload))
+    cur.close()
     return rows
 
 
@@ -103,9 +122,9 @@ def _latest_prices(pg, symbols, interval):
 
 def evaluate(mode: str, interval: str) -> dict:
     if mode not in INTENT_GROUPS or interval != "60m": raise ValueError("unsupported mode/interval")
-    rows = _scan_rows(mode); symbols = [r["symbol"] for _, r in rows]
     pg = psycopg2.connect(**PG)
     try:
+        rows = _scan_rows(pg, mode); symbols = [r["symbol"] for _, r in rows]
         init_schema(pg); prices = _latest_prices(pg, symbols, interval)
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         changed=[]; evaluated=0

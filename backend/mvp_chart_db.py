@@ -21,27 +21,47 @@ from __future__ import annotations
 
 import os
 from typing import Any, Optional
+from threading import Lock
 
 
-# ── DB connection (lazy, fail-loud) ────────────────────────────────────
+_POOL = None
+_POOL_LOCK = Lock()
+
+
+def _get_db_pool():
+    global _POOL
+    if _POOL is None:
+        with _POOL_LOCK:
+            if _POOL is None:
+                from psycopg2.pool import ThreadedConnectionPool
+                host = os.getenv("POSTGRES_HOST")
+                if not host:
+                    return None
+                _POOL = ThreadedConnectionPool(
+                    1, 4,
+                    host=host,
+                    port=int(os.getenv("POSTGRES_PORT", "5432")),
+                    user=os.getenv("POSTGRES_USER", "signalix"),
+                    password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
+                    dbname=os.getenv("POSTGRES_DB", "signalix"),
+                )
+    return _POOL
+
 
 def _get_db_connection() -> Optional[Any]:
-    """Return a psycopg2 connection using environment variables.
+    """Borrow a connection from a small process-local pool."""
+    pool = _get_db_pool()
+    return pool.getconn() if pool is not None else None
 
-    Returns None when DB is not configured (no conn info), allowing
-    graceful degradation to NOT_VERIFIED.
-    """
-    host = os.getenv("POSTGRES_HOST")
-    if not host:
-        return None
-    import psycopg2
-    return psycopg2.connect(
-        host=host,
-        port=int(os.getenv("POSTGRES_PORT", "5432")),
-        user=os.getenv("POSTGRES_USER", "signalix"),
-        password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
-        dbname=os.getenv("POSTGRES_DB", "signalix"),
-    )
+
+def _release_db_connection(pg: Any, *, close: bool = False) -> None:
+    pool = _POOL
+    if pool is None or pg is None:
+        return
+    if close:
+        pool.putconn(pg, close=True)
+    else:
+        pool.putconn(pg)
 
 
 # ── Queries (SELECT only, never write) ─────────────────────────────────
@@ -254,7 +274,7 @@ def project_chart_db_response(symbol: str) -> Optional[dict]:
         }
     finally:
         try:
-            pg.close()
+            _release_db_connection(pg)
         except Exception:
             pass
 

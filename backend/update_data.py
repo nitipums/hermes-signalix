@@ -328,14 +328,12 @@ def update_intraday_feed_status(pg, summary, cooldown_hours=24):
         if symbol in failed:
             cur.execute("""INSERT INTO intraday_feed_status
                 (symbol,status,consecutive_failures,reason,last_failure_at,retry_at,updated_at)
-                VALUES(%s,'retry',1,'empty_or_failed_response',%s,%s,%s)
+                VALUES(%s,'unavailable',1,'settrade_empty_or_failed_response',%s,%s,%s)
                 ON CONFLICT(symbol) DO UPDATE SET
                   consecutive_failures=intraday_feed_status.consecutive_failures+1,
-                  status=CASE WHEN intraday_feed_status.consecutive_failures+1 >= 3
-                              THEN 'unavailable' ELSE 'retry' END,
-                  reason='empty_or_failed_response', last_failure_at=EXCLUDED.last_failure_at,
-                  retry_at=CASE WHEN intraday_feed_status.consecutive_failures+1 >= 3
-                                THEN EXCLUDED.retry_at ELSE NULL END,
+                  status='unavailable',
+                  reason='settrade_empty_or_failed_response', last_failure_at=EXCLUDED.last_failure_at,
+                  retry_at=EXCLUDED.retry_at,
                   updated_at=EXCLUDED.updated_at""",
                 (symbol, now, now + dt.timedelta(hours=cooldown_hours), now))
         else:
@@ -345,7 +343,8 @@ def update_intraday_feed_status(pg, summary, cooldown_hours=24):
                 ON CONFLICT(symbol) DO UPDATE SET
                   status='available', consecutive_failures=0,
                   reason=NULL, last_success_at=EXCLUDED.last_success_at,
-                  retry_at=NULL, updated_at=EXCLUDED.updated_at""",
+                  retry_at=NULL, updated_at=EXCLUDED.updated_at
+                WHERE intraday_feed_status.status <> 'unavailable'""",
                 (symbol, now, now))
     pg.commit()
     cur.close()
