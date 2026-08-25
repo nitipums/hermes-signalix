@@ -33,6 +33,8 @@
     slStaleRetry:  $("#shortlist-stale-retry"),
     slRising:      $("#shortlist-rising"),
     slRisingCards: $("#shortlist-rising-cards"),
+    slCaution:     $("#shortlist-caution"),
+    slCautionCards: $("#shortlist-caution-cards"),
     slReadyCards:  $("#shortlist-ready-cards"),
     slPreCards:    $("#shortlist-pre-ready-cards"),
 
@@ -199,6 +201,7 @@
     var changeAmount = fmtChangeAmount(item.change_amount);
     var action = shortAction(item.action || item.phase || "");
     var stage = shortStage(item.stage);
+    var watchNote = item.watch_state ? '<div class="decision-card__watch-note"><strong>' + escapeHTML(item.watch_state === "CAUTION" ? "DO NOT CHASE" : "WATCH ONLY") + '</strong> · ' + escapeHTML(item.watch_reason || "Price/volume move; setup not actionable") + '</div>' : '';
     return "" +
       '<div class="decision-card" data-symbol="' + escapeHTML(item.symbol) + '">' +
         '<div class="decision-card__top">' +
@@ -212,6 +215,7 @@
           '<span class="decision-card__stage decision-card__stage--' + stageClass(item.stage) + '">' + escapeHTML(stage) + '</span>' +
           '<span class="decision-card__action">' + escapeHTML(action) + '</span>' +
         '</div>' +
+        watchNote +
         '<div class="decision-card__meta">' +
           '<span>Stop ' + (item.risk_stop != null ? item.risk_stop.toFixed(2) : "–") + '</span>' +
           '<span>RS ' + (item.rs != null ? Math.round(item.rs) : "–") + '</span>' +
@@ -533,10 +537,10 @@
 
         var ready = data.ready || [];
         var preReady = data.pre_ready || [];
-        var rising = ready.filter(isRising);
-        ready = ready.filter(function(item) { return !isRising(item); });
+        var rising = data.rising_movers || [];
+        var caution = data.caution || [];
 
-        if (ready.length === 0 && preReady.length === 0 && rising.length === 0) {
+        if (ready.length === 0 && preReady.length === 0 && rising.length === 0 && caution.length === 0) {
           show(dom.slEmpty);
           return;
         }
@@ -546,6 +550,11 @@
           show(dom.slRising);
           dom.slRisingCards.innerHTML = "";
           rising.forEach(function(item) { dom.slRisingCards.insertAdjacentHTML("beforeend", buildDecisionCard(item)); });
+        }
+        if (caution.length > 0) {
+          show(dom.slCaution);
+          dom.slCautionCards.innerHTML = "";
+          caution.forEach(function(item) { dom.slCautionCards.insertAdjacentHTML("beforeend", buildDecisionCard(item)); });
         }
 
         // render READY

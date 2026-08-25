@@ -238,6 +238,62 @@ def _resolve_decision_state(items: list[dict]) -> str:
     return DECISION_STATE_PROVISIONAL
 
 
+def _watch_lane_projection(items: list[dict], *, excluded_symbols: set[str],
+                           scan_time: str | None, scan_run_id: str | None) -> tuple[list[dict], list[dict]]:
+    """Project price movers separately from actionable Daily Shortlist lanes.
+
+    These are context/watch-only lanes. They never receive shortlist rank,
+    READY/PRE_READY state, or a positive entry directive.
+    """
+    rising, caution = [], []
+    for raw in items:
+        symbol = str(raw.get("symbol", "")).upper()
+        if not symbol or symbol in excluded_symbols:
+            continue
+        daily = raw.get("daily_eod_freshness") or {}
+        if daily.get("status") != "latest_available" or raw.get("dataFreshness") in ("stale", "unknown"):
+            continue
+        change = _resolve_change_pct(raw)
+        if change is None or change < 5.0:
+            continue
+        stage = raw.get("stage")
+        phase = raw.get("phase")
+        quality = raw.get("setup_quality") or {}
+        reasons = list(quality.get("reasons") or [])
+        volume_ratio = _number(
+            raw.get("volumeRatio50")
+            or raw.get("volume_ratio_50")
+            or quality.get("vol_ratio_50")
+        )
+        has_volume_evidence = bool(raw.get("volumeSurge")) or (volume_ratio is not None and volume_ratio >= 2.0)
+        if not has_volume_evidence:
+            continue
+        card = _card_to_shortlist_item(raw, scan_time, scan_run_id)
+        card.update({
+            "publication_state": "WATCH_ONLY",
+            "watch_state": "RISING_MOVERS",
+            "watch_change_pct": change,
+            "watch_volume_ratio": volume_ratio,
+            "action": "WATCH ONLY",
+            "action_queue": "rising_movers_watch",
+            "rank_components": {},
+            "total_score": None,
+            "policy_version": None,
+        })
+        if stage in {"S1_basing", "S2_uptrend"} and phase not in {"broken", "declining"}:
+            card["watch_reason"] = "Price/volume surge, but Daily setup is not confirmed"
+            rising.append(card)
+        elif stage in {"S3_distributing", "S4_down"} or phase in {"topping", "breakout_extended", "declining", "broken"} or "extended" in reasons:
+            card["watch_state"] = "CAUTION"
+            card["action"] = "DO NOT CHASE"
+            card["action_queue"] = "caution_watch"
+            card["watch_reason"] = "Price/volume surge in weak, topping, or extended structure"
+            caution.append(card)
+    rising.sort(key=lambda x: (-float(x.get("watch_change_pct") or 0), str(x.get("symbol"))))
+    caution.sort(key=lambda x: (-float(x.get("watch_change_pct") or 0), str(x.get("symbol"))))
+    return rising, caution
+
+
 def _daily_eod_status(as_of: str | None, now: datetime | None = None) -> str | None:
     """Classify today's Daily EOD as market-closed, not stale intraday data."""
     if not as_of:
@@ -320,6 +376,8 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
             },
             "ready": [],
             "pre_ready": [],
+            "rising_movers": [],
+            "caution": [],
             "scan_time": None,
             "scan_run_id": None,
         }
@@ -379,6 +437,12 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
 
     ready_items = [enrich(r) for r in ready]
     pre_items = [enrich(p) for p in pre_ready]
+    rising_items, caution_items = _watch_lane_projection(
+        normalized_items,
+        excluded_symbols={str(x.get("symbol", "")).upper() for x in candidates},
+        scan_time=scan_time,
+        scan_run_id=scan_run_id,
+    )
 
     # Prefer canonical MVP root metadata; item-derived fallback is transitional.
     freshness = (snapshot_meta or {}).get("freshness") or _resolve_freshness(items)
@@ -389,6 +453,8 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         "freshness": freshness,
         "ready": ready_items,
         "pre_ready": pre_items,
+        "rising_movers": rising_items,
+        "caution": caution_items,
         "scan_time": scan_time,
         "scan_run_id": root_run_id or scan_run_id or "",
     }

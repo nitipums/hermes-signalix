@@ -5,6 +5,21 @@ from typing import Any
 
 CONTRACT_VERSION = "signalix.mvp.v1"
 
+# Legacy projection fields are not canonical MVP decision data.  Keeping them
+# in the artifact lets an old group/date leak beside the current Stage/Phase.
+LEGACY_PROJECTION_FIELDS = frozenset({
+    "evidence_summary",
+    "old_group_mapping",
+    "lifecycle_badge",
+})
+
+
+def sanitize_mvp_item(raw: dict) -> dict:
+    """Keep canonical scan fields; remove stale legacy presentation labels."""
+    if not isinstance(raw, dict):
+        raise ValueError("MVP item must be an object")
+    return {key: value for key, value in raw.items() if key not in LEGACY_PROJECTION_FIELDS}
+
 
 def validate_mvp_snapshot(payload: dict, *, expected_run_id=None, expected_item_count=None) -> None:
     if payload.get("contract_version") != CONTRACT_VERSION:
@@ -39,7 +54,7 @@ def build_mvp_snapshot(items: list[dict], *, run_id: str | None,
         raise ValueError("MVP snapshot freshness must be an object")
     normalized = []
     for raw in items:
-        item = dict(raw)
+        item = sanitize_mvp_item(raw)
         provenance = dict(item.get("provenance") or {})
         if run_id is not None:
             provenance["scan_run_id"] = run_id
@@ -69,4 +84,5 @@ def load_mvp_artifact(path):
         raise ValueError("invalid MVP contract_version")
     if not isinstance(payload.get("items"), list):
         raise ValueError("MVP artifact requires an items list")
+    payload["items"] = [sanitize_mvp_item(item) for item in payload["items"]]
     return payload
