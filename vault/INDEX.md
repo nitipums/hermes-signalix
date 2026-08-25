@@ -80,7 +80,7 @@
 
 ## 6. Changelog
 
-- **2026-08-25 (canonical source cutover)**: `release/signalix-mvp-stable` at `3ec48f7` is the current source. `/root/signalix` is the only registered worktree and the only production bind-mount source. Feature/dirty worktrees were retired after audit preservation in `/root/signalix-cleanup-audit-20260825/`.
+- **2026-08-25 (canonical source cutover)**: `release/signalix-mvp-stable` at `3ec48f7` became current. `/root/signalix` is the only registered worktree and production bind-mount source; temporary feature/quarantine/audit copies were retired after stable push.
 
 - **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
 - **2026-08-25 (MVP watch lanes `195a090`)**: added `RISING MOVERS / WATCH ONLY` and `CAUTION / DO NOT CHASE` without weakening READY/PRE_READY; sanitized legacy projection labels at the canonical artifact boundary.

@@ -58,6 +58,8 @@
     drawer:        $("#drawer"),
     drawerOverlay: $("#drawer-overlay"),
     drawerClose:   $("#drawer-close"),
+    drawerPrev:    $("#drawer-prev"),
+    drawerNext:    $("#drawer-next"),
     drawerSymbol:  $("#drawer-symbol"),
     drawerName:    $("#drawer-name"),
     drawerPrice:   $("#drawer-price"),
@@ -103,6 +105,9 @@
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
   let chartSymbol = null;
+  let drawerSymbols = [];
+  let drawerIndex = -1;
+  let drawerTouchStartX = null;
   let chartRequestSeq = 0;
   let chartAbort = null;
 
@@ -400,9 +405,55 @@
     }
   }
 
-  function openDrawer(item, symbol) {
+  function updateDrawerNav() {
+    var hasItems = drawerSymbols.length > 1 && drawerIndex >= 0;
+    dom.drawerPrev.disabled = !hasItems || drawerIndex <= 0;
+    dom.drawerNext.disabled = !hasItems || drawerIndex >= drawerSymbols.length - 1;
+    dom.drawerPrev.title = hasItems ? "Previous stock" : "No previous stock";
+    dom.drawerNext.title = hasItems ? "Next stock" : "No next stock";
+  }
+
+  function visibleDrawerSymbols() {
+    var selector = currentTab === "shortlist"
+      ? "#panel-shortlist .decision-card[data-symbol]"
+      : "#panel-explorer .explorer-card[data-symbol]";
+    return Array.from(document.querySelectorAll(selector)).map(function(card) {
+      return card.getAttribute("data-symbol");
+    }).filter(Boolean);
+  }
+
+  function localShortlistItem(symbol) {
+    if (!shortlistData) return null;
+    var lanes = ["ready", "pre_ready", "rising_movers", "caution"];
+    for (var i = 0; i < lanes.length; i++) {
+      var found = (shortlistData[lanes[i]] || []).find(function(item) { return item.symbol === symbol; });
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function drawerItemForSymbol(symbol) {
+    return localShortlistItem(symbol) || {symbol: symbol, name: symbol, provenance: {}};
+  }
+
+  function navigateDrawer(delta) {
+    var nextIndex = drawerIndex + delta;
+    if (nextIndex < 0 || nextIndex >= drawerSymbols.length) return;
+    var symbol = drawerSymbols[nextIndex];
+    drawerIndex = nextIndex;
+    openDrawer(drawerItemForSymbol(symbol), symbol, drawerSymbols, drawerIndex);
+  }
+
+  function openDrawer(item, symbol, navSymbols, navIndex) {
     var sameSymbolOpen = chartSymbol === symbol && !dom.drawer.classList.contains("drawer--hidden");
     chartSymbol = symbol;
+    if (Array.isArray(navSymbols)) drawerSymbols = navSymbols.slice();
+    if (navIndex != null) drawerIndex = navIndex;
+    else {
+      drawerIndex = drawerSymbols.indexOf(symbol);
+      if (drawerIndex < 0) drawerIndex = -1;
+    }
+    updateDrawerNav();
     var requestSeq = ++chartRequestSeq;
     var requestedTimeframe = chartTimeframe;
     if (chartAbort) chartAbort.abort();
@@ -535,13 +586,29 @@
         provenance: {}
       };
     }
-    openDrawer(item, symbol);
+    var navSymbols = visibleDrawerSymbols();
+    var navIndex = navSymbols.indexOf(symbol);
+    openDrawer(item, symbol, navSymbols, navIndex);
   });
 
   /* ── close drawer ── */
   dom.drawerClose.addEventListener("click", closeDrawer);
   dom.drawerOverlay.addEventListener("click", closeDrawer);
+  dom.drawerPrev.addEventListener("click", function() { navigateDrawer(-1); });
+  dom.drawerNext.addEventListener("click", function() { navigateDrawer(1); });
+  dom.drawer.addEventListener("touchstart", function(e) {
+    if (e.touches && e.touches.length === 1) drawerTouchStartX = e.touches[0].clientX;
+  }, {passive: true});
+  dom.drawer.addEventListener("touchend", function(e) {
+    if (drawerTouchStartX == null || !e.changedTouches || !e.changedTouches.length) return;
+    var delta = e.changedTouches[0].clientX - drawerTouchStartX;
+    drawerTouchStartX = null;
+    if (Math.abs(delta) < 50) return;
+    navigateDrawer(delta > 0 ? -1 : 1);
+  }, {passive: true});
   document.addEventListener("keydown", function(e) {
+    if (e.key === "ArrowLeft" && !dom.drawer.classList.contains("drawer--hidden")) navigateDrawer(-1);
+    if (e.key === "ArrowRight" && !dom.drawer.classList.contains("drawer--hidden")) navigateDrawer(1);
     if (e.key === "Escape" && !dom.drawer.classList.contains("drawer--hidden")) closeDrawer();
   });
 

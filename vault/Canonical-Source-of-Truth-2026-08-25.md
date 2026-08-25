@@ -14,11 +14,7 @@
 
 ## Retired confusion sources
 
-Feature worktrees and the former release-candidate path were retired on 2026-08-25 after their dirty scope was captured in:
-
-`/root/signalix-cleanup-audit-20260825/`
-
-The audit bundle is recovery evidence only. Its patches, untracked-source archives, old branches, generated files, and dated notes are not current implementation authority.
+Feature worktrees, the former release-candidate path, and temporary quarantine copies were retired after the stable branch became canonical. Their cleanup evidence was intentionally removed after the stable GitHub push; no retired path is a current implementation authority.
 
 ## Runtime verification at cutover
 
@@ -34,7 +30,7 @@ The audit bundle is recovery evidence only. Its patches, untracked-source archiv
 
 ## Artifact boundary
 
-`mvp_snapshot.json` and `artifact_manifest.json` are generated runtime artifacts and remain outside Git source authority. The snapshot restored during this cutover came from `/root/signalix-mvp-quarantine/backend/mvp_snapshot.json`; it must be revalidated/rebuilt by the canonical EOD pipeline on the next successful Daily run. Do not copy generated snapshots into vault notes or treat them as source code.
+`mvp_snapshot.json` and `artifact_manifest.json` are generated runtime artifacts and remain outside Git source authority. They must be revalidated/rebuilt by the canonical EOD pipeline on the next successful Daily run. Do not copy generated snapshots into vault notes or treat them as source code.
 
 ## Secret boundary
 

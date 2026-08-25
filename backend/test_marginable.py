@@ -61,7 +61,12 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert '<dt>Trigger</dt>' in html
     assert '<dt>Stop</dt>' in html
     assert 'drawer-margin-rights' not in html
+    assert 'id="drawer-prev"' in html
+    assert 'id="drawer-next"' in html
     assert 'decision-card__risk' in js
+    assert 'visibleDrawerSymbols' in js
+    assert 'touchstart' in js
+    assert 'ArrowLeft' in js
     assert 'marginable=' in js
     assert "margin_rates=" in js
     assert "%Margin " in js

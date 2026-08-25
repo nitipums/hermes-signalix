@@ -310,6 +310,10 @@ body {
   position: sticky; top: 0; background: var(--surface); z-index: 2;
 }
 .drawer-title  { font-size: 16px; font-weight: 700; }
+.drawer-nav { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.drawer-nav-button { min-height:var(--touch); min-width:var(--touch); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text-2); font-size:20px; cursor:pointer; }
+.drawer-nav-button:hover:not(:disabled) { color:var(--accent); border-color:var(--accent); }
+.drawer-nav-button:disabled { opacity:.3; cursor:not-allowed; }
 .drawer-close {
   min-height: var(--touch); min-width: var(--touch);
   display: flex; align-items: center; justify-content: center;

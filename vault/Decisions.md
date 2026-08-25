@@ -8,8 +8,12 @@ Canonical product/architecture decisions for Signalix. Keep concise and cite the
 Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. Daily Shortlist and All Stocks Explorer default to the Krungsri list, with explicit `All stocks` and `Not on Krungsri list` options plus multi-select initial-margin rates (for example `50% + 60%`). Cards show compact `%Margin X%`; drawer shows only `Marginable: X%`.
 Reason: Arm normally trades through this Credit Balance list and wants the decision surface pre-filtered to usable collateral/shorting context. Margin metadata is presentation/filter-only and must not mutate canonical scan eligibility or Daily state. Owner workflow checks for a new PDF monthly; each PDF's effective date is authoritative.
 
+## 2026-08-25 — Drawer stock navigation and cleanup boundary
+Decision: The MVP drawer supports previous/next navigation across the currently visible stock cards on the active surface, via buttons, ArrowLeft/ArrowRight, and horizontal touch swipe. Navigation preserves the same authoritative symbol-detail fetch and chart contract. Retired local Signalix quarantine/audit copies are disposable after stable GitHub cutover; source, runtime artifacts, database volumes, and user research files remain protected.
+Reason: Restore the legacy review flow without reintroducing a second source/worktree or deleting user-owned research data.
+
 ## 2026-08-25 — Canonical MVP source and worktree cutover
-Decision: Treat GitHub `nitipums/hermes-signalix`, branch `release/signalix-mvp-stable`, as the current Signalix MVP source. The canonical local worktree is `/root/signalix`; it is the only registered worktree and is the production Docker bind-mount source. Former feature/release worktrees are retired; their dirty scope is preserved only in `/root/signalix-cleanup-audit-20260825/` for audit/recovery and must not be treated as current implementation.
+Decision: Treat GitHub `nitipums/hermes-signalix`, branch `release/signalix-mvp-stable`, as the current Signalix MVP source. The canonical local worktree is `/root/signalix`; it is the only registered worktree and is the production Docker bind-mount source. Former feature/release worktrees and temporary cleanup copies are retired and must not be treated as current implementation.
 Reason: Multiple dirty worktrees and stale vault notes caused source confusion. One clean stable worktree is now the release authority; generated artifacts remain runtime outputs and secrets remain host-only.
 
 ## Work management — final owner decision 2026-08-23

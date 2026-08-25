@@ -12,7 +12,7 @@ MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-`/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. The former release-candidate and feature worktrees were retired on 2026-08-25; their dirty scope is preserved in `/root/signalix-cleanup-audit-20260825/`, not treated as current source.
+`/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. Former release-candidate/feature worktrees and temporary cleanup copies were retired after stable push; no retired path is treated as current source.
 
 
 ## Reload after edits (CRITICAL)
