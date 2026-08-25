@@ -10,3 +10,5 @@ numpy==1.26.4
 settrade-v2==2.2.1
 PyMuPDF==1.28.2
 python-multipart==0.0.20
+gdown==6.1.0
+yfinance==1.5.2
