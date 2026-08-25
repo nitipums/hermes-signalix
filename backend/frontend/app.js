@@ -81,6 +81,8 @@
     indStop:       $("#ind-stop"),
     indTarget:     $("#ind-target"),
     drawerTarget:   $("#drawer-target"),
+    drawerTrigger:  $("#drawer-trigger"),
+    drawerStop:     $("#drawer-stop"),
     drawerRR:       $("#drawer-rr"),
     drawerMembership: $("#drawer-membership"),
     drawerMargin:   $("#drawer-margin"),
@@ -244,6 +246,11 @@
           '<span>Vol ' + fmtNum(item.avgDailyValue20) + '</span>' +
           marginBadge(item) +
         '</div>' +
+        '<div class="decision-card__risk">' +
+          '<span>Trigger ' + escapeHTML(item.trigger || "NOT_VERIFIED") + '</span>' +
+          '<span>Stop ' + (item.risk_stop != null ? item.risk_stop.toFixed(2) : "NOT_VERIFIED") + '</span>' +
+          '<span>Target ' + (item.target != null ? item.target.toFixed(2) : "NOT_VERIFIED") + '</span>' +
+        '</div>' +
       '</div>';
   }
 
@@ -278,6 +285,8 @@
     dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
     var drawerChg = fmtChange(item.change_pct);
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
+    dom.drawerTrigger.textContent = displayValue(item.trigger);
+    dom.drawerStop.textContent = displayValue(item.risk_stop != null ? Number(item.risk_stop).toFixed(2) : null);
     dom.drawerTarget.textContent = displayValue(item.target != null ? Number(item.target).toFixed(2) : null);
     dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
     dom.drawerMembership.textContent = displayValue((item.index_membership || []).join(" · "));

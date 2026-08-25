@@ -234,6 +234,8 @@ body {
   display: flex; align-items: center; gap: 10px; margin-top: 6px;
   font-size: 11px; color: var(--text-3);
 }
+.decision-card__risk { display:flex; flex-wrap:wrap; gap:8px; margin-top:5px; font-size:11px; color:var(--text-2); }
+.decision-card__risk span { min-width:0; }
 
 /* explorer card (simpler, no trigger/invalidation) */
 .explorer-card {

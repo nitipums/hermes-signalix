@@ -58,7 +58,10 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert 'id="explorer-marginable"' in html
     assert 'class="margin-rate-toggle"' in html
     assert '<dt>Marginable</dt>' in html
+    assert '<dt>Trigger</dt>' in html
+    assert '<dt>Stop</dt>' in html
     assert 'drawer-margin-rights' not in html
+    assert 'decision-card__risk' in js
     assert 'marginable=' in js
     assert "margin_rates=" in js
     assert "%Margin " in js
