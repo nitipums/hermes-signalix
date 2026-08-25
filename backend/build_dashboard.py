@@ -1376,10 +1376,13 @@ def build(scanned=None, run_id=None):
                 )
         finally:
             pg_daily.close()
+    mvp_scan_time = scan_time
+    if run_id and daily_run and daily_run[0] is not None:
+        mvp_scan_time = str(daily_run[0])
     mvp_doc = build_mvp_snapshot(
         items,
         run_id=run_id,
-        scan_time=scan_time,
+        scan_time=mvp_scan_time,
         freshness=mvp_freshness,
         decision_state=resolve_decision_state(
             freshness.get("market_session"),

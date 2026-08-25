@@ -149,9 +149,16 @@
   function formatProvenance(iso) {
     if (!iso) return "–";
     try {
+      // A date-only value has no time-of-day. Never reinterpret it as UTC midnight.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) {
+        var dateOnly = new Date(String(iso) + "T00:00:00Z");
+        return dateOnly.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric", timeZone:"Asia/Bangkok"})
+          + " time unavailable (Bangkok)";
+      }
       var d = new Date(iso);
-      return d.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"2-digit", timeZone:"Asia/Bangkok"})
-        .replace(/,/g, "") + "T" + d.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", hour12:false, timeZone:"Asia/Bangkok"});
+      return d.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric", timeZone:"Asia/Bangkok"})
+        + " " + d.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, timeZone:"Asia/Bangkok"})
+        + " ICT (Bangkok)";
     } catch (e) { return "–"; }
   }
 
@@ -520,7 +527,7 @@
         hide(dom.slLoading);
         hide(dom.slError);
         hide(dom.slEmpty);
-        setFreshness("fresh", data.freshness.as_of);
+        setFreshness("fresh", data.freshness.data_fetched_at || data.freshness.as_of);
 
         var ready = data.ready || [];
         var preReady = data.pre_ready || [];
