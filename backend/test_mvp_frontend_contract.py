@@ -18,10 +18,22 @@ def test_stage_colors_and_rising_lane_are_declared():
 
 
 def test_explorer_filters_are_sent_to_api():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'params += "&stage="' in js
     assert 'params += "&search="' in js
-    assert "explorer-apply" in js
+    assert "explorer-apply" not in html
+    assert "addEventListener(\"change\"" in js
+
+
+def test_chart_timeframes_are_real_controls_not_labels_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for timeframe in ("1D", "1W", "60M"):
+        assert f'data-timeframe="{timeframe}"' in html
+    assert "?timeframe=" in js
+    assert "chart-timeframe" in js
+    assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():

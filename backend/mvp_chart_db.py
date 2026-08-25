@@ -20,6 +20,7 @@ adapter that fills the candles gap without modifying the existing contract.
 from __future__ import annotations
 
 import os
+import datetime as dt
 from typing import Any, Optional
 from threading import Lock
 
@@ -66,23 +67,41 @@ def _release_db_connection(pg: Any, *, close: bool = False) -> None:
 
 # ── Queries (SELECT only, never write) ─────────────────────────────────
 
-def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250) -> list[dict]:
-    """Fetch daily OHLCV candles from price_data, newest first → reversed.
-
-    Returns list of dicts: {date, open, high, low, close, volume}
-    in chronological order (oldest first).
-    """
-    cur.execute(
-        """
-        SELECT date, open, high, low, close, volume
-        FROM price_data
-        WHERE market = %s AND UPPER(symbol) = UPPER(%s) AND instrument_type = 'ORD'
-        ORDER BY date DESC
-        LIMIT %s
-        """,
-        (market, symbol, limit),
-    )
-    rows = cur.fetchall()
+def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+                   timeframe: str = "1D") -> list[dict]:
+    """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
+    timeframe = (timeframe or "1D").upper()
+    if timeframe == "60M":
+        cur.execute("""
+            SELECT ts, open, high, low, close, volume
+            FROM intraday_price_data
+            WHERE UPPER(symbol) = UPPER(%s) AND interval = '60m'
+            ORDER BY ts DESC LIMIT %s
+        """, (symbol, limit))
+        rows = cur.fetchall()
+    else:
+        daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
+        cur.execute("""
+            SELECT date, open, high, low, close, volume
+            FROM price_data
+            WHERE market = %s AND UPPER(symbol) = UPPER(%s) AND instrument_type = 'ORD'
+            ORDER BY date DESC LIMIT %s
+        """, (market, symbol, daily_limit))
+        rows = cur.fetchall()
+        if timeframe in {"1W", "1M"}:
+            periods = {}
+            for stamp, open_, high, low, close, volume in reversed(rows):
+                day = stamp if isinstance(stamp, dt.date) else stamp.date()
+                key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
+                if key not in periods:
+                    periods[key] = [key, open_, high, low, close, float(volume or 0)]
+                else:
+                    p = periods[key]
+                    p[2] = max(p[2], high)
+                    p[3] = min(p[3], low)
+                    p[4] = close
+                    p[5] += float(volume or 0)
+            rows = list(reversed(sorted(periods.values(), key=lambda r: r[0])))[:limit]
     candles: list[dict] = []
     for row in rows:
         candles.append({
@@ -93,9 +112,10 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250) 
             "close": float(row[4]) if row[4] is not None else None,
             "volume": float(row[5]) if row[5] is not None else None,
         })
-    # Reverse to chronological order (oldest first)
-    candles.reverse()
+    if timeframe in {"1D", "60M"}:
+        candles.reverse()
     return candles
+
 
 
 # ── Indicator computations (deterministic, no DB) ──────────────────────
@@ -211,26 +231,14 @@ def _compute_rsi(closes: list[float], period: int = 14) -> list[Optional[float]]
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-def project_chart_db_response(symbol: str) -> Optional[dict]:
-    """Build the GET /api/chart-db/{symbol} response from price_data.
+def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[dict]:
+    """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
-    Returns:
-        {
-          "symbol": str,
-          "candles": [...OHLCV dicts] | None,
-          "ma20": [float|None, ...] | None,
-          "ma50": [float|None, ...] | None,
-          "ma200": [float|None, ...] | None,
-          "macd": {...} | None,
-          "rsi": [float|None, ...] | None,
-          "source": "price_data" | None,
-          "as_of": "YYYY-MM-DD" | None,
-          "provenance": {"source": ..., "as_of": ..., "note": ...}
-        }
-
-    Returns None when symbol is not found in price_data.
-    Returns partial (NOT_VERIFIED) when DB unavailable or query fails.
+    Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
     """
+    timeframe = (timeframe or "1D").upper()
+    if timeframe not in {"1D", "1W", "60M", "1M"}:
+        raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
     pg = _get_db_connection()
     if pg is None:
         return {
@@ -252,7 +260,7 @@ def project_chart_db_response(symbol: str) -> Optional[dict]:
 
     try:
         cur = pg.cursor()
-        candles = _fetch_candles(cur, symbol)
+        candles = _fetch_candles(cur, symbol, timeframe=timeframe)
         cur.close()
     except Exception as e:
         # Fail-graceful: return NOT_VERIFIED
@@ -309,6 +317,7 @@ def project_chart_db_response(symbol: str) -> Optional[dict]:
 
     return {
         "symbol": symbol.upper(),
+        "timeframe": timeframe,
         "candles": candles,
         "ma20": ma20,
         "ma50": ma50,

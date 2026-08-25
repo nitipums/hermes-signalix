@@ -118,7 +118,6 @@
           <label class="explorer-control explorer-search">Search
             <input id="explorer-search" type="search" inputmode="search" placeholder="Symbol / name" aria-label="Search symbol or name">
           </label>
-          <button id="explorer-apply" class="btn btn--filter" type="button">Apply</button>
         </div>
         <div id="explorer-cards" class="card-list card-list--explorer"></div>
 
@@ -161,22 +160,28 @@
           <div id="drawer-chart" class="drawer-chart">
             <canvas id="drawer-canvas" width="720" height="420"></canvas>
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
-            <div class="chart-controls" aria-label="Chart layers">
-              <button type="button" class="chart-toggle is-active" data-layer="candles">OHLC</button>
-              <button type="button" class="chart-toggle is-active" data-layer="volume">VOL</button>
-              <button type="button" class="chart-toggle is-active" data-layer="ma">MA</button>
-              <button type="button" class="chart-toggle is-active" data-layer="rsi">RSI</button>
-            </div>
-            <div class="drawer-indicator-legend" aria-label="Chart overlays">
-              <span>MA20 <em id="ind-ma20">–</em></span>
-              <span>MA50 <em id="ind-ma50">–</em></span>
-              <span>MA200 <em id="ind-ma200">–</em></span>
-              <span>MACD <em id="ind-macd">–</em></span>
-              <span>RSI <em id="ind-rsi">–</em></span>
-              <span>Trigger <em id="ind-trigger">–</em></span>
-              <span>Stop <em id="ind-stop">–</em></span>
-              <span>Target <em id="ind-target">–</em></span>
-            </div>
+          </div>
+          <div class="chart-timeframe-controls" aria-label="Chart timeframe">
+            <span class="chart-control-label">Timeframe</span>
+            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">Day</button>
+            <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
+            <button type="button" class="chart-timeframe" data-timeframe="60M">Hour</button>
+          </div>
+          <div class="chart-controls" aria-label="Chart layers">
+            <button type="button" class="chart-toggle is-active" data-layer="candles">OHLC</button>
+            <button type="button" class="chart-toggle is-active" data-layer="volume">VOL</button>
+            <button type="button" class="chart-toggle is-active" data-layer="ma">MA</button>
+            <button type="button" class="chart-toggle is-active" data-layer="rsi">RSI</button>
+          </div>
+          <div class="drawer-indicator-legend" aria-label="Chart overlays">
+            <span>MA20 <em id="ind-ma20">–</em></span>
+            <span>MA50 <em id="ind-ma50">–</em></span>
+            <span>MA200 <em id="ind-ma200">–</em></span>
+            <span>MACD <em id="ind-macd">–</em></span>
+            <span>RSI <em id="ind-rsi">–</em></span>
+            <span>Trigger <em id="ind-trigger">–</em></span>
+            <span>Stop <em id="ind-stop">–</em></span>
+            <span>Target <em id="ind-target">–</em></span>
           </div>
 
           <dl class="drawer-fields">

@@ -333,11 +333,13 @@ body {
   margin-bottom: 8px; display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
-.drawer-chart .drawer-indicator-legend { position:absolute; right:8px; top:8px; display:flex; flex-direction:column; align-items:flex-end; gap:3px; margin:0; font-size:10px; color:var(--text-3); }
-.drawer-chart .drawer-indicator-legend span { background:rgba(10,14,23,.82); border:1px solid var(--border); border-radius:3px; padding:2px 5px; }
+.drawer-chart .drawer-indicator-legend { position:static; }
 .drawer-chart canvas { width: 100%; height: 100%; }
 .chart-placeholder { font-size: 13px; color: var(--text-3); }
-.chart-controls { position:absolute; left:8px; top:8px; display:flex; gap:4px; z-index:2; }
+.chart-controls, .chart-timeframe-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:8px 0; }
+.chart-control-label { font-size:10px; color:var(--text-3); margin-right:2px; }
+.chart-timeframe { min-height:30px; padding:0 10px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--text-2); font-size:11px; cursor:pointer; }
+.chart-timeframe.is-active { color:var(--accent); border-color:var(--accent); }
 .chart-toggle { min-height:28px; padding:0 7px; border:1px solid var(--border); border-radius:3px; background:rgba(10,14,23,.82); color:var(--text-3); font-size:10px; cursor:pointer; }
 .chart-toggle.is-active { color:var(--accent); border-color:var(--accent); }
 

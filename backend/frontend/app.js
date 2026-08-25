@@ -50,7 +50,6 @@
     exPageInfo:    $("#explorer-page-info"),
     exStage:       $("#explorer-stage"),
     exSearch:      $("#explorer-search"),
-    exApply:       $("#explorer-apply"),
 
     // drawer
     drawer:        $("#drawer"),
@@ -95,6 +94,8 @@
   let explorerSearch = "";
   let shortlistData = null;
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
+  let chartTimeframe = "1D";
+  let chartSymbol = null;
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -367,6 +368,7 @@
   }
 
   function openDrawer(item, symbol) {
+    chartSymbol = symbol;
     // Immediate render from local card data (fast path).
     renderDrawerDetail(item);
 
@@ -394,7 +396,7 @@
       .catch(function() { /* keep card-local detail on failure */ });
 
     // Fetch DB-backed candles first; snapshot overlay is fallback only.
-    fetch("/api/chart-db/" + encodeURIComponent(symbol))
+    fetch("/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(chartTimeframe))
       .then(function(res) {
         if (!res.ok) throw new Error("DB chart HTTP " + res.status);
         return res.json();
@@ -639,12 +641,25 @@
   dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
   });
-  dom.exApply.addEventListener("click", function() {
+  dom.exStage.addEventListener("change", function() {
     explorerStage = dom.exStage.value;
-    explorerSearch = dom.exSearch.value.trim();
     loadExplorer(1);
   });
-  dom.exSearch.addEventListener("keydown", function(e) { if (e.key === "Enter") dom.exApply.click(); });
+  var explorerSearchTimer = null;
+  dom.exSearch.addEventListener("input", function() {
+    clearTimeout(explorerSearchTimer);
+    explorerSearch = dom.exSearch.value.trim();
+    explorerSearchTimer = setTimeout(function() { loadExplorer(1); }, 250);
+  });
+  $$(".chart-timeframe").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      chartTimeframe = btn.getAttribute("data-timeframe") || "1D";
+      $$(".chart-timeframe").forEach(function(other) { other.classList.toggle("is-active", other === btn); });
+      if (chartSymbol) {
+        openDrawer({symbol: chartSymbol, name: chartSymbol}, chartSymbol);
+      }
+    });
+  });
   $$(".chart-toggle").forEach(function(btn) {
     btn.addEventListener("click", function() {
       var layer = btn.getAttribute("data-layer");

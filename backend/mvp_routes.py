@@ -87,7 +87,11 @@ def handle_mvp_api(path, handler) -> bool:
         if not symbol:
             json_response(handler, {"error": "symbol required"}, status=400); return True
         import mvp_chart_db
-        result = mvp_chart_db.project_chart_db_response(symbol)
+        timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
+        try:
+            result = mvp_chart_db.project_chart_db_response(symbol, timeframe=timeframe)
+        except ValueError as exc:
+            json_response(handler, {"error": str(exc)}, status=400); return True
         if result is None: _not_found(handler, symbol)
         else: json_response(handler, result)
         return True
@@ -99,7 +103,11 @@ def handle_mvp_api(path, handler) -> bool:
         result = mvp_chart.project_chart_response(items, symbol)
         if not result or not (result.get("candles") or []):
             import mvp_chart_db
-            result = mvp_chart_db.project_chart_db_response(symbol) or result
+            timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
+            try:
+                result = mvp_chart_db.project_chart_db_response(symbol, timeframe=timeframe) or result
+            except ValueError as exc:
+                json_response(handler, {"error": str(exc)}, status=400); return True
         if result is None: _not_found(handler, symbol)
         else: json_response(handler, result)
         return True
