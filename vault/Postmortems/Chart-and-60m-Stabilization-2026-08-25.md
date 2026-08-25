@@ -1,6 +1,6 @@
 # Chart Latency and 60m Feed Stabilization — 2026-08-25
 
-> **STATUS: CURRENT** · Stable candidate `release/signalix-mvp-stable` · commit `595eb49` (chart/filter follow-up)
+> **STATUS: HISTORICAL** · Prior stable-candidate evidence; superseded as source authority by `Canonical-Source-of-Truth-2026-08-25.md`
 
 ## Chart latency
 

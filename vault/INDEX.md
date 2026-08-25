@@ -28,7 +28,8 @@
 |---|---|---|---|
 || `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
 || `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
-| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP candidate `595eb49` |
+|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP `3ec48f7` |
+|| `Canonical-Source-of-Truth-2026-08-25.md` | Current repo/worktree/runtime authority | ✅ current | Sole source authority after cutover |
 | `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
@@ -45,7 +46,7 @@
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 | `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
 | `2026-08-21-Intraday-Feed-Availability-Handoff.md` | 11 unavailable 60m feeds + COLOR boundary | ✅ current | feed-specific cooldown; Daily preserved |
-| `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | ✅ current | stable candidate `595eb49` |
+|| `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | 🟡 historical evidence | prior candidate; not source authority |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -77,6 +78,8 @@
 6. *(ว่าง — reopen เมื่อเจองานใหม่)*
 
 ## 6. Changelog
+
+- **2026-08-25 (canonical source cutover)**: `release/signalix-mvp-stable` at `3ec48f7` is the current source. `/root/signalix` is the only registered worktree and the only production bind-mount source. Feature/dirty worktrees were retired after audit preservation in `/root/signalix-cleanup-audit-20260825/`.
 
 - **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
 - **2026-08-25 (MVP watch lanes `195a090`)**: added `RISING MOVERS / WATCH ONLY` and `CAUTION / DO NOT CHASE` without weakening READY/PRE_READY; sanitized legacy projection labels at the canonical artifact boundary.

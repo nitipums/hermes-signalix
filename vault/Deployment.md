@@ -6,17 +6,17 @@
 
 ```text
 branch: release/signalix-mvp-stable
-release candidate: 595eb49 (`fix: improve explorer filters and chart timeframes`)
-source: /root/signalix-release-candidate
+release: 3ec48f7 (`fix: preserve Daily run lineage in EOD dashboard build`)
+source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-The release tree is the production bind mount. `/root/signalix` remains rollback-only and must not be used as the active service source. The stable candidate is served by `signalix_dashboard` from `/root/signalix-release-candidate/backend`.
+`/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. The former release-candidate and feature worktrees were retired on 2026-08-25; their dirty scope is preserved in `/root/signalix-cleanup-audit-20260825/`, not treated as current source.
 
 
 ## Reload after edits (CRITICAL)
-For this bind-mounted release candidate, a dashboard-only Python/UI change is
+For this bind-mounted stable worktree, a dashboard-only Python/UI change is
 reloaded with:
 ```bash
 docker restart signalix_dashboard
@@ -39,9 +39,9 @@ after the restart; a successful restart alone is not acceptance evidence.
 | `SETTRADE_*` | Settrade Open API creds (in `settradeupdated.env`) |
 
 ## systemd timers (host, not docker)
-- `signalix-update.timer` — weekday EOD ingestion + Daily scan at 18:30 Bangkok. Its canonical source is `/root/signalix-release-candidate/backend/update_data.service`; the deployed unit must be byte-identical. Daily path does **not** run full intraday; `signalix-intraday.service` owns 60m fetching. `ExecStartPost` runs `verify_mvp_only.py` against the canonical MVP artifact and latest Daily run.
+- `signalix-update.timer` — weekday EOD ingestion + Daily scan at 18:30 Bangkok. Its canonical source is `/root/signalix/backend/update_data.service`; the deployed unit must be byte-identical. Daily path does **not** run full intraday; `signalix-intraday.service` owns 60m fetching. `ExecStartPost` runs `verify_mvp_only.py` against the canonical MVP artifact and latest Daily run.
 - `signalix-eod-healthcheck.timer` — weekday EOD freshness watchdog at 20:00 Bangkok. It checks the latest `price_data` date, latest Daily scan date, service result, and writes durable JSONL/state evidence to `/root/signalix/eod_healthcheck_log.jsonl` and `/root/signalix/eod_healthcheck_observations.json`.
-- `signalix-intraday.timer` — every 30 minutes in guarded Bangkok weekday time blocks; `signalix-intraday.service` fetches/evaluates **active 60m only**. The fetch is active ORD after `intraday_feed_status` cooldown filtering; `--intraday-limit` means bars per symbol, not symbol count. Settrade empty responses are marked feed-unavailable for 24 hours immediately; Daily/EOD remains available. After upsert/evaluation, intraday rebuilds from the latest canonical Daily DB observations and does not run a Daily scan. `ExecStopPost` runs from `/root/signalix-release-candidate` using the package module path. Validate `OnCalendar` with `systemd-analyze calendar` after edits.
+- `signalix-intraday.timer` — every 30 minutes in guarded Bangkok weekday time blocks; `signalix-intraday.service` fetches/evaluates **active 60m only**. The fetch is active ORD after `intraday_feed_status` cooldown filtering; `--intraday-limit` means bars per symbol, not symbol count. Settrade empty responses are marked feed-unavailable for 24 hours immediately; Daily/EOD remains available. After upsert/evaluation, intraday rebuilds from the latest canonical Daily DB observations and does not run a Daily scan. `ExecStopPost` runs from `/root/signalix` using the package module path. Validate `OnCalendar` with `systemd-analyze calendar` after edits.
 - `signalix-intraday-watchdog.timer` — independent freshness monitor. It tolerates expected `partial_success`, checks `intraday_price_data` at a cadence-aware 90-minute threshold, checks evaluator state at 30 minutes, and writes structured JSONL evidence.
 - `signalix-profile-refresh.timer` — low-frequency weekday Yahoo fallback metadata cache refresh; `refresh_company_profiles.py` is constrained to active `ORD` rows and records failures/backoff in PostgreSQL. It is context-only and must not feed signal calculations.
 - `signalix-factsheet-refresh.timer` — bounded weekday SET factsheet refresh, active ORD only, 20 symbols per run, persisted JSONL progress, upserts `set_factsheet` fields without overwriting stronger existing evidence. It is the authoritative profile-source refresh; Yahoo remains fallback.

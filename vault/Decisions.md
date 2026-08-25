@@ -4,6 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
+## 2026-08-25 — Canonical MVP source and worktree cutover
+Decision: Treat GitHub `nitipums/hermes-signalix`, branch `release/signalix-mvp-stable`, as the current Signalix MVP source. The canonical local worktree is `/root/signalix`; it is the only registered worktree and is the production Docker bind-mount source. Former feature/release worktrees are retired; their dirty scope is preserved only in `/root/signalix-cleanup-audit-20260825/` for audit/recovery and must not be treated as current implementation.
+Reason: Multiple dirty worktrees and stale vault notes caused source confusion. One clean stable worktree is now the release authority; generated artifacts remain runtime outputs and secrets remain host-only.
+
 ## Work management — final owner decision 2026-08-23
 
 Decision: **Markdown `Execution-Pipeline.md` is the active Signalix work source. Kanban is audit/archive only and must not be used for new dispatches.** Focused executable plans live under `/root/signalix/.hermes/plans/` and must link back to the pipeline row.
