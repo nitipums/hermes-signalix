@@ -157,6 +157,72 @@ def _result_sort_key(result):
     return (result.get("state_rank", 9), result.get("forming_rank", 9), -int(bool((result.get("data") or {}).get("freshness") == "fresh")), distance_key, float(contraction) if contraction is not None else 999999.0, -(float(breakout) if breakout is not None else 0.0), -len(latest), result.get("symbol", ""))
 
 
+def load_observed_ath(pg, symbols, as_of=None):
+    if not symbols:
+        return {}
+    cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = "SELECT symbol, MAX(high) AS ath FROM price_data WHERE market='TH' AND (instrument_type='ORD' OR instrument_type IS NULL) AND symbol=ANY(%s)"
+    params = [symbols]
+    if as_of is not None:
+        query += " AND date <= %s"
+        params.append(as_of.date() if hasattr(as_of, "date") else as_of)
+    query += " GROUP BY symbol"
+    cur.execute(query, tuple(params))
+    rows = {r["symbol"]: {"observed_ath_all_time": float(r["ath"]) if r["ath"] is not None else None, "source": "price_data", "as_of": str(as_of) if as_of else None} for r in cur.fetchall()}
+    cur.close()
+    return rows
+
+
+def _classify_types(result, *, ath_context=None, listing_context=None):
+    ath_context = ath_context or {}
+    listing_context = listing_context or {}
+    state = result.get("state")
+    price = result.get("price") or {}
+    pattern = result.get("pattern") or {}
+    evidence = result.get("evidence") or {}
+    close = price.get("last_close")
+    pivot = price.get("pivot_high")
+    base_depth = pattern.get("base_depth_pct")
+    latest_contraction = pattern.get("latest_contraction_pct")
+    distance = price.get("distance_to_pivot_pct")
+    ath = ath_context.get("observed_ath_all_time")
+    ath_distance = ((close / ath) - 1) * 100 if close is not None and ath else None
+    low_cheat = bool(
+        evidence.get("price_contraction_pass") and evidence.get("leg_volume_pass")
+        and pattern.get("pivots") and base_depth is not None and base_depth <= 15
+        and latest_contraction is not None and latest_contraction <= 8
+        and distance is not None and distance <= 5
+        and ath_distance is not None and ath_distance >= -10
+        and state not in {"NOT_VERIFIED", "STALE", "FAILED"}
+    )
+    base_type = "low_cheat_vcp" if low_cheat else ("standard_vcp" if pattern.get("pivots") and evidence.get("price_contraction_pass") else None)
+    break_ath = bool(ath and close is not None and close >= ath * 1.005)
+    listing_date = listing_context.get("listing_date")
+    new_stock = bool(listing_date and listing_context.get("age_calendar_days") is not None and listing_context["age_calendar_days"] <= 120)
+    overlays = []
+    if break_ath: overlays.append("break_ath")
+    if new_stock: overlays.append("new_stock")
+    types = ([base_type] if base_type else []) + overlays
+    result["vcp_type"] = {
+        "base_type": base_type,
+        "overlays": overlays,
+        "types": types,
+        "primary_type": "break_ath" if break_ath else ("new_stock" if new_stock else base_type),
+        "type_evidence": {
+            "observed_ath_all_time": ath,
+            "ath_distance_pct": ath_distance,
+            "break_ath_price_pass": break_ath,
+            "listing_date": listing_date,
+            "new_stock_age_calendar_days": listing_context.get("age_calendar_days"),
+            "low_cheat_base_depth_pct": base_depth,
+            "low_cheat_latest_contraction_pct": latest_contraction,
+            "low_cheat_distance_to_pivot_pct": distance,
+        },
+        "type_policy_version": "signalix/vcp-types-v1-candidate",
+    }
+    return result
+
+
 def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=None,
                           ingestion_run_id=None, ingestion_status=None, fetch_completed_at=None):
     cfg = config or VCP60Config()
@@ -167,6 +233,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     rows = load_vcp_60m_rows(pg, eligible, as_of=observed_as_of)
     daily_context = load_daily_trend_context(pg, eligible, as_of=observed_as_of)
     daily_metrics = load_daily_metrics(pg, eligible, as_of=observed_as_of)
+    ath_context = load_observed_ath(pg, eligible, as_of=observed_as_of)
     feed_status = {}
     if eligible:
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -188,6 +255,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
         result["data"]["feed_retry_at"] = str(feed_status.get(symbol, {}).get("retry_at")) if feed_status.get(symbol, {}).get("retry_at") else None
         result["data"]["feed_last_success_at"] = str(feed_status.get(symbol, {}).get("last_success_at")) if feed_status.get(symbol, {}).get("last_success_at") else None
         result["data"]["daily_metrics"] = daily_metrics.get(symbol, {})
+        result = _classify_types(result, ath_context=ath_context.get(symbol), listing_context=None)
         result["provenance"]["run_id"] = run_id
         result["provenance"]["market"] = market.upper()
         result["provenance"]["ingestion_run_id"] = ingestion_run_id

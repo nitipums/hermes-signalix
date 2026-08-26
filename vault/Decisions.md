@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — VCP type taxonomy pending sample validation
+## 2026-08-26 — VCP type candidate implementation
+Decision: Add candidate metadata `vcp_type.base_type`, `vcp_type.overlays`, `vcp_type.types`, `type_evidence`, and `type_policy_version` without changing state/actionability. Historical `price_data` is the observed ATH source. `new_stock` remains unassigned until listing-date provenance exists.
+Reason: Enable sample-driven type review while preserving the stable VCP state machine and full-universe evidence.
+
 Decision: Treat `break_ath`, `new_stock`, `low_cheat_vcp`, and `standard_vcp` as candidate VCP types for the next v1 fine-tuning pass. Keep type separate from state/actionability; no type alone can promote READY/CONFIRMED.
 Reason: Arm wants distinct VCP archetypes without locking ambiguous rules before reviewing real sample cases.
 

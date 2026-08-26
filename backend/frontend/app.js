@@ -686,7 +686,11 @@
     var cls = state.toLowerCase().replace(/_/g, "-");
     var reason = (result.reasons || result.reason_codes || []).join(" · ");
     var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
-    var tags = [];
+    var typeInfo = result.vcp_type || {};
+    var typeTags = [];
+    if (typeInfo.base_type) typeTags.push(typeInfo.base_type === "low_cheat_vcp" ? "LOW-CHEAT" : "STANDARD");
+    (typeInfo.overlays || []).forEach(function(type){ typeTags.push(type === "break_ath" ? "BREAK ATH" : type === "new_stock" ? "NEW" : type); });
+    var tags = typeTags;
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
     if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
     var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
