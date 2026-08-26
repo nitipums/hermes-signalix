@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — Separate price-event review lanes from VCP confirmation
+## 2026-08-26 — 60m-only confirmation correction
+Decision: VCP lifecycle `trend_pass` uses 60m evidence only. Daily trend remains supporting context and may produce `DAILY_CONTEXT_WATCH`, but cannot promote `READY`, `CONFIRMED`, or structural VCP state. Re-run after correction showed TWP downgrade from invalid prior `CONFIRMED` to review-only `BREAKOUT_WATCH`.
+Reason: Prevent a Daily-context OR fallback from creating a misleading 60m confirmation.
+
 Decision: Add `review_lane` overlays for price/volume breakout, pivot-touch volume watch, close-breakout volume pending, and insurance context. These lanes surface BGRIM/TIPH/AOT/BH-style evidence without changing VCP lifecycle state or `CONFIRMED` requirements.
 Reason: Current strict VCP gates were correct but hid useful price-event context from the fast review queue; user needs take-action context without false confirmation.
 

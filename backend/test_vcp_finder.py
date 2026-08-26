@@ -57,6 +57,11 @@ def test_invalid_and_duplicate_rows_are_reported():
     json.dumps(result)
 
 
+def test_daily_context_cannot_promote_60m_trend():
+    result = find_vcp_60m(pd.DataFrame(bars(100)), daily_context={"trend_pass": True})
+    assert result["trend"]["pass"] is result["trend"]["pass_60m"]
+
+
 def test_review_lanes_keep_confirmation_separate():
     common = {"freshness": "fresh", "last_close": 100.0, "failure": 90.0}
     assert _review_lane(close_pass=True, volume_confirmed=True, structure_pass=False, distance_pct=2.0, **common) == "PRICE_VOLUME_BREAKOUT"

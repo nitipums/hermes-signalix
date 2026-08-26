@@ -252,7 +252,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     daily_context = daily_context or {}
     daily_trend_pass = bool(daily_context.get("trend_pass"))
     trend_pass_60m = last_close > float(ema20.iloc[-1]) and (ema_slope or 0) > 0 and prior_return > 0
-    trend_pass = bool(trend_pass_60m or daily_trend_pass)
+    trend_pass = bool(trend_pass_60m)
     result_base = _empty_result("FORMING", [], data=data, as_of=observed_as_of, config=cfg)
     result_base["data"] = data
     result_base["trend"] = {"ema20": _plain(float(ema20.iloc[-1])), "ema20_slope_pct": _plain(ema_slope), "prior_trend_return_pct": _plain(prior_return), "pass_60m": bool(trend_pass_60m), "daily_context_pass": daily_trend_pass, "daily_context": daily_context, "pass": bool(trend_pass)}

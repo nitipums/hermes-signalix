@@ -20,6 +20,8 @@ The candidate implementation separates **type** from **state/actionability**:
 
 This taxonomy is still under sample validation. Types never promote READY/CONFIRMED by themselves, and full-universe retention remains unchanged.
 
+The 60m lifecycle trend gate is strict: Daily trend context cannot promote 60m `READY` or `CONFIRMED`; it is used only by context overlays.
+
 ## Review lanes
 
 The current VCP lifecycle state remains authoritative. A separate `review_lane` preserves actionable context when a price/volume event exists before full VCP morphology qualifies:
