@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — VCP type candidate implementation
+## 2026-08-26 — One-month VCP replay baseline
+Decision: Preserve a one-month append-only point-in-time VCP replay baseline using 20 daily as-of snapshots and full 931-symbol retention. Use it for logic review only; do not call the forward proxy a win rate or final accuracy. Exact 60m breakout timing remains a follow-up replay pass.
+Reason: Establish empirical evidence before locking VCP v1/type thresholds while preserving no-lookahead and live-run isolation.
+
 Decision: Add candidate metadata `vcp_type.base_type`, `vcp_type.overlays`, `vcp_type.types`, `type_evidence`, and `type_policy_version` without changing state/actionability. Historical `price_data` is the observed ATH source. `new_stock` remains unassigned until listing-date provenance exists.
 Reason: Enable sample-driven type review while preserving the stable VCP state machine and full-universe evidence.
 
