@@ -21,6 +21,14 @@
     tabExplorer:     $("#tab-explorer"),
     panelShortlist:  $("#panel-shortlist"),
     panelExplorer:   $("#panel-explorer"),
+    tabDailyVcp:     $("#tab-daily-vcp"),
+    panelDailyVcp:   $("#panel-daily-vcp"),
+    dailyVcpLoading: $("#daily-vcp-loading"),
+    dailyVcpError:   $("#daily-vcp-error"),
+    dailyVcpErrorMsg: $("#daily-vcp-error-msg"),
+    dailyVcpContent: $("#daily-vcp-content"),
+    dailyVcpCards:   $("#daily-vcp-cards"),
+    dailyVcpMeta:    $("#daily-vcp-meta"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -110,7 +118,7 @@
   };
 
   /* ── state ── */
-  let currentTab = "vcp";
+  let currentTab = "daily-vcp";
   let explorerPage = 1;
   let explorerTotalPages = 1;
   let explorerStage = "";
@@ -457,8 +465,8 @@
   }
 
   function visibleDrawerSymbols() {
-    var selector = currentTab === "shortlist"
-      ? "#panel-shortlist .decision-card[data-symbol]"
+    var selector = currentTab === "daily-vcp"
+      ? "#panel-daily-vcp .vcp-card[data-symbol]"
       : currentTab === "vcp"
         ? "#panel-vcp .vcp-card[data-symbol]"
         : "#panel-explorer .explorer-card[data-symbol]";
@@ -692,13 +700,30 @@
     return ({CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
   }
 
-  function renderVcpResults(results) {
+  function renderVcpResults(results, target) {
+    target = target || dom.vcpCards;
     var order = ["CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
-    dom.vcpCards.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
+    target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
       return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
     }).join("") || '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+  }
+
+  function loadDailyVcp() {
+    show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
+    fetch("/api/vcp-finder?interval=60m&market=TH&actionable=true")
+      .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function(data){
+        hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
+        vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
+        vcpResultsBySymbol = {};
+        var results = (data.results || []).filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0; });
+        results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " actionable / " + ((data.universe || {}).evaluated || 0) + " evaluated";
+        renderVcpResults(results, dom.dailyVcpCards);
+      })
+      .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); dom.dailyVcpErrorMsg.textContent = "Unable to load Daily VCP shortlist: " + err.message; });
   }
 
   function loadVcp() {
@@ -732,26 +757,19 @@
   /* ── tab switching ── */
   function switchTab(tab) {
     currentTab = tab;
-    dom.tabShortlist.classList.toggle("nav-tab--active", tab === "shortlist");
-    dom.tabShortlist.setAttribute("aria-selected", tab === "shortlist");
-    dom.tabExplorer.classList.toggle("nav-tab--active", tab === "explorer");
-    dom.tabExplorer.setAttribute("aria-selected", tab === "explorer");
+    dom.tabDailyVcp.classList.toggle("nav-tab--active", tab === "daily-vcp");
+    dom.tabDailyVcp.setAttribute("aria-selected", tab === "daily-vcp");
     dom.tabVcp.classList.toggle("nav-tab--active", tab === "vcp");
     dom.tabVcp.setAttribute("aria-selected", tab === "vcp");
-
-    dom.panelShortlist.classList.toggle("panel--active", tab === "shortlist");
-    dom.panelShortlist.classList.toggle("panel--hidden", tab !== "shortlist");
-    dom.panelExplorer.classList.toggle("panel--active", tab === "explorer");
-    dom.panelExplorer.classList.toggle("panel--hidden", tab !== "explorer");
+    dom.panelDailyVcp.classList.toggle("panel--active", tab === "daily-vcp");
+    dom.panelDailyVcp.classList.toggle("panel--hidden", tab !== "daily-vcp");
     dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
     dom.panelVcp.classList.toggle("panel--hidden", tab !== "vcp");
-
-    if (tab === "explorer") loadExplorer(1);
+    if (tab === "daily-vcp") loadDailyVcp();
     if (tab === "vcp") loadVcp();
   }
 
-  dom.tabShortlist.addEventListener("click", function() { switchTab("shortlist"); });
-  dom.tabExplorer.addEventListener("click", function() { switchTab("explorer"); });
+  dom.tabDailyVcp.addEventListener("click", function() { switchTab("daily-vcp"); });
   dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
   dom.vcpState.addEventListener("change", loadVcp);
   dom.vcpRetry.addEventListener("click", loadVcp);
@@ -988,5 +1006,5 @@
 
   /* ── init ── */
   setFreshness("loading");
-  loadVcp();
+  loadDailyVcp();
 })();

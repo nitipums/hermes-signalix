@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — VCP Finder is the primary MVP surface
+## 2026-08-26 — Daily VCP Shortlist and All VCP split
+Decision: Split the VCP-first MVP into two visible surfaces: `Daily VCP Shortlist` as the fastest default page showing only actionable review (`READY`, `NEAR_TRIGGER`, `CONFIRMED`), and `All VCP · 60m` as the current full-universe table with forming/state filters. Retire the former Daily Shortlist and All Stocks Explorer from visible MVP navigation while preserving backend/history for rollback and audit.
+Reason: Arm wants a minimal fast review queue without losing access to the complete VCP universe and evidence.
+
 Decision: Make VCP Finder · 60m the default/primary owner-only MVP surface. Remove Daily Shortlist from visible MVP navigation; retain backend/routes and historical evidence for rollback. Keep Explorer only as secondary Research / Full Universe. VCP presentation uses compact tables with Symbol, Price, % Change, Distance, and R/R; contraction/breakout volume remain evidence-driven sorting inputs. Price ranges are multi-select; margin rates use Select all/Clear/Apply. Missing index or margin metadata produces no tag, never a `NOT_VERIFIED` placeholder.
 Reason: Arm uses VCP Finder as the core workflow and needs dense, sortable opportunity review without oversized cards or refresh-on-every-filter-click.
 

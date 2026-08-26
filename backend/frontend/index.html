@@ -19,21 +19,28 @@
       </div>
     </header>
 
-    <!-- nav tabs -->
     <nav class="nav" role="tablist" aria-label="Surface">
-      <button id="tab-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-vcp">
-        VCP Finder · 60m
+      <button id="tab-daily-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-daily-vcp">
+        Daily VCP Shortlist
       </button>
-      <button id="tab-shortlist" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-shortlist">
-        Daily Setups
-      </button>
-      <button id="tab-explorer" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-explorer">
-        Research / Full Universe
+      <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
+        All VCP · 60m
       </button>
     </nav>
 
-    <!-- ── VCP Finder panel ── -->
-    <main id="panel-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-vcp">
+    <!-- ── Daily VCP Shortlist panel ── -->
+    <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
+      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading Daily VCP shortlist…</p></section>
+      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load Daily VCP shortlist.</p></section>
+      <section id="daily-vcp-content" class="state--hidden">
+        <p class="explorer-note">Actionable 60m VCP review only · not an automatic buy signal.</p>
+        <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
+        <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
+      </section>
+    </main>
+
+    <!-- ── All VCP panel ── -->
+    <main id="panel-vcp" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-vcp">
       <section id="vcp-loading" class="state state--hidden" aria-live="polite">
         <div class="state-icon">⌛</div><p class="state-text">Loading 60m VCP finder…</p>
       </section>

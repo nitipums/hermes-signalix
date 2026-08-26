@@ -387,7 +387,7 @@ body {
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }
 
-#tab-shortlist, #panel-shortlist { display:none !important; }
+#tab-shortlist, #panel-shortlist, #tab-explorer, #panel-explorer { display:none !important; }
 .vcp-table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
 .vcp-table { width:100%; border-collapse:collapse; min-width:0; font-size:.82rem; table-layout:fixed; }
 .vcp-table th, .vcp-table td { padding:10px 12px; border-bottom:1px solid var(--border); text-align:right; white-space:nowrap; }

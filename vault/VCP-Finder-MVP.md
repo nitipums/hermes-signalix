@@ -5,9 +5,9 @@
 
 ## Product surface
 
-- `/mvp` opens on **VCP Finder · 60m**.
-- Daily Shortlist is removed from visible MVP navigation; its backend/API and historical notes remain preserved for rollback/audit.
-- Research / Full Universe is secondary research/audit only.
+- `/mvp` opens on **Daily VCP Shortlist**, the fast actionable-only view.
+- **All VCP · 60m** is the full current VCP universe view with forming/state filters and audit coverage.
+- The former Daily Shortlist and All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical notes remain preserved for rollback/audit.
 
 ## Table contract
 

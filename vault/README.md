@@ -15,7 +15,7 @@ real-time alerts to **Telegram**.
 |-------|-------|-------|
 | Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
-| Dashboard (web) | ✅ Current stable MVP | owner-only `/mvp`, port 3001; VCP Finder · 60m is the primary surface; research-only Explorer remains secondary |
+| Dashboard (web) | ✅ Current stable MVP | owner-only `/mvp`, port 3001; Daily VCP Shortlist is the fast primary view; All VCP · 60m is the full current view |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ✅ Done | Redis `signals` → `signalix_delivery` → Telegram |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |

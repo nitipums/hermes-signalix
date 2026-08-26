@@ -71,11 +71,11 @@ The owner-only MVP is VCP-first:
 
 ```text
 /mvp
-  ├─ VCP Finder · 60m       primary, compact sortable tables
-  └─ Research / Full Universe secondary audit route
+  ├─ Daily VCP Shortlist  primary fast view: actionable review only
+  └─ All VCP · 60m       full VCP universe / forming / audit view
 ```
 
-Daily Shortlist is removed from the visible MVP navigation but its backend/API and historical evidence remain preserved for rollback/audit. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
+Daily Shortlist and the former All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical evidence remain preserved for rollback/audit. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
 
 VCP runs after committed full/partial 60m ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Missing optional index/margin metadata is omitted from tags; it is never displayed as `NOT_VERIFIED`.
 
