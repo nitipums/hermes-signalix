@@ -53,4 +53,5 @@ Display order:
 - Failed/skipped ingestion does not create a new VCP run.
 - Drawer uses the VCP result payload immediately and fetches only the 60m chart; it does not fetch Daily symbol detail or substitute old Daily provenance.
 - Provenance displays VCP run `as_of`/`fetch_completed_at` and latest closed bar.
+- Daily VCP Shortlist polls for a newer run while open; it shows review count separately from full-universe evaluation and feed coverage.
 - Missing optional company description is hidden; it is not required for the core decision surface.

@@ -126,7 +126,7 @@ def _result_sort_key(result):
     pattern = result.get("pattern") or {}
     volume = result.get("volume") or {}
     distance = price.get("distance_to_pivot_pct")
-    if result.get("state") in {"READY", "NEAR_TRIGGER"}:
+    if result.get("state") in {"READY", "NEAR_TRIGGER", "BREAKOUT_WATCH"}:
         distance_key = abs(float(distance)) if distance is not None else 999999.0
     else:
         distance_key = 0.0
@@ -172,6 +172,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
         result["provenance"]["fetch_completed_at"] = str(fetch_completed_at) if fetch_completed_at else None
         results.append(_presentation_fields(result))
     results.sort(key=_result_sort_key)
+    coverage = {"returned": len(results), "feed_unavailable": sum(1 for r in results if (r.get("data") or {}).get("feed_status") == "unavailable"), "no_data": sum(1 for r in results if (r.get("data") or {}).get("bar_count", 0) == 0)}
     return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "finder": "vcp_finder_60m",
@@ -188,6 +189,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
             "evaluated": len(results),
             "returned": len(results),
         },
+        "coverage": coverage,
         "results": results,
     }
 
@@ -226,6 +228,8 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         params.append(max(1, min(int(limit), 5000)))
     cur.execute(query, params)
     results = [r["result"] for r in cur.fetchall()]
+    cur.execute("SELECT COUNT(*) FILTER (WHERE result->'data'->>'feed_status' = 'unavailable') AS feed_unavailable, COUNT(*) FILTER (WHERE COALESCE((result->'data'->>'bar_count')::int, 0) = 0) AS no_data FROM vcp_finder_60m_results WHERE run_id=%s", (run["run_id"],))
+    coverage_row = cur.fetchone()
     cur.close()
     from marginable import lookup
     for result in results:
@@ -249,6 +253,7 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         "ingestion_status": run["ingestion_status"],
         "fetch_completed_at": run["fetch_completed_at"].isoformat() if hasattr(run["fetch_completed_at"], "isoformat") else (str(run["fetch_completed_at"]) if run["fetch_completed_at"] else None),
         "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": len(results)},
+        "coverage": {"feed_unavailable": coverage_row["feed_unavailable"] or 0, "no_data": coverage_row["no_data"] or 0},
         "results": results,
     }
 

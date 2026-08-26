@@ -720,7 +720,7 @@
         vcpResultsBySymbol = {};
         var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
         results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " review / " + ((data.universe || {}).evaluated || 0) + " evaluated";
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " review / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderVcpResults(results, dom.dailyVcpCards);
       })
       .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); dom.dailyVcpErrorMsg.textContent = "Unable to load Daily VCP shortlist: " + err.message; });
@@ -1007,4 +1007,8 @@
   /* ── init ── */
   setFreshness("loading");
   loadDailyVcp();
+  setInterval(function() {
+    if (currentTab === "daily-vcp") loadDailyVcp();
+    else if (currentTab === "vcp" && dom.vcpState.value !== "ALL") loadVcp();
+  }, 60000);
 })();
