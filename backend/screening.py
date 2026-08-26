@@ -971,6 +971,18 @@ def universe_layer3(pg, symbols):
 
 def load_index_membership(pg):
     cur = pg.cursor()
+    # Prefer the normalized, historical table when present.  Keep the old
+    # table as a compatibility fallback for deployments before migration 006.
+    cur.execute("SELECT to_regclass('public.index_memberships')")
+    if cur.fetchone()[0]:
+        cur.execute("""SELECT DISTINCT symbol
+                       FROM index_memberships
+                       WHERE index_name = 'SET50'
+                         AND effective_from <= CURRENT_DATE
+                         AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)""")
+        rows = {r[0] for r in cur.fetchall()}
+        cur.close()
+        return rows
     cur.execute("SELECT to_regclass('public.index_membership')")
     if not cur.fetchone()[0]:
         cur.close(); return set()

@@ -1,0 +1,17 @@
+[Unit]
+Description=Signalix official SET50/SET100 index membership sync
+After=network-online.target signalix_postgres.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/root/signalix/backend
+Environment=POSTGRES_HOST=127.0.0.1
+Environment=POSTGRES_PORT=5432
+Environment=POSTGRES_USER=signalix
+Environment=POSTGRES_PASSWORD=signalix_pass
+Environment=POSTGRES_DB=signalix
+ExecStart=/root/.venv_img/bin/python /root/signalix/backend/sync_set_indices.py
+StandardOutput=append:/root/signalix/set_index_sync.log
+StandardError=append:/root/signalix/set_index_sync.log
+TimeoutStartSec=180
