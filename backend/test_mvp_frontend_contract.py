@@ -33,6 +33,9 @@ def test_chart_timeframes_are_real_controls_not_labels_only():
         assert f'data-timeframe="{timeframe}"' in html
     assert "?timeframe=" in js
     assert "chart-timeframe" in js
+    assert 'let chartTimeframe = "60M"' in js
+    assert 'var requestedTimeframe = item.vcp_result ? "60M" : chartTimeframe;' in js
+    assert "setChartTimeframeButtons(requestedTimeframe)" in js
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
@@ -41,6 +44,7 @@ def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
     assert "intraday_fetched_at" in source
     assert "setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of, freshness.intraday_fetched_at)" in js
+    assert 'scan_time: vm.fetch_completed_at || vm.as_of' in js
     assert "60m " in js
 
 
@@ -55,10 +59,13 @@ def test_unavailable_hour_chart_is_explicit_not_blank():
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for marker in ('data-layer="candles"', 'data-layer="volume"', 'data-layer="ma"', 'data-layer="rsi"'):
-        assert marker in html
     for marker in ("function drawChart", "chartLayers.candles", "chartLayers.volume", "chartLayers.ma", "chartLayers.rsi"):
         assert marker in js
+    for marker in ("decisionLine", 'data-timeframe="60M"', 'data-timeframe="1D"', 'data-timeframe="1W"'):
+        assert marker in html or marker in js
+    for marker in ('data-layer="candles"', 'data-layer="volume"', 'data-layer="ma"', 'data-layer="rsi"'):
+        assert marker not in html
+    assert 'id="drawer-indicator-legend"' not in html
     assert "tryFixtureShortlist" not in js
     assert "tryFixtureExplorer" not in js
 
@@ -66,5 +73,5 @@ def test_chart_contract_has_real_layers_and_fail_closed_runtime():
 def test_mobile_interactive_targets_are_touch_safe():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
-    assert ".chart-toggle { min-height:44px; min-width:44px;" in css
+
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css

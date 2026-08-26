@@ -133,7 +133,7 @@
   let vcpResultsBySymbol = {};
   let vcpRunMeta = {};
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
-  let chartTimeframe = "1D";
+  let chartTimeframe = "60M";
   let chartSymbol = null;
   let drawerSymbols = [];
   let drawerIndex = -1;
@@ -375,21 +375,6 @@
   }
 
   function renderDrawerChart(chart) {
-    // Populate overlay legend with real values; null → NOT_VERIFIED.
-    var ma20 = latestIndicatorValue(chart.ma20);
-    var ma50 = latestIndicatorValue(chart.ma50);
-    var ma200 = latestIndicatorValue(chart.ma200);
-    var macd = latestIndicatorValue(chart.macd);
-    var rsi = latestIndicatorValue(chart.rsi);
-    dom.indMa20.textContent = ma20 != null ? ma20.toFixed(2) : "NOT_VERIFIED";
-    dom.indMa50.textContent = ma50 != null ? ma50.toFixed(2) : "NOT_VERIFIED";
-    dom.indMa200.textContent = ma200 != null ? ma200.toFixed(2) : "NOT_VERIFIED";
-    dom.indMacd.textContent = macd != null ? macd.toFixed(3) : "NOT_VERIFIED";
-    dom.indRsi.textContent = rsi != null ? rsi.toFixed(1) : "NOT_VERIFIED";
-    dom.indTrigger.textContent = chart.trigger != null ? String(chart.trigger) : "NOT_VERIFIED";
-    dom.indStop.textContent = chart.stop != null ? Number(chart.stop).toFixed(2) : "NOT_VERIFIED";
-    dom.indTarget.textContent = chart.target != null ? Number(chart.target).toFixed(2) : "NOT_VERIFIED";
-
     window.__signalixLastChart = chart;
     if (chart.candles && chart.candles.length > 0) {
       // A real OHLCV series is present — draw it (basic canvas line render).
@@ -419,8 +404,11 @@
     var closes = candles.map(function(c) { return Number(c.close); });
     var highs = candles.map(function(c) { return Number(c.high); });
     var lows = candles.map(function(c) { return Number(c.low); });
-    var min = Math.min.apply(null, lows.filter(function(v){return Number.isFinite(v);}));
-    var max = Math.max.apply(null, highs.filter(function(v){return Number.isFinite(v);}));
+    var levels = [chart.trigger, chart.stop, chart.target].map(Number).filter(Number.isFinite);
+    var allLows = lows.filter(function(v){return Number.isFinite(v);}).concat(levels);
+    var allHighs = highs.filter(function(v){return Number.isFinite(v);}).concat(levels);
+    var min = Math.min.apply(null, allLows);
+    var max = Math.max.apply(null, allHighs);
     var range = (max - min) || 1;
     var xFor = function(i) { return left + (i / Math.max(1, candles.length - 1)) * plotW; };
     var yPrice = function(v) { return top + priceH - ((v - min) / range) * priceH; };
@@ -458,6 +446,25 @@
       rsi.forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=top+priceH+volH+rsiH-(Number(v)/100)*rsiH;if(!rs){ctx.moveTo(x,y);rs=true;}else ctx.lineTo(x,y);});if(rs)ctx.stroke();
       ctx.strokeStyle=colors.grid;ctx.setLineDash([3,3]);[30,70].forEach(function(v){var y=top+priceH+volH+rsiH-(v/100)*rsiH;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});ctx.setLineDash([]);
     }
+    // Decision levels live on the price chart; no duplicate metric boxes below it.
+    function decisionLine(value, color, label) {
+      value = Number(value);
+      if (!Number.isFinite(value)) return;
+      var y = yPrice(value);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([7, 5]);
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w - right, y); ctx.stroke();
+      ctx.setLineDash([]); ctx.fillStyle = color; ctx.font = "11px sans-serif";
+      ctx.fillText(label + " " + value.toFixed(2), left + 4, Math.max(12, y - 4));
+    }
+    decisionLine(chart.trigger, "#f4c95d", "Trigger");
+    decisionLine(chart.stop, "#ef7777", "Stop");
+    decisionLine(chart.target, "#6ee7b7", "Target");
+  }
+
+  function setChartTimeframeButtons(value) {
+    $$(".chart-timeframe").forEach(function(btn) {
+      btn.classList.toggle("is-active", btn.getAttribute("data-timeframe") === value);
+    });
   }
 
   function updateDrawerNav() {
@@ -514,6 +521,7 @@
     var requestSeq = ++chartRequestSeq;
     var requestedTimeframe = item.vcp_result ? "60M" : chartTimeframe;
     if (item.vcp_result) chartTimeframe = "60M";
+    setChartTimeframeButtons(requestedTimeframe);
     if (chartAbort) chartAbort.abort();
     var chartController = new AbortController();
     chartAbort = chartController;
@@ -565,6 +573,9 @@
       .then(function(chart) {
         if (requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe) return;
         if (chart && chart.symbol) {
+          chart.trigger = chart.trigger != null ? chart.trigger : item.trigger;
+          chart.stop = chart.stop != null ? chart.stop : item.risk_stop;
+          chart.target = chart.target != null ? chart.target : item.target;
           if (!Array.isArray(chart.candles) || chart.candles.length < 2) {
             chart.candles = [];
             chart.provenance = chart.provenance || {};
@@ -1011,14 +1022,6 @@
       if (chartSymbol) {
         openDrawer({symbol: chartSymbol, name: chartSymbol}, chartSymbol);
       }
-    });
-  });
-  $$(".chart-toggle").forEach(function(btn) {
-    btn.addEventListener("click", function() {
-      var layer = btn.getAttribute("data-layer");
-      chartLayers[layer] = !chartLayers[layer];
-      btn.classList.toggle("is-active", chartLayers[layer]);
-      if (window.__signalixLastChart) drawChart(window.__signalixLastChart);
     });
   });
 
