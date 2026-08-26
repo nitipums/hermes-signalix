@@ -37,7 +37,7 @@ Display order:
 10. **STALE DATA**
 11. **NOT VERIFIED**
 
-- `BREAKOUT_WATCH` is an intrabar watch state: price reaches pivot and volume evidence passes, but the latest bar is not yet a closed confirmation. It is actionable for review only, never an automatic buy.
+- `BREAKOUT_WATCH` is an intrabar watch state: price reaches the 60m pivot and volume evidence passes, but the latest bar is not yet a closed confirmation. It is reviewable in Daily VCP Shortlist but `actionable=false`; it never means an automatic buy.
 - Forming filters are `all`, `maturing`, `early`, and `needs_work`. Full-universe persistence remains one result per eligible symbol; presentation grouping never changes scan eligibility.
 
 ## Filters

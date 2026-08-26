@@ -712,15 +712,15 @@
 
   function loadDailyVcp() {
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&actionable=true")
+    fetch("/api/vcp-finder?interval=60m&market=TH&review=true")
       .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data){
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         vcpResultsBySymbol = {};
-        var results = (data.results || []).filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
+        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
         results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " actionable / " + ((data.universe || {}).evaluated || 0) + " evaluated";
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " review / " + ((data.universe || {}).evaluated || 0) + " evaluated";
         renderVcpResults(results, dom.dailyVcpCards);
       })
       .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); dom.dailyVcpErrorMsg.textContent = "Unable to load Daily VCP shortlist: " + err.message; });

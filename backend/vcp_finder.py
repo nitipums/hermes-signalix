@@ -315,7 +315,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if close_pass and not volume_confirmed: reasons.append("breakout_close_without_volume_confirmation")
     if state == "FAILED": reasons.append("below_structural_invalidation")
     result_base.update({
-        "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER", "BREAKOUT_WATCH"},
+        "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER"}, "watchable": state == "BREAKOUT_WATCH",
         "reason_codes": reasons,
         "reasons": reasons,
         "price": {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},
