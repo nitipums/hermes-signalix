@@ -9,7 +9,10 @@ Decision: Preserve `last_watch_event`/`late_watch` separately from current VCP s
 Reason: Prevent BA/BGRIM/TIPH-style opportunities from disappearing when current state changes or Daily and 60m evidence diverge.
 
 
-## 2026-08-26 — Remove unused DR/US price archive
+## 2026-08-26 — Stable v1 closeout checkpoint
+Decision: Treat `release/signalix-mvp-stable` commit `4c7bf9c` as the stable checkpoint for today's Signalix MVP. It includes VCP Watchlist/All VCP, 60m auto-run, event context, one-month replay evidence, database cleanup, and official SET50/SET100 historical membership sync.
+Reason: Owner approved closing today's session at the verified pushed stable version; future VCP type/replay refinements branch from this checkpoint.
+
 Decision: Retain only TH ORD/INDEX in `price_data` for the current Signalix product. Delete historical TH DR and US price rows after replay completion, then run `VACUUM FULL`, `REINDEX`, and `ANALYZE`. Preserve VCP replay tables and TH historical source data.
 Reason: Current VCP/Watchlist/All VCP workflow is Thai ORD 60m; DR/US rows were unused in the current MVP and consumed storage/index space.
 

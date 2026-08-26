@@ -6,7 +6,7 @@
 
 ```text
 branch: release/signalix-mvp-stable
-release: 3ec48f7 (`fix: preserve Daily run lineage in EOD dashboard build`)
+release: 4c7bf9c (`feat: sync official SET50 and SET100 memberships`)
 source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404

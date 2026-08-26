@@ -38,7 +38,7 @@
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Shortlist default + All VCP full view; old Daily/Explorer contract superseded** |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `4c7bf9c`; old Daily/Explorer contract superseded** |
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
