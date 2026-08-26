@@ -16,7 +16,7 @@
 
 ## Superseded/removed cleanup record
 
-- Old 718-symbol taxonomy, old 15m cadence, old checkpoint/provider/margin duplicates were removed from fact_store after current replacements were verified.
+- Old 718-symbol taxonomy, old 15m cadence, old checkpoint/provider/margin duplicates, and contradictory quota/liquidity facts were removed from fact_store after current replacements were verified.
 - Old Daily Shortlist/All Explorer product contract remains in vault as `STATUS: SUPERSEDED`, preserving historical design evidence.
 - Old implementation handoffs and postmortems remain historical unless their header says `STATUS: CURRENT`.
 
