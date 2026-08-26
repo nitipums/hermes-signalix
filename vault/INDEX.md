@@ -66,7 +66,7 @@
 
 ## 4. สถานะซิงค์กับ fact_store
 
-- **2026-08-26:** Consolidated 24 overlapping Signalix skills into `signalix-production-delivery`, `signalix-dashboard`, and `signalix-screening-replay`; created Hermes umbrellas `hermes-operations` and `memory-documentation-governance`. Originals remain reversible under `_archived_consolidation_20260826`.
+- **2026-08-26:** Consolidated 26 overlapping/superseded Signalix skills into `signalix-production-delivery`, `signalix-dashboard`, and `signalix-screening-replay`; created Hermes umbrellas `hermes-operations` and `memory-documentation-governance`. Originals remain reversible under `_archived_consolidation_20260826`.
 
 - Stage-first / FULL ORD / LAYER1-LAYER2 ↔ fact 117, 121, 112; `MEMORY.md`
 - Intraday sequential 60m ↔ fact (Memory 2026-08-18) + `signalix-backfill-and-parity` skill

@@ -22,7 +22,7 @@
 
 ## Skill consolidation — 2026-08-26
 
-- 24 overlapping Signalix skills were archived reversibly under `_archived_consolidation_20260826`.
+- 26 overlapping/superseded Signalix skills were archived reversibly under `_archived_consolidation_20260826`.
 - Active umbrellas: `signalix-production-delivery`, `signalix-dashboard`, `signalix-screening-replay`.
 - Hermes umbrellas created: `hermes-operations`, `memory-documentation-governance`.
 - The original skills remain available for restore if an umbrella loses a needed procedure.
