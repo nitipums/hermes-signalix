@@ -406,6 +406,8 @@ body {
 .vcp-card__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 14px; margin:12px 0; font-size:.82rem; }
 .vcp-card__grid span { display:flex; justify-content:space-between; gap:8px; color:var(--text-2); min-width:0; overflow-wrap:anywhere; }
 .vcp-card__grid b { color:var(--text); font-weight:700; }
+.vcp-card__tags { display:flex; flex-wrap:wrap; gap:5px; margin:8px 0 2px; }
+.vcp-card__tags .tag { border:1px solid rgba(201,168,76,.45); border-radius:999px; padding:3px 8px; color:#d8bc65; font-size:.72rem; }
 .vcp-card__evidence { font-size:.78rem; line-height:1.45; color:var(--text-2); overflow-wrap:anywhere; }
 .vcp-card__provenance { margin-top:9px; font-size:.7rem; color:var(--text-3); line-height:1.4; overflow-wrap:anywhere; }
 @media (max-width: 767px) {

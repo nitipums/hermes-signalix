@@ -116,6 +116,8 @@
   let marginRates = [];
   let priceBand = "all";
   let shortlistData = null;
+  let vcpResultsBySymbol = {};
+  let vcpRunMeta = {};
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
   let chartSymbol = null;
@@ -289,8 +291,31 @@
       '</div>';
   }
 
-  /* ── detail drawer ── */
+  function setOptionalDrawerField(el, value) {
+    var present = value != null && String(value).trim() !== "";
+    el.textContent = present ? String(value) : "";
+    var row = el.closest(".drawer-field");
+    if (row) row.hidden = !present;
+  }
+
   function renderDrawerDetail(item) {
+    if (item.vcp_result) {
+      var vr = item.vcp_result;
+      var vp = vr.price || {};
+      var vd = vr.data || {};
+      var vm = vcpRunMeta || {};
+      item = Object.assign({}, item, {
+        name: item.symbol,
+        action: vcpStateLabel(vr.state),
+        close: vp.last_close,
+        trigger: vp.pivot_high,
+        risk_stop: vp.invalidation,
+        index_membership: vr.index_membership || [],
+        margin_rate_pct: vr.margin_rate_pct,
+        description: null,
+        provenance: {source: "intraday_price_data", interval: "60m", scan_run_id: vm.run_id || "", scan_time: vm.fetch_completed_at || vm.as_of || "", latest_closed_bar: vd.latest_closed_bar || vd.last_bar_ts || ""}
+      });
+    }
     dom.drawerSymbol.textContent = item.symbol;
     dom.drawerSymbol.href = "https://www.tradingview.com/symbols/" + encodeURIComponent(item.symbol) + "/?exchange=SET";
     dom.drawerName.textContent = item.name || "–";
@@ -300,7 +325,8 @@
     dom.drawerIndustry.textContent = item.industry || "Industry –";
     dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap);
     dom.drawerTradeValue.textContent = "Trade value " + fmtNum(item.trade_value || item.avgDailyValue20);
-    dom.drawerDescription.textContent = displayValue(item.description);
+    dom.drawerDescription.textContent = item.description || "";
+    dom.drawerDescription.hidden = !item.description;
     dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
     var drawerChg = fmtChange(item.change_pct);
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
@@ -308,9 +334,9 @@
     dom.drawerStop.textContent = displayValue(item.risk_stop != null ? Number(item.risk_stop).toFixed(2) : null);
     dom.drawerTarget.textContent = displayValue(item.target != null ? Number(item.target).toFixed(2) : null);
     dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
-    dom.drawerMembership.textContent = displayValue((item.index_membership || []).join(" · "));
+    setOptionalDrawerField(dom.drawerMembership, (item.index_membership || []).join(" · "));
     var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
-    dom.drawerMargin.textContent = marginRate != null ? Number(marginRate).toFixed(0) + "%" : "NOT_VERIFIED";
+    setOptionalDrawerField(dom.drawerMargin, marginRate != null ? Number(marginRate).toFixed(0) + "%" : null);
     dom.drawer52W.textContent = formatRange(item.high52, item.low52);
     dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low);
     var prov = item.provenance || {};
@@ -471,7 +497,8 @@
     }
     updateDrawerNav();
     var requestSeq = ++chartRequestSeq;
-    var requestedTimeframe = chartTimeframe;
+    var requestedTimeframe = item.vcp_result ? "60M" : chartTimeframe;
+    if (item.vcp_result) chartTimeframe = "60M";
     if (chartAbort) chartAbort.abort();
     var chartController = new AbortController();
     chartAbort = chartController;
@@ -496,8 +523,8 @@
     dom.drawer.classList.remove("drawer--hidden");
     document.body.style.overflow = "hidden";
 
-    // Fetch authoritative symbol detail from the served API.
-    fetch("/api/symbol/" + encodeURIComponent(symbol))
+    // Daily/Explorer details are intentionally not fetched for VCP: card payload is the authoritative VCP detail.
+    if (!item.vcp_result) fetch("/api/symbol/" + encodeURIComponent(symbol))
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -567,20 +594,14 @@
 
     var item = null;
     if (card.classList.contains("vcp-card")) {
-      item = {
-        symbol: symbol,
-        name: symbol,
-        action: card.querySelector(".vcp-card__state") ? card.querySelector(".vcp-card__state").textContent : "VCP 60m review",
-        stage: null, phase: null, sector: null, industry: null,
-        market_cap: null, trade_value: null, description: "Intraday 60m VCP Finder · no Daily fallback.",
-        close: null, change_pct: null, change_amount: null, target: null, rr: null,
-        index_membership: [], margin_pct: null, high52: null, low52: null, ath_high: null, ath_low: null,
-        provenance: {source: "intraday_price_data", interval: "60m", note: "VCP Finder evidence is shown on the card; drawer loads authoritative symbol detail."}
-      };
+      item = Object.assign({symbol: symbol, vcp_result: vcpResultsBySymbol[symbol] || null}, vcpResultsBySymbol[symbol] || {});
+      item.name = symbol;
+      item.action = vcpStateLabel(item.state);
+      item.description = null;
     }
 
     // Find local item for immediate fast-path render; authoritative detail is fetched below.
-    if (shortlistData) {
+    if (!card.classList.contains("vcp-card") && shortlistData) {
       var all = (shortlistData.ready || []).concat(shortlistData.pre_ready || []);
       for (var i = 0; i < all.length; i++) {
         if (all[i].symbol === symbol) { item = all[i]; break; }
@@ -650,8 +671,12 @@
     var cls = state.toLowerCase().replace(/_/g, "-");
     var reason = (result.reasons || result.reason_codes || []).join(" · ");
     var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
+    var tags = [];
+    if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
+    if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
+    var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
     return '<article class="vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + (result.margin_rate_pct != null ? ' · %Margin ' + Number(result.margin_rate_pct).toFixed(0) + '%' : '') + '</span></div>' +
+      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + '</span></div>' + tagHTML +
       '<div class="vcp-card__grid">' +
         '<span>Close <b>' + displayValue(price.last_close) + '</b></span>' +
         '<span>Pivot <b>' + displayValue(price.pivot_high) + '</b></span>' +
@@ -690,6 +715,9 @@
       .then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data) {
         hide(dom.vcpLoading); show(dom.vcpContent);
+        vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
+        vcpResultsBySymbol = {};
+        (data.results || []).forEach(function(r) { vcpResultsBySymbol[r.symbol] = r; });
         var selected = dom.vcpState.value || "actionable";
         var results = data.results || [];
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
