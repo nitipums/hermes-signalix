@@ -1,6 +1,6 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled with `Architecture.md`, `Components.md`, `Deployment.md`, and `Execution-Pipeline.md` at stable release `0ab8c44`.
+> **STATUS: CURRENT** · Reconciled with `Architecture.md`, `Components.md`, `Deployment.md`, and `Execution-Pipeline.md` at stable release `e5c7139`.
 
 AI Trading-Agent SaaS for Thai SET retail traders. Trend-Following engine
 (Mark Minervini / VCP) that auto-screens the market, scores setups, and pushes

@@ -6,7 +6,7 @@
 
 ```text
 branch: release/signalix-mvp-stable
-release: 0ab8c44 (`docs: close stable v1 checkpoint`)
+release: e5c7139 (`fix: enforce 60m-only vcp confirmation`)
 source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404
