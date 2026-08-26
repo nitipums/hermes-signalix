@@ -75,7 +75,8 @@ def handle_mvp_api(path, handler) -> bool:
                 symbol = (qs.get("symbol", [""])[0] or "").upper() or None
                 state = (qs.get("state", [""])[0] or "").upper() or None
                 limit = int(qs["limit"][0]) if qs.get("limit") else None
-                payload = load_latest_vcp_run(pg, market=market, state=state, symbol=symbol, limit=limit)
+                actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+                payload = load_latest_vcp_run(pg, market=market, state=state, symbol=symbol, limit=limit, actionable=actionable)
             finally:
                 pg.close()
             if payload is None:

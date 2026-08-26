@@ -667,7 +667,12 @@
 
   function loadVcp() {
     show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&limit=5000")
+    var selected = dom.vcpState.value || "actionable";
+    var endpoint = "/api/vcp-finder?interval=60m&market=TH";
+    if (selected === "actionable") endpoint += "&actionable=true";
+    else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
+    else endpoint += "&limit=5000";
+    fetch(endpoint)
       .then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data) {
         hide(dom.vcpLoading); show(dom.vcpContent);

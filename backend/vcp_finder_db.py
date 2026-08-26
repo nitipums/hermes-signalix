@@ -111,7 +111,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     }
 
 
-def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None):
+def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None, actionable=False):
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         """SELECT run_id, market, interval, policy_version, as_of,
@@ -129,6 +129,8 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None)
     if state:
         clauses.append("state=%s")
         params.append(state.upper())
+    elif actionable:
+        clauses.append("state IN ('READY','NEAR_TRIGGER','CONFIRMED')")
     if symbol:
         clauses.append("symbol=%s")
         params.append(symbol.upper())
