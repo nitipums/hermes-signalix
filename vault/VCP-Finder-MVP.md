@@ -28,15 +28,17 @@ Display order:
 1. CONFIRMED · REVIEW
 2. NEAR TRIGGER · VOLUME CHECK
 3. READY · WAIT FOR BREAKOUT
-4. FORMING · MATURING
-5. FORMING · EARLY
-6. FORMING · NEEDS WORK
-7. EXTENDED · DO NOT CHASE
-8. FAILED / INVALIDATED
-9. STALE DATA
-10. NOT VERIFIED
+4. **BREAKOUT WATCH · INTRABAR**
+5. **FORMING · MATURING**
+6. **FORMING · EARLY**
+7. **FORMING · NEEDS WORK**
+8. **EXTENDED · DO NOT CHASE**
+9. **FAILED / INVALIDATED**
+10. **STALE DATA**
+11. **NOT VERIFIED**
 
-Forming filters are `all`, `maturing`, `early`, and `needs_work`. Full-universe persistence remains one result per eligible symbol; presentation grouping never changes scan eligibility.
+- `BREAKOUT_WATCH` is an intrabar watch state: price reaches pivot and volume evidence passes, but the latest bar is not yet a closed confirmation. It is actionable for review only, never an automatic buy.
+- Forming filters are `all`, `maturing`, `early`, and `needs_work`. Full-universe persistence remains one result per eligible symbol; presentation grouping never changes scan eligibility.
 
 ## Filters
 

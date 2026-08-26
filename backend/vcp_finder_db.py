@@ -69,6 +69,37 @@ def load_vcp_60m_rows(pg, symbols, lookback=400, as_of=None):
     return grouped
 
 
+def load_daily_trend_context(pg, symbols, as_of=None, lookback=80):
+    if not symbols:
+        return {}
+    cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """SELECT symbol, date, close FROM (
+                 SELECT symbol, date, close,
+                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+                 FROM price_data
+                 WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
+               ) x WHERE rn <= %s"""
+    params = [symbols, int(lookback)]
+    if as_of is not None:
+        query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
+        params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
+    cur.execute(query, tuple(params))
+    grouped = {s: [] for s in symbols}
+    for row in cur.fetchall(): grouped[row["symbol"]].append(float(row["close"]))
+    cur.close()
+    contexts = {}
+    for symbol, values in grouped.items():
+        values.reverse()
+        if len(values) < 40:
+            contexts[symbol] = {"trend_pass": False, "status": "insufficient_history", "bars": len(values)}
+            continue
+        recent = sum(values[-20:]) / 20
+        prior = sum(values[-40:-20]) / 20
+        ret = (values[-1] / values[-21] - 1) * 100 if values[-21] else 0
+        contexts[symbol] = {"trend_pass": bool(values[-1] > recent and recent >= prior and ret > 0), "return_20d_pct": ret, "status": "available", "bars": len(values)}
+    return contexts
+
+
 def _presentation_fields(result):
     state = result.get("state")
     evidence = result.get("evidence") or {}
@@ -81,7 +112,7 @@ def _presentation_fields(result):
             forming_group, forming_rank = "needs_work", 2
     else:
         forming_group, forming_rank = None, 9
-    state_rank = {"CONFIRMED": 0, "NEAR_TRIGGER": 1, "READY": 2, "EXTENDED": 4, "FAILED": 6, "STALE": 7, "NOT_VERIFIED": 8, "FORMING": 3}.get(state, 9)
+    state_rank = {"BREAKOUT_WATCH": 0, "CONFIRMED": 1, "NEAR_TRIGGER": 2, "READY": 3, "EXTENDED": 5, "FAILED": 7, "STALE": 8, "NOT_VERIFIED": 9, "FORMING": 4}.get(state, 10)
     result["forming_group"] = forming_group
     result["state_rank"] = state_rank
     result["forming_rank"] = forming_rank
@@ -113,6 +144,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     eligible = sorted(set(symbols or active_ord_symbols(pg)))
     observed_as_of = as_of or datetime.now(timezone.utc)
     rows = load_vcp_60m_rows(pg, eligible, as_of=observed_as_of)
+    daily_context = load_daily_trend_context(pg, eligible, as_of=observed_as_of)
     feed_status = {}
     if eligible:
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -127,7 +159,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     run_id = new_run_id()
     results = []
     for symbol in eligible:
-        result = find_vcp_60m(rows.get(symbol), as_of=observed_as_of, config=cfg)
+        result = find_vcp_60m(rows.get(symbol), as_of=observed_as_of, config=cfg, daily_context=daily_context.get(symbol))
         result["symbol"] = symbol
         result["data"]["feed_status"] = feed_status.get(symbol, {}).get("status", "unknown")
         result["data"]["feed_reason"] = feed_status.get(symbol, {}).get("reason")
@@ -180,9 +212,9 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         clauses.append("state=%s")
         params.append(state.upper())
     elif actionable:
-        clauses.append("state IN ('READY','NEAR_TRIGGER','CONFIRMED')")
+        clauses.append("state IN ('READY','NEAR_TRIGGER','CONFIRMED','BREAKOUT_WATCH')")
     elif focused:
-        clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED') OR (state='FORMING' AND result->>'forming_group'='maturing'))")
+        clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED','BREAKOUT_WATCH') OR (state='FORMING' AND result->>'forming_group'='maturing'))")
     if symbol:
         clauses.append("symbol=%s")
         params.append(symbol.upper())

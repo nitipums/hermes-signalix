@@ -199,7 +199,7 @@ def _closed_bar_context(latest_dt, as_of_dt):
     return latest_local, as_of_local, latest_may_be_open
 
 
-def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None = None) -> dict:
+def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None = None, daily_context=None) -> dict:
     cfg = config or VCP60Config()
     try:
         df, invalid_rows, duplicate_rows = _normalize(frame)
@@ -237,10 +237,13 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     prev_close = float(close.iloc[-2]) if len(close) >= 2 else None
     change_pct = ((last_close / prev_close) - 1) * 100 if prev_close else None
     atr, _ = _atr14(close.tolist(), work["high"].tolist(), work["low"].tolist(), cfg.atr_bars)
-    trend_pass = last_close > float(ema20.iloc[-1]) and (ema_slope or 0) > 0 and prior_return > 0
+    daily_context = daily_context or {}
+    daily_trend_pass = bool(daily_context.get("trend_pass"))
+    trend_pass_60m = last_close > float(ema20.iloc[-1]) and (ema_slope or 0) > 0 and prior_return > 0
+    trend_pass = bool(trend_pass_60m or daily_trend_pass)
     result_base = _empty_result("FORMING", [], data=data, as_of=observed_as_of, config=cfg)
     result_base["data"] = data
-    result_base["trend"] = {"ema20": _plain(float(ema20.iloc[-1])), "ema20_slope_pct": _plain(ema_slope), "prior_trend_return_pct": _plain(prior_return), "pass": bool(trend_pass)}
+    result_base["trend"] = {"ema20": _plain(float(ema20.iloc[-1])), "ema20_slope_pct": _plain(ema_slope), "prior_trend_return_pct": _plain(prior_return), "pass_60m": bool(trend_pass_60m), "daily_context_pass": daily_trend_pass, "daily_context": daily_context, "pass": bool(trend_pass)}
     result_base["price"] = {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr)}
     if not trend_pass:
         result_base["reason_codes"] = ["prior_trend_not_confirmed"]
@@ -255,8 +258,11 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         return result_base
     depths = [(seq[0]["price"] - seq[1]["price"]) / seq[0]["price"] * 100, (seq[2]["price"] - seq[3]["price"]) / seq[2]["price"] * 100]
     ratios = [depths[i] / depths[i - 1] if depths[i - 1] else None for i in range(1, len(depths))]
+    base_start = seq[0]["idx"]
+    base_end = len(work) - (1 if data.get("latest_bar_may_be_open") else 0)
+    base_window = work.iloc[base_start:max(base_start + 1, base_end)]
     base_high = max(p["price"] for p in seq if p["kind"] == "high")
-    base_low = min(p["price"] for p in seq if p["kind"] == "low")
+    base_low = float(base_window["low"].min()) if not base_window.empty else min(p["price"] for p in seq if p["kind"] == "low")
     base_depth = (base_high - base_low) / base_high * 100 if base_high else None
     latest_contraction = depths[-1]
     contraction_pass = len(depths) >= 2 and all(r is not None and r <= cfg.contraction_ratio for r in ratios)
@@ -288,6 +294,8 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         state = "EXTENDED" if (distance_pct or 0) > cfg.extension_limit_pct else "NEAR_TRIGGER"
     elif structure_pass and distance_pct is not None and distance_pct >= -0.5:
         state = "NEAR_TRIGGER"
+    elif (not structure_pass and contraction_pass and leg_volume_pass and base_depth is not None and base_depth >= 3.0 and distance_pct is not None and distance_pct >= 0 and volume_confirmed):
+        state = "BREAKOUT_WATCH"
     elif structure_pass:
         state = "READY"
     elif base_pass:
@@ -307,7 +315,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if close_pass and not volume_confirmed: reasons.append("breakout_close_without_volume_confirmation")
     if state == "FAILED": reasons.append("below_structural_invalidation")
     result_base.update({
-        "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER"},
+        "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER", "BREAKOUT_WATCH"},
         "reason_codes": reasons,
         "reasons": reasons,
         "price": {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},

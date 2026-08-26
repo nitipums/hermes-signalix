@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — Intraday cadence update
+## 2026-08-26 — Intrabar breakout watch
+Decision: Add `BREAKOUT_WATCH` as a review-only actionable state when price reaches the 60m pivot and volume evidence passes before the bar closes. Keep `CONFIRMED` for closed-bar close + volume confirmation. Daily trend is supporting context; 60m pivot/trigger remains authoritative.
+Reason: Avoid losing intraday timing while preserving the distinction between early watch and confirmed breakout.
+
 Decision: Run active ORD 60m fetch/VCP rounds at `10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30, 16:45` Bangkok weekday time. The final 16:45 round is an explicit session-close round.
 Reason: Align monitoring with the requested SET continuous-session windows `10:00–12:30` and `14:00–16:45`.
 
