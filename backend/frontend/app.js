@@ -426,7 +426,9 @@
   function visibleDrawerSymbols() {
     var selector = currentTab === "shortlist"
       ? "#panel-shortlist .decision-card[data-symbol]"
-      : "#panel-explorer .explorer-card[data-symbol]";
+      : currentTab === "vcp"
+        ? "#panel-vcp .vcp-card[data-symbol]"
+        : "#panel-explorer .explorer-card[data-symbol]";
     return Array.from(document.querySelectorAll(selector)).map(function(card) {
       return card.getAttribute("data-symbol");
     }).filter(Boolean);
@@ -554,14 +556,26 @@
 
   /* ── card click delegation ── */
   document.addEventListener("click", function(e) {
-    var card = e.target.closest(".decision-card, .explorer-card");
+    var card = e.target.closest(".decision-card, .explorer-card, .vcp-card");
     if (!card) return;
     var symbol = card.getAttribute("data-symbol");
     if (!symbol) return;
 
-    // Find local item for immediate fast-path render (may be partial for
-    // explorer cards); authoritative detail is fetched from /api/symbol/.
     var item = null;
+    if (card.classList.contains("vcp-card")) {
+      item = {
+        symbol: symbol,
+        name: symbol,
+        action: card.querySelector(".vcp-card__state") ? card.querySelector(".vcp-card__state").textContent : "VCP 60m review",
+        stage: null, phase: null, sector: null, industry: null,
+        market_cap: null, trade_value: null, description: "Intraday 60m VCP Finder · no Daily fallback.",
+        close: null, change_pct: null, change_amount: null, target: null, rr: null,
+        index_membership: [], margin_pct: null, high52: null, low52: null, ath_high: null, ath_low: null,
+        provenance: {source: "intraday_price_data", interval: "60m", note: "VCP Finder evidence is shown on the card; drawer loads authoritative symbol detail."}
+      };
+    }
+
+    // Find local item for immediate fast-path render; authoritative detail is fetched below.
     if (shortlistData) {
       var all = (shortlistData.ready || []).concat(shortlistData.pre_ready || []);
       for (var i = 0; i < all.length; i++) {
