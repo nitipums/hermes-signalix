@@ -9,6 +9,7 @@ import argparse
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import psycopg2
@@ -53,6 +54,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--end", default=None, help="UTC ISO timestamp; defaults to now")
+    ap.add_argument("--cadence", choices=("daily", "60m"), default="daily")
+    ap.add_argument("--trading-days", type=int, default=None)
     args = ap.parse_args()
     end = datetime.fromisoformat(args.end) if args.end else datetime.now(timezone.utc)
     if end.tzinfo is None:
@@ -77,17 +80,25 @@ def main():
             grouped[row[0]].append({"ts": row[1], "open": row[2], "high": row[3], "low": row[4], "close": row[5], "volume": row[6]})
         cur.execute("SELECT DISTINCT (ts AT TIME ZONE 'Asia/Bangkok')::date FROM intraday_price_data WHERE interval='60m' AND ts >= %s AND ts <= %s ORDER BY 1", (start, end))
         dates = [r[0] for r in cur.fetchall()]
+        if args.trading_days:
+            selected_dates = set(dates[-max(1, args.trading_days):])
+            selected_ts = [r["ts"] for rows in grouped.values() for r in rows if r["ts"].astimezone(ZoneInfo("Asia/Bangkok")).date() in selected_dates]
+            if selected_ts:
+                start = min(selected_ts)
         snapshots = []
-        for day in dates:
-            day_end = datetime.combine(day, datetime.max.time(), tzinfo=timezone.utc)
-            ts_values = [r["ts"] for rows in grouped.values() for r in rows if r["ts"] <= day_end]
-            if ts_values:
-                snapshots.append(max(ts_values))
-        snapshots = sorted(set(snapshots))
+        if args.cadence == "60m":
+            snapshots = sorted({r["ts"] for rows in grouped.values() for r in rows if start <= r["ts"] <= end})
+        else:
+            for day in dates:
+                day_end = datetime.combine(day, datetime.max.time(), tzinfo=timezone.utc)
+                ts_values = [r["ts"] for rows in grouped.values() for r in rows if r["ts"] <= day_end]
+                if ts_values:
+                    snapshots.append(max(ts_values))
+            snapshots = sorted(set(snapshots))
         summary = {"window_start": start.isoformat(), "window_end": end.isoformat(), "snapshots": len(snapshots), "runs": [], "coverage": {}}
         previous = {}
         for idx, as_of in enumerate(snapshots, 1):
-            replay_id = f"vcp-replay-1m-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{idx:03d}"
+            replay_id = f"vcp-replay-1m-{args.cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{idx:03d}"
             results = []
             for symbol in symbols:
                 rows = [r for r in grouped.get(symbol, []) if r["ts"] <= as_of][-400:]

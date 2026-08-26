@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — One-month VCP replay baseline
+## 2026-08-26 — Remove unused DR/US price archive
+Decision: Retain only TH ORD/INDEX in `price_data` for the current Signalix product. Delete historical TH DR and US price rows after replay completion, then run `VACUUM FULL`, `REINDEX`, and `ANALYZE`. Preserve VCP replay tables and TH historical source data.
+Reason: Current VCP/Watchlist/All VCP workflow is Thai ORD 60m; DR/US rows were unused in the current MVP and consumed storage/index space.
+
 Decision: Preserve a one-month append-only point-in-time VCP replay baseline using 20 daily as-of snapshots and full 931-symbol retention. Use it for logic review only; do not call the forward proxy a win rate or final accuracy. Exact 60m breakout timing remains a follow-up replay pass.
 Reason: Establish empirical evidence before locking VCP v1/type thresholds while preserving no-lookahead and live-run isolation.
 
