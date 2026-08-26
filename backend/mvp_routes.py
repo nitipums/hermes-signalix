@@ -76,7 +76,8 @@ def handle_mvp_api(path, handler) -> bool:
                 state = (qs.get("state", [""])[0] or "").upper() or None
                 limit = int(qs["limit"][0]) if qs.get("limit") else None
                 actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-                payload = load_latest_vcp_run(pg, market=market, state=state, symbol=symbol, limit=limit, actionable=actionable)
+                focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+                payload = load_latest_vcp_run(pg, market=market, state=state, symbol=symbol, limit=limit, actionable=actionable, focused=focused)
             finally:
                 pg.close()
             if payload is None:
