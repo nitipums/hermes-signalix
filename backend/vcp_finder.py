@@ -241,10 +241,8 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     result_base["trend"] = {"ema20": _plain(float(ema20.iloc[-1])), "ema20_slope_pct": _plain(ema_slope), "prior_trend_return_pct": _plain(prior_return), "pass": bool(trend_pass)}
     result_base["price"] = {"last_close": last_close, "atr14": _plain(atr)}
     if not trend_pass:
-        result_base["state"] = "FORMING"
         result_base["reason_codes"] = ["prior_trend_not_confirmed"]
         result_base["reasons"] = ["Prior 60m trend is not confirmed; shrinking candles alone are not a VCP."]
-        return result_base
     pivots = _pivots(work, cfg)
     result_base["pattern"]["pivots"] = [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in pivots]
     seq = _sequence(pivots)
@@ -279,7 +277,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     breakout_volume = volume[-1] / (sum(volume[-20:-1]) / 19) if len(volume) >= 20 and sum(volume[-20:-1]) > 0 else None
     close_pass = last_close > required_close
     volume_confirmed = breakout_volume is not None and breakout_volume >= cfg.breakout_volume_ratio
-    structure_pass = bool(contraction_pass and base_pass and leg_volume_pass)
+    structure_pass = bool(trend_pass and contraction_pass and base_pass and leg_volume_pass)
     if last_close < failure:
         state = "FAILED"
     elif structure_pass and close_pass and volume_confirmed:
@@ -297,6 +295,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if freshness == "stale" and state not in {"FAILED", "NOT_VERIFIED"}:
         state = "STALE"
     reasons = []
+    if not trend_pass: reasons.append("prior_trend_not_confirmed")
     if contraction_pass: reasons.append("descending_pullback_contractions")
     if base_pass: reasons.append("base_depth_and_latest_contraction_pass")
     if volume_pass: reasons.append("recent_volume_dryup")
