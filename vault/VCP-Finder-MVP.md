@@ -5,9 +5,18 @@
 
 ## Product surface
 
-- `/mvp` opens on **Daily VCP Shortlist**, the fast actionable-only view.
+- `/mvp` opens on **Daily VCP Watchlist**, the fast review view.
 - **All VCP · 60m** is the full current VCP universe view with forming/state filters and audit coverage.
 - The former Daily Shortlist and All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical notes remain preserved for rollback/audit.
+
+## Watchlist defaults
+
+Daily VCP Watchlist defaults to these removable presentation filters:
+
+- Marginable: on, all margin rates
+- 20-day average trade value: `> THB 10,000,000`
+- Current 60m price: `> THB 0.60`
+- These defaults are presentation filters only and can be disabled by the owner.
 
 ## Table contract
 

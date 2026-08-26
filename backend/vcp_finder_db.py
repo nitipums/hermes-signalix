@@ -100,6 +100,27 @@ def load_daily_trend_context(pg, symbols, as_of=None, lookback=80):
     return contexts
 
 
+def load_daily_metrics(pg, symbols, as_of=None, lookback=20):
+    if not symbols:
+        return {}
+    cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """SELECT symbol, date, close, volume FROM (
+                 SELECT symbol, date, close, volume,
+                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+                 FROM price_data
+                 WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
+               ) x WHERE rn <= %s"""
+    params = [symbols, int(lookback)]
+    if as_of is not None:
+        query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
+        params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
+    cur.execute(query, tuple(params))
+    grouped = {s: [] for s in symbols}
+    for row in cur.fetchall(): grouped[row["symbol"]].append((float(row["close"]), float(row["volume"])))
+    cur.close()
+    return {s: {"avg_trade_value_20": sum(c * v for c, v in vals) / len(vals) if vals else None, "latest_daily_close": vals[-1][0] if vals else None, "bars": len(vals)} for s, vals in grouped.items()}
+
+
 def _presentation_fields(result):
     state = result.get("state")
     evidence = result.get("evidence") or {}
@@ -145,6 +166,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     observed_as_of = as_of or datetime.now(timezone.utc)
     rows = load_vcp_60m_rows(pg, eligible, as_of=observed_as_of)
     daily_context = load_daily_trend_context(pg, eligible, as_of=observed_as_of)
+    daily_metrics = load_daily_metrics(pg, eligible, as_of=observed_as_of)
     feed_status = {}
     if eligible:
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -165,6 +187,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
         result["data"]["feed_reason"] = feed_status.get(symbol, {}).get("reason")
         result["data"]["feed_retry_at"] = str(feed_status.get(symbol, {}).get("retry_at")) if feed_status.get(symbol, {}).get("retry_at") else None
         result["data"]["feed_last_success_at"] = str(feed_status.get(symbol, {}).get("last_success_at")) if feed_status.get(symbol, {}).get("last_success_at") else None
+        result["data"]["daily_metrics"] = daily_metrics.get(symbol, {})
         result["provenance"]["run_id"] = run_id
         result["provenance"]["market"] = market.upper()
         result["provenance"]["ingestion_run_id"] = ingestion_run_id

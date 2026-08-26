@@ -21,19 +21,24 @@
 
     <nav class="nav" role="tablist" aria-label="Surface">
       <button id="tab-daily-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-daily-vcp">
-        Daily VCP Shortlist
+        Daily VCP Watchlist
       </button>
       <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
         All VCP · 60m
       </button>
     </nav>
 
-    <!-- ── Daily VCP Shortlist panel ── -->
+    <!-- ── Daily VCP Watchlist panel ── -->
     <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
-      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading Daily VCP shortlist…</p></section>
-      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load Daily VCP shortlist.</p></section>
+      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading VCP Watchlist…</p></section>
+      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load VCP Watchlist.</p></section>
       <section id="daily-vcp-content" class="state--hidden">
         <p class="explorer-note">60m review queue · actionable setups + breakout watch · not an automatic buy signal.</p>
+        <div class="watchlist-default-filters" aria-label="Watchlist default filters">
+          <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
+          <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
+          <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
+        </div>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
       </section>

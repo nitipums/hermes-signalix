@@ -29,6 +29,9 @@
     dailyVcpContent: $("#daily-vcp-content"),
     dailyVcpCards:   $("#daily-vcp-cards"),
     dailyVcpMeta:    $("#daily-vcp-meta"),
+    dailyFilterMarginable: $("#daily-filter-marginable"),
+    dailyFilterTradeValue: $("#daily-filter-trade-value"),
+    dailyFilterPrice: $("#daily-filter-price"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -244,11 +247,12 @@
   /* ── freshness ── */
   function setFreshness(status, asOf, intradayAt) {
     dom.freshnessDot.className = "freshness-dot freshness-dot--" + status;
-    dom.freshnessLabel.textContent = status === "loading" ? "Loading…"
-      : status === "fresh" ? "Fresh · " + timeAgo(asOf)
-      : status === "market_closed" ? "Daily EOD · " + timeAgo(asOf) + " · 60m " + (intradayAt ? timeAgo(intradayAt) : "NOT_VERIFIED")
-      : status === "stale" ? "Stale · " + timeAgo(asOf)
-      : "Error";
+    dom.freshnessLabel.textContent = status === "loading" ? "60m loading…"
+      : intradayAt ? "60m updated · " + timeAgo(intradayAt)
+      : status === "fresh" ? "60m updated · " + timeAgo(asOf)
+      : status === "market_closed" ? "60m updated · " + (intradayAt ? timeAgo(intradayAt) : "–")
+      : status === "stale" ? "60m stale · " + timeAgo(asOf)
+      : "60m update unavailable";
   }
 
   /* ── render card ── */
@@ -717,13 +721,21 @@
       .then(function(data){
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
+        setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
         var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
+        results = results.filter(function(r){
+          var metrics = (r.data || {}).daily_metrics || {};
+          if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;
+          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
+          if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return false;
+          return true;
+        });
         results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
         dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " review / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderVcpResults(results, dom.dailyVcpCards);
       })
-      .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); dom.dailyVcpErrorMsg.textContent = "Unable to load Daily VCP shortlist: " + err.message; });
+      .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
   }
 
   function loadVcp() {
@@ -739,6 +751,7 @@
       .then(function(data) {
         hide(dom.vcpLoading); show(dom.vcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
+        setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
         (data.results || []).forEach(function(r) { vcpResultsBySymbol[r.symbol] = r; });
         var selected = dom.vcpState.value || "actionable";
@@ -753,6 +766,10 @@
       })
       .catch(function(err) { hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
   }
+
+  [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {
+    if (input) input.addEventListener("change", loadDailyVcp);
+  });
 
   /* ── tab switching ── */
   function switchTab(tab) {
