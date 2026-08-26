@@ -20,7 +20,13 @@
 - Old Daily Shortlist/All Explorer product contract remains in vault as `STATUS: SUPERSEDED`, preserving historical design evidence.
 - Old implementation handoffs and postmortems remain historical unless their header says `STATUS: CURRENT`.
 
-## Task-progress / operational facts to review
+## Skill consolidation — 2026-08-26
+
+- 24 overlapping Signalix skills were archived reversibly under `_archived_consolidation_20260826`.
+- Active umbrellas: `signalix-production-delivery`, `signalix-dashboard`, `signalix-screening-replay`.
+- Hermes umbrellas created: `hermes-operations`, `memory-documentation-governance`.
+- The original skills remain available for restore if an umbrella loses a needed procedure.
+
 
 Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, and old provider states should not be promoted to permanent memory.
 
