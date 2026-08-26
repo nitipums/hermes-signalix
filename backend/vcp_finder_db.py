@@ -18,8 +18,14 @@ CREATE TABLE IF NOT EXISTS vcp_finder_60m_runs (
   as_of TIMESTAMPTZ NOT NULL,
   eligible_count INTEGER NOT NULL,
   evaluated_count INTEGER NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ingestion_run_id TEXT,
+  ingestion_status TEXT,
+  fetch_completed_at TIMESTAMPTZ
 );
+ALTER TABLE vcp_finder_60m_runs ADD COLUMN IF NOT EXISTS ingestion_run_id TEXT;
+ALTER TABLE vcp_finder_60m_runs ADD COLUMN IF NOT EXISTS ingestion_status TEXT;
+ALTER TABLE vcp_finder_60m_runs ADD COLUMN IF NOT EXISTS fetch_completed_at TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS vcp_finder_60m_results (
   run_id TEXT NOT NULL REFERENCES vcp_finder_60m_runs(run_id) ON DELETE CASCADE,
   symbol TEXT NOT NULL,
@@ -63,7 +69,44 @@ def load_vcp_60m_rows(pg, symbols, lookback=400, as_of=None):
     return grouped
 
 
-def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=None):
+def _presentation_fields(result):
+    state = result.get("state")
+    evidence = result.get("evidence") or {}
+    if state == "FORMING":
+        if evidence.get("prior_trend_pass") and evidence.get("price_contraction_pass") and evidence.get("base_pass"):
+            forming_group, forming_rank = "maturing", 0
+        elif evidence.get("prior_trend_pass") and (evidence.get("price_contraction_pass") or evidence.get("base_pass")):
+            forming_group, forming_rank = "early", 1
+        else:
+            forming_group, forming_rank = "needs_work", 2
+    else:
+        forming_group, forming_rank = None, 9
+    state_rank = {"CONFIRMED": 0, "NEAR_TRIGGER": 1, "READY": 2, "EXTENDED": 4, "FAILED": 6, "STALE": 7, "NOT_VERIFIED": 8, "FORMING": 3}.get(state, 9)
+    result["forming_group"] = forming_group
+    result["state_rank"] = state_rank
+    result["forming_rank"] = forming_rank
+    result["review_rank"] = state_rank * 10 + forming_rank
+    result["data"]["latest_closed_bar"] = result["data"].get("last_bar_ts")
+    return result
+
+
+def _result_sort_key(result):
+    price = result.get("price") or {}
+    pattern = result.get("pattern") or {}
+    volume = result.get("volume") or {}
+    distance = price.get("distance_to_pivot_pct")
+    if result.get("state") in {"READY", "NEAR_TRIGGER"}:
+        distance_key = abs(float(distance)) if distance is not None else 999999.0
+    else:
+        distance_key = 0.0
+    latest = (result.get("data") or {}).get("latest_closed_bar") or ""
+    contraction = pattern.get("latest_contraction_pct")
+    breakout = volume.get("breakout_volume_ratio")
+    return (result.get("state_rank", 9), result.get("forming_rank", 9), -int(bool((result.get("data") or {}).get("freshness") == "fresh")), distance_key, float(contraction) if contraction is not None else 999999.0, -(float(breakout) if breakout is not None else 0.0), -len(latest), result.get("symbol", ""))
+
+
+def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=None,
+                          ingestion_run_id=None, ingestion_status=None, fetch_completed_at=None):
     cfg = config or VCP60Config()
     if market.upper() != "TH":
         raise ValueError("vcp_finder_60m currently supports market=TH only")
@@ -92,8 +135,11 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
         result["data"]["feed_last_success_at"] = str(feed_status.get(symbol, {}).get("last_success_at")) if feed_status.get(symbol, {}).get("last_success_at") else None
         result["provenance"]["run_id"] = run_id
         result["provenance"]["market"] = market.upper()
-        results.append(result)
-    results.sort(key=lambda x: x["symbol"])
+        result["provenance"]["ingestion_run_id"] = ingestion_run_id
+        result["provenance"]["ingestion_status"] = ingestion_status
+        result["provenance"]["fetch_completed_at"] = str(fetch_completed_at) if fetch_completed_at else None
+        results.append(_presentation_fields(result))
+    results.sort(key=_result_sort_key)
     return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "finder": "vcp_finder_60m",
@@ -102,6 +148,9 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
         "run_id": run_id,
         "policy_version": POLICY_VERSION,
         "as_of": observed_as_of.isoformat(),
+        "ingestion_run_id": ingestion_run_id,
+        "ingestion_status": ingestion_status,
+        "fetch_completed_at": str(fetch_completed_at) if fetch_completed_at else None,
         "universe": {
             "eligible": len(eligible),
             "evaluated": len(results),
@@ -111,11 +160,12 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     }
 
 
-def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None, actionable=False):
+def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None, actionable=False, focused=False):
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         """SELECT run_id, market, interval, policy_version, as_of,
-                  eligible_count, evaluated_count
+                  eligible_count, evaluated_count, ingestion_run_id,
+                  ingestion_status, fetch_completed_at
            FROM vcp_finder_60m_runs
            WHERE market=%s ORDER BY created_at DESC LIMIT 1""",
         (market.upper(),),
@@ -131,6 +181,8 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         params.append(state.upper())
     elif actionable:
         clauses.append("state IN ('READY','NEAR_TRIGGER','CONFIRMED')")
+    elif focused:
+        clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED') OR (state='FORMING' AND result->>'forming_group'='maturing'))")
     if symbol:
         clauses.append("symbol=%s")
         params.append(symbol.upper())
@@ -150,6 +202,7 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
             "source": "Krungsri Credit Balance" if record else None,
         }
         result["margin_rate_pct"] = record.get("margin_rate_pct") if record else None
+    results.sort(key=_result_sort_key)
     return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "finder": "vcp_finder_60m",
@@ -158,6 +211,9 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         "run_id": run["run_id"],
         "policy_version": run["policy_version"],
         "as_of": run["as_of"].isoformat() if hasattr(run["as_of"], "isoformat") else str(run["as_of"]),
+        "ingestion_run_id": run["ingestion_run_id"],
+        "ingestion_status": run["ingestion_status"],
+        "fetch_completed_at": run["fetch_completed_at"].isoformat() if hasattr(run["fetch_completed_at"], "isoformat") else (str(run["fetch_completed_at"]) if run["fetch_completed_at"] else None),
         "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": len(results)},
         "results": results,
     }
@@ -168,10 +224,12 @@ def persist_vcp_run(pg, payload):
     cur = pg.cursor()
     cur.execute(
         """INSERT INTO vcp_finder_60m_runs
-           (run_id, market, interval, policy_version, as_of, eligible_count, evaluated_count)
-           VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+           (run_id, market, interval, policy_version, as_of, eligible_count, evaluated_count,
+            ingestion_run_id, ingestion_status, fetch_completed_at)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         (payload["run_id"], payload["market"], payload["interval"], payload["policy_version"],
-         payload["as_of"], payload["universe"]["eligible"], payload["universe"]["evaluated"]),
+         payload["as_of"], payload["universe"]["eligible"], payload["universe"]["evaluated"],
+         payload.get("ingestion_run_id"), payload.get("ingestion_status"), payload.get("fetch_completed_at")),
     )
     rows = [(payload["run_id"], r["symbol"], r["state"], bool(r["actionable"]), json.dumps(r, default=str)) for r in payload["results"]]
     psycopg2.extras.execute_values(

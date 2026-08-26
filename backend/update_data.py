@@ -1111,6 +1111,41 @@ def refresh_dashboard_from_existing_scan():
     return result
 
 
+def run_vcp_after_ingestion(pg, summary):
+    """Evaluate/persist VCP only after a committed successful ingestion."""
+    if summary.get("status") not in {"full_success", "partial_success"}:
+        print("VCP_FINDER_SKIP " + json.dumps({"reason": "ingestion_not_eligible", "status": summary.get("status")}))
+        return None
+    cur = pg.cursor()
+    cur.execute("SELECT pg_try_advisory_lock(hashtext('signalix:vcp-finder-60m'))")
+    locked = bool(cur.fetchone()[0])
+    cur.close()
+    if not locked:
+        print("VCP_FINDER_SKIP " + json.dumps({"reason": "run_lock_busy"}))
+        return None
+    try:
+        from vcp_finder_db import find_vcp_universe_60m, persist_vcp_run
+        completed = summary.get("fetch_completed_at")
+        as_of = dt.datetime.fromisoformat(completed) if completed else dt.datetime.now(dt.timezone.utc)
+        payload = find_vcp_universe_60m(
+            pg, market="TH", as_of=as_of,
+            ingestion_run_id=summary.get("run_id"),
+            ingestion_status=summary.get("status"),
+            fetch_completed_at=completed,
+        )
+        persist_vcp_run(pg, payload)
+        print("VCP_FINDER_RUN " + json.dumps({
+            "run_id": payload["run_id"], "ingestion_run_id": summary.get("run_id"),
+            "status": summary.get("status"), "universe": payload["universe"],
+        }, sort_keys=True))
+        return payload
+    finally:
+        cur = pg.cursor()
+        cur.execute("SELECT pg_advisory_unlock(hashtext('signalix:vcp-finder-60m'))")
+        pg.commit()
+        cur.close()
+
+
 # ---------- main ----------
 def run(args):
     started_at = dt.datetime.now(dt.timezone.utc)
@@ -1142,6 +1177,7 @@ def run(args):
             )
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
+            run_vcp_after_ingestion(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
             print(format_intraday_run_log(
                 run_id=summary["run_id"],

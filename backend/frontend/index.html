@@ -21,19 +21,19 @@
 
     <!-- nav tabs -->
     <nav class="nav" role="tablist" aria-label="Surface">
-      <button id="tab-shortlist" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-shortlist">
-        Daily Shortlist
+      <button id="tab-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-vcp">
+        VCP Finder · 60m
+      </button>
+      <button id="tab-shortlist" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-shortlist">
+        Daily Setups
       </button>
       <button id="tab-explorer" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-explorer">
-        All Stocks Explorer
-      </button>
-      <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
-        VCP Finder · 60m
+        Research / Full Universe
       </button>
     </nav>
 
     <!-- ── VCP Finder panel ── -->
-    <main id="panel-vcp" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-vcp">
+    <main id="panel-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-vcp">
       <section id="vcp-loading" class="state state--hidden" aria-live="polite">
         <div class="state-icon">⌛</div><p class="state-text">Loading 60m VCP finder…</p>
       </section>
@@ -81,7 +81,7 @@
     </main>
 
     <!-- ── Daily Shortlist panel ── -->
-    <main id="panel-shortlist" class="panel panel--active" role="tabpanel" aria-labelledby="tab-shortlist">
+    <main id="panel-shortlist" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-shortlist">
 
       <!-- loading state -->
       <section id="shortlist-loading" class="state" aria-live="polite">

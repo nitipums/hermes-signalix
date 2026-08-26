@@ -32,7 +32,7 @@ def test_vcp_route_evaluates_then_filters(monkeypatch):
     class Conn:
         def close(self): pass
     monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
-    def latest(pg, market, state, symbol, limit, actionable):
+    def latest(pg, market, state, symbol, limit, actionable, focused):
         filtered = [r for r in payload["results"] if (not state or r["state"] == state) and (not actionable or r["state"] in {"READY", "NEAR_TRIGGER", "CONFIRMED"})]
         return {**payload, "results": filtered}
     monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", latest)

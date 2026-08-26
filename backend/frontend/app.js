@@ -107,7 +107,7 @@
   };
 
   /* ── state ── */
-  let currentTab = "shortlist";
+  let currentTab = "vcp";
   let explorerPage = 1;
   let explorerTotalPages = 1;
   let explorerStage = "";
@@ -665,11 +665,25 @@
     '</article>';
   }
 
+  function vcpDisplayGroup(result) {
+    if (result.state === "FORMING") return "FORMING · " + ({maturing: "MATURING", early: "EARLY", needs_work: "NEEDS WORK"}[result.forming_group] || "NEEDS WORK");
+    return ({CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
+  }
+
+  function renderVcpResults(results) {
+    var order = ["CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
+    var groups = {};
+    results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
+    dom.vcpCards.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
+      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2>' + groups[key].map(vcpCard).join("") + '</section>';
+    }).join("") || '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+  }
+
   function loadVcp() {
     show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
     var selected = dom.vcpState.value || "actionable";
     var endpoint = "/api/vcp-finder?interval=60m&market=TH";
-    if (selected === "actionable") endpoint += "&actionable=true";
+    if (selected === "actionable") endpoint += "&focused=true";
     else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
     else endpoint += "&limit=5000";
     fetch(endpoint)
@@ -680,10 +694,10 @@
         var results = data.results || [];
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
         results = results.filter(priceMatches);
-        if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0; });
+        if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0 || (r.state === "FORMING" && r.forming_group === "maturing"); });
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
         dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
-        dom.vcpCards.innerHTML = results.length ? results.map(vcpCard).join("") : '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+        renderVcpResults(results);
       })
       .catch(function(err) { hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
   }
@@ -937,5 +951,5 @@
 
   /* ── init ── */
   setFreshness("loading");
-  loadShortlist();
+  loadVcp();
 })();

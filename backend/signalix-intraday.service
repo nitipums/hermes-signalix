@@ -5,7 +5,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-WorkingDirectory=/root/signalix-release-candidate/backend
+WorkingDirectory=/root/signalix/backend
 Environment=POSTGRES_HOST=127.0.0.1
 Environment=POSTGRES_PORT=5432
 Environment=POSTGRES_USER=signalix
@@ -13,10 +13,10 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 EnvironmentFile=/root/signalix/settradeupdated.env
 # Current/open 60m candle is retained and refreshed during continuous SET sessions.
-ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if [ "$t" -ge 1000 ] && [ "$t" -le 1645 ]; then exec /root/.venv_img/bin/python /root/signalix-release-candidate/backend/update_data.py --source settrade --intraday-only --intraday-mode full --intraday-interval 60m --intraday-limit 4 --intraday-workers 10 --intraday-batch-size 50 --intraday-batch-delay 2 --intraday-batch-jitter 0.5 --no-scan; else echo "signalix full ORD 60m: outside configured window ($t Bangkok), skip"; fi'
+ExecStart=/bin/bash -lc 't=$(TZ=Asia/Bangkok date +%%H%%M); if [ "$t" -ge 1000 ] && [ "$t" -le 1645 ]; then exec /root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --intraday-only --intraday-mode full --intraday-interval 60m --intraday-limit 4 --intraday-workers 10 --intraday-batch-size 50 --intraday-batch-delay 2 --intraday-batch-jitter 0.5 --no-scan; else echo "signalix full ORD 60m: outside configured window ($t Bangkok), skip"; fi'
 StandardOutput=append:/root/signalix/intraday_update_log.txt
 StandardError=append:/root/signalix/intraday_update_log.txt
 TimeoutStartSec=1800
 # ExecStopPost runs after both successful and failed fetches, so stored candles are
 # still evaluated when Settrade/session acquisition fails.
-ExecStopPost=/bin/bash -lc 'cd /root/signalix-release-candidate && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5432 POSTGRES_USER=signalix POSTGRES_PASSWORD=signalix_pass POSTGRES_DB=signalix /root/.venv_img/bin/python -m backend.run_intraday_evaluation --mode active --interval 60m'
+ExecStopPost=/bin/bash -lc 'cd /root/signalix && POSTGRES_HOST=127.0.0.1 POSTGRES_PORT=5432 POSTGRES_USER=signalix POSTGRES_PASSWORD=signalix_pass POSTGRES_DB=signalix /root/.venv_img/bin/python -m backend.run_intraday_evaluation --mode active --interval 60m'
