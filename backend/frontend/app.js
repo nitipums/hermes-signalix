@@ -345,9 +345,6 @@
     dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
     var drawerChg = fmtChange(item.change_pct);
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
-    dom.drawerTrigger.textContent = displayValue(item.trigger);
-    dom.drawerStop.textContent = displayValue(item.risk_stop != null ? Number(item.risk_stop).toFixed(2) : null);
-    dom.drawerTarget.textContent = displayValue(item.target != null ? Number(item.target).toFixed(2) : null);
     dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
     setOptionalDrawerField(dom.drawerMembership, (item.index_membership || []).join(" · "));
     var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
@@ -528,11 +525,6 @@
     // Immediate render from local card data (fast path).
     renderDrawerDetail(item);
 
-    // Reset overlay legend to loading placeholder.
-    dom.indMa20.textContent = "…"; dom.indMa50.textContent = "…";
-    dom.indMa200.textContent = "…"; dom.indMacd.textContent = "…";
-    dom.indRsi.textContent = "…"; dom.indTrigger.textContent = "…";
-    dom.indStop.textContent = "…"; dom.indTarget.textContent = "…";
     if (sameSymbolOpen && window.__signalixLastChart && Array.isArray(window.__signalixLastChart.candles) && window.__signalixLastChart.candles.length >= 2) {
       // Keep the last-good plot visible while a new timeframe request is in flight.
       dom.drawerChartPH.style.display = "none";
