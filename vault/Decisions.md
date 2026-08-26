@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — Daily VCP Shortlist and All VCP split
+## 2026-08-26 — Intraday cadence update
+Decision: Run active ORD 60m fetch/VCP rounds at `10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30, 16:45` Bangkok weekday time. The final 16:45 round is an explicit session-close round.
+Reason: Align monitoring with the requested SET continuous-session windows `10:00–12:30` and `14:00–16:45`.
+
 Decision: Split the VCP-first MVP into two visible surfaces: `Daily VCP Shortlist` as the fastest default page showing only actionable review (`READY`, `NEAR_TRIGGER`, `CONFIRMED`), and `All VCP · 60m` as the current full-universe table with forming/state filters. Retire the former Daily Shortlist and All Stocks Explorer from visible MVP navigation while preserving backend/history for rollback and audit.
 Reason: Arm wants a minimal fast review queue without losing access to the complete VCP universe and evidence.
 
