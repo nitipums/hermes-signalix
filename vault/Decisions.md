@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — VCP Watchlist naming and defaults
+## 2026-08-26 — VCP type taxonomy pending sample validation
+Decision: Treat `break_ath`, `new_stock`, `low_cheat_vcp`, and `standard_vcp` as candidate VCP types for the next v1 fine-tuning pass. Keep type separate from state/actionability; no type alone can promote READY/CONFIRMED.
+Reason: Arm wants distinct VCP archetypes without locking ambiguous rules before reviewing real sample cases.
+
 Decision: Rename Daily VCP Shortlist to Daily VCP Watchlist. Default removable presentation filters are Marginable (all rates), 20-day average trade value > THB 10M, and current 60m price > THB 0.60. Watchlist state review includes actionable setups plus breakout watch.
 Reason: Standardize watchlist language and keep the fast review queue focused on tradable/liquid names without changing full-universe scan eligibility.
 

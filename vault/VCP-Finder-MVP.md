@@ -9,6 +9,17 @@
 - **All VCP · 60m** is the full current VCP universe view with forming/state filters and audit coverage.
 - The former Daily Shortlist and All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical notes remain preserved for rollback/audit.
 
+## VCP type taxonomy — next v1 fine-tuning
+
+The next sample-driven logic work will separate **type** from **state/actionability**. Candidate types are:
+
+- `break_ath`
+- `new_stock`
+- `low_cheat_vcp`
+- `standard_vcp`
+
+These names are a pending classification contract, not locked rules. Each type must be validated against owner-supplied samples before changing the deterministic engine. A type must never by itself promote a result to READY/CONFIRMED.
+
 ## Watchlist defaults
 
 Daily VCP Watchlist defaults to these removable presentation filters:
