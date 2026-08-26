@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="Signalix — Daily decision surface for Thai equities. Owner-only MVP.">
-  <title>Signalix · Daily Shortlist</title>
+  <meta name="description" content="Signalix — VCP Finder 60m decision surface for Thai equities. Owner-only MVP.">
+  <title>Signalix · VCP Finder</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -52,15 +52,17 @@
               <option value="NEAR_TRIGGER">Near trigger</option>
               <option value="CONFIRMED">Confirmed breakout</option>
               <option value="EXTENDED">Extended · do not chase</option>
-              <option value="FORMING">Forming</option>
+              <option value="FORMING">Forming · all</option>
+              <option value="FORMING_MATURING">Forming · maturing</option>
+              <option value="FORMING_EARLY">Forming · early</option>
+              <option value="FORMING_NEEDS_WORK">Forming · needs work</option>
               <option value="FAILED">Failed</option>
               <option value="STALE">Stale</option>
               <option value="NOT_VERIFIED">Not verified</option>
             </select>
           </label>
           <label class="explorer-control">Price range
-            <select id="vcp-price-band" aria-label="Filter VCP by price range">
-              <option value="all" selected>All prices</option>
+            <select id="vcp-price-band" aria-label="Filter VCP by price range" multiple size="3">
               <option value="below_2">&lt; 2 THB</option>
               <option value="2_to_10">2–10 THB</option>
               <option value="above_10">&gt; 10 THB</option>
@@ -73,6 +75,9 @@
             <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="70">70%</label>
             <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="80">80%</label>
             <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="100">100%</label>
+            <button type="button" id="vcp-margin-all" class="btn btn--filter">Select all</button>
+            <button type="button" id="vcp-margin-clear" class="btn btn--filter">Clear</button>
+            <button type="button" id="vcp-filter-apply" class="btn btn--filter btn--primary">Apply</button>
           </fieldset>
           <span id="vcp-meta" class="marginable-filter-meta">Loading…</span>
         </div>

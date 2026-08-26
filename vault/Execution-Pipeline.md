@@ -36,8 +36,9 @@ The product must let a user answer, quickly and honestly:
 - Breakout lifecycle has immutable trigger/pivot/invalidation evidence and retry lineage.
 - Intraday is a 60-minute stored overlay; it must never overwrite historical Daily classification.
 - Thai and curated US AI Buildout use shared market-scoped scanner logic. US remains a research watchlist with explicitly labelled bootstrap data quality.
-- Owner-only MVP is the served decision surface: Daily Shortlist (`READY`/`PRE_READY`), separate `RISING MOVERS` (`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) lanes, plus full-ORD All Stocks Explorer.
-- Explorer Stage/Search filters apply immediately. Detail charts use real `1D`, `1W`, `60M`, and `1M` contracts; controls/indicator values stay below the plot.
+- Owner-only MVP is VCP Finder · 60m first: compact sortable tables with Symbol, Price, % Change, Distance, and R/R. Daily Shortlist is removed from visible MVP navigation; Research / Full Universe Explorer remains secondary audit/research.
+- VCP full-universe persistence retains every evaluated symbol. Forming presentation lanes are maturing/early/needs_work; contraction and breakout volume are deterministic sort inputs, not primary table columns.
+- VCP runs after committed full/partial 60m ingestion with ingestion lineage and overlap lock; failed/skipped ingestion does not create a new VCP run. Missing optional index/margin data is omitted rather than rendered as `NOT_VERIFIED`.
 - Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
 - The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
 

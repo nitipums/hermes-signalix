@@ -1,0 +1,54 @@
+# Signalix VCP Finder MVP
+
+> **STATUS: CURRENT** · **CANONICAL_FOR:** VCP-first MVP surface and display contract.
+> **Last reviewed:** 2026-08-26
+
+## Product surface
+
+- `/mvp` opens on **VCP Finder · 60m**.
+- Daily Shortlist is removed from visible MVP navigation; its backend/API and historical notes remain preserved for rollback/audit.
+- Research / Full Universe is secondary research/audit only.
+
+## Table contract
+
+The primary VCP table shows only:
+
+- Symbol/name
+- Price
+- `% Change` from the latest two stored 60m closes
+- Distance to pivot
+- R/R when an authoritative target/risk source exists; otherwise `—`
+
+Contraction and breakout-volume evidence remain deterministic sort inputs and drawer evidence, not primary table columns.
+
+## Display and grouping
+
+Display order:
+
+1. CONFIRMED · REVIEW
+2. NEAR TRIGGER · VOLUME CHECK
+3. READY · WAIT FOR BREAKOUT
+4. FORMING · MATURING
+5. FORMING · EARLY
+6. FORMING · NEEDS WORK
+7. EXTENDED · DO NOT CHASE
+8. FAILED / INVALIDATED
+9. STALE DATA
+10. NOT VERIFIED
+
+Forming filters are `all`, `maturing`, `early`, and `needs_work`. Full-universe persistence remains one result per eligible symbol; presentation grouping never changes scan eligibility.
+
+## Filters
+
+- Price range supports multi-select: `<2 THB`, `2–10 THB`, `>10 THB`.
+- Margin rates support multi-select with **Select all / Clear / Apply**. Checkbox changes do not reload until Apply.
+- Missing index/margin data produces no tag and never a `NOT_VERIFIED` placeholder.
+
+## Data and provenance
+
+- VCP reads stored 60m OHLCV only and does not overwrite Daily state.
+- VCP runs after committed `full_success` or `partial_success` intraday ingestion, with ingestion lineage and overlap lock.
+- Failed/skipped ingestion does not create a new VCP run.
+- Drawer uses the VCP result payload immediately and fetches only the 60m chart; it does not fetch Daily symbol detail or substitute old Daily provenance.
+- Provenance displays VCP run `as_of`/`fetch_completed_at` and latest closed bar.
+- Missing optional company description is hidden; it is not required for the core decision surface.

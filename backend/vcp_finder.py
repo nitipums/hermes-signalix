@@ -234,12 +234,14 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     prior_idx = max(0, len(work) - cfg.pattern_bars)
     prior_return = float((close.iloc[prior_idx] / close.iloc[max(0, prior_idx - 20)] - 1) * 100) if prior_idx > 0 and close.iloc[max(0, prior_idx - 20)] else 0.0
     last_close = float(close.iloc[-1])
+    prev_close = float(close.iloc[-2]) if len(close) >= 2 else None
+    change_pct = ((last_close / prev_close) - 1) * 100 if prev_close else None
     atr, _ = _atr14(close.tolist(), work["high"].tolist(), work["low"].tolist(), cfg.atr_bars)
     trend_pass = last_close > float(ema20.iloc[-1]) and (ema_slope or 0) > 0 and prior_return > 0
     result_base = _empty_result("FORMING", [], data=data, as_of=observed_as_of, config=cfg)
     result_base["data"] = data
     result_base["trend"] = {"ema20": _plain(float(ema20.iloc[-1])), "ema20_slope_pct": _plain(ema_slope), "prior_trend_return_pct": _plain(prior_return), "pass": bool(trend_pass)}
-    result_base["price"] = {"last_close": last_close, "atr14": _plain(atr)}
+    result_base["price"] = {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr)}
     if not trend_pass:
         result_base["reason_codes"] = ["prior_trend_not_confirmed"]
         result_base["reasons"] = ["Prior 60m trend is not confirmed; shrinking candles alone are not a VCP."]
@@ -308,7 +310,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER"},
         "reason_codes": reasons,
         "reasons": reasons,
-        "price": {"last_close": last_close, "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},
+        "price": {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},
         "pattern": {"pivots": [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in seq], "base_depth_pct": _plain(base_depth), "contractions_pct": [_plain(x) for x in depths], "contraction_ratios": [_plain(x) for x in ratios], "latest_contraction_pct": _plain(latest_contraction)},
         "volume": {"leg_average_volume": [_plain(x) for x in leg_average_volume], "leg_volume_non_increasing": bool(leg_volume_pass), "recent_5_avg": _plain(recent), "baseline_15_avg": _plain(baseline), "dryup_ratio": _plain(dryup), "volume_dryup": bool(volume_pass), "breakout_volume_ratio": _plain(breakout_volume)},
         "breakout": {"pivot_level": pivot, "required_close": required_close, "close_confirmed": bool(close_pass), "volume_confirmed": bool(volume_confirmed)},

@@ -65,24 +65,20 @@ logs in the non-TTY container).
 - `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
 - `docker-compose.yml` — 4 services
 
-## Current MVP surface contract — 2026-08-25
+## Current MVP surface contract — 2026-08-26
 
-The served owner-only MVP is intentionally separate from the legacy dashboard:
+The owner-only MVP is VCP-first:
 
 ```text
 /mvp
-  ├─ Daily Shortlist       READY / PRE_READY only
-  ├─ Rising Movers         WATCH ONLY; never actionable
-  ├─ Caution               DO NOT CHASE; never actionable
-  └─ All Stocks Explorer   full-ORD research, immediate Stage/Search filters
+  ├─ VCP Finder · 60m       primary, compact sortable tables
+  └─ Research / Full Universe secondary audit route
 ```
 
-Daily Shortlist hard gates are unchanged. `Rising Movers` uses explicit Daily
-price/volume evidence for S1/S2 context; `Caution` exposes strong moves in
-S3/S4/topping/extended structures. Neither lane receives shortlist rank,
-trigger permission, or READY styling.
+Daily Shortlist is removed from the visible MVP navigation but its backend/API and historical evidence remain preserved for rollback/audit. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
 
-Chart contract is `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`:
+VCP runs after committed full/partial 60m ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Missing optional index/margin metadata is omitted from tags; it is never displayed as `NOT_VERIFIED`.
+
 `1D` reads Daily bars, `1W`/`1M` aggregate Daily bars, and `60M` reads stored
 intraday 60m bars. Chart controls and indicator legends are below the plot so
 they cannot obscure candles, volume, MA, or RSI panes.

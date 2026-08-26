@@ -4,8 +4,15 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-25 — Krungsri Credit Balance marginable filter
-Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. Daily Shortlist and All Stocks Explorer default to the Krungsri list, with explicit `All stocks` and `Not on Krungsri list` options plus multi-select initial-margin rates (for example `50% + 60%`). Cards show compact `%Margin X%`; drawer shows only `Marginable: X%`.
+## 2026-08-26 — VCP Finder is the primary MVP surface
+Decision: Make VCP Finder · 60m the default/primary owner-only MVP surface. Remove Daily Shortlist from visible MVP navigation; retain backend/routes and historical evidence for rollback. Keep Explorer only as secondary Research / Full Universe. VCP presentation uses compact tables with Symbol, Price, % Change, Distance, and R/R; contraction/breakout volume remain evidence-driven sorting inputs. Price ranges are multi-select; margin rates use Select all/Clear/Apply. Missing index or margin metadata produces no tag, never a `NOT_VERIFIED` placeholder.
+Reason: Arm uses VCP Finder as the core workflow and needs dense, sortable opportunity review without oversized cards or refresh-on-every-filter-click.
+
+## 2026-08-26 — VCP auto-run and forming lanes
+Decision: Run isolated VCP 60m after each committed full/partial intraday ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Forming presentation lanes are `maturing`, `early`, and `needs_work`; full-universe retention remains mandatory.
+Reason: Avoid stale evaluations while preserving opportunities and make the large forming population reviewable.
+
+Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. VCP Finder uses it for optional multi-select margin filtering; legacy Daily/Explorer routes retain their existing filters for secondary/audit use. Cards show compact `%Margin X%`; drawer shows only `Marginable: X%` when present.
 Reason: Arm normally trades through this Credit Balance list and wants the decision surface pre-filtered to usable collateral/shorting context. Margin metadata is presentation/filter-only and must not mutate canonical scan eligibility or Daily state. Owner workflow checks for a new PDF monthly; each PDF's effective date is authoritative.
 
 ## 2026-08-25 — Drawer stock navigation and cleanup boundary

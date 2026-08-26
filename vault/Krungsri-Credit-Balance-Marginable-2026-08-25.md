@@ -20,12 +20,12 @@
 
 ## Product behavior
 
-- Both Daily Shortlist and All Stocks Explorer default to `Krungsri · default`.
-- Filter options: Krungsri list, All stocks, Not on Krungsri list, plus multi-select initial-margin rates such as `50% + 60%`.
-- Cards show only the compact `%Margin X%` badge when the symbol is in the current list.
-- Drawer shows only the compact `Marginable: X%` field; PDF permissions remain API/source metadata and are not shown in the drawer.
+- VCP Finder is the current primary surface and supports multi-select initial-margin rates with Select all/Clear/Apply; checkbox changes do not refresh until Apply.
+- Daily Shortlist is removed from visible MVP navigation; Explorer remains secondary research/audit.
+- VCP cards/tables show only a compact `%Margin X%` tag when the symbol is in the current list.
+- Drawer shows only the compact `Marginable: X%` field when present; missing margin data has no placeholder/tag.
 - Marginability is presentation/filter metadata only. It does not remove symbols from canonical scan history or mutate Daily state.
-- Symbols outside the list remain visible only when Arm selects `All stocks`; their margin fields are `NOT_VERIFIED`.
+- Symbols outside the list remain visible in full-universe views without a fabricated margin status.
 
 ## Refresh policy
 

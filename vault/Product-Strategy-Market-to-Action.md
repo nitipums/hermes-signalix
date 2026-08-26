@@ -924,6 +924,8 @@ Dependent Action Queue, Outcome Log, and UI redesign cards MUST remain blocked u
 
 ## 11. 2026-08-23 — Owner-approved Daily Shortlist reset
 
+> **STATUS: SUPERSEDED 2026-08-26** — The historical Daily Shortlist reset remains preserved for audit, but VCP Finder · 60m is now the owner-approved MVP core. See section 12.
+
 Owner approved a product reset to a **Daily Shortlist** as Signalix's default decision surface and retained the existing stage-first dashboard as a secondary **All Stocks Explorer**. The approved design is `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`.
 
 - Daily Shortlist serves Thai Daily-chart swing trades held for several days to several weeks.

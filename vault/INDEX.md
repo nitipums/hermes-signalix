@@ -38,7 +38,8 @@
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; Daily Shortlist default + Explorer + separate watch/caution context lanes** |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **VCP Finder · 60m is current MVP core; section 11 Daily reset is historical/superseded** |
+| `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
@@ -85,7 +86,7 @@
 - **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
 - **2026-08-25 (MVP watch lanes `195a090`)**: added `RISING MOVERS / WATCH ONLY` and `CAUTION / DO NOT CHASE` without weakening READY/PRE_READY; sanitized legacy projection labels at the canonical artifact boundary.
 
-- **2026-08-23**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; canonical design: `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`. Implementation remains pending written-design review and focused plan approval.
+- **2026-08-23 (SUPERSEDED 2026-08-26)**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; replaced by VCP Finder · 60m as the current MVP core. Historical design remains for audit.
 - **2026-08-22**: Added cross-team review resolution to `Product-Strategy-Market-to-Action.md` after independent Ploy, Prae, View, Mali, Nida, and Khim reviews; direction PASS, implementation readiness REVISE; added regime/state/ranking/lifecycle/acceptance clarifications.
 - **2026-08-22**: Added the approved **Decision-quality Setup Copilot** direction to the canonical `Product-Strategy-Market-to-Action.md`: experienced self-directed trader, setup-first, regime-aware queue, hard gates + quality ranking, immutable event-based outcomes, and explicit non-goals.
 - **2026-08-22**: Team/provider closeout: created Prae PM, revived View designer, verified local A2A/profile boundaries, and recorded the provider allocation in `Team-Operating-Model.md`.

@@ -32,6 +32,9 @@
     vcpState:        $("#vcp-state"),
     vcpPriceBand:    $("#vcp-price-band"),
     vcpMeta:         $("#vcp-meta"),
+    vcpMarginAll:    $("#vcp-margin-all"),
+    vcpMarginClear:  $("#vcp-margin-clear"),
+    vcpFilterApply:  $("#vcp-filter-apply"),
 
     // shortlist states
     slLoading:     $("#shortlist-loading"),
@@ -114,7 +117,7 @@
   let explorerSearch = "";
   let marginableFilter = "krungsri";
   let marginRates = [];
-  let priceBand = "all";
+  let priceBand = [];
   let shortlistData = null;
   let vcpResultsBySymbol = {};
   let vcpRunMeta = {};
@@ -675,19 +678,13 @@
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
     if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
     var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
-    return '<article class="vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + '</span></div>' + tagHTML +
-      '<div class="vcp-card__grid">' +
-        '<span>Close <b>' + displayValue(price.last_close) + '</b></span>' +
-        '<span>Pivot <b>' + displayValue(price.pivot_high) + '</b></span>' +
-        '<span>Distance <b>' + (price.distance_to_pivot_pct == null ? "NOT_VERIFIED" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</b></span>' +
-        '<span>Invalidation <b>' + displayValue(price.invalidation) + '</b></span>' +
-        '<span>Contractions <b>' + (pattern.contractions_pct || []).map(function(x){return Number(x).toFixed(1) + "%";}).join(" → ") + '</b></span>' +
-        '<span>Breakout vol <b>' + (volume.breakout_volume_ratio == null ? "NOT_VERIFIED" : Number(volume.breakout_volume_ratio).toFixed(2) + "x") + '</b></span>' +
-      '</div>' +
-      '<div class="vcp-card__evidence">' + escapeHTML(reason || "No qualifying 60m structure") + '</div>' +
-      '<div class="vcp-card__provenance">' + escapeHTML(feed) + ' · ' + escapeHTML(data.freshness || "NOT_VERIFIED") + ' · no Daily fallback</div>' +
-    '</article>';
+    return '<tr class="vcp-row vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
+      '<td class="vcp-row__symbol"><strong>' + escapeHTML(result.symbol || "–") + '</strong>' + tagHTML + '</td>' +
+      '<td>' + displayValue(price.last_close) + '</td>' +
+      '<td class="vcp-row__change">' + (price.change_pct == null ? "—" : Number(price.change_pct).toFixed(2) + "%") + '</td>' +
+      '<td>' + (price.distance_to_pivot_pct == null ? "—" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</td>' +
+      '<td>' + (result.rr == null ? "—" : Number(result.rr).toFixed(2) + "R") + '</td>' +
+    '</tr>';
   }
 
   function vcpDisplayGroup(result) {
@@ -700,7 +697,7 @@
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     dom.vcpCards.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
-      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2>' + groups[key].map(vcpCard).join("") + '</section>';
+      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
     }).join("") || '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
   }
 
@@ -709,6 +706,7 @@
     var selected = dom.vcpState.value || "actionable";
     var endpoint = "/api/vcp-finder?interval=60m&market=TH";
     if (selected === "actionable") endpoint += "&focused=true";
+    else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
     else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
     else endpoint += "&limit=5000";
     fetch(endpoint)
@@ -723,6 +721,7 @@
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
         results = results.filter(priceMatches);
         if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0 || (r.state === "FORMING" && r.forming_group === "maturing"); });
+        else if (selected.indexOf("FORMING_") === 0) results = results.filter(function(r){ return r.state === "FORMING" && r.forming_group === selected.slice(8).toLowerCase(); });
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
         dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
         renderVcpResults(results);
@@ -761,13 +760,13 @@
     return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";
   }
   function priceBandQuery() {
-    return priceBand === "all" ? "" : "&price_band=" + encodeURIComponent(priceBand);
+    return priceBand.length ? "&price_band=" + encodeURIComponent(priceBand[0]) : "";
   }
   function priceMatches(item) {
-    if (priceBand === "all") return true;
+    if (!priceBand.length) return true;
     var value = Number(item.close != null ? item.close : ((item.price || {}).last_close));
     if (!Number.isFinite(value)) return false;
-    return priceBand === "below_2" ? value < 2 : priceBand === "2_to_10" ? value >= 2 && value <= 10 : value > 10;
+    return priceBand.some(function(band) { return band === "below_2" ? value < 2 : band === "2_to_10" ? value >= 2 && value <= 10 : value > 10; });
   }
 
   /* ── fetch shortlist ── */
@@ -915,6 +914,7 @@
     $$(".margin-rate-toggle").forEach(function(input) {
       input.checked = marginRates.indexOf(Number(input.value)) >= 0;
     });
+    if (surface === "vcp") return;
     if (surface === "shortlist") loadShortlist();
     else if (surface === "vcp") loadVcp();
     else loadExplorer(1);
@@ -924,15 +924,24 @@
       updateMarginRates(input.getAttribute("data-surface") || "explorer");
     });
   });
+  if (dom.vcpMarginAll) dom.vcpMarginAll.addEventListener("click", function() {
+    $$(".margin-rate-toggle[data-surface=\"vcp\"]").forEach(function(input){ input.checked = true; });
+    updateMarginRates("vcp");
+  });
+  if (dom.vcpMarginClear) dom.vcpMarginClear.addEventListener("click", function() {
+    $$(".margin-rate-toggle[data-surface=\"vcp\"]").forEach(function(input){ input.checked = false; });
+    updateMarginRates("vcp");
+  });
+  if (dom.vcpFilterApply) dom.vcpFilterApply.addEventListener("click", function() { loadVcp(); });
   function updatePriceBand(value) {
-    priceBand = value || "all";
-    [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) { if (select) select.value = priceBand; });
+    priceBand = Array.isArray(value) ? value : (value ? [value] : []);
+    [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) { if (select) Array.from(select.options).forEach(function(option){ option.selected = priceBand.indexOf(option.value) >= 0; }); });
     if (currentTab === "shortlist") loadShortlist();
     else if (currentTab === "explorer") loadExplorer(1);
     else loadVcp();
   }
   [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) {
-    if (select) select.addEventListener("change", function() { updatePriceBand(select.value); });
+    if (select) select.addEventListener("change", function() { updatePriceBand(Array.from(select.selectedOptions).map(function(option){ return option.value; })); });
   });
   dom.slMarginable.addEventListener("change", function() {
     marginableFilter = dom.slMarginable.value || "krungsri";
