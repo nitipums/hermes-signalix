@@ -6,7 +6,7 @@
 
 ```text
 branch: release/signalix-mvp-stable
-release: 4c7bf9c (`feat: sync official SET50 and SET100 memberships`)
+release: 0ab8c44 (`docs: close stable v1 checkpoint`)
 source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404
