@@ -702,6 +702,8 @@
     var tags = typeTags;
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
     if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
+    var avgTrade = Number((data.daily_metrics || {}).avg_trade_value_20);
+    if (result.reviewable && Number.isFinite(avgTrade) && avgTrade <= 10000000) tags.push("Liquidity < THB 10M");
     var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
     return '<tr class="vcp-row vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
       '<td class="vcp-row__symbol"><strong>' + escapeHTML(result.symbol || "–") + '</strong>' + tagHTML + '</td>' +
@@ -713,7 +715,11 @@
   }
 
   function vcpDisplayGroup(result) {
-    if (result.daily_context_watch) return "DAILY CONTEXT WATCH";
+    var lane = result.review_lane;
+    if (lane === "PRICE_VOLUME_BREAKOUT") return "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK";
+    if (lane === "PIVOT_TOUCH_VOLUME_WATCH") return "PIVOT TOUCH · VOLUME WATCH";
+    if (lane === "CLOSE_BREAKOUT_VOLUME_PENDING") return "CLOSE BREAKOUT · VOLUME PENDING";
+    if (result.insurance_context_watch) return "INSURANCE · CONTEXT WATCH";
     if (result.late_watch) return "LATE WATCH · DO NOT CHASE";
     if (result.state === "FORMING") return "FORMING · " + ({maturing: "MATURING", early: "EARLY", needs_work: "NEEDS WORK"}[result.forming_group] || "NEEDS WORK");
     return ({BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
@@ -721,7 +727,7 @@
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
+    var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK", "PIVOT TOUCH · VOLUME WATCH", "CLOSE BREAKOUT · VOLUME PENDING", "INSURANCE · CONTEXT WATCH", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -738,11 +744,11 @@
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
-        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || r.daily_context_watch || r.late_watch || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
+        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || r.reviewable || r.insurance_context_watch || r.daily_context_watch || r.late_watch || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
         results = results.filter(function(r){
           var metrics = (r.data || {}).daily_metrics || {};
           if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;
-          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
+          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000) && !r.reviewable && !r.insurance_context_watch && !r.daily_context_watch) return false;
           if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return false;
           return true;
         });

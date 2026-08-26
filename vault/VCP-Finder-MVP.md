@@ -20,7 +20,18 @@ The candidate implementation separates **type** from **state/actionability**:
 
 This taxonomy is still under sample validation. Types never promote READY/CONFIRMED by themselves, and full-universe retention remains unchanged.
 
-## Event context
+## Review lanes
+
+The current VCP lifecycle state remains authoritative. A separate `review_lane` preserves actionable context when a price/volume event exists before full VCP morphology qualifies:
+
+- `PRICE_VOLUME_BREAKOUT` — close and breakout volume pass, but full structure does not.
+- `PIVOT_TOUCH_VOLUME_WATCH` — pivot touched/near with volume evidence, close confirmation pending.
+- `CLOSE_BREAKOUT_VOLUME_PENDING` — close clears the required level, but volume confirmation is absent.
+- `INSURANCE · CONTEXT WATCH` — insurance industry context within the review distance window; not a buy signal.
+- `DAILY_CONTEXT_WATCH` — Daily waiting-breakout context; independent from 60m confirmation.
+
+These lanes are review overlays only. They do not change `state`, `actionable`, or `watchable`; low-liquidity exceptions remain visibly tagged.
+
 
 Current state does not erase prior review-worthy events. API/UI may expose `last_watch_event` and `late_watch` context. `DAILY_CONTEXT_WATCH` surfaces the latest Daily `waiting_breakout` context when 60m VCP is not yet qualified; it does not change VCP state or actionability. `LATE WATCH · DO NOT CHASE` identifies a prior watch whose current distance is beyond the fresh-review threshold.
 

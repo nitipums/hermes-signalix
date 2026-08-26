@@ -55,6 +55,18 @@ def _plain(value: Any):
     return str(value)
 
 
+def _review_lane(*, close_pass, volume_confirmed, structure_pass, distance_pct, freshness, last_close, failure):
+    if freshness == "stale" or last_close < failure:
+        return None
+    if close_pass and volume_confirmed and not structure_pass:
+        return "PRICE_VOLUME_BREAKOUT"
+    if (not close_pass) and volume_confirmed and distance_pct is not None and distance_pct >= -0.5:
+        return "PIVOT_TOUCH_VOLUME_WATCH"
+    if close_pass and not volume_confirmed:
+        return "CLOSE_BREAKOUT_VOLUME_PENDING"
+    return None
+
+
 def _empty_result(state: str, reasons: list[str], *, data=None, as_of=None, config=None):
     cfg = config or VCP60Config()
     return {
@@ -304,6 +316,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         state = "FORMING"
     if freshness == "stale" and state not in {"FAILED", "NOT_VERIFIED"}:
         state = "STALE"
+    review_lane = _review_lane(close_pass=close_pass, volume_confirmed=volume_confirmed, structure_pass=structure_pass, distance_pct=distance_pct, freshness=freshness, last_close=last_close, failure=failure)
     reasons = []
     if not trend_pass: reasons.append("prior_trend_not_confirmed")
     if contraction_pass: reasons.append("descending_pullback_contractions")
@@ -316,6 +329,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if state == "FAILED": reasons.append("below_structural_invalidation")
     result_base.update({
         "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER"}, "watchable": state == "BREAKOUT_WATCH",
+        "review_lane": review_lane, "reviewable": bool(review_lane),
         "reason_codes": reasons,
         "reasons": reasons,
         "price": {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},

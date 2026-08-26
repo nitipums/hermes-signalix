@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — Preserve review event context
+## 2026-08-26 — Separate price-event review lanes from VCP confirmation
+Decision: Add `review_lane` overlays for price/volume breakout, pivot-touch volume watch, close-breakout volume pending, and insurance context. These lanes surface BGRIM/TIPH/AOT/BH-style evidence without changing VCP lifecycle state or `CONFIRMED` requirements.
+Reason: Current strict VCP gates were correct but hid useful price-event context from the fast review queue; user needs take-action context without false confirmation.
+
 Decision: Preserve `last_watch_event`/`late_watch` separately from current VCP state, and expose `DAILY_CONTEXT_WATCH` for Daily waiting-breakout symbols whose 60m VCP is not qualified. These overlays never promote state/actionability.
 Reason: Prevent BA/BGRIM/TIPH-style opportunities from disappearing when current state changes or Daily and 60m evidence diverge.
 

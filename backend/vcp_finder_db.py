@@ -307,7 +307,7 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
     elif actionable:
         clauses.append("state IN ('READY','NEAR_TRIGGER','CONFIRMED')")
     elif review:
-        clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED','BREAKOUT_WATCH') OR (state='FORMING' AND symbol IN (SELECT o.symbol FROM daily_scan_observations o JOIN daily_scan_runs d ON d.id=o.run_id WHERE d.id=(SELECT id FROM daily_scan_runs WHERE scanner_version='signalix/daily-state-v2' ORDER BY scan_date DESC,run_timestamp DESC LIMIT 1) AND o.classification='waiting_breakout')))" )
+        clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED','BREAKOUT_WATCH') OR result->>'reviewable' = 'true' OR (state='FORMING' AND symbol IN (SELECT o.symbol FROM daily_scan_observations o JOIN daily_scan_runs d ON d.id=o.run_id WHERE d.id=(SELECT id FROM daily_scan_runs WHERE scanner_version='signalix/daily-state-v2' ORDER BY scan_date DESC,run_timestamp DESC LIMIT 1) AND o.classification='waiting_breakout')) OR (state NOT IN ('FAILED','STALE','NOT_VERIFIED') AND (result->'price'->>'distance_to_pivot_pct')::double precision BETWEEN -2 AND 5 AND symbol IN (SELECT symbol FROM company_profiles WHERE industry ILIKE 'Insurance%%')))" )
     elif focused:
         clauses.append("(state IN ('READY','NEAR_TRIGGER','CONFIRMED','BREAKOUT_WATCH') OR (state='FORMING' AND result->>'forming_group'='maturing'))")
     if symbol:
@@ -324,12 +324,17 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
     if symbols:
         cur.execute("SELECT o.symbol FROM daily_scan_observations o JOIN daily_scan_runs d ON d.id=o.run_id WHERE d.id=(SELECT id FROM daily_scan_runs WHERE scanner_version='signalix/daily-state-v2' ORDER BY scan_date DESC,run_timestamp DESC LIMIT 1) AND o.classification='waiting_breakout' AND o.symbol=ANY(%s)", (symbols,))
         daily_watch = {r["symbol"] for r in cur.fetchall()}
+    insurance_symbols = set()
+    if symbols:
+        cur.execute("SELECT symbol FROM company_profiles WHERE symbol=ANY(%s) AND industry ILIKE 'Insurance%%'", (symbols,))
+        insurance_symbols = {r["symbol"] for r in cur.fetchall()}
     event_context = {}
     if symbols:
         cur.execute("SELECT DISTINCT ON (x.symbol) x.symbol,r.as_of,x.result FROM vcp_finder_60m_results x JOIN vcp_finder_60m_runs r ON r.run_id=x.run_id WHERE x.symbol=ANY(%s) AND x.state='BREAKOUT_WATCH' AND r.as_of < %s ORDER BY x.symbol,r.as_of DESC", (symbols, run["as_of"]))
         event_context = {r["symbol"]: {"state": "BREAKOUT_WATCH", "as_of": r["as_of"].isoformat() if hasattr(r["as_of"], "isoformat") else str(r["as_of"]), "price": (r["result"].get("price") or {}).get("last_close"), "pivot": (r["result"].get("price") or {}).get("pivot_high"), "volume_ratio": (r["result"].get("volume") or {}).get("breakout_volume_ratio")} for r in cur.fetchall()}
     for result in results:
         result["daily_context_watch"] = result.get("symbol") in daily_watch
+        result["insurance_context_watch"] = result.get("symbol") in insurance_symbols and result.get("state") not in {"FAILED", "STALE", "NOT_VERIFIED"} and -2 <= float((result.get("price") or {}).get("distance_to_pivot_pct")) <= 5 if (result.get("price") or {}).get("distance_to_pivot_pct") is not None else False
         result["last_watch_event"] = event_context.get(result.get("symbol"))
         dist = (result.get("price") or {}).get("distance_to_pivot_pct")
         result["late_watch"] = bool(result.get("last_watch_event") and dist is not None and float(dist) > 3 and result.get("state") not in {"BREAKOUT_WATCH","CONFIRMED"})

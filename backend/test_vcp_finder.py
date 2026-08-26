@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from vcp_finder import VCP60Config, find_vcp_60m
+from vcp_finder import VCP60Config, _review_lane, find_vcp_60m
 
 
 def bars(n=100, start=10.0):
@@ -55,6 +55,15 @@ def test_invalid_and_duplicate_rows_are_reported():
     assert result["data"]["invalid_rows"] >= 1
     assert result["provenance"]["legacy_scanner_used"] is False
     json.dumps(result)
+
+
+def test_review_lanes_keep_confirmation_separate():
+    common = {"freshness": "fresh", "last_close": 100.0, "failure": 90.0}
+    assert _review_lane(close_pass=True, volume_confirmed=True, structure_pass=False, distance_pct=2.0, **common) == "PRICE_VOLUME_BREAKOUT"
+    assert _review_lane(close_pass=False, volume_confirmed=True, structure_pass=False, distance_pct=0.0, **common) == "PIVOT_TOUCH_VOLUME_WATCH"
+    assert _review_lane(close_pass=True, volume_confirmed=False, structure_pass=False, distance_pct=2.0, **common) == "CLOSE_BREAKOUT_VOLUME_PENDING"
+    assert _review_lane(close_pass=True, volume_confirmed=True, structure_pass=True, distance_pct=2.0, **common) is None
+    assert _review_lane(close_pass=True, volume_confirmed=True, structure_pass=False, distance_pct=2.0, freshness="stale", last_close=100.0, failure=90.0) is None
 
 
 def test_deterministic_replay():
