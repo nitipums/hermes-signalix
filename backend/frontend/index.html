@@ -58,6 +58,22 @@
               <option value="NOT_VERIFIED">Not verified</option>
             </select>
           </label>
+          <label class="explorer-control">Price range
+            <select id="vcp-price-band" aria-label="Filter VCP by price range">
+              <option value="all" selected>All prices</option>
+              <option value="below_2">&lt; 2 THB</option>
+              <option value="2_to_10">2–10 THB</option>
+              <option value="above_10">&gt; 10 THB</option>
+            </select>
+          </label>
+          <fieldset class="margin-rate-options">
+            <legend>%Margin</legend>
+            <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="50">50%</label>
+            <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="60">60%</label>
+            <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="70">70%</label>
+            <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="80">80%</label>
+            <label><input type="checkbox" class="margin-rate-toggle" data-surface="vcp" value="100">100%</label>
+          </fieldset>
           <span id="vcp-meta" class="marginable-filter-meta">Loading…</span>
         </div>
         <div id="vcp-cards" class="card-list card-list--explorer"></div>
@@ -100,6 +116,14 @@
             <option value="krungsri" selected>Krungsri · default</option>
             <option value="all">All stocks</option>
             <option value="non_marginable">Not on Krungsri list</option>
+          </select>
+        </label>
+        <label class="explorer-control">Price range
+          <select id="shortlist-price-band" aria-label="Filter shortlist by price range">
+            <option value="all" selected>All prices</option>
+            <option value="below_2">&lt; 2 THB</option>
+            <option value="2_to_10">2–10 THB</option>
+            <option value="above_10">&gt; 10 THB</option>
           </select>
         </label>
         <span id="shortlist-marginable-meta" class="marginable-filter-meta">Loading list…</span>
@@ -164,9 +188,17 @@
               <option value="krungsri" selected>Krungsri · default</option>
               <option value="all">All stocks</option>
               <option value="non_marginable">Not on Krungsri list</option>
-            </select>
-          </label>
-          <fieldset class="margin-rate-options">
+              </select>
+              </label>
+              <label class="explorer-control">Price range
+              <select id="explorer-price-band" aria-label="Filter explorer by price range">
+                <option value="all" selected>All prices</option>
+                <option value="below_2">&lt; 2 THB</option>
+                <option value="2_to_10">2–10 THB</option>
+                <option value="above_10">&gt; 10 THB</option>
+              </select>
+              </label>
+              <fieldset class="margin-rate-options">
             <legend>%Margin</legend>
             <label><input type="checkbox" class="margin-rate-toggle" data-surface="explorer" value="50">50%</label>
             <label><input type="checkbox" class="margin-rate-toggle" data-surface="explorer" value="60">60%</label>

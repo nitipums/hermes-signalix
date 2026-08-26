@@ -30,6 +30,7 @@
     vcpContent:      $("#vcp-content"),
     vcpCards:        $("#vcp-cards"),
     vcpState:        $("#vcp-state"),
+    vcpPriceBand:    $("#vcp-price-band"),
     vcpMeta:         $("#vcp-meta"),
 
     // shortlist states
@@ -42,6 +43,7 @@
     slStaleTime:   $("#shortlist-stale-time"),
     slStaleRetry:  $("#shortlist-stale-retry"),
     slMarginable: $("#shortlist-marginable"),
+    slPriceBand: $("#shortlist-price-band"),
     slMarginableMeta: $("#shortlist-marginable-meta"),
     slRising:      $("#shortlist-rising"),
     slRisingCards: $("#shortlist-rising-cards"),
@@ -63,6 +65,7 @@
     exStage:       $("#explorer-stage"),
     exSearch:      $("#explorer-search"),
     exMarginable:  $("#explorer-marginable"),
+    exPriceBand:   $("#explorer-price-band"),
 
     // drawer
     drawer:        $("#drawer"),
@@ -111,6 +114,7 @@
   let explorerSearch = "";
   let marginableFilter = "krungsri";
   let marginRates = [];
+  let priceBand = "all";
   let shortlistData = null;
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
   let chartTimeframe = "1D";
@@ -647,7 +651,7 @@
     var reason = (result.reasons || result.reason_codes || []).join(" · ");
     var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
     return '<article class="vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + '</span></div>' +
+      '<div class="vcp-card__top"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__state">' + escapeHTML(vcpStateLabel(state)) + (result.margin_rate_pct != null ? ' · %Margin ' + Number(result.margin_rate_pct).toFixed(0) + '%' : '') + '</span></div>' +
       '<div class="vcp-card__grid">' +
         '<span>Close <b>' + displayValue(price.last_close) + '</b></span>' +
         '<span>Pivot <b>' + displayValue(price.pivot_high) + '</b></span>' +
@@ -669,6 +673,8 @@
         hide(dom.vcpLoading); show(dom.vcpContent);
         var selected = dom.vcpState.value || "actionable";
         var results = data.results || [];
+        if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
+        results = results.filter(priceMatches);
         if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED"].indexOf(r.state) >= 0; });
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
         dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
@@ -707,6 +713,15 @@
   function marginRateQuery() {
     return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";
   }
+  function priceBandQuery() {
+    return priceBand === "all" ? "" : "&price_band=" + encodeURIComponent(priceBand);
+  }
+  function priceMatches(item) {
+    if (priceBand === "all") return true;
+    var value = Number(item.close != null ? item.close : ((item.price || {}).last_close));
+    if (!Number.isFinite(value)) return false;
+    return priceBand === "below_2" ? value < 2 : priceBand === "2_to_10" ? value >= 2 && value <= 10 : value > 10;
+  }
 
   /* ── fetch shortlist ── */
   function loadShortlist() {
@@ -717,7 +732,7 @@
     hide(dom.slStale);
     show(dom.slLoading);
 
-    fetch("/api/daily-shortlist?marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery())
+    fetch("/api/daily-shortlist?marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery() + priceBandQuery())
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -804,7 +819,7 @@
     hide($("#explorer-content"));
 
     var params = "page=" + page + "&page_size=20";
-    params += "&marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery();
+    params += "&marginable=" + encodeURIComponent(marginableFilter) + marginRateQuery() + priceBandQuery();
     if (explorerStage) params += "&stage=" + encodeURIComponent(explorerStage);
     if (explorerSearch) params += "&search=" + encodeURIComponent(explorerSearch);
     fetch("/api/explorer?" + params)
@@ -854,12 +869,23 @@
       input.checked = marginRates.indexOf(Number(input.value)) >= 0;
     });
     if (surface === "shortlist") loadShortlist();
+    else if (surface === "vcp") loadVcp();
     else loadExplorer(1);
   }
   $$(".margin-rate-toggle").forEach(function(input) {
     input.addEventListener("change", function() {
       updateMarginRates(input.getAttribute("data-surface") || "explorer");
     });
+  });
+  function updatePriceBand(value) {
+    priceBand = value || "all";
+    [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) { if (select) select.value = priceBand; });
+    if (currentTab === "shortlist") loadShortlist();
+    else if (currentTab === "explorer") loadExplorer(1);
+    else loadVcp();
+  }
+  [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) {
+    if (select) select.addEventListener("change", function() { updatePriceBand(select.value); });
   });
   dom.slMarginable.addEventListener("change", function() {
     marginableFilter = dom.slMarginable.value || "krungsri";

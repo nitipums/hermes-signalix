@@ -3,6 +3,7 @@ from pathlib import Path
 
 from marginable import filter_items, load_marginable_data, lookup, normalize_rates
 from mvp_api import project_explorer_response
+from mvp_api import filter_price_band
 
 
 ROOT = Path(__file__).parent
@@ -51,11 +52,24 @@ def test_explorer_response_exposes_margin_fields_and_filter_metadata():
     assert card["marginable"]["can_short"] is True
 
 
+
+
+def test_price_band_filter_is_presentation_only():
+    items = [{"symbol": "LOW", "close": 1.99}, {"symbol": "MID", "close": 5}, {"symbol": "HIGH", "close": 10.01}]
+    assert [x["symbol"] for x in filter_price_band(items, "below_2")] == ["LOW"]
+    assert [x["symbol"] for x in filter_price_band(items, "2_to_10")] == ["MID"]
+    assert [x["symbol"] for x in filter_price_band(items, "above_10")] == ["HIGH"]
+
+
 def test_frontend_has_both_filters_and_drawer_permissions():
     html = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
     js = (ROOT / "frontend/app.js").read_text(encoding="utf-8")
     assert 'id="shortlist-marginable"' in html
     assert 'id="explorer-marginable"' in html
+    assert 'id="shortlist-price-band"' in html
+    assert 'id="explorer-price-band"' in html
+    assert 'id="vcp-price-band"' in html
+    assert 'data-surface="vcp"' in html
     assert 'class="margin-rate-toggle"' in html
     assert '<dt>Marginable</dt>' in html
     assert '<dt>Trigger</dt>' in html

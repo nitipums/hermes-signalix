@@ -369,9 +369,31 @@ def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
 
 # ── Public API ────────────────────────────────────────────────────────
 
+def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
+    """Presentation-only price band filter; never changes scan eligibility."""
+    band = str(price_band or "all").strip().lower()
+    if band not in {"all", "below_2", "2_to_10", "above_10"}:
+        band = "all"
+    if band == "all":
+        return list(items)
+    result = []
+    for item in items:
+        try:
+            price = float(item.get("close"))
+        except (TypeError, ValueError):
+            continue
+        if band == "below_2" and price < 2:
+            result.append(item)
+        elif band == "2_to_10" and 2 <= price <= 10:
+            result.append(item)
+        elif band == "above_10" and price > 10:
+            result.append(item)
+    return result
+
+
 def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,
                                marginable_filter: str = "krungsri",
-                               margin_rates=None) -> dict:
+                               margin_rates=None, price_band: str = "all") -> dict:
     """Build the GET /api/daily-shortlist response from serialized cards.
 
     Uses daily_shortlist.project_shortlist() for eligibility/ranking,
@@ -380,7 +402,7 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
     """
     marginable_filter = normalize_filter(marginable_filter)
     margin_rates = normalize_rates(margin_rates)
-    items = filter_items(items, marginable_filter, margin_rates)
+    items = filter_price_band(filter_items(items, marginable_filter, margin_rates), price_band)
     margin_meta = marginable_metadata()
     if not items:
         return {
@@ -494,6 +516,7 @@ def project_explorer_response(
     snapshot_meta: dict | None = None,
     marginable_filter: str = "krungsri",
     margin_rates=None,
+    price_band: str = "all",
 ) -> dict:
     """Build the GET /api/explorer response from serialized cards.
 
@@ -502,7 +525,7 @@ def project_explorer_response(
     """
     marginable_filter = normalize_filter(marginable_filter)
     margin_rates = normalize_rates(margin_rates)
-    items = filter_items(items, marginable_filter, margin_rates)
+    items = filter_price_band(filter_items(items, marginable_filter, margin_rates), price_band)
     margin_meta = marginable_metadata()
     page = max(1, page)
     page_size = max(1, min(page_size, 100))

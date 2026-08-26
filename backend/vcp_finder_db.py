@@ -139,6 +139,15 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None)
     cur.execute(query, params)
     results = [r["result"] for r in cur.fetchall()]
     cur.close()
+    from marginable import lookup
+    for result in results:
+        record = lookup(result.get("symbol"))
+        result["marginable"] = {
+            "is_marginable": bool(record),
+            "margin_rate_pct": record.get("margin_rate_pct") if record else None,
+            "source": "Krungsri Credit Balance" if record else None,
+        }
+        result["margin_rate_pct"] = record.get("margin_rate_pct") if record else None
     return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "finder": "vcp_finder_60m",
