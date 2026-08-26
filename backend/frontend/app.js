@@ -704,13 +704,15 @@
   }
 
   function vcpDisplayGroup(result) {
+    if (result.daily_context_watch) return "DAILY CONTEXT WATCH";
+    if (result.late_watch) return "LATE WATCH · DO NOT CHASE";
     if (result.state === "FORMING") return "FORMING · " + ({maturing: "MATURING", early: "EARLY", needs_work: "NEEDS WORK"}[result.forming_group] || "NEEDS WORK");
     return ({BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
   }
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
+    var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -727,7 +729,7 @@
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
-        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
+        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || r.daily_context_watch || r.late_watch || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
         results = results.filter(function(r){
           var metrics = (r.data || {}).daily_metrics || {};
           if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;

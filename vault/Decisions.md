@@ -4,6 +4,11 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
+## 2026-08-26 — Preserve review event context
+Decision: Preserve `last_watch_event`/`late_watch` separately from current VCP state, and expose `DAILY_CONTEXT_WATCH` for Daily waiting-breakout symbols whose 60m VCP is not qualified. These overlays never promote state/actionability.
+Reason: Prevent BA/BGRIM/TIPH-style opportunities from disappearing when current state changes or Daily and 60m evidence diverge.
+
+
 ## 2026-08-26 — Remove unused DR/US price archive
 Decision: Retain only TH ORD/INDEX in `price_data` for the current Signalix product. Delete historical TH DR and US price rows after replay completion, then run `VACUUM FULL`, `REINDEX`, and `ANALYZE`. Preserve VCP replay tables and TH historical source data.
 Reason: Current VCP/Watchlist/All VCP workflow is Thai ORD 60m; DR/US rows were unused in the current MVP and consumed storage/index space.

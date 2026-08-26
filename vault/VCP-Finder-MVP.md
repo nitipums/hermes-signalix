@@ -20,6 +20,10 @@ The candidate implementation separates **type** from **state/actionability**:
 
 This taxonomy is still under sample validation. Types never promote READY/CONFIRMED by themselves, and full-universe retention remains unchanged.
 
+## Event context
+
+Current state does not erase prior review-worthy events. API/UI may expose `last_watch_event` and `late_watch` context. `DAILY_CONTEXT_WATCH` surfaces the latest Daily `waiting_breakout` context when 60m VCP is not yet qualified; it does not change VCP state or actionability. `LATE WATCH · DO NOT CHASE` identifies a prior watch whose current distance is beyond the fresh-review threshold.
+
 ## Watchlist defaults
 
 Daily VCP Watchlist defaults to these removable presentation filters:
