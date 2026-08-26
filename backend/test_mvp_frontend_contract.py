@@ -39,6 +39,14 @@ def test_chart_timeframes_are_real_controls_not_labels_only():
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
+def test_daily_and_all_vcp_use_one_drawer_item_adapter():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "function drawerItemForSymbol(symbol)" in js
+    assert "Both VCP surfaces feed the same drawer contract" in js
+    assert "item = drawerItemForSymbol(symbol);" in js
+    assert "openDrawer(item, symbol, navSymbols, navIndex);" in js
+
+
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")

@@ -494,6 +494,15 @@
   }
 
   function drawerItemForSymbol(symbol) {
+    var vcp = vcpResultsBySymbol[symbol];
+    if (vcp) {
+      // Both VCP surfaces feed the same drawer contract, including navigation.
+      return Object.assign({symbol: symbol, vcp_result: vcp}, vcp, {
+        name: symbol,
+        action: vcpStateLabel(vcp.state),
+        description: null
+      });
+    }
     return localShortlistItem(symbol) || {symbol: symbol, name: symbol, provenance: {}};
   }
 
@@ -612,10 +621,7 @@
 
     var item = null;
     if (card.classList.contains("vcp-card")) {
-      item = Object.assign({symbol: symbol, vcp_result: vcpResultsBySymbol[symbol] || null}, vcpResultsBySymbol[symbol] || {});
-      item.name = symbol;
-      item.action = vcpStateLabel(item.state);
-      item.description = null;
+      item = drawerItemForSymbol(symbol);
     }
 
     // Find local item for immediate fast-path render; authoritative detail is fetched below.
