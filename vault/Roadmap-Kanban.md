@@ -1,7 +1,7 @@
 # Roadmap — Kanban Board (Signalix)
 
 > **Human-readable mirror** of live Kanban board `signalix` at `~/.hermes/kanban/boards/signalix/kanban.db`.
-> **Operational source of truth:** Kanban DB. This file is not used to dispatch or mutate work.
+> **Operational source of truth:** `vault/Execution-Pipeline.md` and linked plans. This file is an audit/archive mirror only.
 > Live audit: **2026-08-22**.
 
 ## Board snapshot

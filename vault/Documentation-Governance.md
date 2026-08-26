@@ -1,7 +1,7 @@
 # Signalix Documentation Governance
 
 > **Status:** CURRENT — governance layer
-> **Last reviewed:** 2026-08-23
+> **Last reviewed:** 2026-08-26
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 

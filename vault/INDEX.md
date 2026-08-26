@@ -27,8 +27,8 @@
 | ไฟล์ | เรื่อง | สถานะ | หมายเหตุ |
 |---|---|---|---|
 || `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
-|| `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
-|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP `3ec48f7` |
+|| `Memory-Cleanup-Candidates.md` | Fact/memory cleanup record | ✅ current | Cleanup completed 2026-08-26; historical vault preserved |
+|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-26; stable MVP `4c7bf9c` |
 || `Canonical-Source-of-Truth-2026-08-25.md` | Current repo/worktree/runtime authority | ✅ current | Sole source authority after cutover |
 || `Krungsri-Credit-Balance-Marginable-2026-08-25.md` | Owner-selected marginable list, rates, permissions, refresh policy | ✅ current | PDF effective 2026-08-25; dataset in `backend/marginable_securities.json` |
 | `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
@@ -38,7 +38,7 @@
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `4c7bf9c`; old Daily/Explorer contract superseded** |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `0ab8c44`; old Daily/Explorer contract superseded** |
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
@@ -62,9 +62,11 @@
 | `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | 🟡 **HISTORICAL** — design/migration evidence; current UI contract verified from source/artifact/browser |
 | `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
 | `Roadmap-Kanban.md` | Archived Kanban mirror | 🟡 historical | Audit only; Markdown pipeline is active work source |
-| `Team-Operating-Model.md` | Team roles, providers, review loop | ✅ current | Bee final gate; provider allocation verified 2026-08-22 |
+| `Team-Operating-Model.md` | Team roles, providers, review loop | 🟡 historical | Provider snapshot 2026-08-22; current work source is Markdown pipeline |
 
 ## 4. สถานะซิงค์กับ fact_store
+
+- **2026-08-26:** Hygiene pass: archived 9 superseded skills + 6 empty stubs reversibly; removed stale duplicate facts; reconciled Kanban historical notes and current stable/index references.
 
 - Stage-first / FULL ORD / LAYER1-LAYER2 ↔ fact 117, 121, 112; `MEMORY.md`
 - Intraday sequential 60m ↔ fact (Memory 2026-08-18) + `signalix-backfill-and-parity` skill

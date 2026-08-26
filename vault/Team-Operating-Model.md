@@ -1,6 +1,6 @@
 # Signalix Team Operating Model & Provider Allocation
 
-**Status:** current as of 2026-08-22
+**Status:** historical team model; current work source is `vault/Execution-Pipeline.md` (Kanban is audit/archive only).
 
 ## Authority and workflow
 
