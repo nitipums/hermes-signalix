@@ -47,6 +47,18 @@ def test_daily_and_all_vcp_use_one_drawer_item_adapter():
     assert "openDrawer(item, symbol, navSymbols, navIndex);" in js
 
 
+def test_vcp_type_filter_and_badges_are_presentation_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="daily-vcp-type"' in html
+    assert 'id="vcp-type"' in html
+    assert 'value="low_cheat_vcp">Low-Cheat' in html
+    assert 'value="standard_vcp">VCP' in html
+    assert 'return base === "low_cheat_vcp" ? "Low-Cheat"' in js
+    assert "vcpTypeMatches" in js
+    assert '"STANDARD"' not in js
+
+
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")

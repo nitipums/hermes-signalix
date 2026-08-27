@@ -38,6 +38,13 @@
           <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
           <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
           <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
+          <label>Type
+            <select id="daily-vcp-type" aria-label="Filter VCP type">
+              <option value="all" selected>All types</option>
+              <option value="low_cheat_vcp">Low-Cheat</option>
+              <option value="standard_vcp">VCP</option>
+            </select>
+          </label>
         </div>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
@@ -71,6 +78,13 @@
               <option value="FAILED">Failed</option>
               <option value="STALE">Stale</option>
               <option value="NOT_VERIFIED">Not verified</option>
+            </select>
+          </label>
+          <label class="explorer-control">Type
+            <select id="vcp-type" aria-label="Filter VCP type">
+              <option value="all" selected>All types</option>
+              <option value="low_cheat_vcp">Low-Cheat</option>
+              <option value="standard_vcp">VCP</option>
             </select>
           </label>
           <label class="explorer-control">Price range

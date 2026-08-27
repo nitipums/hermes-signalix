@@ -32,6 +32,7 @@
     dailyFilterMarginable: $("#daily-filter-marginable"),
     dailyFilterTradeValue: $("#daily-filter-trade-value"),
     dailyFilterPrice: $("#daily-filter-price"),
+    dailyVcpType:   $("#daily-vcp-type"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -41,6 +42,7 @@
     vcpContent:      $("#vcp-content"),
     vcpCards:        $("#vcp-cards"),
     vcpState:        $("#vcp-state"),
+    vcpType:         $("#vcp-type"),
     vcpPriceBand:    $("#vcp-price-band"),
     vcpMeta:         $("#vcp-meta"),
     vcpMarginAll:    $("#vcp-margin-all"),
@@ -184,6 +186,15 @@
 
   function shortAction(value) {
     return ({"VALIDATE FRESH BREAKOUT": "Fresh Breakout", "QUALIFIED PULLBACK": "Pullback", "WAIT FOR CONFIRMATION": "Wait for Breakout"})[value] || compactText(value || "", 20);
+  }
+
+  function vcpTypeLabel(result) {
+    var base = (result.vcp_type || {}).base_type;
+    return base === "low_cheat_vcp" ? "Low-Cheat" : base === "standard_vcp" ? "VCP" : null;
+  }
+
+  function vcpTypeMatches(result, selected) {
+    return !selected || selected === "all" || (result.vcp_type || {}).base_type === selected;
   }
 
   function escapeHTML(str) {
@@ -697,7 +708,8 @@
     var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
     var typeInfo = result.vcp_type || {};
     var typeTags = [];
-    if (typeInfo.base_type) typeTags.push(typeInfo.base_type === "low_cheat_vcp" ? "LOW-CHEAT" : "STANDARD");
+    var baseType = vcpTypeLabel(result);
+    if (baseType) typeTags.push(baseType);
     (typeInfo.overlays || []).forEach(function(type){ typeTags.push(type === "break_ath" ? "BREAK ATH" : type === "new_stock" ? "NEW" : type); });
     var tags = typeTags;
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
@@ -750,6 +762,7 @@
           if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;
           if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000) && !r.reviewable && !r.insurance_context_watch && !r.daily_context_watch) return false;
           if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return false;
+          if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return false;
           return true;
         });
         results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
@@ -776,7 +789,7 @@
         vcpResultsBySymbol = {};
         (data.results || []).forEach(function(r) { vcpResultsBySymbol[r.symbol] = r; });
         var selected = dom.vcpState.value || "actionable";
-        var results = data.results || [];
+        var results = (data.results || []).filter(function(r){ return vcpTypeMatches(r, dom.vcpType.value); });
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
         results = results.filter(priceMatches);
         if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0 || (r.state === "FORMING" && r.forming_group === "maturing"); });
@@ -791,7 +804,7 @@
   [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {
     if (input) input.addEventListener("change", loadDailyVcp);
   });
-
+  if (dom.dailyVcpType) dom.dailyVcpType.addEventListener("change", loadDailyVcp);
   /* ── tab switching ── */
   function switchTab(tab) {
     currentTab = tab;
@@ -810,6 +823,7 @@
   dom.tabDailyVcp.addEventListener("click", function() { switchTab("daily-vcp"); });
   dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
   dom.vcpState.addEventListener("change", loadVcp);
+  dom.vcpType.addEventListener("change", loadVcp);
   dom.vcpRetry.addEventListener("click", loadVcp);
 
   function marginRateQuery() {
