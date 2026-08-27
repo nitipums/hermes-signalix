@@ -130,9 +130,34 @@ class TestDevelopingImmature:
 
 
 class TestPublicationState:
-    def test_fresh_breakout_is_ready(self):
+    def test_fresh_breakout_is_ready_when_confirmed(self):
         result = classify_shortlist(
             card(action_queue="fresh_breakout", avgDailyValue20=20_000_000))
+        assert result["eligible"] is True
+        assert result["publication_state"] == "READY"
+
+    def test_fresh_breakout_unconfirmed_quality_fail_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout",
+                 setup_quality={"pass": False, "reasons": ["range_too_wide"]}))
+        assert result["eligible"] is False
+        assert "UNCONFIRMED_BREAKOUT" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_unconfirmed_close_below_level_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", close=51.0, breakoutLevel=52.0))
+        assert result["eligible"] is False
+        assert "UNCONFIRMED_BREAKOUT" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_unconfirmed_missing_level_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", breakoutLevel=None))
+        assert result["eligible"] is False
+        assert "UNCONFIRMED_BREAKOUT" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_confirmed_exactly_at_level(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", close=52.0, breakoutLevel=52.0))
         assert result["eligible"] is True
         assert result["publication_state"] == "READY"
 
@@ -441,6 +466,30 @@ class TestProjectShortlist:
         assert r["publication_state"] == "PRE_READY"
         assert r["why_now"] is not None
         assert "confirm" in r["why_now"].lower()
+
+    def test_pullback_why_now_does_not_call_breakout(self):
+        """qualified_pullback why_now must not label the setup as a breakout."""
+        item = card(symbol="PB", action_queue="qualified_pullback",
+                    action="HOLD IF SUPPORT DEFENDS")
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert r["why_now"] is not None
+        assert "breakout" not in r["why_now"].lower()
+        assert "pullback" in r["why_now"].lower()
+
+    def test_retest_why_now_does_not_call_breakout(self):
+        """retest_watch why_now must not label the setup as a breakout."""
+        item = card(symbol="RT", action_queue="retest_watch",
+                    action="WAIT FOR RETEST")
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert r["why_now"] is not None
+        assert "breakout" not in r["why_now"].lower()
+        assert "retest" in r["why_now"].lower()
 
 
 if __name__ == "__main__":

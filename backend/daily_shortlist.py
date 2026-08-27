@@ -153,6 +153,23 @@ def _liquidity_component(item: dict) -> float:
     return round(min(1.0, val / (MIN_AVG_DAILY_VALUE_20 * 2)), 4)
 
 
+def _fresh_breakout_confirmed(item: dict) -> bool:
+    """Fail-closed trigger evidence for fresh_breakout READY.
+
+    Requires explicit setup_quality.pass plus numeric close >= breakoutLevel.
+    Existing source-card volume/spec gates are honored upstream by the
+    action_queue assignment, not duplicated here.
+    """
+    setup_q = item.get("setup_quality") or {}
+    if not bool(setup_q.get("pass")):
+        return False
+    close = _to_float(item.get("close"))
+    breakout_level = _to_float(item.get("breakoutLevel"))
+    if close is None or breakout_level is None or breakout_level <= 0:
+        return False
+    return close >= breakout_level
+
+
 def _trigger(item: dict) -> str | None:
     """Explainable trigger label (entry condition)."""
     phase = item.get("phase")
@@ -164,7 +181,7 @@ def _trigger(item: dict) -> str | None:
     if queue == "qualified_pullback":
         return "Pullback holding support reference"
     if queue == "retest_watch":
-        return "Breakout retest at reference"
+        return "Retest at reference"
     return None
 
 
@@ -242,11 +259,17 @@ def _why_now(item: dict, publication_state: str) -> str | None:
     """Human-readable why-now: combines trigger and readiness state."""
     prox = item.get("setup_proximity") or {}
     state = prox.get("state")
+    queue = item.get("action_queue")
     if publication_state == "READY":
-        if state == "action":
-            return "Trigger confirmed — close at/above breakout level with quality pass"
-        if state == "near_trigger":
-            return "Near trigger; setup ready for confirmation"
+        if queue == "fresh_breakout":
+            if state == "action":
+                return "Trigger confirmed — close at/above breakout level with quality pass"
+            if state == "near_trigger":
+                return "Near breakout trigger; fresh breakout awaiting confirmation"
+        if queue == "qualified_pullback":
+            return "Pullback holding support reference; defend support before entry"
+        if queue == "retest_watch":
+            return "Retest at reference; confirm hold before entry"
     if publication_state == "PRE_READY":
         if state == "near_trigger":
             return "Near trigger/pivot; confirm with close + volume"
@@ -307,6 +330,9 @@ def classify_shortlist(item: dict) -> dict:
 
     # --- Publication state ---
     if queue in READY_QUEUES:
+        # Fail-closed: fresh_breakout READY requires explicit trigger evidence.
+        if queue == "fresh_breakout" and not _fresh_breakout_confirmed(item):
+            return _ineligible(["UNCONFIRMED_BREAKOUT"], symbol, POLICY_VERSION)
         pub = "READY"
     elif queue in PRE_READY_QUEUES:
         pub = "PRE_READY"
