@@ -4,9 +4,10 @@ from vcp_finder_db import _classify_types, find_vcp_universe_60m
 
 
 def test_type_classification_is_separate_and_deterministic():
-    result = {"state": "READY", "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 2}, "pattern": {"pivots": [{"kind": "high"}], "base_depth_pct": 10, "latest_contraction_pct": 5}, "evidence": {"price_contraction_pass": True, "leg_volume_pass": True}}
+    result = {"state": "READY", "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 0.5, "invalidation": 95, "atr14": 2}, "pattern": {"pivots": [{"kind": kind} for kind in ("high", "low", "high", "low", "high")], "base_depth_pct": 10, "latest_contraction_pct": 5}, "evidence": {"prior_trend_pass": True, "price_contraction_pass": True, "base_pass": True, "leg_volume_pass": True}}
     out = _classify_types(result, ath_context={"observed_ath_all_time": 99}, listing_context=None)
     assert out["vcp_type"]["base_type"] == "low_cheat_vcp"
+    assert out["vcp_type"]["entry_profile"] == "early_entry"
     assert out["vcp_type"]["overlays"] == ["break_ath"]
     assert out["state"] == "READY"
 
@@ -17,18 +18,34 @@ def test_new_stock_requires_listing_evidence():
     assert "new_stock" not in out["vcp_type"]["types"]
 
 
-def test_low_cheat_type_is_structural_even_when_state_is_failed():
+def test_low_cheat_requires_non_failed_early_entry_state():
     result = {
         "state": "FAILED",
-        "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 2},
-        "pattern": {"pivots": [{"kind": "high"}], "base_depth_pct": 10, "latest_contraction_pct": 5},
-        "evidence": {"price_contraction_pass": True, "leg_volume_pass": True},
+        "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 0.5, "invalidation": 95, "atr14": 2},
+        "pattern": {"pivots": [{"kind": kind} for kind in ("high", "low", "high", "low", "high")], "base_depth_pct": 10, "latest_contraction_pct": 5},
+        "evidence": {"prior_trend_pass": True, "price_contraction_pass": True, "base_pass": True, "leg_volume_pass": True},
     }
 
     out = _classify_types(result, ath_context={"observed_ath_all_time": 99}, listing_context=None)
 
-    assert out["vcp_type"]["base_type"] == "low_cheat_vcp"
+    assert out["vcp_type"]["base_type"] == "standard_vcp"
+    assert out["vcp_type"]["entry_profile"] == "standard_entry"
     assert out["state"] == "FAILED"
+
+
+def test_low_cheat_requires_healthy_trend_and_tight_risk():
+    result = {
+        "state": "READY",
+        "price": {"last_close": 100, "pivot_high": 99, "distance_to_pivot_pct": 0.5, "invalidation": 80, "atr14": 2},
+        "pattern": {"pivots": [{"kind": kind} for kind in ("high", "low", "high", "low", "high")], "base_depth_pct": 10, "latest_contraction_pct": 5},
+        "evidence": {"prior_trend_pass": False, "price_contraction_pass": True, "base_pass": True, "leg_volume_pass": True},
+    }
+
+    out = _classify_types(result, ath_context={}, listing_context=None)
+
+    assert out["vcp_type"]["base_type"] is None
+    assert out["vcp_type"]["type_evidence"]["healthy_trend_60m"] is False
+    assert out["vcp_type"]["type_evidence"]["tight_risk_pass"] is False
 
 
 

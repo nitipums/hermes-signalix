@@ -11,14 +11,16 @@
 
 ## VCP type taxonomy — candidate implementation
 
-The candidate implementation separates **type** from **state/actionability**:
+The candidate implementation separates **VCP morphology**, **entry profile**, and **state/actionability**:
 
-- `standard_vcp` — baseline verified VCP morphology
-- `low_cheat_vcp` — shallow/near-pivot subtype using the experimental relaxed thresholds
-- `break_ath` — price-break overlay from historical `price_data` ATH when evidence qualifies
-- `new_stock` — reserved for verified listing-date evidence; not assigned from ticker/feed age
+- `standard_vcp` — valid VCP morphology with the normal entry profile: wait for pivot breakout/confirmation.
+- `low_cheat_vcp` — a stricter early-entry profile that is a subset of valid VCP morphology, requiring healthy 60m trend, shallow/tight final contraction, near-pivot price, and tight usable invalidation risk. It is review-only and never an automatic buy.
+- `break_ath` — price-break overlay from historical `price_data` ATH when evidence qualifies.
+- `new_stock` — reserved for verified listing-date evidence; not assigned from ticker/feed age.
 
-This taxonomy is still under sample validation. Types never promote READY/CONFIRMED by themselves, and full-universe retention remains unchanged.
+Low-Cheat is not a looser or higher-quality replacement for Standard VCP. `cheat` describes the possible entry timing before a confirmed breakout, not a pattern name inferred from shallow numbers alone. Types never promote READY/CONFIRMED, and full-universe retention remains unchanged.
+
+This taxonomy is still under sample validation; thresholds and sample outcomes must be reviewed before locking v1.
 
 The 60m lifecycle trend gate is strict: Daily trend context cannot promote 60m `READY` or `CONFIRMED`; it is used only by context overlays.
 

@@ -39,6 +39,16 @@ CREATE INDEX IF NOT EXISTS vcp_finder_60m_results_state_idx
 """
 
 
+# Low-Cheat is an early-entry profile, not a looser VCP quality gate.
+LOW_CHEAT_MAX_BASE_DEPTH_PCT = 15.0
+LOW_CHEAT_MAX_FINAL_CONTRACTION_PCT = 8.0
+LOW_CHEAT_MIN_DISTANCE_TO_PIVOT_PCT = -2.0
+LOW_CHEAT_MAX_DISTANCE_TO_PIVOT_PCT = 1.0
+LOW_CHEAT_MAX_RISK_PCT = 8.0
+LOW_CHEAT_MAX_RISK_ATR = 2.5
+LOW_CHEAT_STATES = frozenset({"READY", "NEAR_TRIGGER"})
+
+
 def init_vcp_schema(pg):
     cur = pg.cursor()
     cur.execute(TABLE_DDL)
@@ -187,14 +197,34 @@ def _classify_types(result, *, ath_context=None, listing_context=None):
     distance = price.get("distance_to_pivot_pct")
     ath = ath_context.get("observed_ath_all_time")
     ath_distance = ((close / ath) - 1) * 100 if close is not None and ath else None
-    low_cheat = bool(
-        evidence.get("price_contraction_pass") and evidence.get("leg_volume_pass")
-        and pattern.get("pivots") and base_depth is not None and base_depth <= 15
-        and latest_contraction is not None and latest_contraction <= 8
-        and distance is not None and distance <= 5
-        and ath_distance is not None and ath_distance >= -10
+    pivots = pattern.get("pivots") or []
+    sequence_valid = len(pivots) >= 5 and [p.get("kind") for p in pivots[-5:]] == ["high", "low", "high", "low", "high"]
+    evidence_valid = all(bool(evidence.get(key)) for key in (
+        "prior_trend_pass", "price_contraction_pass", "base_pass", "leg_volume_pass"
+    ))
+    base_valid = base_depth is not None and 0 < float(base_depth) <= 35
+    contraction_valid = latest_contraction is not None and 0 < float(latest_contraction) <= 12
+    invalidation = price.get("invalidation")
+    risk_pct = ((float(close) - float(invalidation)) / float(close) * 100
+                if close is not None and invalidation is not None and float(close) > 0 else None)
+    atr = price.get("atr14")
+    risk_atr = ((float(close) - float(invalidation)) / float(atr)
+                if close is not None and invalidation is not None and atr is not None and float(atr) > 0 else None)
+    usable_risk = bool(
+        risk_pct is not None and 0 < risk_pct <= LOW_CHEAT_MAX_RISK_PCT
+        and risk_atr is not None and 0 < risk_atr <= LOW_CHEAT_MAX_RISK_ATR
     )
-    base_type = "low_cheat_vcp" if low_cheat else ("standard_vcp" if pattern.get("pivots") and evidence.get("price_contraction_pass") else None)
+    valid_vcp_morphology = bool(sequence_valid and evidence_valid and base_valid and contraction_valid)
+    low_cheat = bool(
+        valid_vcp_morphology
+        and state in LOW_CHEAT_STATES
+        and float(base_depth) <= LOW_CHEAT_MAX_BASE_DEPTH_PCT
+        and float(latest_contraction) <= LOW_CHEAT_MAX_FINAL_CONTRACTION_PCT
+        and distance is not None
+        and LOW_CHEAT_MIN_DISTANCE_TO_PIVOT_PCT <= float(distance) <= LOW_CHEAT_MAX_DISTANCE_TO_PIVOT_PCT
+        and usable_risk
+    )
+    base_type = "low_cheat_vcp" if low_cheat else ("standard_vcp" if valid_vcp_morphology else None)
     break_ath = bool(ath and close is not None and close >= ath * 1.005)
     listing_date = listing_context.get("listing_date")
     new_stock = bool(listing_date and listing_context.get("age_calendar_days") is not None and listing_context["age_calendar_days"] <= 120)
@@ -207,6 +237,7 @@ def _classify_types(result, *, ath_context=None, listing_context=None):
         "overlays": overlays,
         "types": types,
         "primary_type": "break_ath" if break_ath else ("new_stock" if new_stock else base_type),
+        "entry_profile": "early_entry" if low_cheat else ("standard_entry" if base_type == "standard_vcp" else None),
         "type_evidence": {
             "observed_ath_all_time": ath,
             "ath_distance_pct": ath_distance,
@@ -216,8 +247,14 @@ def _classify_types(result, *, ath_context=None, listing_context=None):
             "low_cheat_base_depth_pct": base_depth,
             "low_cheat_latest_contraction_pct": latest_contraction,
             "low_cheat_distance_to_pivot_pct": distance,
+            "valid_vcp_morphology": valid_vcp_morphology,
+            "valid_pivot_sequence": sequence_valid,
+            "healthy_trend_60m": bool(evidence.get("prior_trend_pass")),
+            "risk_to_invalidation_pct": risk_pct,
+            "risk_to_invalidation_atr": risk_atr,
+            "tight_risk_pass": usable_risk,
         },
-        "type_policy_version": "signalix/vcp-types-v1-candidate",
+        "type_policy_version": "signalix/vcp-types-v2-early-entry",
     }
     return result
 

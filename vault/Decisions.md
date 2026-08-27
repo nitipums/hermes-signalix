@@ -4,7 +4,10 @@
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
-## 2026-08-26 — 60m-only confirmation correction
+## 2026-08-27 — VCP type semantics
+Decision: Treat `standard_vcp` as the normal valid VCP morphology/entry profile and `low_cheat_vcp` as a stricter early-entry profile that is a subset of valid VCP morphology. Low-Cheat requires healthy 60m trend, valid H-L-H-L-H structure, valid base/contraction/leg-volume evidence, near-pivot price, usable tight invalidation risk, and an early non-confirmed lifecycle state. ATH proximity is not a prerequisite. Type never promotes lifecycle state or actionability.
+Reason: The previous shallow/near-pivot heuristic could label trend-failed or structurally incomplete results as Low-Cheat. The owner approved clarifying that “cheat” describes entry timing before confirmation, not a looser pattern class.
+
 Decision: VCP lifecycle `trend_pass` uses 60m evidence only. Daily trend remains supporting context and may produce `DAILY_CONTEXT_WATCH`, but cannot promote `READY`, `CONFIRMED`, or structural VCP state. Re-run after correction showed TWP downgrade from invalid prior `CONFIRMED` to review-only `BREAKOUT_WATCH`.
 Reason: Prevent a Daily-context OR fallback from creating a misleading 60m confirmation.
 
