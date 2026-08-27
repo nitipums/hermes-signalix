@@ -189,6 +189,7 @@
   }
 
   function vcpTypeLabel(result) {
+    if (["FAILED", "STALE", "NOT_VERIFIED"].indexOf(result.state) >= 0) return null;
     var base = (result.vcp_type || {}).base_type;
     return base === "low_cheat_vcp" ? "Low-Cheat" : base === "standard_vcp" ? "VCP" : null;
   }
@@ -737,6 +738,15 @@
     return ({BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
   }
 
+  function vcpEmptyState(target) {
+    var type = target === dom.vcpCards ? dom.vcpType.value : dom.dailyVcpType.value;
+    var focused = target === dom.vcpCards && dom.vcpState.value === "actionable";
+    if (type === "low_cheat_vcp" && focused) {
+      return '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No Low-Cheat setups in focused review.</p><p class="state-hint">Low-Cheat patterns may exist outside focused review. Switch to All states.</p></div>';
+    }
+    return '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+  }
+
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
     var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK", "PIVOT TOUCH · VOLUME WATCH", "CLOSE BREAKOUT · VOLUME PENDING", "INSURANCE · CONTEXT WATCH", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
@@ -744,7 +754,7 @@
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
       return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
-    }).join("") || '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+    }).join("") || vcpEmptyState(target);
   }
 
   function loadDailyVcp() {

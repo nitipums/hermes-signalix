@@ -193,7 +193,6 @@ def _classify_types(result, *, ath_context=None, listing_context=None):
         and latest_contraction is not None and latest_contraction <= 8
         and distance is not None and distance <= 5
         and ath_distance is not None and ath_distance >= -10
-        and state not in {"NOT_VERIFIED", "STALE", "FAILED"}
     )
     base_type = "low_cheat_vcp" if low_cheat else ("standard_vcp" if pattern.get("pivots") and evidence.get("price_contraction_pass") else None)
     break_ath = bool(ath and close is not None and close >= ath * 1.005)

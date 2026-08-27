@@ -17,6 +17,20 @@ def test_new_stock_requires_listing_evidence():
     assert "new_stock" not in out["vcp_type"]["types"]
 
 
+def test_low_cheat_type_is_structural_even_when_state_is_failed():
+    result = {
+        "state": "FAILED",
+        "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 2},
+        "pattern": {"pivots": [{"kind": "high"}], "base_depth_pct": 10, "latest_contraction_pct": 5},
+        "evidence": {"price_contraction_pass": True, "leg_volume_pass": True},
+    }
+
+    out = _classify_types(result, ath_context={"observed_ath_all_time": 99}, listing_context=None)
+
+    assert out["vcp_type"]["base_type"] == "low_cheat_vcp"
+    assert out["state"] == "FAILED"
+
+
 
 def test_universe_keeps_missing_and_insufficient_symbols(monkeypatch):
     pg = MagicMock()

@@ -57,6 +57,9 @@ def test_vcp_type_filter_and_badges_are_presentation_only():
     assert 'return base === "low_cheat_vcp" ? "Low-Cheat"' in js
     assert "vcpTypeMatches" in js
     assert '"STANDARD"' not in js
+    assert '"FAILED", "STALE", "NOT_VERIFIED"' in js
+    assert "No Low-Cheat setups in focused review." in js
+    assert "Switch to All states." in js
 
 
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
