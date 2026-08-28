@@ -17,7 +17,7 @@ import psycopg2.extras
 
 from instruments import active_ord_symbols
 from vcp_finder import POLICY_VERSION, find_vcp_60m
-from vcp_finder_db import _classify_types
+from vcp_finder_db import _classify_types, load_daily_metrics, load_daily_trend_context
 
 TYPE_POLICY_VERSION = "signalix/vcp-types-v2-early-entry"
 TARGET_R_MULTIPLE = 3.0
@@ -76,13 +76,52 @@ def trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
     }
 
 
+def build_replay_result(symbol, rows, *, as_of, replay_id,
+                        daily_context=None, daily_metrics=None,
+                        rr_multiple=TARGET_R_MULTIPLE):
+    """Build one point-in-time replay result with the same Daily inputs as live."""
+    result = find_vcp_60m(
+        pd.DataFrame(rows), as_of=as_of,
+        daily_context=daily_context or {},
+    )
+    result["symbol"] = symbol
+    result.setdefault("data", {})["daily_metrics"] = daily_metrics or {}
+    result = _classify_types(result, ath_context={}, listing_context=None)
+    result.setdefault("provenance", {})["replay_id"] = replay_id
+    result["provenance"]["replay_as_of"] = as_of.isoformat()
+    result["replay_trade_plan"] = trade_plan(result, rr_multiple=rr_multiple)
+    return result
+
+
 def evaluate_trade(plan, future_rows):
     """Evaluate only bars strictly after detection, conservatively."""
     if not plan:
         return None
     entry, stop, target = plan["entry"], plan["stop"], plan["target"]
-    highs = [float(row["high"]) for row in future_rows]
-    lows = [float(row["low"]) for row in future_rows]
+    base_type = plan.get("base_type")
+    pre_entry_bars = 0
+    entry_ts = "detection"
+    observed_rows = list(future_rows)
+    if base_type == "standard_vcp":
+        activation_idx = next(
+            (i for i, row in enumerate(observed_rows) if float(row["high"]) >= entry),
+            None,
+        )
+        if activation_idx is None:
+            return {
+                "outcome": "entry_not_activated",
+                "entry_activated": False,
+                "entry_ts": None,
+                "pre_entry_bars": len(observed_rows),
+                "bars_observed": 0,
+                "mfe_r": None,
+                "mae_r": None,
+            }
+        pre_entry_bars = activation_idx
+        entry_ts = observed_rows[activation_idx].get("ts")
+        observed_rows = observed_rows[activation_idx:]
+    highs = [float(row["high"]) for row in observed_rows]
+    lows = [float(row["low"]) for row in observed_rows]
     if not highs:
         outcome = "insufficient_future_data"
     else:
@@ -101,7 +140,10 @@ def evaluate_trade(plan, future_rows):
     risk = entry - stop
     return {
         "outcome": outcome,
-        "bars_observed": len(future_rows),
+        "entry_activated": True,
+        "entry_ts": entry_ts,
+        "pre_entry_bars": pre_entry_bars,
+        "bars_observed": len(observed_rows),
         "mfe_r": max(((high - entry) / risk for high in highs), default=None),
         "mae_r": min(((low - entry) / risk for low in lows), default=None),
     }
@@ -160,16 +202,20 @@ def main():
         for idx, as_of in enumerate(snapshots, 1):
             replay_id = f"vcp-replay-1m-{args.cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{idx:03d}"
             results = []
+            daily_contexts = load_daily_trend_context(pg, symbols, as_of=as_of)
+            daily_metrics = load_daily_metrics(pg, symbols, as_of=as_of)
             for symbol in symbols:
                 rows = [r for r in grouped.get(symbol, []) if r["ts"] <= as_of][-400:]
-                result = find_vcp_60m(pd.DataFrame(rows), as_of=as_of)
-                result["symbol"] = symbol
-                result = _classify_types(result, ath_context={}, listing_context=None)
+                result = build_replay_result(
+                    symbol, rows, as_of=as_of, replay_id=replay_id,
+                    daily_context=daily_contexts.get(symbol),
+                    daily_metrics=daily_metrics.get(symbol),
+                    rr_multiple=args.rr,
+                )
                 result["provenance"]["replay_id"] = replay_id
                 result["provenance"]["replay_window_start"] = start.isoformat()
                 result["provenance"]["replay_as_of"] = as_of.isoformat()
-                plan = trade_plan(result, rr_multiple=args.rr)
-                result["replay_trade_plan"] = plan
+                plan = result["replay_trade_plan"]
                 if plan and (symbol, plan["base_type"]) not in first_events:
                     future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
                     evaluation = evaluate_trade(plan, future)
