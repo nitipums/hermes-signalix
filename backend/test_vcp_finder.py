@@ -120,3 +120,69 @@ def test_sequence_diagnostics_keeps_v1_first_and_selects_latest_for_shadow(monke
     assert diagnostics["v2_final_pivot_ts"] == pivots[6]["ts"].isoformat()
     assert diagnostics["v2_final_pivot_age_hours"] == 7 * 24 - 6
     assert result["price"]["pivot_high"] == 11.7
+
+
+def test_sequence_policy_shadow_is_opt_in_and_recomputes_latest_sequence(monkeypatch):
+    ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    pivots = [
+        {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
+        for i, (kind, price) in enumerate([
+            ("high", 12.0), ("low", 10.0), ("high", 11.8),
+            ("low", 10.5), ("high", 11.7), ("low", 10.7),
+            ("high", 11.6),
+        ])
+    ]
+    monkeypatch.setattr(vcp_finder, "_pivots", lambda *_: pivots)
+    frame = pd.DataFrame(bars(100))
+    as_of = datetime(2026, 8, 8, tzinfo=timezone.utc)
+
+    v1 = find_vcp_60m(frame, as_of=as_of)
+    shadowed = find_vcp_60m(
+        frame, as_of=as_of, include_sequence_policy_shadow=True,
+    )
+
+    assert "sequence_policy_shadow_v2" not in v1
+    assert shadowed["price"]["pivot_high"] == 11.7
+    shadow = shadowed["sequence_policy_shadow_v2"]
+    assert shadow["policy_version"] == "signalix/vcp-sequence-policy-shadow-v2"
+    assert shadow["selection"]["candidate_count"] == 2
+    assert shadow["selection"]["selected_final_pivot_idx"] == 46
+    assert shadow["price"]["pivot_high"] == 11.6
+    assert shadow["price"]["invalidation"] == 10.7
+    json.dumps(shadow)
+
+
+def test_sequence_policy_shadow_selects_prior_non_broken_candidate(monkeypatch):
+    ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    pivots = [
+        {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
+        for i, (kind, price) in enumerate([
+            ("high", 12.0), ("low", 10.0), ("high", 11.8),
+            ("low", 10.5), ("high", 11.7), ("low", 10.7),
+            ("high", 11.6),
+        ])
+    ]
+    monkeypatch.setattr(vcp_finder, "_pivots", lambda *_: pivots)
+    rows = bars(100)
+    rows[-1].update({"open": 10.6, "high": 10.65, "low": 10.55, "close": 10.6})
+
+    result = find_vcp_60m(
+        pd.DataFrame(rows), as_of=datetime(2026, 8, 8, tzinfo=timezone.utc),
+        include_sequence_policy_shadow=True,
+    )
+
+    shadow = result["sequence_policy_shadow_v2"]
+    assert shadow["selection"]["selected_final_pivot_idx"] == 44
+    assert shadow["price"]["pivot_high"] == 11.7
+    assert shadow["price"]["invalidation"] == 10.5
+
+
+def test_sequence_policy_shadow_is_explicit_for_insufficient_history():
+    result = find_vcp_60m(
+        pd.DataFrame(bars(79)), include_sequence_policy_shadow=True,
+    )
+
+    shadow = result["sequence_policy_shadow_v2"]
+    assert shadow["state"] == "NO_ACTIVE_SEQUENCE"
+    assert shadow["selection"]["reason"] == "insufficient_history"
+    assert shadow["standard_entry_eligible"] is False
