@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 
-POLICY_VERSION = "signalix/vcp-finder-60m-v1"
+POLICY_VERSION = "signalix/vcp-finder-60m-v2-latest-sequence"
 SEQUENCE_POLICY_SHADOW_VERSION = "signalix/vcp-sequence-policy-shadow-v2"
 REQUIRED_COLUMNS = ("ts", "open", "high", "low", "close", "volume")
 
@@ -206,6 +206,12 @@ def _sequence_diagnostics(sequences, *, last_close, as_of):
         "v2_final_pivot_ts": _plain(v2[-1]["ts"]) if v2 else None,
         "v2_final_pivot_age_hours": _plain(age_hours),
     }
+
+
+def _production_sequence(sequences, *, last_close):
+    """Select the latest candidate whose invalidation has not broken."""
+    active = [seq for seq in sequences if last_close >= float(seq[3]["price"])]
+    return active[-1] if active else None
 
 
 def _set_session_open(local_dt):
@@ -465,7 +471,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     pivots = _pivots(work, cfg)
     result_base["pattern"]["pivots"] = [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in pivots]
     sequences = _sequences(pivots)
-    seq = sequences[0] if sequences else None
+    seq = _production_sequence(sequences, last_close=last_close) if sequences else None
     sequence_diagnostics = _sequence_diagnostics(
         sequences, last_close=last_close, as_of=observed_as_of,
     )

@@ -97,7 +97,7 @@ def test_sequences_returns_every_confirmed_alternating_window():
     assert found[1][-1]["idx"] == 46
 
 
-def test_sequence_diagnostics_keeps_v1_first_and_selects_latest_for_shadow(monkeypatch):
+def test_sequence_diagnostics_records_first_and_latest_sequence(monkeypatch):
     ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
     pivots = [
         {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
@@ -119,10 +119,10 @@ def test_sequence_diagnostics_keeps_v1_first_and_selects_latest_for_shadow(monke
     assert diagnostics["v1_final_pivot_ts"] == pivots[4]["ts"].isoformat()
     assert diagnostics["v2_final_pivot_ts"] == pivots[6]["ts"].isoformat()
     assert diagnostics["v2_final_pivot_age_hours"] == 7 * 24 - 6
-    assert result["price"]["pivot_high"] == 11.7
+    assert result["price"]["pivot_high"] == 11.6
 
 
-def test_sequence_policy_shadow_is_opt_in_and_recomputes_latest_sequence(monkeypatch):
+def test_sequence_policy_shadow_matches_production_latest_sequence(monkeypatch):
     ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
     pivots = [
         {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
@@ -142,7 +142,8 @@ def test_sequence_policy_shadow_is_opt_in_and_recomputes_latest_sequence(monkeyp
     )
 
     assert "sequence_policy_shadow_v2" not in v1
-    assert shadowed["price"]["pivot_high"] == 11.7
+    assert v1["price"]["pivot_high"] == 11.6
+    assert shadowed["price"]["pivot_high"] == 11.6
     shadow = shadowed["sequence_policy_shadow_v2"]
     assert shadow["policy_version"] == "signalix/vcp-sequence-policy-shadow-v2"
     assert shadow["selection"]["candidate_count"] == 2
