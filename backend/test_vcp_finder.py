@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from vcp_finder import VCP60Config, _review_lane, find_vcp_60m
+import vcp_finder
+from vcp_finder import VCP60Config, _review_lane, _sequences, find_vcp_60m
 
 
 def bars(n=100, start=10.0):
@@ -76,3 +77,46 @@ def test_deterministic_replay():
     a = find_vcp_60m(frame, as_of=datetime(2026, 8, 5, tzinfo=timezone.utc))
     b = find_vcp_60m(frame, as_of=datetime(2026, 8, 5, tzinfo=timezone.utc))
     assert a == b
+
+
+def test_sequences_returns_every_confirmed_alternating_window():
+    ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    pivots = [
+        {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
+        for i, (kind, price) in enumerate([
+            ("high", 12.0), ("low", 10.0), ("high", 11.8),
+            ("low", 10.5), ("high", 11.7), ("low", 10.7),
+            ("high", 11.6),
+        ])
+    ]
+
+    found = _sequences(pivots)
+
+    assert len(found) == 2
+    assert found[0][-1]["idx"] == 44
+    assert found[1][-1]["idx"] == 46
+
+
+def test_sequence_diagnostics_keeps_v1_first_and_selects_latest_for_shadow(monkeypatch):
+    ts = datetime(2026, 8, 1, tzinfo=timezone.utc)
+    pivots = [
+        {"kind": kind, "idx": 40 + i, "ts": ts + timedelta(hours=i), "price": price}
+        for i, (kind, price) in enumerate([
+            ("high", 12.0), ("low", 10.0), ("high", 11.8),
+            ("low", 10.5), ("high", 11.7), ("low", 10.7),
+            ("high", 11.6),
+        ])
+    ]
+    monkeypatch.setattr(vcp_finder, "_pivots", lambda *_: pivots)
+    as_of = datetime(2026, 8, 8, tzinfo=timezone.utc)
+
+    result = find_vcp_60m(pd.DataFrame(bars(100)), as_of=as_of)
+
+    diagnostics = result["pattern"]["sequence_diagnostics"]
+    assert diagnostics["candidate_count"] == 2
+    assert diagnostics["v1_selection_rule"] == "first_confirmed_sequence"
+    assert diagnostics["v2_shadow_selection_rule"] == "latest_non_broken_sequence"
+    assert diagnostics["v1_final_pivot_ts"] == pivots[4]["ts"].isoformat()
+    assert diagnostics["v2_final_pivot_ts"] == pivots[6]["ts"].isoformat()
+    assert diagnostics["v2_final_pivot_age_hours"] == 7 * 24 - 6
+    assert result["price"]["pivot_high"] == 11.7

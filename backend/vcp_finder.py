@@ -172,12 +172,39 @@ def _pivots(df: pd.DataFrame, cfg: VCP60Config):
     return alternating
 
 
-def _sequence(pivots):
+def _sequences(pivots):
+    found = []
     for i in range(len(pivots) - 4):
         seq = pivots[i:i + 5]
         if [p["kind"] for p in seq] == ["high", "low", "high", "low", "high"]:
-            return seq
-    return None
+            found.append(seq)
+    return found
+
+
+def _sequence(pivots):
+    """Compatibility selector for v1: retain the first confirmed sequence."""
+    sequences = _sequences(pivots)
+    return sequences[0] if sequences else None
+
+
+def _sequence_diagnostics(sequences, *, last_close, as_of):
+    v1 = sequences[0] if sequences else None
+    non_broken = [seq for seq in sequences if last_close >= float(seq[3]["price"])]
+    v2 = non_broken[-1] if non_broken else None
+    age_hours = None
+    if v2:
+        final_ts = v2[-1]["ts"]
+        if hasattr(final_ts, "to_pydatetime"):
+            final_ts = final_ts.to_pydatetime()
+        age_hours = max(0.0, (as_of - final_ts).total_seconds() / 3600)
+    return {
+        "candidate_count": len(sequences),
+        "v1_selection_rule": "first_confirmed_sequence",
+        "v2_shadow_selection_rule": "latest_non_broken_sequence",
+        "v1_final_pivot_ts": _plain(v1[-1]["ts"]) if v1 else None,
+        "v2_final_pivot_ts": _plain(v2[-1]["ts"]) if v2 else None,
+        "v2_final_pivot_age_hours": _plain(age_hours),
+    }
 
 
 def _set_session_open(local_dt):
@@ -262,7 +289,12 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         result_base["reasons"] = ["Prior 60m trend is not confirmed; shrinking candles alone are not a VCP."]
     pivots = _pivots(work, cfg)
     result_base["pattern"]["pivots"] = [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in pivots]
-    seq = _sequence(pivots)
+    sequences = _sequences(pivots)
+    seq = sequences[0] if sequences else None
+    sequence_diagnostics = _sequence_diagnostics(
+        sequences, last_close=last_close, as_of=observed_as_of,
+    )
+    result_base["pattern"]["sequence_diagnostics"] = sequence_diagnostics
     if not seq:
         result_base["state"] = "FORMING" if len(pivots) >= 3 else "NOT_VERIFIED"
         result_base["reason_codes"] = ["no_valid_base_sequence"]
@@ -333,7 +365,7 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         "reason_codes": reasons,
         "reasons": reasons,
         "price": {"last_close": last_close, "previous_close": prev_close, "change_pct": _plain(change_pct), "atr14": _plain(atr), "pivot_high": pivot, "distance_to_pivot_pct": _plain(distance_pct), "invalidation": _plain(failure)},
-        "pattern": {"pivots": [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in seq], "base_depth_pct": _plain(base_depth), "contractions_pct": [_plain(x) for x in depths], "contraction_ratios": [_plain(x) for x in ratios], "latest_contraction_pct": _plain(latest_contraction)},
+        "pattern": {"pivots": [{"kind": p["kind"], "ts": _plain(p["ts"]), "price": p["price"]} for p in seq], "base_depth_pct": _plain(base_depth), "contractions_pct": [_plain(x) for x in depths], "contraction_ratios": [_plain(x) for x in ratios], "latest_contraction_pct": _plain(latest_contraction), "sequence_diagnostics": sequence_diagnostics},
         "volume": {"leg_average_volume": [_plain(x) for x in leg_average_volume], "leg_volume_non_increasing": bool(leg_volume_pass), "recent_5_avg": _plain(recent), "baseline_15_avg": _plain(baseline), "dryup_ratio": _plain(dryup), "volume_dryup": bool(volume_pass), "breakout_volume_ratio": _plain(breakout_volume)},
         "breakout": {"pivot_level": pivot, "required_close": required_close, "close_confirmed": bool(close_pass), "volume_confirmed": bool(volume_confirmed)},
         "evidence": {"prior_trend_pass": bool(trend_pass), "price_contraction_pass": bool(contraction_pass), "base_pass": bool(base_pass), "leg_volume_pass": bool(leg_volume_pass), "volume_contraction_pass": bool(volume_pass), "breakout_close_pass": bool(close_pass), "breakout_volume_pass": bool(volume_confirmed)},
