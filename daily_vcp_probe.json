@@ -1,0 +1,38 @@
+{
+  "task_id": "t_5bce348e",
+  "run_id": 367,
+  "probe_time": "2026-08-28T11:18:00+07:00",
+  "status": "orienting",
+  "changed_files": [],
+  "invariant_tests": {
+    "existing_daily_shortlist_module": "backend/daily_shortlist.py (READY/PRE_READY lanes)",
+    "vcp_db_module": "backend/vcp_finder_db.py (load_latest_vcp_run with review/action filters)",
+    "mvp_routes": "backend/mvp_routes.py exposes /api/vcp-finder",
+    "frontend_daily_vcp": "backend/frontend/app.js calls /api/vcp-finder?review=true, groups by state",
+    "tests": [
+      "test_daily_shortlist.py",
+      "test_vcp_finder_api.py",
+      "test_mvp_frontend_contract.py"
+    ]
+  },
+  "blockers": null,
+  "plan": [
+    "Add project_daily_vcp_watchlist() in vcp_finder_db.py with fail-closed quality+proximity+liquidity+freshness gates and hard caps ACTION/NEAR_TRIGGER/BREAKOUT_WATCH.",
+    "Expose /api/vcp-finder?daily_watchlist=true in mvp_routes.py; keep full universe route unchanged.",
+    "Update frontend loadDailyVcp() to call daily_watchlist=true and render capped lanes.",
+    "Add tests for confirmed-without-quality, late/extended exclusion, cap/order, duplicate exclusion, empty/error-safe.",
+    "Run focused pytest files; report command/output."
+  ],
+  "assumptions": [
+    "ACTION lane = state in {CONFIRMED, READY} with quality pass + proximity action + coherent close/trigger.",
+    "NEAR_TRIGGER lane = state NEAR_TRIGGER with quality pass + valid proximity.",
+    "BREAKOUT_WATCH lane = state BREAKOUT_WATCH, watch-only, not actionable.",
+    "setup_quality.pass equivalent = valid_vcp_morphology + evidence passes (all VCP evidence gates).",
+    "liquidity floor = avg_trade_value_20 > THB 10M; freshness = feed_status != unavailable/stale.",
+    "Existing /api/vcp-finder?review=true full-universe query must remain unfiltered."
+  ],
+  "not_verified": [
+    "Exact backend DB state (no live DB connection in this probe).",
+    "Live :8000 projection and :3001 dashboard (downstream QA responsibility per card)."
+  ]
+}

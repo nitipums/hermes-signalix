@@ -1,0 +1,39 @@
+{
+  "task_id": "t_5bce348e",
+  "run_id": 367,
+  "completion_time": "2026-08-28T18:37:32+07:00",
+  "status": "completed",
+  "changed_files": [
+    "backend/vcp_finder_db.py",
+    "backend/mvp_routes.py",
+    "backend/frontend/app.js",
+    "backend/test_vcp_finder_api.py"
+  ],
+  "tests": {
+    "command": "pytest -q backend/test_vcp_finder_api.py backend/test_mvp_frontend_contract.py",
+    "result": "24 passed",
+    "note": "Focused regression tests added for confirmed-without-quality, near-trigger-without-quality, extended exclusion, late-watch exclusion, breakout-watch watch-only, close/trigger coherence, cap enforcement, quality-first ranking, cross-lane duplicate exclusion, and empty/error-safe behavior."
+  },
+  "additional_tests": {
+    "command": "pytest -q backend/test_vcp_finder.py backend/test_mvp_watch_lanes.py backend/test_mvp_projection.py backend/test_mvp_snapshot.py backend/test_mvp_artifact_contract.py",
+    "result": "20 passed"
+  },
+  "pre_existing_failures": {
+    "files": ["backend/test_daily_shortlist.py"],
+    "count": 4,
+    "reason": "Unrelated to this change; assertions expect 'UNCONFIRMED_BREAKOUT' reason code and 'pullback' wording that differ from current daily_shortlist implementation. No daily_shortlist.py changes were made."
+  },
+  "ploy_5_self_check": {
+    "quality_plus_proximity_plus_close_gte_breakout": "PASS — ACTION_REVIEW requires _dv_quality_pass (4 evidence gates) + state READY/CONFIRMED + _dv_action_review_coherent (CONFIRMED close>=pivot & close_confirmed; READY holds above invalidation). NEAR_TRIGGER requires quality pass.",
+    "why_now_safety": "N/A — VCP watchlist projection does not emit why_now; lifecycle state is authoritative.",
+    "no_pre_ready_with_null_why_now": "N/A — VCP projection has no PRE_READY lane.",
+    "no_cross_lane_duplicate_symbols": "PASS — deduplication pass keeps symbol in highest-priority lane (ACTION_REVIEW > NEAR_TRIGGER > BREAKOUT_WATCH).",
+    "lifecycle_consistency": "PASS — only states READY/CONFIRMED/NEAR_TRIGGER/BREAKOUT_WATCH are eligible; EXTENDED/FAILED/STALE/NOT_VERIFIED/FORMING are excluded."
+  },
+  "blockers": null,
+  "residual_risk": [
+    "Live DB-dependent behavior of load_latest_vcp_run(daily_watchlist=True) not exercised in unit tests; downstream QA must probe :8000 live projection.",
+    "Frontend rendering of capped lanes verified by string/contract tests only; browser journey on :3001 served dashboard is downstream QA responsibility per card.",
+    "Ranking weights are a first cut (quality/proximity/context/risk-reward/liquidity/recency); real sample review may require tuning."
+  ]
+}

@@ -777,27 +777,56 @@
     }).join("") || vcpEmptyState(target);
   }
 
+  function renderDailyVcpWatchlist(lanes, target) {
+    target = target || dom.dailyVcpCards;
+    var order = ["action_review", "near_trigger", "breakout_watch"];
+    var labels = {
+      action_review: "ACTION / REVIEW",
+      near_trigger: "NEAR TRIGGER · VOLUME CHECK",
+      breakout_watch: "BREAKOUT WATCH · INTRABAR"
+    };
+    var capKeys = {
+      action_review: "ACTION_REVIEW",
+      near_trigger: "NEAR_TRIGGER",
+      breakout_watch: "BREAKOUT_WATCH"
+    };
+    var caps = (lanes && lanes.caps) || {};
+    var html = "";
+    order.forEach(function(key) {
+      var items = (lanes && lanes[key]) || [];
+      if (!items.length) return;
+      var cap = caps[capKeys[key]];
+      var subhead = cap != null ? String(items.length) + " / " + String(cap) : String(items.length);
+      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(labels[key]) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + items.map(vcpCard).join("") + '</tbody></table></div></section>';
+    });
+    target.innerHTML = html || vcpEmptyState(target);
+  }
+
   function loadDailyVcp() {
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&review=true")
+    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true")
       .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data){
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
-        var results = (data.results || []).filter(function(r){ return r.actionable || r.watchable || r.reviewable || r.insurance_context_watch || r.daily_context_watch || r.late_watch || ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0; });
-        results = results.filter(function(r){
-          var metrics = (r.data || {}).daily_metrics || {};
-          if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;
-          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
-          if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return false;
-          if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return false;
-          return true;
+        var lanes = data.daily_watchlist || {action_review: [], near_trigger: [], breakout_watch: []};
+        var filtered = {action_review: [], near_trigger: [], breakout_watch: []};
+        ["action_review", "near_trigger", "breakout_watch"].forEach(function(key) {
+          (lanes[key] || []).forEach(function(r){
+            var metrics = (r.data || {}).daily_metrics || {};
+            if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return;
+            if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
+            if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return;
+            if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return;
+            filtered[key].push(r);
+            vcpResultsBySymbol[r.symbol] = r;
+          });
         });
-        results.forEach(function(r){ vcpResultsBySymbol[r.symbol] = r; });
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + results.length + " review / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
-        renderVcpResults(results, dom.dailyVcpCards);
+        var total = filtered.action_review.length + filtered.near_trigger.length + filtered.breakout_watch.length;
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " watchlist / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
+        renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
       })
       .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
   }

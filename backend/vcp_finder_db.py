@@ -321,7 +321,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     }
 
 
-def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None, actionable=False, focused=False, review=False):
+def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, symbol=None, limit=None, actionable=False, focused=False, review=False):
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         """SELECT run_id, market, interval, policy_version, as_of,
@@ -335,6 +335,11 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
     if not run:
         cur.close()
         return None
+    if daily_watchlist:
+        # The watchlist projection must see the full run and apply its own
+        # fail-closed caps. Ignore caller state/limit/symbol filters.
+        state = symbol = limit = None
+        actionable = focused = review = False
     clauses = ["run_id=%s"]
     params = [run["run_id"]]
     if state:
@@ -401,6 +406,222 @@ def load_latest_vcp_run(pg, *, market="TH", state=None, symbol=None, limit=None,
         "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": len(results)},
         "coverage": {"feed_unavailable": coverage_row["feed_unavailable"] or 0, "no_data": coverage_row["no_data"] or 0},
         "results": results,
+        "daily_watchlist": project_daily_vcp_watchlist(results) if daily_watchlist else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Daily VCP Watchlist projection — fail-closed, quality-gated, capped lanes.
+# ---------------------------------------------------------------------------
+
+DAILY_VCP_WATCHLIST_VERSION = "signalix/daily-vcp-watchlist-v1"
+DAILY_VCP_MIN_LIQUIDITY = 10_000_000
+DAILY_VCP_CAP_ACTION_REVIEW = 10
+DAILY_VCP_CAP_NEAR_TRIGGER = 10
+DAILY_VCP_CAP_BREAKOUT_WATCH = 5
+
+
+def _dv_to_float(value, default=None):
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _dv_quality_pass(result):
+    """Canonical VCP structural quality: all base evidence must pass."""
+    ev = result.get("evidence") or {}
+    return bool(
+        ev.get("prior_trend_pass")
+        and ev.get("price_contraction_pass")
+        and ev.get("base_pass")
+        and ev.get("leg_volume_pass")
+    )
+
+
+def _dv_daily_context_pass(result):
+    return bool((result.get("trend") or {}).get("daily_context_pass"))
+
+
+def _dv_fresh(result):
+    if result.get("state") in {"STALE", "FAILED", "NOT_VERIFIED"}:
+        return False
+    data = result.get("data") or {}
+    if data.get("freshness") != "fresh":
+        return False
+    if data.get("feed_status") == "unavailable":
+        return False
+    return True
+
+
+def _dv_liquid(result):
+    metrics = (result.get("data") or {}).get("daily_metrics") or {}
+    val = _dv_to_float(metrics.get("avg_trade_value_20"), 0)
+    return val >= DAILY_VCP_MIN_LIQUIDITY
+
+
+def _dv_action_review_coherent(result):
+    """Close/trigger evidence is coherent for the ACTION_REVIEW lane.
+
+    CONFIRMED must have a closed-bar close at/above the pivot with volume.
+    READY is a valid pre-breakout setup: it must hold above invalidation and
+    must not contradict the trigger (close below pivot is expected).
+    """
+    state = result.get("state")
+    price = result.get("price") or {}
+    breakout = result.get("breakout") or {}
+    close = _dv_to_float(price.get("last_close"))
+    pivot = _dv_to_float(breakout.get("pivot_level") or price.get("pivot_high"))
+    invalidation = _dv_to_float(price.get("invalidation"))
+    if close is None or pivot is None or pivot <= 0:
+        return False
+    if invalidation is not None and close < invalidation:
+        return False
+    if state == "CONFIRMED":
+        return bool(breakout.get("close_confirmed")) and close >= pivot
+    if state == "READY":
+        # Pre-breakout: close below pivot is expected; above pivot would be
+        # CONFIRMED. Anything at/above invalidation is coherent.
+        return True
+    return False
+
+
+def _dv_risk_reward_score(result):
+    price = result.get("price") or {}
+    close = _dv_to_float(price.get("last_close"))
+    stop = _dv_to_float(price.get("invalidation"))
+    pivot = _dv_to_float(price.get("pivot_high") or (result.get("breakout") or {}).get("pivot_level"))
+    if not close or not stop or stop >= close or not pivot:
+        return 0.0
+    risk = close - stop
+    if risk <= 0:
+        return 0.0
+    reward = abs(pivot - close)
+    rr = reward / risk
+    return round(min(1.0, max(0.0, (rr - 1.0) / 8.0 + 0.25)), 4)
+
+
+def _dv_liquidity_score(result):
+    metrics = (result.get("data") or {}).get("daily_metrics") or {}
+    val = _dv_to_float(metrics.get("avg_trade_value_20"), 0)
+    if val <= 0:
+        return 0.0
+    return round(min(1.0, val / (DAILY_VCP_MIN_LIQUIDITY * 2)), 4)
+
+
+def _dv_rank_score(result):
+    """Quality/proximity/context/risk-reward/liquidity/recency composite."""
+    ev = result.get("evidence") or {}
+    structure = sum([
+        bool(ev.get("prior_trend_pass")),
+        bool(ev.get("price_contraction_pass")),
+        bool(ev.get("base_pass")),
+        bool(ev.get("leg_volume_pass")),
+    ]) / 4.0
+    state = result.get("state")
+    readiness = {
+        "CONFIRMED": 1.0,
+        "READY": 0.9,
+        "NEAR_TRIGGER": 0.7,
+        "BREAKOUT_WATCH": 0.4,
+    }.get(state, 0.0)
+    rr = _dv_risk_reward_score(result)
+    liq = _dv_liquidity_score(result)
+    context = 1.0 if _dv_daily_context_pass(result) else 0.0
+    data = result.get("data") or {}
+    recency = 1.0 if data.get("freshness_session_age", 1) == 0 else 0.5
+    return round(
+        0.35 * structure
+        + 0.25 * readiness
+        + 0.15 * rr
+        + 0.10 * liq
+        + 0.10 * context
+        + 0.05 * recency,
+        4,
+    )
+
+
+def _dv_lane(result):
+    """Return canonical Daily VCP lane or None (fail-closed)."""
+    state = result.get("state")
+    if state in {"EXTENDED", "FAILED", "STALE", "NOT_VERIFIED", "FORMING"}:
+        return None
+    if not _dv_fresh(result) or not _dv_liquid(result):
+        return None
+    if result.get("late_watch") is True:
+        return None
+    quality = _dv_quality_pass(result)
+    if state in {"READY", "CONFIRMED"}:
+        if not quality or not _dv_daily_context_pass(result):
+            return None
+        if not _dv_action_review_coherent(result):
+            return None
+        return "ACTION_REVIEW"
+    if state == "NEAR_TRIGGER":
+        if not quality or not _dv_daily_context_pass(result):
+            return None
+        return "NEAR_TRIGGER"
+    if state == "BREAKOUT_WATCH":
+        if not _dv_daily_context_pass(result):
+            return None
+        return "BREAKOUT_WATCH"
+    return None
+
+
+def _dv_sort_key(result):
+    return (
+        -(_dv_rank_score(result)),
+        -(_dv_liquidity_score(result)),
+        str(result.get("symbol") or ""),
+    )
+
+
+def project_daily_vcp_watchlist(results):
+    """Fail-closed Daily VCP Watchlist projection with deterministic caps.
+
+    Lanes:
+      - ACTION_REVIEW: READY/CONFIRMED with quality pass + coherent close/trigger.
+      - NEAR_TRIGGER: NEAR_TRIGGER with quality pass.
+      - BREAKOUT_WATCH: intrabar watch-only, never actionable.
+
+    Hard caps: ACTION_REVIEW <= 10, NEAR_TRIGGER <= 10, BREAKOUT_WATCH <= 5.
+    Cross-lane duplicate symbols are removed, keeping the highest-priority lane.
+    """
+    raw_lanes = {"ACTION_REVIEW": [], "NEAR_TRIGGER": [], "BREAKOUT_WATCH": []}
+    caps = {
+        "ACTION_REVIEW": DAILY_VCP_CAP_ACTION_REVIEW,
+        "NEAR_TRIGGER": DAILY_VCP_CAP_NEAR_TRIGGER,
+        "BREAKOUT_WATCH": DAILY_VCP_CAP_BREAKOUT_WATCH,
+    }
+    for r in results or []:
+        lane = _dv_lane(r)
+        if lane:
+            raw_lanes[lane].append(r)
+    for lane, items in raw_lanes.items():
+        items.sort(key=_dv_sort_key)
+        raw_lanes[lane] = items[:caps[lane]]
+    seen = set()
+    lanes = {}
+    counts = {}
+    for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH"):
+        filtered = []
+        for r in raw_lanes[lane]:
+            sym = str(r.get("symbol", "")).upper()
+            if not sym or sym in seen:
+                continue
+            seen.add(sym)
+            filtered.append(r)
+        lanes[lane] = filtered
+        counts[lane] = len(filtered)
+    return {
+        "policy_version": DAILY_VCP_WATCHLIST_VERSION,
+        "caps": caps,
+        "counts": counts,
+        "action_review": lanes["ACTION_REVIEW"],
+        "near_trigger": lanes["NEAR_TRIGGER"],
+        "breakout_watch": lanes["BREAKOUT_WATCH"],
     }
 
 
