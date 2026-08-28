@@ -16,6 +16,7 @@ import psycopg2
 import psycopg2.extras
 
 from instruments import active_ord_symbols
+from marginable import lookup as marginable_lookup
 from vcp_decision_policy import project_vcp_decision_shadow
 from vcp_finder import POLICY_VERSION, find_vcp_60m
 from vcp_finder_db import _classify_types, load_daily_metrics, load_daily_trend_context
@@ -45,6 +46,19 @@ CREATE TABLE IF NOT EXISTS vcp_finder_60m_replay_results (
 CREATE INDEX IF NOT EXISTS vcp_replay_results_symbol_idx
   ON vcp_finder_60m_replay_results(symbol, replay_id);
 """
+
+
+def make_replay_id(prefix, cadence, as_of, index):
+    return f"{prefix}-{cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{index:03d}"
+
+
+def pending_replay_points(prefix, cadence, snapshots, existing_ids):
+    pending = []
+    for index, as_of in enumerate(snapshots, 1):
+        replay_id = make_replay_id(prefix, cadence, as_of, index)
+        if replay_id not in existing_ids:
+            pending.append((index, as_of, replay_id))
+    return pending
 
 
 def pg_args():
@@ -79,6 +93,7 @@ def trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
 
 def build_replay_result(symbol, rows, *, as_of, replay_id,
                         daily_context=None, daily_metrics=None,
+                        marginable_record=None,
                         rr_multiple=TARGET_R_MULTIPLE):
     """Build one point-in-time replay result with the same Daily inputs as live."""
     result = find_vcp_60m(
@@ -87,6 +102,10 @@ def build_replay_result(symbol, rows, *, as_of, replay_id,
     )
     result["symbol"] = symbol
     result.setdefault("data", {})["daily_metrics"] = daily_metrics or {}
+    result["marginable"] = {
+        "is_marginable": bool(marginable_record),
+        "margin_rate_pct": marginable_record.get("margin_rate_pct") if marginable_record else None,
+    }
     result = _classify_types(result, ath_context={}, listing_context=None)
     result.setdefault("provenance", {})["replay_id"] = replay_id
     result["provenance"]["replay_as_of"] = as_of.isoformat()
@@ -151,6 +170,12 @@ def evaluate_trade(plan, future_rows):
     }
 
 
+def attach_replay_evaluation(result, plan, future_rows):
+    evaluation = evaluate_trade(plan, future_rows)
+    result["replay_evaluation"] = evaluation
+    return evaluation
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30)
@@ -158,6 +183,7 @@ def main():
     ap.add_argument("--cadence", choices=("daily", "60m"), default="daily")
     ap.add_argument("--trading-days", type=int, default=None)
     ap.add_argument("--rr", type=float, default=TARGET_R_MULTIPLE)
+    ap.add_argument("--id-prefix", default="vcp-replay-1m")
     args = ap.parse_args()
     end = datetime.fromisoformat(args.end) if args.end else datetime.now(timezone.utc)
     if end.tzinfo is None:
@@ -169,6 +195,7 @@ def main():
         cur.execute(DDL)
         pg.commit()
         symbols = sorted(set(active_ord_symbols(pg)))
+        marginable_records = {symbol: marginable_lookup(symbol) for symbol in symbols}
         cur.execute(
             """SELECT symbol, ts, open, high, low, close, volume
                FROM intraday_price_data
@@ -197,12 +224,23 @@ def main():
                 if ts_values:
                     snapshots.append(max(ts_values))
             snapshots = sorted(set(snapshots))
-        summary = {"window_start": start.isoformat(), "window_end": end.isoformat(), "snapshots": len(snapshots), "runs": [], "coverage": {}}
+        cur.execute(
+            "SELECT replay_id FROM vcp_finder_60m_replay_runs WHERE replay_id LIKE %s",
+            (args.id_prefix + "-%",),
+        )
+        existing_ids = {row[0] for row in cur.fetchall()}
+        pending_points = pending_replay_points(
+            args.id_prefix, args.cadence, snapshots, existing_ids,
+        )
+        summary = {
+            "window_start": start.isoformat(), "window_end": end.isoformat(),
+            "snapshots": len(snapshots), "snapshots_existing": len(snapshots) - len(pending_points),
+            "snapshots_pending": len(pending_points), "runs": [], "coverage": {},
+        }
         previous = {}
         first_events = {}
         outcome_counts = defaultdict(int)
-        for idx, as_of in enumerate(snapshots, 1):
-            replay_id = f"vcp-replay-1m-{args.cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{idx:03d}"
+        for idx, as_of, replay_id in pending_points:
             results = []
             daily_contexts = load_daily_trend_context(pg, symbols, as_of=as_of)
             daily_metrics = load_daily_metrics(pg, symbols, as_of=as_of)
@@ -212,6 +250,7 @@ def main():
                     symbol, rows, as_of=as_of, replay_id=replay_id,
                     daily_context=daily_contexts.get(symbol),
                     daily_metrics=daily_metrics.get(symbol),
+                    marginable_record=marginable_records.get(symbol),
                     rr_multiple=args.rr,
                 )
                 result["provenance"]["replay_id"] = replay_id
@@ -220,7 +259,7 @@ def main():
                 plan = result["replay_trade_plan"]
                 if plan and (symbol, plan["base_type"]) not in first_events:
                     future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
-                    evaluation = evaluate_trade(plan, future)
+                    evaluation = attach_replay_evaluation(result, plan, future)
                     event = {"symbol": symbol, "detected_at": as_of.isoformat(), **plan, **(evaluation or {})}
                     first_events[(symbol, plan["base_type"])] = event
                     outcome_counts[(plan["base_type"], event.get("outcome"))] += 1

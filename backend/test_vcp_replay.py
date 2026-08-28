@@ -1,7 +1,14 @@
 from datetime import datetime, timezone
 
 import run_vcp_replay_1m
-from run_vcp_replay_1m import build_replay_result, evaluate_trade, trade_plan
+from run_vcp_replay_1m import (
+    attach_replay_evaluation,
+    build_replay_result,
+    evaluate_trade,
+    make_replay_id,
+    pending_replay_points,
+    trade_plan,
+)
 
 
 def test_low_cheat_trade_plan_uses_close_and_three_r_target():
@@ -110,6 +117,7 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
         "AAA", [], as_of=as_of, replay_id="replay-1",
         daily_context={"trend_pass": True, "as_of": "2026-08-26"},
         daily_metrics={"avg_trade_value_20": 20_000_000, "as_of": "2026-08-26"},
+        marginable_record={"margin_rate_pct": 50},
     )
 
     assert captured == {
@@ -120,3 +128,39 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     assert result["provenance"]["replay_id"] == "replay-1"
     assert result["decision_shadow_v2"]["policy_version"] == "signalix/vcp-decision-shadow-v2"
     assert result["decision_shadow_v2"]["symbol"] == "AAA"
+    assert result["marginable"] == {"is_marginable": True, "margin_rate_pct": 50}
+    assert result["decision_shadow_v2"]["tradability"]["marginable_pass"] is True
+
+
+def test_replay_id_prefix_is_explicit_and_isolated():
+    as_of = datetime(2026, 8, 27, 6, tzinfo=timezone.utc)
+
+    replay_id = make_replay_id("vcp-shadow-v2", "60m", as_of, 3)
+
+    assert replay_id == "vcp-shadow-v2-60m-20260827T060000Z-003"
+
+
+def test_pending_replay_points_skip_already_persisted_ids():
+    snapshots = [
+        datetime(2026, 8, 27, hour, tzinfo=timezone.utc)
+        for hour in (2, 3, 4)
+    ]
+    existing = {make_replay_id("shadow", "60m", snapshots[0], 1)}
+
+    pending = pending_replay_points("shadow", "60m", snapshots, existing)
+
+    assert pending == [
+        (2, snapshots[1], "shadow-60m-20260827T030000Z-002"),
+        (3, snapshots[2], "shadow-60m-20260827T040000Z-003"),
+    ]
+
+
+def test_attach_replay_evaluation_persists_descriptive_outcome():
+    result = {"symbol": "AAA"}
+    plan = {"base_type": "standard_vcp", "entry": 100.0, "stop": 95.0, "target": 115.0}
+    future = [{"ts": "next", "high": 116.0, "low": 100.0}]
+
+    evaluation = attach_replay_evaluation(result, plan, future)
+
+    assert evaluation["outcome"] == "target_hit"
+    assert result["replay_evaluation"] == evaluation
