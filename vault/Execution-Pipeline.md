@@ -36,7 +36,7 @@ The product must let a user answer, quickly and honestly:
 - Breakout lifecycle has immutable trigger/pivot/invalidation evidence and retry lineage.
 - Intraday is a 60-minute stored overlay; it must never overwrite historical Daily classification.
 - Thai and curated US AI Buildout use shared market-scoped scanner logic. US remains a research watchlist with explicitly labelled bootstrap data quality.
-- Owner-only MVP is VCP-first: `Daily VCP Shortlist` is the fast default with actionable review only; `All VCP · 60m` is the full current universe/forming/audit table. Former Daily Shortlist and All Stocks Explorer are removed from visible MVP navigation.
+- Owner-only MVP is VCP-first: `Daily VCP Watchlist` is the fast default with actionable review plus `BREAKOUT_WATCH`; `All VCP · 60m` / Explorer is the full current universe/forming/audit table. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation. Alert delivery is currently paused; dashboard watchlist + explorer are the active product focus.
 - VCP full-universe persistence retains every evaluated symbol. Forming presentation lanes are maturing/early/needs_work; contraction and breakout volume are deterministic sort inputs, not primary table columns.
 - VCP runs after committed full/partial 60m ingestion with ingestion lineage and overlap lock; failed/skipped ingestion does not create a new VCP run. Missing optional index/margin data is omitted rather than rendered as `NOT_VERIFIED`.
 - Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
@@ -55,7 +55,7 @@ Only pull one tightly scoped implementation item at a time. Lite is the final ev
 
 | Order | Deliverable | Outcome / acceptance gate | Origin of migrated Kanban work |
 |---|---|---|---|
-| 1 | **Daily Shortlist decision contract + compact artifact** | **Stable candidate verified at `595eb49`:** default publishes only `READY`/`PRE_READY`; separate non-actionable mover/caution lanes preserve strong price moves without weakening gates. Immediate Explorer filters, real 1D/1W/60M charts, canonical artifact sanitizer, full tests and served browser evidence complete. | Owner-approved 2026-08-23 Daily Shortlist + All Stocks Explorer design |
+| 1 | **Dashboard VCP decision contract + compact artifact** | **Current dashboard focus:** Daily VCP Watchlist for actionable review plus All VCP · 60m / Explorer for full-universe research/audit. UI/API tests and served endpoints are verified. Alert delivery is paused separately. | Owner-approved dashboard-first MVP scope |
 | 2 | **Active ORD instrument master** | An authoritative, active-ORD-only instrument record with symbol, venue, asset class, currency, timezone, session, source, freshness, and active state. No guessed universe expansion. | `signalix-p0-instrument-master` |
 | 3 | **Provenance and freshness contract** | Canonical `data_fetched_at`, source, as-of market date, freshness status, and limitations appear consistently in API/UI; never substitute candle timestamp or page-render time. Add regression tests for stale/unknown. | `signalix-p0-provenance-freshness`, timestamp-fix lineage |
 | 4 | **Daily vs intraday event boundary** | Persist intraday emerging events append-only against an official Daily baseline. Full EOD scan alone owns the final daily class and reconciles earlier events as confirmed/expired/invalidated/not-confirmed. | `signalix-p0-intraday-emerging-event-ledger`, `signalix-p0-eod-scan-reconciliation` |

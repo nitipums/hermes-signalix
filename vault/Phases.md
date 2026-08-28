@@ -6,11 +6,15 @@
 - **Phase 1 — Webhook ingestion + storage + Redis pub/sub** ✅
 - **Phase 2 — Deterministic screening (TT/VCP/RS/Position sizing)** ✅
 - **Phase 3 — LLM summarization** ✅ (2026-08-12)
-- **Phase 4 — Bot delivery** ✅ (Telegram; LINE dropped)
+- **Phase 4 — Bot delivery** ✅ implemented, currently paused (Telegram; LINE dropped)
 - **User layer (multi-tenant routing)** ✅ (2026-08-12)
 
-## User layer (DONE 2026-08-12)
+## Current operating boundary — 2026-08-28
+The dashboard is the active product focus: Daily VCP Watchlist plus All VCP · 60m / Explorer. Alert delivery is paused because generated volume made action difficult. The delivery implementation, routing, and historical alert notes remain preserved for a deliberate future reactivation; normal Compose startup excludes the service via profile `alerts`.
+
 Multi-tenant routing so Signalix can serve many subscribers, not one hardcoded chat.
+
+## User layer (DONE 2026-08-12)
 - `backend/users.py` — tables `users` (telegram_chat_id unique, tier) +
   `user_watchlists` (user_id, symbol). Empty watchlist = receive ALL signals.
 - API: `POST /register?chat_id=&tier=` , `POST /watch?chat_id=&symbols=` (csv,

@@ -6,11 +6,16 @@
 
 ```text
 branch: release/signalix-mvp-stable
-release: e5c7139 (`fix: enforce 60m-only vcp confirmation`)
 source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
+
+## Current runtime scope — 2026-08-28
+
+Dashboard-first operation is current: Daily VCP Watchlist plus All VCP · 60m / Explorer remain in focus. Alert delivery is paused. The Compose `delivery` service uses profile `alerts`, and is not started by default; enable only deliberately with `docker compose --profile alerts up -d delivery` after a future owner decision. Current active services are `signalix_backend`, `signalix_dashboard`, `signalix_postgres`, and `signalix_redis`.
+
+The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
 
 `/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. Former release-candidate/feature worktrees and temporary cleanup copies were retired after stable push; no retired path is treated as current source.
 

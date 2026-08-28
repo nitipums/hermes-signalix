@@ -7,7 +7,8 @@
 
 - `/mvp` opens on **Daily VCP Watchlist**, the fast review view.
 - **All VCP · 60m** is the full current VCP universe view with forming/state filters and audit coverage.
-- The former Daily Shortlist and All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical notes remain preserved for rollback/audit.
+- The current visible MVP focus is dashboard-only: Daily VCP Watchlist is the fast review view; All VCP · 60m / Explorer is the full current VCP universe view with forming/state filters and audit coverage. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation; backend/API and historical notes remain preserved for rollback/audit.
+- Alert delivery is paused. The delivery source remains preserved, but the Docker service is gated under Compose profile `alerts` and is not started by default.
 
 ## VCP type taxonomy — candidate implementation
 

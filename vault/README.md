@@ -1,10 +1,10 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled with `Architecture.md`, `Components.md`, `Deployment.md`, and `Execution-Pipeline.md` at stable release `e5c7139`.
+> **STATUS: CURRENT** · Reconciled with `Architecture.md`, `Components.md`, `Deployment.md`, and `Execution-Pipeline.md` at current dashboard-first release.
 
 AI Trading-Agent SaaS for Thai SET retail traders. Trend-Following engine
-(Mark Minervini / VCP) that auto-screens the market, scores setups, and pushes
-real-time alerts to **Telegram**.
+(Mark Minervini / VCP) that auto-screens the market and supports dashboard-based
+watchlist/explorer review. Alert delivery is currently paused.
 
 > Owner: Nitipum.s (collaborates with Arm). This vault is the canonical
 > knowledge base — keep it in sync after every structural change.
@@ -17,10 +17,10 @@ real-time alerts to **Telegram**.
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
 | Dashboard (web) | ✅ Current stable MVP | owner-only `/mvp`, port 3001; Daily VCP Watchlist is the fast primary view; All VCP · 60m is the full current view |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
-| Realtime delivery | ✅ Done | Redis `signals` → `signalix_delivery` → Telegram |
+| Realtime delivery | ⏸ Paused | Docker `delivery` is gated under Compose profile `alerts`; source/routing retained |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |
 | **LINE** | ❌ Dropped | user decision; `notify-api.line.me` DNS-blocked on VPS |
-| LLM summarization (Phase 3) | ✅ Done | Nous `upstage/solar-pro4:free`, Thai "why now" note |
+| LLM summarization (Phase 3) | ✅ Implemented, paused with alert delivery | Retained for future alert reactivation; no current alert push |
 | Multi-tenant user routing + tier quota | ✅ Done | `users.py` + `TIER_LIMITS` enforced 2026-08-12 |
 | Portal frontend (self-service SPA) | ✅ Done | portal.html ↔ backend APIs; watchlist sync |
 | Subscription / payment billing | ⬜ Gap | tier field exists; no payment/subscription frontend |

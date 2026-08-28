@@ -2,6 +2,11 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
+## 2026-08-28 — Dashboard-first scope; alerts paused
+Decision: For the current MVP focus, keep only the dashboard surfaces: **Daily VCP Watchlist** for fast actionable review and **All VCP · 60m / Explorer** for full-universe research and audit. Pause alert delivery; the Docker `delivery` service is stopped and assigned to Compose profile `alerts`, so normal `docker compose up -d` does not start it. Backend, dashboard, PostgreSQL, and Redis remain active.
+
+Reason: Generated alert volume made action difficult. Arm explicitly chose to focus on watchlist + explorer before revisiting alerts. This is a reversible operational/product boundary; alert source code and historical evidence remain preserved.
+
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
 ## 2026-08-27 — VCP type semantics
