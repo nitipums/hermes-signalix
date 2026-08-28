@@ -1,10 +1,10 @@
 # Signalix Execution Pipeline
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`. Active work source is this Markdown pipeline plus linked focused plans; Kanban is audit/archive only.
+> **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`. Markdown plus linked focused plans define product scope/acceptance; the Signalix Kanban board is the active durable execution/orchestration state for the current gated run and must not be mirrored into this note.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
-> This is the durable work-management source for Signalix. Do not reopen or create Kanban tasks for this project. Use this document for the active sequence, [[Decisions]] for durable choices, and focused implementation plans under `/root/signalix/.hermes/plans/` for executable detail.
+> Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused implementation plans under `/root/signalix/.hermes/plans/` for executable detail, and the Kanban board for named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
 
 ## Product contract
 
@@ -49,7 +49,7 @@ The intraday E2E path is now explicit and verified: full active ORD 60m fetch �
 This closes the previous “DB updated but dashboard stale” gap. Unexpected source/credential/network/code failures still alert for operator action; the system does not silently modify source code.
 
 
-Only pull one tightly scoped implementation item at a time. Bee is the final evidence gate; worker completion is not final approval.
+Only pull one tightly scoped implementation item at a time. Lite is the final evidence gate; worker completion is not final approval. Every active-chain card terminal outcome (`PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED`) requires a delivered report to the owner; a `REVISE`/`FAIL` must produce a bounded remediation card or an explicit human/capability/resource blocker.
 
 ### Now — P0 product/data integrity
 
@@ -98,6 +98,21 @@ The following migrated board categories are retained as references but are not a
 - Market View → Instrument → Action contracts, DR/TFEX/fund mapping, and recommendation schemas remain strategic foundation work in [[Product-Strategy-Market-to-Action]]. They do not displace the P0 public scanner/data integrity sequence.
 - Public SaaS auth/entitlement and webhook retry work remain later hardening scope.
 
+## Loop prevention — mandatory after 2026-08-28 retrospective (LOCKED 2026-08-28 — owner approved, enforce on every card)
+
+Derived from **260 cards / 355 runs / 154 logs** (`vault/Lesson-Learned-2026-08-28-Loop-Retrospective.md` + `vault/Lesson-Learned-Full-Board-260-Cards-2026-08-28.md` + `hermes-kanban-ops/references/signalix-2026-08-28-loop-retrospective.md`).
+
+**Violating these gates is a process failure, not a worker mistake. Orchestrator must reject or split cards that violate them before dispatch.**
+
+1. **Card scoping (files list mandatory):** One card = one authority. Split every remediation into (a) code + focused tests, (b) `docker compose up -d --build backend && python build_dashboard.py`, (c) live probe + browser. **Card body must list `files:`, `tests:`, `live endpoints:`, `first artifact deadline 15m`**. No `files:` → no dispatch. Prevents `prep 409` loops (`t_7cca0a57`).
+2. **Stale runtime gate:** After any `backend/daily_shortlist.py|mvp_api.py|app.py` edit, Nida/Ploy/Lite must `curl :8000/dashboard/shortlist` and `curl :8000/dashboard/shortlist/compact` and grep `Trigger confirmed / quality pass` before PASS. Mismatch → REVISE `stale_runtime`. Deploy only via Lite/approved path.
+3. **Resource gate:** Docker-heavy or dirty-repo cards use `max_retries=1`. On `load>1.8 or swap<500M` block 10 min with reason; do not instant reclaim. `t_925028aa` (5 runs, timed_out 23m, 262× terminal) must not repeat.
+4. **Browser locality:** QA primary evidence is `curl :3001/dashboard.html + curl :8000/compact.json + read_file /worktree/*.json`. `browser_open localhost` is screenshot-only; 119× blocked prepares on `t_cbd7e900` is forbidden.
+5. **Completion schema:** `kanban_complete` requires non-empty `artifacts` — at minimum one probe JSON (`sl8000_after.json`). Pure-logic fix without file must still emit a probe. Mirror `artifacts` inside metadata.
+6. **Heartbeat checkpoint:** Orchestrator watches `last_heartbeat_at` with empty artifacts. >15 min → bounded checkpoint: complete with artifacts or block with root cause in 10 min. Heartbeat-only (`t_3755a74f` 17 heartbeats, `t_7e1964f8` 59) not acceptable.
+7. **No parallel workers** for full-universe or docker rebuild cards (owner directive 2026-08-19).
+8. **Stagger + crash-cluster pause:** Do not open >2 large P0/UI cards concurrently (08-22/23 had 29–33 waste runs/day). If `crashed` >3 in 1 min, pause dispatch 10 min (08-19/21 clusters). Lite sole orchestrator enforces.
+
 ## Evidence standard for every pull
 
 Before a row above can be marked complete in this document, record:
@@ -108,3 +123,4 @@ Before a row above can be marked complete in this document, record:
 4. deployment status (including explicitly **not deployed** when applicable);
 5. browser/mobile verification when UI changes;
 6. Bee final-gate verdict.
+7. For any `daily_shortlist.py` change, also record `curl :8000` live probe vs source diff (stale-runtime check) and resource-gate result.

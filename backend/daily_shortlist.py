@@ -118,12 +118,14 @@ def _entry_readiness(item: dict) -> float:
 
     if queue in _DAILY_ONLY_QUEUES:
         # READY queues (action/near-trigger confirmed) score high.
-        if state in ("action", "near_trigger"):
+        if state == "action":
             return 1.0
-        if state == "forming":
+        if state == "near_trigger":
             return 0.5
+        if state == "forming":
+            return 0.25
     # Default conservative.
-    return 0.5
+    return 0.25
 
 
 def _risk_reward(item: dict) -> float:
@@ -153,35 +155,20 @@ def _liquidity_component(item: dict) -> float:
     return round(min(1.0, val / (MIN_AVG_DAILY_VALUE_20 * 2)), 4)
 
 
-def _fresh_breakout_confirmed(item: dict) -> bool:
-    """Fail-closed trigger evidence for fresh_breakout READY.
-
-    Requires explicit setup_quality.pass plus numeric close >= breakoutLevel.
-    Existing source-card volume/spec gates are honored upstream by the
-    action_queue assignment, not duplicated here.
-    """
-    setup_q = item.get("setup_quality") or {}
-    if not bool(setup_q.get("pass")):
-        return False
-    close = _to_float(item.get("close"))
-    breakout_level = _to_float(item.get("breakoutLevel"))
-    if close is None or breakout_level is None or breakout_level <= 0:
-        return False
-    return close >= breakout_level
-
-
 def _trigger(item: dict) -> str | None:
-    """Explainable trigger label (entry condition)."""
-    phase = item.get("phase")
+    """Explainable trigger label (entry condition) — fail-closed.
+
+    Only emits a confirmed trigger description when quality passes, proximity
+    is 'action', and close is at/above the breakout level."""
+    if not _trigger_confirmed(item):
+        return None
     queue = item.get("action_queue")
-    if phase == "breakout_new" or queue == "fresh_breakout":
+    if queue == "fresh_breakout" or item.get("phase") == "breakout_new":
         return "Daily close >= breakout trigger with quality pass"
-    if queue == "pre_breakout":
-        return "Near trigger/pivot; confirm with close + volume"
     if queue == "qualified_pullback":
         return "Pullback holding support reference"
     if queue == "retest_watch":
-        return "Retest at reference"
+        return "Breakout retest at reference"
     return None
 
 
@@ -255,21 +242,71 @@ def _ready_action_for_queue(queue: str | None) -> str:
     }.get(queue, "REVIEW FRESH BREAKOUT")
 
 
+def _breakout_confirmed(item: dict) -> bool:
+    """True only when trigger evidence supports a confirmed breakout claim.
+
+    Requires an explicit quality pass AND close >= breakoutLevel.
+    Missing/non-numeric levels or failed quality never claim confirmation.
+    """
+    quality_pass = bool((item.get("setup_quality") or {}).get("pass"))
+    if not quality_pass:
+        return False
+    close = _to_float(item.get("close"))
+    breakout_level = _to_float(item.get("breakoutLevel"))
+    if close is None or breakout_level is None or breakout_level <= 0:
+        return False
+    return close >= breakout_level
+
+
+def _trigger_confirmed(item: dict) -> bool:
+    """Fail-closed READY confirmation: quality pass + action proximity +
+    close at/above breakout level.
+
+    This is the canonical gate used by both publication-state assignment and
+    trigger/why-now wording so the frontend cannot receive a READY label
+    paired with unconfirmed evidence.
+    """
+    prox = item.get("setup_proximity") or {}
+    if prox.get("state") != "action":
+        return False
+    return _breakout_confirmed(item)
+
+
+def _lifecycle_state(item: dict) -> str:
+    """Canonical lifecycle state from the serialized card.
+
+    Accepts either lifecycle_state or lifecycleState source fields and falls
+    back to phase, eliminating drift between the two input contracts.
+    """
+    return (
+        item.get("lifecycle_state")
+        or item.get("lifecycleState")
+        or item.get("phase")
+        or "unclassified"
+    )
+
+
 def _why_now(item: dict, publication_state: str) -> str | None:
-    """Human-readable why-now: combines trigger and readiness state."""
+    """Human-readable why-now: combines trigger and readiness state.
+
+    READY text must NOT claim a confirmed breakout unless the item's evidence
+    (quality pass + close at/above breakout level) actually supports it.
+    PRE_READY wording is preserved as confirmation-oriented guidance.
+    """
     prox = item.get("setup_proximity") or {}
     state = prox.get("state")
-    queue = item.get("action_queue")
     if publication_state == "READY":
-        if queue == "fresh_breakout":
-            if state == "action":
+        if state == "action":
+            queue = item.get("action_queue")
+            if queue == "qualified_pullback":
+                return "Support defense in action area; confirm support hold"
+            if queue == "retest_watch":
+                return "Retest in action area; confirm hold before entry"
+            if _breakout_confirmed(item):
                 return "Trigger confirmed — close at/above breakout level with quality pass"
-            if state == "near_trigger":
-                return "Near breakout trigger; fresh breakout awaiting confirmation"
-        if queue == "qualified_pullback":
-            return "Pullback holding support reference; defend support before entry"
-        if queue == "retest_watch":
-            return "Retest at reference; confirm hold before entry"
+            return "Setup in action area; awaiting confirmation at trigger level with quality pass"
+        if state == "near_trigger":
+            return "Near trigger; setup ready for confirmation"
     if publication_state == "PRE_READY":
         if state == "near_trigger":
             return "Near trigger/pivot; confirm with close + volume"
@@ -329,11 +366,14 @@ def classify_shortlist(item: dict) -> dict:
         return _ineligible(["DEVELOPING_BASE"], symbol, POLICY_VERSION)
 
     # --- Publication state ---
+    # A fresh-breakout queue is excluded when the breakout-level evidence does
+    # not support the claim. All READY queues additionally require action
+    # proximity + quality pass + close >= breakout; anything less becomes
+    # PRE_READY so the frontend cannot show false confirmed-trigger wording.
+    if queue == "fresh_breakout" and not _breakout_confirmed(item):
+        return _ineligible(["TRIGGER_NOT_CONFIRMED"], symbol, POLICY_VERSION)
     if queue in READY_QUEUES:
-        # Fail-closed: fresh_breakout READY requires explicit trigger evidence.
-        if queue == "fresh_breakout" and not _fresh_breakout_confirmed(item):
-            return _ineligible(["UNCONFIRMED_BREAKOUT"], symbol, POLICY_VERSION)
-        pub = "READY"
+        pub = "READY" if _trigger_confirmed(item) else "PRE_READY"
     elif queue in PRE_READY_QUEUES:
         pub = "PRE_READY"
     else:
@@ -391,7 +431,7 @@ def project_shortlist(items: list[dict]) -> list[dict]:
             classified.append({
                 "symbol": item.get("symbol"),
                 "publication_state": pub,
-                "lifecycle_state": item.get("lifecycle_state") or item.get("lifecycleState") or item.get("phase") or "unclassified",
+                "lifecycle_state": _lifecycle_state(item),
                 "action": normalized_action,
                 "source_action": source_action,
                 "rank_components": components,
@@ -530,6 +570,9 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
     Broken/invalidated/stale/illiquid/developing names enter NO lane.
     """
     ready_pre = project_shortlist(items or [])
+    # Cross-lane exclusivity: a symbol already assigned to REVIEW_NOW or PREPARE
+    # must never duplicate into LEADERSHIP_EXTENDED.
+    assigned_symbols = {r["symbol"] for r in ready_pre}
     lanes: dict[str, list[dict]] = {lane: [] for lane in LANE_ORDER}
     for r in ready_pre:
         lane = "REVIEW_NOW" if r["publication_state"] == "READY" else "PREPARE"
@@ -541,6 +584,8 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
 
     extended = []
     for item in items or []:
+        if item.get("symbol") in assigned_symbols:
+            continue
         result = classify_shortlist_extended(item)
         if not result["eligible"]:
             continue
@@ -549,7 +594,7 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
         extended.append({
             "symbol": item.get("symbol"),
             "publication_state": "EXTENDED",
-            "lifecycle_state": item.get("lifecycle_state") or item.get("lifecycleState") or item.get("phase") or "unclassified",
+            "lifecycle_state": _lifecycle_state(item),
             "action": action,
             "source_action": source_action,
             "rank_components": result["rank_components"],

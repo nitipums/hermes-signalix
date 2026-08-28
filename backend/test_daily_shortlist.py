@@ -492,5 +492,79 @@ class TestProjectShortlist:
         assert "retest" in r["why_now"].lower()
 
 
+class TestWhyNowEvidenceHardening:
+    """Regression: READY why_now must not claim confirmed breakout unless
+    the item's close and quality evidence actually supports it.
+    """
+
+    def test_ready_close_below_breakout_is_not_published(self):
+        """close < breakoutLevel => fail closed, not READY."""
+        item = card(symbol="BELOW_BO",
+                    close=48.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_ready_quality_fail_is_not_published(self):
+        """setup_quality.pass=False => fail closed, not READY."""
+        item = card(symbol="QUALITY_FAIL",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": False, "reasons": ["loose_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_ready_valid_confirmed_case_keeps_confirmed_language(self):
+        """close >= breakoutLevel + quality pass => READY why_now MAY claim confirmed."""
+        item = card(symbol="VALID_BO",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert "confirmed" in r["why_now"].lower()
+        assert "breakout" in r["why_now"].lower()
+
+    def test_near_trigger_without_breakout_close_is_not_published_ready(self):
+        """close below breakout => no READY publication."""
+        item = card(symbol="NEAR_NO_CONFIRM",
+                    close=51.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "near_trigger"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_pre_ready_wording_preserved(self):
+        """PRE_READY wording stays confirmation-oriented regardless of evidence."""
+        item = card(symbol="PRE_PRESERVE",
+                    action_queue="pre_breakout",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "near_trigger"})
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "PRE_READY"
+        assert "confirm" in r["why_now"].lower()
+        assert "confirmed" not in r["why_now"].lower()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

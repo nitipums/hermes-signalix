@@ -430,4 +430,10 @@ body {
   #panel-vcp .card-list { display:flex; flex-direction:column; gap:8px; }
   #panel-vcp .vcp-card__grid { grid-template-columns:1fr; }
   #panel-vcp .vcp-card__state { max-width:52%; }
+  .vcp-table th, .vcp-table td { padding:8px 4px; }
+  .vcp-table th:first-child, .vcp-table td:first-child { width:26%; }
+  .vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:18.5%; }
+  .vcp-row__symbol { flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
+  .vcp-row__symbol .vcp-card__tags { max-width:100%; margin:0; }
+  .vcp-row__symbol .tag { padding:2px 4px; font-size:.6rem; white-space:normal; }
 }

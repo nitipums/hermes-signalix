@@ -1,6 +1,6 @@
 # Signalix Decisions
 
-> **STATUS: CURRENT** · Canonical decision ledger. Active work-management rule is recorded below: Markdown pipeline active; Kanban audit/archive only.
+> **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
@@ -66,9 +66,13 @@ Reason: Multiple dirty worktrees and stale vault notes caused source confusion. 
 
 ## Work management — final owner decision 2026-08-23
 
-Decision: **Markdown `Execution-Pipeline.md` is the active Signalix work source. Kanban is audit/archive only and must not be used for new dispatches.** Focused executable plans live under `/root/signalix/.hermes/plans/` and must link back to the pipeline row.
+Decision: **Markdown `Execution-Pipeline.md` and focused plans define product scope and acceptance. Kanban is the active durable execution/orchestration state for named workers, dependencies, heartbeats, retries, and evidence handoffs; do not mirror live card status into vault notes.**
 
-Reason: Kanban generated duplicate/blocked graph noise and required more orchestration than the bounded work justified. Keep its history for audit, but use one controlled Markdown sequence for active work.
+Reason: The prior audit-only wording caused the monitor to ignore the active gated run and select stale diagnostic blockers. Separate product authority from execution state instead: one explicit active chain in Kanban, no stale-card selection, and no duplicate status copies in documentation.
+
+## 2026-08-28 — Terminal card reporting and REVISE recovery
+Decision: Every active-chain Kanban card reaching `PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED` must emit one delivered report to Arm with task/run ID, owner, verdict, evidence, next action, downstream holds, and production readiness. `REVISE`/`FAIL` stops downstream promotion and requires a bounded remediation card for the responsible implementation owner, linked to the failed card, unless explicitly blocked by human input/capability/resource safety.
+Reason: A monitor previously missed a completed card and later stopped after `REVISE` without creating the next remediation. This invariant makes terminal delivery and recovery auditable and prevents silent flow breaks.
 
 
 ## 2026-08-12 — LINE dropped

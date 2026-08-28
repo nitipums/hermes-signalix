@@ -333,10 +333,12 @@
       var vm = vcpRunMeta || {};
       item = Object.assign({}, item, {
         name: item.symbol,
-        action: vcpStateLabel(vr.state),
+        action: vcpDecisionLabel(vr),
         close: vp.last_close,
+        change_pct: vp.change_pct,
         trigger: vp.pivot_high,
         risk_stop: vp.invalidation,
+        avgDailyValue20: (vd.daily_metrics || {}).avg_trade_value_20,
         index_membership: vr.index_membership || [],
         margin_rate_pct: vr.margin_rate_pct,
         description: null,
@@ -347,7 +349,7 @@
     dom.drawerSymbol.href = "https://www.tradingview.com/symbols/" + encodeURIComponent(item.symbol) + "/?exchange=SET";
     dom.drawerName.textContent = item.name || "–";
     dom.drawerTrend.textContent = shortStage(item.stage);
-    dom.drawerAction.textContent = shortAction(item.action || item.phase);
+    dom.drawerAction.textContent = item.vcp_result ? item.action : shortAction(item.action || item.phase);
     dom.drawerSector.textContent = item.sector || "Sector –";
     dom.drawerIndustry.textContent = item.industry || "Industry –";
     dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap);
@@ -511,7 +513,7 @@
       // Both VCP surfaces feed the same drawer contract, including navigation.
       return Object.assign({symbol: symbol, vcp_result: vcp}, vcp, {
         name: symbol,
-        action: vcpStateLabel(vcp.state),
+        action: vcpDecisionLabel(vcp),
         description: null
       });
     }
@@ -698,7 +700,23 @@
   });
 
   function vcpStateLabel(state) {
-    return ({READY: "SETUP READY · WAIT FOR BREAKOUT", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", EXTENDED: "DO NOT CHASE", FORMING: "FORMING", FAILED: "FAILED", STALE: "STALE 60m DATA", NOT_VERIFIED: "NOT VERIFIED"})[state] || state || "NOT VERIFIED";
+    return ({READY: "SETUP READY · WAIT FOR BREAKOUT", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", CONFIRMED: "TRIGGER CONFIRMED", EXTENDED: "DO NOT CHASE", FORMING: "FORMING", FAILED: "FAILED", STALE: "STALE 60m DATA", NOT_VERIFIED: "NOT VERIFIED"})[state] || state || "NOT VERIFIED";
+  }
+
+  function vcpQualityFlags(result) {
+    var flags = [];
+    var volume = result.volume || {};
+    var trend = result.trend || {};
+    if (volume.volume_dryup === false) flags.push("NO VOLUME DRY-UP");
+    if (trend.daily_context_pass === false) flags.push("DAILY CONTEXT FAIL");
+    return flags;
+  }
+
+  function vcpDecisionLabel(result) {
+    if (result && result.state === "CONFIRMED" && vcpQualityFlags(result).length) {
+      return "TRIGGER CONFIRMED · QUALITY INCOMPLETE";
+    }
+    return vcpStateLabel(result && result.state);
   }
 
   function vcpCard(result) {
@@ -713,6 +731,7 @@
     if (baseType) typeTags.push(baseType);
     (typeInfo.overlays || []).forEach(function(type){ typeTags.push(type === "break_ath" ? "BREAK ATH" : type === "new_stock" ? "NEW" : type); });
     var tags = typeTags;
+    if (state === "CONFIRMED") tags = tags.concat(vcpQualityFlags(result));
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
     if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
     var avgTrade = Number((data.daily_metrics || {}).avg_trade_value_20);
@@ -729,6 +748,7 @@
 
   function vcpDisplayGroup(result) {
     var lane = result.review_lane;
+    if (result.state === "CONFIRMED" && vcpQualityFlags(result).length) return "TRIGGER CONFIRMED · QUALITY INCOMPLETE";
     if (lane === "PRICE_VOLUME_BREAKOUT") return "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK";
     if (lane === "PIVOT_TOUCH_VOLUME_WATCH") return "PIVOT TOUCH · VOLUME WATCH";
     if (lane === "CLOSE_BREAKOUT_VOLUME_PENDING") return "CLOSE BREAKOUT · VOLUME PENDING";
@@ -749,7 +769,7 @@
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["BREAKOUT WATCH · INTRABAR", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK", "PIVOT TOUCH · VOLUME WATCH", "CLOSE BREAKOUT · VOLUME PENDING", "INSURANCE · CONTEXT WATCH", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
+    var order = ["BREAKOUT WATCH · INTRABAR", "TRIGGER CONFIRMED · QUALITY INCOMPLETE", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK", "PIVOT TOUCH · VOLUME WATCH", "CLOSE BREAKOUT · VOLUME PENDING", "INSURANCE · CONTEXT WATCH", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -770,7 +790,7 @@
         results = results.filter(function(r){
           var metrics = (r.data || {}).daily_metrics || {};
           if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return false;
-          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000) && !r.reviewable && !r.insurance_context_watch && !r.daily_context_watch) return false;
+          if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
           if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return false;
           if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return false;
           return true;

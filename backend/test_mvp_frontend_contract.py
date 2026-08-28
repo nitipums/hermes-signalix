@@ -45,6 +45,19 @@ def test_daily_and_all_vcp_use_one_drawer_item_adapter():
     assert "Both VCP surfaces feed the same drawer contract" in js
     assert "item = drawerItemForSymbol(symbol);" in js
     assert "openDrawer(item, symbol, navSymbols, navIndex);" in js
+    assert "change_pct: vp.change_pct" in js
+    assert "avgDailyValue20: (vd.daily_metrics || {}).avg_trade_value_20" in js
+
+
+def test_vcp_confirmed_quality_gaps_are_decision_visible():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "function vcpQualityFlags(result)" in js
+    assert 'flags.push("NO VOLUME DRY-UP")' in js
+    assert 'flags.push("DAILY CONTEXT FAIL")' in js
+    assert 'return "TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
+    assert "vcpDecisionLabel(vr)" in js
+    assert 'item.vcp_result ? item.action : shortAction(item.action || item.phase)' in js
+    assert '"TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
 
 
 def test_vcp_type_filter_and_badges_are_presentation_only():
@@ -60,6 +73,18 @@ def test_vcp_type_filter_and_badges_are_presentation_only():
     assert '"FAILED", "STALE", "NOT_VERIFIED"' in js
     assert "No Low-Cheat setups in focused review." in js
     assert "Switch to All states." in js
+
+
+def test_daily_vcp_default_filters_are_literal_presentation_filters():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "dom.dailyFilterMarginable.checked" in js
+    assert "dom.dailyFilterTradeValue.checked" in js
+    assert "dom.dailyFilterPrice.checked" in js
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
+    ) in js
+    assert "&& !r.reviewable" not in js
 
 
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
@@ -98,3 +123,6 @@ def test_mobile_interactive_targets_are_touch_safe():
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
 
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
+    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:26%;" in css
+    assert ".vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:18.5%;" in css
+    assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css

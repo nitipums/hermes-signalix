@@ -231,6 +231,11 @@ def _compute_rsi(closes: list[float], period: int = 14) -> list[Optional[float]]
 
 # ── Public API ─────────────────────────────────────────────────────────
 
+def _chart_source(timeframe: str) -> str:
+    """Return the authoritative storage relation for a chart timeframe."""
+    return "intraday_price_data" if str(timeframe).upper() == "60M" else "price_data"
+
+
 def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
@@ -239,6 +244,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     timeframe = (timeframe or "1D").upper()
     if timeframe not in {"1D", "1W", "60M", "1M"}:
         raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
+    chart_source = _chart_source(timeframe)
     pg = _get_db_connection()
     if pg is None:
         return {
@@ -275,7 +281,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             "source": None,
             "as_of": None,
             "provenance": {
-                "source": "price_data",
+                "source": chart_source,
                 "as_of": None,
                 "note": f"NOT_VERIFIED: DB query failed — {str(e)[:200]}",
             },
@@ -332,7 +338,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     rsi = _compute_rsi(closes, 14) if len(closes) >= 15 else None
 
     note = (", ".join(notes) if notes else
-            "Computed from price_data (SELECT only). All indicators available.")
+            f"Computed from {chart_source} (SELECT only). All indicators available.")
 
     return {
         "symbol": symbol.upper(),
@@ -343,10 +349,10 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
         "ma200": ma200,
         "macd": macd,
         "rsi": rsi,
-        "source": "price_data",
+        "source": chart_source,
         "as_of": as_of,
         "provenance": {
-            "source": "price_data",
+            "source": chart_source,
             "as_of": as_of,
             "note": note,
         },

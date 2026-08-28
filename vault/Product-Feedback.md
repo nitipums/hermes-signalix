@@ -4,7 +4,7 @@ Curated product/user-testing feedback for Signalix.
 
 ## Rules
 - This file stores durable product feedback, not raw chat transcripts.
-- Mali may write beginner/user-tester feedback here.
+- Retired profile `mali` no longer writes here. Keep existing observations as curated historical feedback.
 - Keep feedback actionable: what was confusing, why it matters, suggested fix.
 - Do not store secrets, tokens, API keys, or `.env` contents.
 

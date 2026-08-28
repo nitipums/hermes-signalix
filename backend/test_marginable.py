@@ -72,8 +72,13 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert 'data-surface="vcp"' in html
     assert 'class="margin-rate-toggle"' in html
     assert '<dt>Marginable</dt>' in html
-    assert '<dt>Trigger</dt>' in html
-    assert '<dt>Stop</dt>' in html
+    # Decision levels live as dashed chart overlays; duplicate metric boxes
+    # below the chart were intentionally removed from the MVP drawer.
+    assert '<dt>Trigger</dt>' not in html
+    assert '<dt>Stop</dt>' not in html
+    assert 'decisionLine(chart.trigger' in js
+    assert 'decisionLine(chart.stop' in js
+    assert 'decisionLine(chart.target' in js
     assert 'drawer-margin-rights' not in html
     assert 'id="drawer-prev"' in html
     assert 'id="drawer-next"' in html

@@ -17,6 +17,10 @@ import psycopg2.extras
 
 from instruments import active_ord_symbols
 from vcp_finder import POLICY_VERSION, find_vcp_60m
+from vcp_finder_db import _classify_types
+
+TYPE_POLICY_VERSION = "signalix/vcp-types-v2-early-entry"
+TARGET_R_MULTIPLE = 3.0
 
 DDL = """
 CREATE TABLE IF NOT EXISTS vcp_finder_60m_replay_runs (
@@ -50,12 +54,66 @@ def pg_args():
                 dbname=os.getenv("POSTGRES_DB", "signalix"))
 
 
+def trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
+    """Build a point-in-time plan; no future bars are read here."""
+    vcp_type = result.get("vcp_type") or {}
+    base_type = vcp_type.get("base_type")
+    if base_type not in {"low_cheat_vcp", "standard_vcp"}:
+        return None
+    price = result.get("price") or {}
+    entry = price.get("last_close") if base_type == "low_cheat_vcp" else (result.get("breakout") or {}).get("required_close")
+    stop = price.get("invalidation")
+    if entry is None or stop is None or float(entry) <= float(stop):
+        return None
+    risk = float(entry) - float(stop)
+    return {
+        "base_type": base_type,
+        "entry_profile": vcp_type.get("entry_profile"),
+        "entry": float(entry),
+        "stop": float(stop),
+        "target": float(entry) + float(rr_multiple) * risk,
+        "rr_multiple": float(rr_multiple),
+    }
+
+
+def evaluate_trade(plan, future_rows):
+    """Evaluate only bars strictly after detection, conservatively."""
+    if not plan:
+        return None
+    entry, stop, target = plan["entry"], plan["stop"], plan["target"]
+    highs = [float(row["high"]) for row in future_rows]
+    lows = [float(row["low"]) for row in future_rows]
+    if not highs:
+        outcome = "insufficient_future_data"
+    else:
+        hit_stop = any(low <= stop for low in lows)
+        hit_target = any(high >= target for high in highs)
+        if hit_stop and hit_target:
+            stop_idx = next(i for i, low in enumerate(lows) if low <= stop)
+            target_idx = next(i for i, high in enumerate(highs) if high >= target)
+            outcome = "ambiguous_same_bar" if stop_idx == target_idx else ("stop_hit" if stop_idx < target_idx else "target_hit")
+        elif hit_stop:
+            outcome = "stop_hit"
+        elif hit_target:
+            outcome = "target_hit"
+        else:
+            outcome = "open_at_replay_end"
+    risk = entry - stop
+    return {
+        "outcome": outcome,
+        "bars_observed": len(future_rows),
+        "mfe_r": max(((high - entry) / risk for high in highs), default=None),
+        "mae_r": min(((low - entry) / risk for low in lows), default=None),
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--end", default=None, help="UTC ISO timestamp; defaults to now")
     ap.add_argument("--cadence", choices=("daily", "60m"), default="daily")
     ap.add_argument("--trading-days", type=int, default=None)
+    ap.add_argument("--rr", type=float, default=TARGET_R_MULTIPLE)
     args = ap.parse_args()
     end = datetime.fromisoformat(args.end) if args.end else datetime.now(timezone.utc)
     if end.tzinfo is None:
@@ -97,6 +155,8 @@ def main():
             snapshots = sorted(set(snapshots))
         summary = {"window_start": start.isoformat(), "window_end": end.isoformat(), "snapshots": len(snapshots), "runs": [], "coverage": {}}
         previous = {}
+        first_events = {}
+        outcome_counts = defaultdict(int)
         for idx, as_of in enumerate(snapshots, 1):
             replay_id = f"vcp-replay-1m-{args.cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{idx:03d}"
             results = []
@@ -104,9 +164,18 @@ def main():
                 rows = [r for r in grouped.get(symbol, []) if r["ts"] <= as_of][-400:]
                 result = find_vcp_60m(pd.DataFrame(rows), as_of=as_of)
                 result["symbol"] = symbol
+                result = _classify_types(result, ath_context={}, listing_context=None)
                 result["provenance"]["replay_id"] = replay_id
                 result["provenance"]["replay_window_start"] = start.isoformat()
                 result["provenance"]["replay_as_of"] = as_of.isoformat()
+                plan = trade_plan(result, rr_multiple=args.rr)
+                result["replay_trade_plan"] = plan
+                if plan and (symbol, plan["base_type"]) not in first_events:
+                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
+                    evaluation = evaluate_trade(plan, future)
+                    event = {"symbol": symbol, "detected_at": as_of.isoformat(), **plan, **(evaluation or {})}
+                    first_events[(symbol, plan["base_type"])] = event
+                    outcome_counts[(plan["base_type"], event.get("outcome"))] += 1
                 results.append(result)
             cur.execute("INSERT INTO vcp_finder_60m_replay_runs (replay_id,window_start,window_end,as_of,policy_version,eligible_count,evaluated_count) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (replay_id) DO NOTHING", (replay_id, start, end, as_of, POLICY_VERSION, len(symbols), len(results)))
             psycopg2.extras.execute_values(cur, "INSERT INTO vcp_finder_60m_replay_results (replay_id,symbol,state,actionable,result) VALUES %s ON CONFLICT (replay_id,symbol) DO NOTHING", [(replay_id, r["symbol"], r["state"], bool(r["actionable"]), json.dumps(r, default=str)) for r in results])
@@ -122,6 +191,10 @@ def main():
             summary["runs"].append({"replay_id": replay_id, "as_of": as_of.isoformat(), "states": dict(states), "transitions": transitions})
             previous = current
         summary["coverage"] = {"eligible": len(symbols), "symbols_with_rows": sum(bool(grouped.get(s)) for s in symbols), "symbols_with_80_at_end": sum(len([r for r in grouped.get(s, []) if r["ts"] <= end]) >= 80 for s in symbols)}
+        summary["type_policy_version"] = TYPE_POLICY_VERSION
+        summary["target_rr"] = args.rr
+        summary["first_events"] = list(first_events.values())
+        summary["outcomes"] = {f"{kind}:{outcome}": count for (kind, outcome), count in outcome_counts.items()}
         print(json.dumps(summary, default=str))
     finally:
         pg.close()

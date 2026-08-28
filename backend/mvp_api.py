@@ -474,8 +474,10 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         result["action"] = cand.get("action") or result["action"]
         result["action_queue"] = cand.get("action_queue") or result.get("action_queue")
         result["decision_state"] = DECISION_STATE_OFFICIAL_DAILY  # shortlist = official daily
-        result["trigger"] = cand.get("trigger") or result["trigger"]
-        result["invalidation"] = cand.get("invalidation") or result["invalidation"]
+        # Let the shortlist projection's fail-closed trigger/invalidation
+        # override any stale raw-card wording; None is a deliberate signal.
+        result["trigger"] = cand.get("trigger")
+        result["invalidation"] = cand.get("invalidation")
         return result
 
     ready_items = [enrich(r) for r in ready]

@@ -40,6 +40,25 @@ DECISION_STATE_OFFICIAL_DAILY = "official_daily"
 DECISION_STATES = (DECISION_STATE_PROVISIONAL, DECISION_STATE_OFFICIAL_DAILY)
 
 
+def screen_price_provenance(last_date=None, scan_time=None):
+    """Return the explicit quote/analysis boundary for the Daily ``/screen`` route.
+
+    ``/screen`` runs Daily/EOD analytics from ``price_data``; it does not fetch a
+    current quote.  Keep that fact machine-readable so a fresh analysis run
+    cannot make an older EOD close look like the current market price.
+    """
+    return {
+        "quote_source": "unavailable",
+        "quote_timestamp": None,
+        "market_status": "unknown",
+        "quote_is_provisional": False,
+        "confirmed_close_date": last_date,
+        "analysis_last_date": last_date,
+        "analysis_scan_time": scan_time,
+        "freshness_verdict": "NOT VERIFIED",
+    }
+
+
 def resolve_decision_state(market_session=None, daily_as_of=None, last_valid_session=None):
     """Return official_daily only for a closed, aligned Daily EOD session."""
     if not daily_as_of:

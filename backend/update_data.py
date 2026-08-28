@@ -475,7 +475,7 @@ def _bangkok_date_from_settrade_ts(ts):
     return dt.datetime.fromtimestamp(int(ts), BANGKOK_TZ).date().isoformat()
 
 
-def _parse_settrade_candlestick(sym, itype, res, after, stats):
+def _parse_settrade_candlestick(sym, itype, res, after, stats, until=None):
     """Convert Settrade get_candlestick response to price_data rows."""
     rows = []
     if isinstance(res, list) and res:
@@ -500,6 +500,8 @@ def _parse_settrade_candlestick(sym, itype, res, after, stats):
         try:
             d = _bangkok_date_from_settrade_ts(times[i])
             if after and dt.date.fromisoformat(d) <= after:
+                continue
+            if until and dt.date.fromisoformat(d) > until:
                 continue
             vol = float(vols[i] or 0)
             if vol == 0:
@@ -851,7 +853,7 @@ def _fetch_one_intraday(sym, interval, market, *, workers, limit, sleep_fn, retr
     return result
 
 
-def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instrument_types=None, flush_batch=0, repair_gaps=False, symbols=None):
+def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instrument_types=None, flush_batch=0, repair_gaps=False, symbols=None, until=None):
     """Preferred automated SET source via Settrade Open API v2.
 
     Uses get_candlestick(symbol, interval='1d', normalized=True). The API needs
@@ -912,7 +914,7 @@ def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instru
             print(f"  ! settrade {sym} failed: {repr(error)[:120]}")
             continue
         try:
-            parsed = _parse_settrade_candlestick(sym, itype, res, sym_after, stats)
+            parsed = _parse_settrade_candlestick(sym, itype, res, sym_after, stats, until=until)
             if parsed:
                 stats["settrade_rows_kept"] = stats.get("settrade_rows_kept", 0) + len(parsed)
                 rows.extend(parsed)
@@ -1197,6 +1199,7 @@ def run(args):
         return 0 if summary["status"] in ("full_success", "partial_success") else 1
 
     pg = get_pg()
+    until = dt.date.fromisoformat(args.until) if args.until else None
     if args.since:
         after = dt.date.fromisoformat(args.since) - dt.timedelta(days=1)
     elif args.repair_gaps:
@@ -1240,6 +1243,7 @@ def run(args):
                 symbols=(args.symbols.split(",") if args.symbols else None),
                 flush_batch=(args.flush_batch if not args.dry_run else 0),
                 repair_gaps=args.repair_gaps,
+                until=until,
             )
         except RuntimeError as e:
             print(f"  ! settrade unavailable: {e}")
@@ -1329,6 +1333,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="list what would be fetched; never writes to the DB")
     ap.add_argument("--since", help="override start date (YYYY-MM-DD, inclusive)")
+    ap.add_argument("--until", help="optional inclusive end date (YYYY-MM-DD); prevents ingesting newer in-progress bars")
     ap.add_argument("--source", default="auto",
                     choices=["auto", "local", "drive", "settrade", "yfinance"])
     ap.add_argument("--settrade-limit", type=int, default=30,

@@ -3,7 +3,7 @@
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
 > Governance: [[Documentation-Governance]]
-> Active work source: `Execution-Pipeline.md` + linked focused plans. Kanban is audit/archive only.
+> Product/acceptance authority: `Execution-Pipeline.md` + linked focused plans. Active named-worker execution state: Kanban board `signalix`; live card status is not mirrored into vault notes.
 
 ## 0. Governance gate
 
@@ -13,7 +13,7 @@
 - Atomic decisions → `Decisions.md`
 - Current architecture/ops → `Architecture.md`, `Components.md`, `Deployment.md`, `Execution-Pipeline.md`
 - Historical evidence → dated handoffs / `Postmortems/`
-- Work status → owner decision required; do not mirror into notes/facts
+- Product/acceptance scope → `Execution-Pipeline.md` + focused plans; active named-worker execution state → Kanban board `signalix`; do not mirror live card status into notes/facts
 
 ## 1. วิธีการใช้
 
@@ -37,7 +37,7 @@
 | `Phases.md` | แผนระยะ | ✅ active | |
 | `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
-| `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
+| `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | historical feedback retained; no retired-profile writes |
 | `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `e5c7139`; old Daily/Explorer contract superseded** |
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
@@ -48,6 +48,10 @@
 | `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 | `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
+| `Postmortems/2026-08-28-Kanban-Terminal-Trigger-Gap.md` | Terminal card reporting and REVISE recovery invariant | ✅ current | active-chain trigger delivery, stale-card exclusion, bounded remediation |
+| `Lesson-Learned-2026-08-28-Loop-Retrospective.md` | Loop taxonomy + 7 prevention gates (เมื่อคืน 13 runs) | ✅ current | 13 runs 2026-08-27 23:05→08:11, refs in Execution-Pipeline.md |
+| `Lesson-Learned-Full-Board-260-Cards-2026-08-28.md` | **Full-board scan 260 cards / 355 runs / 154 logs** — ใครวนตรงไหนทั้งบอร์ด | ✅ current | 58 multi-run, 148 waste, 21 prep>150, crash clusters 08-19/21 |
+| `Card-Template-LOCKED-2026-08-28.md` | **Card template บังคับ 8 gates** — ตัวอย่าง body ที่ orchestrator ต้อง enforce | ✅ current | owner approved, files/tests/endpoints/deadline mandatory |
 | `2026-08-21-Intraday-Feed-Availability-Handoff.md` | 11 unavailable 60m feeds + COLOR boundary | ✅ current | feed-specific cooldown; Daily preserved |
 || `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | 🟡 historical evidence | prior candidate; not source authority |
 
@@ -73,8 +77,10 @@
 - Test สถานะ ↔ fact 119 (126 unit + 6 integration)
 - A2A/Browser infra ↔ fact 71/122 + skills
 
-## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
+## 2026-08-28 — Profile and memory cleanup
+Retired `Prae`, `View`, and `Mali` profile references were marked historical. Current active review team is Lite, Khim, Nida, and Ploy; Wallie remains outside Signalix. Markdown Execution Pipeline remains product/acceptance authority; Kanban holds active named-worker execution state without status mirroring.
 
+## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~
 ~~2. **Mark handoff เก่า** — ทั้ง 5 ตัว mark HISTORICAL/SUPERSEDED เรียบร้อย ✅~~
 ~~3. **Coverage lineage 1,143/934/718** — `coverage_report.json` + runtime validator fixed ✅~~

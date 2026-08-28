@@ -52,7 +52,7 @@ Dated handoffs and postmortems remain valuable as evidence.
 
 ## Known conflict — resolved 2026-08-23
 
-Arm chose **Markdown `Execution-Pipeline.md` as the active work source**. Kanban is audit/archive only.
+Arm chose Markdown `Execution-Pipeline.md` and linked focused plans as the product-scope/acceptance authority. Kanban is the active durable execution/orchestration state for the current gated run (named workers, dependencies, heartbeats, retries, and evidence handoffs); live card status must not be copied into vault notes.
 
 ## Cleanup policy
 

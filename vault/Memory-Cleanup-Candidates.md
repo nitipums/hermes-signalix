@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT**
 > This note records cleanup already completed and remaining candidates only.
-> Last reviewed: 2026-08-26.
+> Last reviewed: 2026-08-28.
 
 ## Keep / current candidates
 
@@ -31,8 +31,10 @@
 Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, and old provider states should not be promoted to permanent memory.
 
 ## Work-management fact — resolved
+Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as the product-scope and acceptance authority. Kanban is the active durable execution/orchestration state for the current gated run; live card status is not mirrored into vault notes. Older audit-only wording is superseded by the 2026-08-28 terminal-reporting decision.
 
-Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as the active work source. Kanban is audit/archive only. Any older fact saying Kanban is operational source should be removed/compacted after this replacement is confirmed.
+## Profile cleanup — 2026-08-28
+Retired profiles `view`, `mali`, and `prae` were removed from active routing. Current Signalix team is Lite (sole orchestrator/final gate), Khim (implementation), Nida (independent QA), and Ploy (trader/product challenge). Wallie remains outside Signalix.
 
 ## Safety
 

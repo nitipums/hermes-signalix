@@ -359,6 +359,7 @@ def get_instrument(symbol: str):
 
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results, load_symbol_intraday  # noqa: E402
+from provenance_contract import screen_price_provenance  # noqa: E402
 from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, breakout_event_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
 # All senders + formatters live in delivery.py so the batch scan (here) and the
 # standalone Redis consumer format + push identically.
@@ -456,6 +457,53 @@ def screen_symbol(symbol: str):
     if result is None:
         raise HTTPException(status_code=404,
                             detail=f"{symbol} not found or insufficient history")
+    # /screen is Daily/EOD analysis only.  Its fresh scan_time must never be
+    # interpreted as a current quote timestamp; current price belongs to /chart.
+    result.update(screen_price_provenance(
+        last_date=result.get("last_date"),
+        scan_time=result.get("scan_time"),
+    ))
+    result["daily_eod"] = {
+        "source": "price_data",
+        "as_of": result.get("last_date"),
+        "close": result.get("close"),
+    }
+    # Keep Daily analytics immutable, but expose the latest stored intraday
+    # quote separately.  A fresh scan must not make an older EOD close look
+    # like the current market price.
+    quote_cur = get_pg().cursor()
+    quote_cur.execute(
+        """SELECT ts, open, high, low, close, volume
+           FROM intraday_price_data
+           WHERE symbol=%s AND interval='60m'
+           ORDER BY ts DESC LIMIT 1""",
+        (symbol.upper(),),
+    )
+    quote_row = quote_cur.fetchone()
+    quote_cur.close()
+    if quote_row:
+        quote_ts, quote_open, quote_high, quote_low, quote_close, quote_volume = quote_row
+        quote_iso = quote_ts.isoformat()
+        quote_freshness = compute_freshness(quote_ts)
+        result.update({
+            "quote_source": "intraday_price_data",
+            "quote_provider": "settrade_intraday_60m",
+            "quote_timestamp": quote_iso,
+            "quote_is_provisional": True,
+            "freshness_verdict": quote_freshness,
+            "current_quote": {
+                "price": float(quote_close),
+                "timestamp": quote_iso,
+                "open": float(quote_open),
+                "high": float(quote_high),
+                "low": float(quote_low),
+                "volume": float(quote_volume or 0),
+                "source": "intraday_price_data",
+                "provider": "settrade_intraday_60m",
+                "is_provisional": True,
+                "freshness": quote_freshness,
+            },
+        })
     _publish_screen(result, result["trend_template"]["conditions_met"])
     # Two-layer actionable setup state (quality gate + proximity timing).
     # Mirrors group_scan_results' daily_state attachment for a single symbol.
@@ -939,19 +987,18 @@ def dashboard_snapshot():
     """
     try:
         import build_dashboard
+        from mvp_snapshot import load_mvp_artifact
         from reconciled_projection import apply_projection, snapshot_payload
-        scan_path = os.path.join(os.path.dirname(__file__), "scan_results.json")
-        scan = dashboard_overview_payload(scan_path)
-        last_valid_session = max((row.get("last_date") for values in scan.get("groups", {}).values()
-                                  for row in values if row.get("last_date")), default=None)
-        try:
-            freshness_pg = build_dashboard.get_pg()
-            try:
-                freshness = build_dashboard.dashboard_freshness(freshness_pg, last_valid_session=last_valid_session)
-            finally:
-                freshness_pg.close()
-        finally:
-            pass
+        # Canonical MVP source.  Do not depend on the retired scan_results.json
+        # envelope: it may be absent after a clean MVP build.
+        mvp_path = os.path.join(os.path.dirname(__file__), "mvp_snapshot.json")
+        mvp = load_mvp_artifact(mvp_path)
+        last_valid_session = (mvp.get("freshness") or {}).get("as_of")
+        freshness = dict(mvp.get("freshness") or {})
+        if not freshness.get("data_fetched_at"):
+            freshness["data_fetched_at"] = mvp.get("scan_time")
+        freshness.setdefault("source", "unknown")
+        freshness.setdefault("status", "unknown")
         cache_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
         try:
             with open(cache_path) as handle:
@@ -977,16 +1024,12 @@ def dashboard_snapshot():
             if "market_regime" in payload and "dashboard_meta" in payload:
                 payload["dashboard_meta"]["market_regime"] = payload["market_regime"]
         except (OSError, ValueError, json.JSONDecodeError):
-            # Safe fallback for a scan generated before the cache artifact was
-            # introduced; normal deploys/builds never take this slow path.
-            pg_fallback = get_pg()
-            try:
-                fallback_items = build_dashboard.snapshot_items(pg_fallback, scan)
-            finally:
-                pg_fallback.close()
-            payload = {"scan_time": scan.get("scan_time"), "market": "TH",
-                       "refresh": "progressive_cards", "items": fallback_items}
-            payload.update(snapshot_payload(payload["items"], scan.get("scan_time")))
+            # Use the same canonical MVP items if the optional enriched cache is
+            # absent.  Never reconstruct from the retired scan_results.json.
+            payload = {"scan_time": mvp.get("scan_time"), "market": mvp.get("market", "TH"),
+                       "refresh": "progressive_cards", "items": mvp["items"]}
+            payload["items"] = apply_projection(payload["items"])
+            payload.update(snapshot_payload(payload["items"], payload["scan_time"]))
         return {**payload,
                 "build_timestamp": payload.get("build_timestamp"),
                 "data_fetched_at": freshness["data_fetched_at"],
@@ -1070,7 +1113,8 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
     if timeframe == "60M":
         if market.upper() != "TH":
             return [], "60-minute data is not configured for this market"
-        cur.execute("""SELECT ts, open, high, low, close, volume, false AS provisional
+        cur.execute("""SELECT ts, open, high, low, close, volume,
+                              (ROW_NUMBER() OVER (ORDER BY ts DESC) = 1) AS provisional
                        FROM intraday_price_data WHERE symbol=%s AND interval='60m'
                        ORDER BY ts DESC LIMIT %s""", (symbol, limit))
         return cur.fetchall(), "60-minute (latest candle may be in progress)"
@@ -1169,9 +1213,18 @@ def run_scan(
         for row in scanned:
             if row["symbol"] in events:
                 row["active_breakout_event"] = events[row["symbol"]]
-        # Persist the complete deterministic evaluator output before filtering
-        # delivery candidates. This captures monitor/risk names too.
-        latest_market_dates = sorted({row.get("last_date") for row in scanned if row.get("last_date")})
+        # The canonical Daily as-of must come from the official price_data
+        # boundary, never from a benchmark/current-session row in scan output.
+        eod_pg = get_pg()
+        try:
+            eod_cur = eod_pg.cursor()
+            eod_cur.execute("SELECT MAX(date) FROM price_data WHERE market='TH'")
+            eod_row = eod_cur.fetchone()
+            eod_cur.close()
+        finally:
+            eod_pg.close()
+        official_eod_date = eod_row[0].isoformat() if eod_row and eod_row[0] else None
+        latest_market_dates = [official_eod_date] if official_eod_date else []
         pg = get_pg()
         try:
             snapshot = persist_daily_scan_snapshot(
