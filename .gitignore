@@ -5,6 +5,7 @@ settradeupdated.env
 *.log
 venv/
 .venv/
+.analysis-venv/
 # ephemeral runtime logs
 backend/intraday_*_log.jsonl
 backend/intraday_*_log.txt

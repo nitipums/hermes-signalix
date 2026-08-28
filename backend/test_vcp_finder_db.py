@@ -1,6 +1,12 @@
+from datetime import date, timedelta
 from unittest.mock import MagicMock
 
-from vcp_finder_db import _classify_types, find_vcp_universe_60m
+from vcp_finder_db import (
+    _classify_types,
+    _daily_context_from_rows,
+    _daily_metrics_from_rows,
+    find_vcp_universe_60m,
+)
 
 
 def test_type_classification_is_separate_and_deterministic():
@@ -62,3 +68,35 @@ def test_universe_keeps_missing_and_insufficient_symbols(monkeypatch):
     assert all(x["provenance"]["legacy_scanner_used"] is False for x in result["results"])
     assert all("vcp_type" in x for x in result["results"])
     assert all("type_policy_version" in x["vcp_type"] for x in result["results"])
+
+
+def test_daily_metrics_latest_close_is_newest_independent_of_input_order():
+    rows = [
+        {"date": date(2026, 8, 27), "close": 47.0, "volume": 10},
+        {"date": date(2026, 8, 25), "close": 45.5, "volume": 20},
+        {"date": date(2026, 8, 26), "close": 46.0, "volume": 30},
+    ]
+
+    out = _daily_metrics_from_rows([rows[1], rows[0], rows[2]])
+
+    assert out["latest_daily_close"] == 47.0
+    assert out["as_of"] == "2026-08-27"
+    assert out["avg_trade_value_20"] == (45.5 * 20 + 47.0 * 10 + 46.0 * 30) / 3
+    assert out["bars"] == 3
+
+
+def test_daily_context_is_chronological_independent_of_input_order():
+    start = date(2026, 6, 1)
+    rows = [
+        {"date": start + timedelta(days=i), "close": float(100 + i)}
+        for i in range(40)
+    ]
+
+    out = _daily_context_from_rows(rows[::2] + rows[1::2])
+
+    assert out["as_of"] == str(start + timedelta(days=39))
+    assert out["bars"] == 40
+    assert out["return_20d_pct"] == (139.0 / 119.0 - 1) * 100
+    assert out["recent_avg_20"] == sum(range(120, 140)) / 20
+    assert out["prior_avg_20"] == sum(range(100, 120)) / 20
+    assert out["trend_pass"] is True

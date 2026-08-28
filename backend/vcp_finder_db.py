@@ -79,6 +79,49 @@ def load_vcp_60m_rows(pg, symbols, lookback=400, as_of=None):
     return grouped
 
 
+def _daily_context_from_rows(rows):
+    ordered = sorted(rows or [], key=lambda row: row["date"])
+    values = [float(row["close"]) for row in ordered]
+    as_of = str(ordered[-1]["date"]) if ordered else None
+    if len(values) < 40:
+        return {
+            "trend_pass": False,
+            "status": "insufficient_history",
+            "bars": len(values),
+            "as_of": as_of,
+        }
+    recent = sum(values[-20:]) / 20
+    prior = sum(values[-40:-20]) / 20
+    ret = (values[-1] / values[-21] - 1) * 100 if values[-21] else 0.0
+    return {
+        "trend_pass": bool(values[-1] > recent and recent >= prior and ret > 0),
+        "return_20d_pct": ret,
+        "recent_avg_20": recent,
+        "prior_avg_20": prior,
+        "status": "available",
+        "bars": len(values),
+        "as_of": as_of,
+    }
+
+
+def _daily_metrics_from_rows(rows):
+    ordered = sorted(rows or [], key=lambda row: row["date"])[-20:]
+    if not ordered:
+        return {
+            "avg_trade_value_20": None,
+            "latest_daily_close": None,
+            "bars": 0,
+            "as_of": None,
+        }
+    values = [(float(row["close"]), float(row["volume"])) for row in ordered]
+    return {
+        "avg_trade_value_20": sum(close * volume for close, volume in values) / len(values),
+        "latest_daily_close": values[-1][0],
+        "bars": len(values),
+        "as_of": str(ordered[-1]["date"]),
+    }
+
+
 def load_daily_trend_context(pg, symbols, as_of=None, lookback=80):
     if not symbols:
         return {}
@@ -88,26 +131,17 @@ def load_daily_trend_context(pg, symbols, as_of=None, lookback=80):
                         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
                  FROM price_data
                  WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
-               ) x WHERE rn <= %s"""
+               ) x WHERE rn <= %s ORDER BY symbol, date ASC"""
     params = [symbols, int(lookback)]
     if as_of is not None:
         query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
         params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
     cur.execute(query, tuple(params))
     grouped = {s: [] for s in symbols}
-    for row in cur.fetchall(): grouped[row["symbol"]].append(float(row["close"]))
+    for row in cur.fetchall():
+        grouped[row["symbol"]].append(dict(row))
     cur.close()
-    contexts = {}
-    for symbol, values in grouped.items():
-        values.reverse()
-        if len(values) < 40:
-            contexts[symbol] = {"trend_pass": False, "status": "insufficient_history", "bars": len(values)}
-            continue
-        recent = sum(values[-20:]) / 20
-        prior = sum(values[-40:-20]) / 20
-        ret = (values[-1] / values[-21] - 1) * 100 if values[-21] else 0
-        contexts[symbol] = {"trend_pass": bool(values[-1] > recent and recent >= prior and ret > 0), "return_20d_pct": ret, "status": "available", "bars": len(values)}
-    return contexts
+    return {symbol: _daily_context_from_rows(rows) for symbol, rows in grouped.items()}
 
 
 def load_daily_metrics(pg, symbols, as_of=None, lookback=20):
@@ -119,16 +153,17 @@ def load_daily_metrics(pg, symbols, as_of=None, lookback=20):
                         ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
                  FROM price_data
                  WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
-               ) x WHERE rn <= %s"""
+               ) x WHERE rn <= %s ORDER BY symbol, date ASC"""
     params = [symbols, int(lookback)]
     if as_of is not None:
         query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
         params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
     cur.execute(query, tuple(params))
     grouped = {s: [] for s in symbols}
-    for row in cur.fetchall(): grouped[row["symbol"]].append((float(row["close"]), float(row["volume"])))
+    for row in cur.fetchall():
+        grouped[row["symbol"]].append(dict(row))
     cur.close()
-    return {s: {"avg_trade_value_20": sum(c * v for c, v in vals) / len(vals) if vals else None, "latest_daily_close": vals[-1][0] if vals else None, "bars": len(vals)} for s, vals in grouped.items()}
+    return {symbol: _daily_metrics_from_rows(rows) for symbol, rows in grouped.items()}
 
 
 def _presentation_fields(result):
