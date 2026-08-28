@@ -3,10 +3,12 @@ from datetime import datetime, timezone
 import run_vcp_replay_1m
 from run_vcp_replay_1m import (
     attach_replay_evaluation,
+    attach_sequence_v2_evaluation,
     build_replay_result,
     evaluate_trade,
     make_replay_id,
     pending_replay_points,
+    sequence_v2_trade_plan,
     trade_plan,
 )
 
@@ -100,9 +102,10 @@ def test_low_cheat_plan_is_active_from_detection():
 def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     captured = {}
 
-    def fake_find(frame, *, as_of, daily_context):
+    def fake_find(frame, *, as_of, daily_context, include_sequence_policy_shadow):
         captured["as_of"] = as_of
         captured["daily_context"] = daily_context
+        captured["include_sequence_policy_shadow"] = include_sequence_policy_shadow
         return {
             "state": "FORMING", "actionable": False,
             "data": {}, "price": {}, "breakout": {}, "pattern": {},
@@ -123,6 +126,7 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     assert captured == {
         "as_of": as_of,
         "daily_context": {"trend_pass": True, "as_of": "2026-08-26"},
+        "include_sequence_policy_shadow": True,
     }
     assert result["data"]["daily_metrics"]["avg_trade_value_20"] == 20_000_000
     assert result["provenance"]["replay_id"] == "replay-1"
@@ -130,6 +134,7 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     assert result["decision_shadow_v2"]["symbol"] == "AAA"
     assert result["marginable"] == {"is_marginable": True, "margin_rate_pct": 50}
     assert result["decision_shadow_v2"]["tradability"]["marginable_pass"] is True
+    assert "sequence_v2_trade_plan" in result
 
 
 def test_replay_id_prefix_is_explicit_and_isolated():
@@ -164,3 +169,67 @@ def test_attach_replay_evaluation_persists_descriptive_outcome():
 
     assert evaluation["outcome"] == "target_hit"
     assert result["replay_evaluation"] == evaluation
+
+
+def test_sequence_v2_trade_plan_uses_shadow_required_close_and_invalidation():
+    result = {
+        "sequence_policy_shadow_v2": {
+            "standard_entry_eligible": True,
+            "low_cheat_observed": False,
+            "breakout": {"required_close": 102.0},
+            "price": {"invalidation": 96.0},
+        }
+    }
+
+    plan = sequence_v2_trade_plan(result)
+
+    assert plan == {
+        "base_type": "standard_vcp",
+        "entry_profile": "standard_entry",
+        "entry": 102.0,
+        "stop": 96.0,
+        "target": 120.0,
+        "rr_multiple": 3.0,
+        "sequence_policy_version": "signalix/vcp-sequence-policy-shadow-v2",
+    }
+
+
+def test_sequence_v2_trade_plan_rejects_incomplete_morphology():
+    result = {
+        "sequence_policy_shadow_v2": {
+            "standard_entry_eligible": False,
+            "breakout": {"required_close": 102.0},
+            "price": {"invalidation": 96.0},
+        }
+    }
+    assert sequence_v2_trade_plan(result) is None
+
+
+def test_low_cheat_observation_never_creates_early_entry_plan():
+    result = {
+        "sequence_policy_shadow_v2": {
+            "policy_version": "signalix/vcp-sequence-policy-shadow-v2",
+            "standard_entry_eligible": True,
+            "low_cheat_observed": True,
+            "breakout": {"required_close": 102.0},
+            "price": {"last_close": 100.0, "invalidation": 96.0},
+        }
+    }
+    plan = sequence_v2_trade_plan(result)
+    assert plan["base_type"] == "standard_vcp"
+    assert plan["entry"] == 102.0
+
+
+def test_attach_sequence_v2_evaluation_uses_separate_namespace():
+    result = {
+        "sequence_v2_trade_plan": {
+            "base_type": "standard_vcp", "entry": 100.0,
+            "stop": 95.0, "target": 115.0,
+        }
+    }
+    evaluation = attach_sequence_v2_evaluation(
+        result, [{"ts": "next", "high": 116.0, "low": 100.0}],
+    )
+    assert evaluation["outcome"] == "target_hit"
+    assert result["sequence_v2_replay_evaluation"] == evaluation
+    assert "replay_evaluation" not in result

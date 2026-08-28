@@ -91,6 +91,27 @@ def trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
     }
 
 
+def sequence_v2_trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
+    """Build standard breakout plan from latest-sequence shadow only."""
+    shadow = result.get("sequence_policy_shadow_v2") or {}
+    if not shadow.get("standard_entry_eligible"):
+        return None
+    entry = (shadow.get("breakout") or {}).get("required_close")
+    stop = (shadow.get("price") or {}).get("invalidation")
+    if entry is None or stop is None or float(entry) <= float(stop):
+        return None
+    risk = float(entry) - float(stop)
+    return {
+        "base_type": "standard_vcp",
+        "entry_profile": "standard_entry",
+        "entry": float(entry),
+        "stop": float(stop),
+        "target": float(entry) + float(rr_multiple) * risk,
+        "rr_multiple": float(rr_multiple),
+        "sequence_policy_version": "signalix/vcp-sequence-policy-shadow-v2",
+    }
+
+
 def build_replay_result(symbol, rows, *, as_of, replay_id,
                         daily_context=None, daily_metrics=None,
                         marginable_record=None,
@@ -99,6 +120,7 @@ def build_replay_result(symbol, rows, *, as_of, replay_id,
     result = find_vcp_60m(
         pd.DataFrame(rows), as_of=as_of,
         daily_context=daily_context or {},
+        include_sequence_policy_shadow=True,
     )
     result["symbol"] = symbol
     result.setdefault("data", {})["daily_metrics"] = daily_metrics or {}
@@ -110,6 +132,8 @@ def build_replay_result(symbol, rows, *, as_of, replay_id,
     result.setdefault("provenance", {})["replay_id"] = replay_id
     result["provenance"]["replay_as_of"] = as_of.isoformat()
     result["replay_trade_plan"] = trade_plan(result, rr_multiple=rr_multiple)
+    result["sequence_v2_trade_plan"] = sequence_v2_trade_plan(
+        result, rr_multiple=rr_multiple)
     result["decision_shadow_v2"] = project_vcp_decision_shadow(result)
     return result
 
@@ -176,6 +200,16 @@ def attach_replay_evaluation(result, plan, future_rows):
     return evaluation
 
 
+def attach_sequence_v2_evaluation(result, future_rows):
+    plan = result.get("sequence_v2_trade_plan")
+    if not plan:
+        result["sequence_v2_replay_evaluation"] = None
+        return None
+    evaluation = evaluate_trade(plan, future_rows)
+    result["sequence_v2_replay_evaluation"] = evaluation
+    return evaluation
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=int, default=30)
@@ -239,7 +273,9 @@ def main():
         }
         previous = {}
         first_events = {}
+        first_sequence_v2_events = {}
         outcome_counts = defaultdict(int)
+        sequence_v2_outcome_counts = defaultdict(int)
         for idx, as_of, replay_id in pending_points:
             results = []
             daily_contexts = load_daily_trend_context(pg, symbols, as_of=as_of)
@@ -263,6 +299,16 @@ def main():
                     event = {"symbol": symbol, "detected_at": as_of.isoformat(), **plan, **(evaluation or {})}
                     first_events[(symbol, plan["base_type"])] = event
                     outcome_counts[(plan["base_type"], event.get("outcome"))] += 1
+                sequence_plan = result["sequence_v2_trade_plan"]
+                if sequence_plan and symbol not in first_sequence_v2_events:
+                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
+                    evaluation = attach_sequence_v2_evaluation(result, future)
+                    event = {
+                        "symbol": symbol, "detected_at": as_of.isoformat(),
+                        **sequence_plan, **(evaluation or {}),
+                    }
+                    first_sequence_v2_events[symbol] = event
+                    sequence_v2_outcome_counts[event.get("outcome")] += 1
                 results.append(result)
             cur.execute("INSERT INTO vcp_finder_60m_replay_runs (replay_id,window_start,window_end,as_of,policy_version,eligible_count,evaluated_count) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (replay_id) DO NOTHING", (replay_id, start, end, as_of, POLICY_VERSION, len(symbols), len(results)))
             psycopg2.extras.execute_values(cur, "INSERT INTO vcp_finder_60m_replay_results (replay_id,symbol,state,actionable,result) VALUES %s ON CONFLICT (replay_id,symbol) DO NOTHING", [(replay_id, r["symbol"], r["state"], bool(r["actionable"]), json.dumps(r, default=str)) for r in results])
@@ -282,6 +328,8 @@ def main():
         summary["target_rr"] = args.rr
         summary["first_events"] = list(first_events.values())
         summary["outcomes"] = {f"{kind}:{outcome}": count for (kind, outcome), count in outcome_counts.items()}
+        summary["sequence_v2_first_events"] = list(first_sequence_v2_events.values())
+        summary["sequence_v2_outcomes"] = dict(sequence_v2_outcome_counts)
         print(json.dumps(summary, default=str))
     finally:
         pg.close()
