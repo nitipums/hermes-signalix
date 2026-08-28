@@ -148,7 +148,7 @@ def _fmt_screen(result: dict) -> str:
     lines.append(f"📊 Trade Readiness: {readiness}")
     if DASHBOARD_PUBLIC_URL:
         lines.append("")
-        lines.append(f"🔗 Dashboard: {DASHBOARD_PUBLIC_URL}/dashboard.html#{sym}")
+        lines.append(f"🔗 Dashboard: {DASHBOARD_PUBLIC_URL}/mvp#{sym}")
         lines.append(f"⚙️ จัดการ Watchlist: {DASHBOARD_PUBLIC_URL}/portal")
     return "\n".join(lines)
 

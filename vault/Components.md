@@ -44,12 +44,12 @@ weekday cycle; the scraper is not a signal/price source.
 Original pandas scanner (pre-DB rewrite). Kept for reference; `screening.py` is
 the live engine. Imports `scan_universe` must stay at module top in `app.py`.
 
-## `build_dashboard.py` — dashboard HTML
-Professional, **English-only**, dark-theme screening workspace. Reads
-`scan_results.json`, emits `dashboard.html` with per-stock cards + clickable
-chart lightbox (canvas, no chart images). Charts fetched from `/chart/{sym}`.
+## `build_dashboard.py` — compatibility snapshot builder
+Builds compatibility snapshots/manifest data for the pipeline. The former
+public `dashboard.html` artifact and route are retired; the owner-facing UI is
+served from `/mvp` and charts are fetched through the MVP API.
 
-Intraday-only runs rebuild this artifact from the existing Daily scan after 60m
+Intraday-only runs refresh the MVP snapshot from the existing Daily scan after 60m
 upsert/evaluation; they do not rerun Daily classification. The active feed is
 filtered by `intraday_feed_status`: after three consecutive Settrade empty/fail
 responses a symbol is `unavailable` for a 24-hour cooldown. This filter is
@@ -69,10 +69,11 @@ Explorer Stage/Search filters reload immediately; there is no Apply step.
 frontend renders candlestick OHLC, volume, MA, and RSI; timeframe/layer controls
 and indicator values sit below the chart plot.
 
-## `dashboard_server.py` — static server (separate dashboard service)
-Serves `/dashboard.html` on :3001 from the bind-mounted `/root/signalix/backend`
-directory. Runtime container is `signalix_dashboard`; it is separate from the
-FastAPI `signalix_backend` service. Verify served artifact freshness against the
+## `mvp_server.py` — MVP static server (separate dashboard service)
+Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
+directory. The former `/dashboard.html` route returns 404. Runtime container is
+`signalix_dashboard`; it is separate from the FastAPI `signalix_backend` service.
+Verify served source and API freshness against the
 latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 
 ## `app.py` — FastAPI backend

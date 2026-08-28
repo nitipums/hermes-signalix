@@ -27,11 +27,10 @@ Multi-tenant routing so Signalix can serve many subscribers, not one hardcoded c
   `TIER_ALERT_CAP = {free:10, paid:200, owner:None}`. A Redis counter
   `alerts:{chat_id}:{YYYY-MM-DD}` increments per push; over-cap alerts are skipped
   (logged). Counter TTL 2 days.
-- **Frontend glue (2026-08-12)**: portal ↔ dashboard now connected. `portal.html` links
-  to `/dashboard.html`; alerts carry both a Dashboard deep-link and a `/portal`
+- **Frontend glue (2026-08-12; retired route updated 2026-08-28)**: portal ↔ MVP now connected. Alerts carry an `/mvp` deep-link and a `/portal`
   manage link. `build_dashboard.py` injects JS that, when loaded with `?chat=ID`,
   fetches `/me` and syncs the watchlist from the backend (instead of localStorage
-  only) — so portal selections appear in the dashboard Watchlist tab.
+  only) — so portal selections appear in the MVP Watchlist tab.
 
 ## Phase 3 — LLM summarization (DONE)
 LLM summarizes ONLY — never computes Trend Template / RS / position size. The

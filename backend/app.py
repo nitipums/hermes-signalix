@@ -381,7 +381,7 @@ def build_and_push_summary(cands, near, scan_time, scanned, run_id=None):
     except Exception as e:
         print(f"  ! dashboard build failed: {repr(e)[:120]}")
         vcp_n = sum(1 for c in cands if c.get("vcp", {}).get("is_vcp"))
-    url = DASHBOARD_PUBLIC_URL.rstrip("/") + "/dashboard.html" if DASHBOARD_PUBLIC_URL else ""
+    url = DASHBOARD_PUBLIC_URL.rstrip("/") + "/mvp" if DASHBOARD_PUBLIC_URL else ""
     top = sorted(cands, key=lambda c: c["trend_template"]["rs_rating"], reverse=True)[:8]
     lines = [f"📊 *Signalix Scan* — {scan_time[:19].replace('T',' ')} UTC",
              f"✅ ผ่าน Trend Template 8/8: *{len(cands)}* หุ้น  |  🔺 VCP: *{vcp_n}*  |  Near-miss 6/8: {len(near)}",

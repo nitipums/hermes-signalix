@@ -55,9 +55,9 @@ logs in the non-TTY container).
 - `backend/screening.py` — DB-backed Minervini engine
 - `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion; `intraday_feed_status` tracks per-symbol Settrade 60m availability without changing Daily eligibility
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence
-- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → `build_dashboard.build()` from existing Daily scan → `dashboard_snapshot.json`/`dashboard.html` → served `:3001`
+- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
-- `backend/build_dashboard.py` — legacy dashboard artifact builder; not the MVP entrypoint
+- `backend/build_dashboard.py` — compatibility snapshot builder; it no longer writes a public dashboard artifact and is not the MVP entrypoint
 - `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher
 - `backend/mvp_snapshot.py` — canonical `signalix.mvp.v1` artifact loader/sanitizer
 - `backend/mvp_api.py` — Daily Shortlist, watch-only mover/caution lanes, Explorer projection
@@ -75,7 +75,7 @@ The owner-only MVP is VCP-first:
   └─ All VCP · 60m       full VCP universe / forming / audit view
 ```
 
-Daily Shortlist and the former All Stocks Explorer are removed from visible MVP navigation; their backend/API and historical evidence remain preserved for rollback/audit. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
+The former `/dashboard.html` surface is retired (HTTP 404). `/mvp` is the only public MVP entrypoint; its Daily VCP Watchlist is the fast review surface and All VCP · 60m is the full-universe/audit view. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
 
 VCP runs after committed full/partial 60m ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Missing optional index/margin metadata is omitted from tags; it is never displayed as `NOT_VERIFIED`.
 

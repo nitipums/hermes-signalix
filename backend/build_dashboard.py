@@ -25,7 +25,9 @@ MARKET_SESSION_TIMEZONE = "Asia/Bangkok"
 MARKET_SESSION_SOURCE = "set_market_day_guard"
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCAN_JSON = os.path.join(HERE, "scan_results.json")
-OUT_HTML = os.path.join(HERE, "dashboard.html")
+# Retired public artifact. Keep the builder's projection work for snapshot
+# compatibility, but never write or advertise the former dashboard.html page.
+OUT_HTML = None
 SNAPSHOT_JSON = os.path.join(HERE, "dashboard_snapshot.json")
 GROUPS = (
     ("breakout_new", "เบรกใหม่", "opportunity", "positive", "Daily breakout cycle ยังทำงานอยู่; ดู stage และรอ 1H confirmation"),
@@ -1444,10 +1446,9 @@ def build(scanned=None, run_id=None):
                                                         "data_freshness_source": freshness.get("source"),
                                                         "market_session": freshness.get("market_session", {}),
                                                         "market_regime": market_regime}, separators=(",", ":"), default=_json_default)))
-    atomic_write_text(OUT_HTML, page)
     write_artifact_manifest(os.path.join(HERE, "artifact_manifest.json"), run_id, os.path.join(HERE, "mvp_snapshot.json"))
     return {"securities": len(items), "shortlist": len(shortlist_items),
-            "groups": counts, "out": OUT_HTML}
+            "groups": counts, "out": "/mvp"}
 
 if __name__ == "__main__":
     print(build())

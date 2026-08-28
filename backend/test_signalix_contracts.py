@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 
 BASE = "http://127.0.0.1:8000"
-DASH = "http://127.0.0.1:3001/dashboard.html?contract-test=1"
+MVP = "http://127.0.0.1:3001/mvp?contract-test=1"
 
 
 def get(url):
@@ -50,13 +50,18 @@ def main():
     else:
         raise AssertionError("15m chart unexpectedly accepted")
 
-    status, body = get(DASH)
+    try:
+        get("http://127.0.0.1:3001/dashboard.html?contract-test=retired")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404, exc.code
+    else:
+        raise AssertionError("retired dashboard.html unexpectedly served")
+
+    status, body = get(MVP)
     html = body.decode("utf-8")
     assert status == 200
-    for marker in ("company-name", "decision-banner", "modal-subtitle", "title-link", "Last Scanned:", "lastFetched:", "Setup quality", "Risk", "Trigger", "VOL", "data-timeframe=\"1D\"", "loadChart:\"Loading chart", "Try again"):
+    for marker in ("Daily VCP Watchlist", "All VCP · 60m", "id=\"daily-vcp-cards\"", "app.js"):
         assert marker in html, marker
-    for removed in ("Market session:", "last valid:", "Evidence provenance", "Canonical event"):
-        assert removed not in html, removed
     print({"health": health, "items": len(snap["items"]), "dashboard_bytes": len(body), "contracts": "ok"})
 
 
