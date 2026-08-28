@@ -71,6 +71,79 @@ def summarize_shadow(records):
     }
 
 
+def summarize_sequence_ab(records):
+    rows = list(records or [])
+    shadow_present = 0
+    pivot_comparable = 0
+    pivot_divergence = 0
+    state_divergence = 0
+    v1_plans = 0
+    v2_plans = 0
+    v1_outcomes = Counter()
+    v2_outcomes = Counter()
+    v1_pre_entry = []
+    v2_pre_entry = []
+    low_cheat_observed = 0
+    low_cheat_violations = 0
+    for row in rows:
+        shadow = row.get("sequence_policy_shadow_v2") or {}
+        if not shadow:
+            continue
+        shadow_present += 1
+        if shadow.get("low_cheat_observed"):
+            low_cheat_observed += 1
+        v1_pivot = (row.get("price") or {}).get("pivot_high")
+        v2_pivot = (shadow.get("price") or {}).get("pivot_high")
+        if v1_pivot is not None and v2_pivot is not None:
+            pivot_comparable += 1
+            if float(v1_pivot) != float(v2_pivot):
+                pivot_divergence += 1
+        if row.get("state") != shadow.get("state"):
+            state_divergence += 1
+        v1_plan = row.get("replay_trade_plan")
+        v2_plan = row.get("sequence_v2_trade_plan")
+        if v1_plan:
+            v1_plans += 1
+        if v2_plan:
+            v2_plans += 1
+            if (v2_plan.get("base_type") == "low_cheat_vcp"
+                    or v2_plan.get("entry_profile") == "early_entry"):
+                low_cheat_violations += 1
+        v1_eval = row.get("replay_evaluation") or {}
+        v2_eval = row.get("sequence_v2_replay_evaluation") or {}
+        if v1_eval.get("outcome"):
+            v1_outcomes[v1_eval["outcome"]] += 1
+        if v2_eval.get("outcome"):
+            v2_outcomes[v2_eval["outcome"]] += 1
+        if v1_eval.get("pre_entry_bars") is not None:
+            v1_pre_entry.append(float(v1_eval["pre_entry_bars"]))
+        if v2_eval.get("pre_entry_bars") is not None:
+            v2_pre_entry.append(float(v2_eval["pre_entry_bars"]))
+
+    def stats(values):
+        return {
+            "count": len(values),
+            "average": (sum(values) / len(values)) if values else None,
+        }
+
+    return {
+        "records": len(rows),
+        "shadow_present": shadow_present,
+        "missing_shadow": len(rows) - shadow_present,
+        "pivot_comparable": pivot_comparable,
+        "pivot_divergence": pivot_divergence,
+        "state_divergence": state_divergence,
+        "v1_plan_count": v1_plans,
+        "sequence_v2_plan_count": v2_plans,
+        "v1_outcomes": dict(v1_outcomes),
+        "sequence_v2_outcomes": dict(v2_outcomes),
+        "v1_pre_entry_bars": stats(v1_pre_entry),
+        "sequence_v2_pre_entry_bars": stats(v2_pre_entry),
+        "low_cheat_observed": low_cheat_observed,
+        "low_cheat_promotion_violations": low_cheat_violations,
+    }
+
+
 def _pg_args():
     return {
         "host": os.getenv("POSTGRES_HOST", "127.0.0.1"),
@@ -95,7 +168,9 @@ def main():
                ORDER BY replay_id, symbol""",
             (args.replay_prefix + "%",),
         )
-        summary = summarize_shadow([row["result"] for row in cur.fetchall()])
+        records = [row["result"] for row in cur.fetchall()]
+        summary = summarize_shadow(records)
+        summary["sequence_ab"] = summarize_sequence_ab(records)
         summary["replay_prefix"] = args.replay_prefix
         print(json.dumps(summary, sort_keys=True, default=str))
     finally:

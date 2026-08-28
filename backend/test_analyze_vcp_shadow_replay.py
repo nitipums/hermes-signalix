@@ -1,4 +1,4 @@
-from analyze_vcp_shadow_replay import summarize_shadow
+from analyze_vcp_shadow_replay import summarize_sequence_ab, summarize_shadow
 
 
 def record(symbol, state, lane, actionability, *, tradable=True, failing=None, outcome=None):
@@ -66,3 +66,58 @@ def test_summarize_shadow_detects_lane_actionability_contradictions():
         "event_watch_actionable": 1,
         "data_blocked_actionable": 1,
     }
+
+
+def test_summarize_sequence_ab_counts_divergence_and_outcomes():
+    records = [
+        {
+            "symbol": "AAA", "state": "READY",
+            "price": {"pivot_high": 10.0, "invalidation": 9.0},
+            "replay_trade_plan": {"base_type": "standard_vcp"},
+            "replay_evaluation": {"outcome": "target_hit", "entry_activated": True, "pre_entry_bars": 2},
+            "sequence_policy_shadow_v2": {
+                "state": "CONFIRMED", "low_cheat_observed": False,
+                "price": {"pivot_high": 11.0, "invalidation": 9.5},
+            },
+            "sequence_v2_trade_plan": {"base_type": "standard_vcp", "entry_profile": "standard_entry"},
+            "sequence_v2_replay_evaluation": {"outcome": "stop_hit", "entry_activated": True, "pre_entry_bars": 1},
+        },
+        {
+            "symbol": "BBB", "state": "FORMING",
+            "price": {"pivot_high": 20.0, "invalidation": 18.0},
+            "replay_trade_plan": None,
+            "sequence_policy_shadow_v2": {
+                "state": "FORMING", "low_cheat_observed": True,
+                "price": {"pivot_high": 20.0, "invalidation": 18.0},
+            },
+            "sequence_v2_trade_plan": None,
+        },
+        {"symbol": "CCC", "state": "NOT_VERIFIED"},
+    ]
+
+    out = summarize_sequence_ab(records)
+
+    assert out["records"] == 3
+    assert out["shadow_present"] == 2
+    assert out["missing_shadow"] == 1
+    assert out["pivot_comparable"] == 2
+    assert out["pivot_divergence"] == 1
+    assert out["state_divergence"] == 1
+    assert out["v1_plan_count"] == 1
+    assert out["sequence_v2_plan_count"] == 1
+    assert out["v1_outcomes"] == {"target_hit": 1}
+    assert out["sequence_v2_outcomes"] == {"stop_hit": 1}
+    assert out["low_cheat_observed"] == 1
+    assert out["low_cheat_promotion_violations"] == 0
+    assert out["v1_pre_entry_bars"] == {"count": 1, "average": 2.0}
+    assert out["sequence_v2_pre_entry_bars"] == {"count": 1, "average": 1.0}
+
+
+def test_summarize_sequence_ab_flags_low_cheat_plan_violation():
+    records = [{
+        "sequence_policy_shadow_v2": {"state": "READY", "price": {}},
+        "sequence_v2_trade_plan": {
+            "base_type": "low_cheat_vcp", "entry_profile": "early_entry",
+        },
+    }]
+    assert summarize_sequence_ab(records)["low_cheat_promotion_violations"] == 1
