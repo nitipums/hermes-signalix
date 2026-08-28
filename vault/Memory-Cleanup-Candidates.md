@@ -2,11 +2,11 @@
 
 > **STATUS: CURRENT**
 > This note records cleanup already completed and remaining candidates only.
-> Last reviewed: 2026-08-28.
+> Last reviewed: 2026-08-28 (vault 10 handoffs archived; fact_store 178(dup of 175)+96(DUP)+49+98(superseded) removed — now 132 facts; huggingface cache deleted).
 
 ## Keep / current candidates
 
-- VCP MVP/current surfaces: facts 175, 178, 180.
+- VCP MVP/current surfaces: facts 175, 180.
 - VCP type candidate taxonomy: fact 181.
 - Database scope/cleanup: fact 182.
 - Stable SET50/SET100 sync: fact 183.
