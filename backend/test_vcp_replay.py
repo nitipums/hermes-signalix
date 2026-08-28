@@ -118,3 +118,5 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     }
     assert result["data"]["daily_metrics"]["avg_trade_value_20"] == 20_000_000
     assert result["provenance"]["replay_id"] == "replay-1"
+    assert result["decision_shadow_v2"]["policy_version"] == "signalix/vcp-decision-shadow-v2"
+    assert result["decision_shadow_v2"]["symbol"] == "AAA"

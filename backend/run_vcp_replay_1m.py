@@ -16,6 +16,7 @@ import psycopg2
 import psycopg2.extras
 
 from instruments import active_ord_symbols
+from vcp_decision_policy import project_vcp_decision_shadow
 from vcp_finder import POLICY_VERSION, find_vcp_60m
 from vcp_finder_db import _classify_types, load_daily_metrics, load_daily_trend_context
 
@@ -90,6 +91,7 @@ def build_replay_result(symbol, rows, *, as_of, replay_id,
     result.setdefault("provenance", {})["replay_id"] = replay_id
     result["provenance"]["replay_as_of"] = as_of.isoformat()
     result["replay_trade_plan"] = trade_plan(result, rr_multiple=rr_multiple)
+    result["decision_shadow_v2"] = project_vcp_decision_shadow(result)
     return result
 
 
