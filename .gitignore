@@ -22,3 +22,4 @@ backend/scan_results.json
 backend/artifact_manifest.json
 # Release worktree/plan metadata
 .superpowers/sdd/
+.worktrees/
