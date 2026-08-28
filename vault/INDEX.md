@@ -41,6 +41,7 @@
 | `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `e5c7139`; old Daily/Explorer contract superseded** |
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
+| `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
