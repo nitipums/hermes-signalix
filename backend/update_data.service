@@ -20,7 +20,7 @@
 #   journalctl -u signalix-update.service -n 100 --no-pager
 #
 # CRONTAB EQUIVALENT (root crontab -e) — weekdays 18:30 Asia/Bangkok:
-#   30 18 * * 1-5 cd /root/signalix && set -a && . ./settradeupdated.env && set +a && cd backend && POSTGRES_HOST=127.0.0.1 /root/.venv_img/bin/python update_data.py --source settrade --scan >> /root/signalix/update_log.txt 2>&1
+#   30 18 * * 1-5 cd /root/signalix && set -a && . ./settradeupdated.env && set +a && cd backend && POSTGRES_HOST=127.0.0.1 /root/.venv_img/bin/python update_data.py --source settrade --scan >> /var/log/signalix/update.log 2>&1
 
 [Unit]
 Description=Signalix incremental SET EOD data update
@@ -39,8 +39,9 @@ EnvironmentFile=/root/signalix/settradeupdated.env
 Environment=SETTRADE_DAILY_WORKERS=30
 ExecStart=/root/.venv_img/bin/python /root/signalix/backend/update_data.py --source settrade --scan --flush-batch 100
 ExecStartPost=/root/.venv_img/bin/python /root/signalix/backend/verify_mvp_only.py
-StandardOutput=append:/root/signalix/update_log.txt
-StandardError=append:/root/signalix/update_log.txt
+StandardOutput=append:/var/log/signalix/update.log
+StandardError=append:/var/log/signalix/update.log
+LogsDirectory=signalix
 TimeoutStartSec=3600
 
 [Install]

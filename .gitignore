@@ -7,6 +7,9 @@ venv/
 .venv/
 .analysis-venv/
 # ephemeral runtime logs
+eod_healthcheck_log.jsonl
+eod_healthcheck_observations.json
+update_log.txt
 backend/intraday_*_log.jsonl
 backend/intraday_*_log.txt
 backend/intraday_update_log.txt

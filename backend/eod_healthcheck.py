@@ -17,7 +17,7 @@ from set_market_day_guard import SET_CLOSED_DATES
 UTC = dt.timezone.utc
 BANGKOK = ZoneInfo("Asia/Bangkok")
 DEFAULT_SERVICE = "signalix-update.service"
-DEFAULT_STATE_FILE = "/root/signalix/eod_healthcheck_observations.json"
+DEFAULT_STATE_FILE = "/var/lib/signalix/eod_healthcheck_observations.json"
 
 
 def as_utc(value):
@@ -99,7 +99,7 @@ def evaluate_health(service_state, eod_date, scan_date, expected_date, now=None)
 
 
 def render_payload(alerts, expected_date, eod_date, scan_date, now=None,
-                   service=DEFAULT_SERVICE):
+                   service=DEFAULT_SERVICE, coverage=None):
     now = as_utc(now or dt.datetime.now(UTC))
     payload = {
         "level": "ALERT" if alerts else "HEALTHY",
@@ -111,6 +111,9 @@ def render_payload(alerts, expected_date, eod_date, scan_date, now=None,
         "scan_latest_date": scan_date.isoformat() if scan_date else None,
         "alerts": alerts,
     }
+    if coverage is not None:
+        payload["coverage"] = coverage
+        payload["data_completeness"] = coverage.get("status", "NOT_VERIFIED")
     return json.dumps(payload, sort_keys=True)
 
 
@@ -132,19 +135,68 @@ def get_pg():
     )
 
 
-def read_freshness(pg):
+def read_freshness(pg, expected_date=None):
+    """Read date freshness and classify every active Thai ORD symbol.
+
+    Process freshness and data completeness are intentionally separate: an EOD
+    run can be current while illiquid, unavailable, or newly listed symbols have
+    stale/no history. The coverage object makes that boundary explicit.
+    """
     cur = pg.cursor()
     try:
         cur.execute("SELECT MAX(date) FROM price_data")
         eod_date = cur.fetchone()[0]
-        cur.execute("""SELECT scan_date FROM daily_scan_runs
+        cur.execute("""SELECT scan_date, evaluated_symbol_count FROM daily_scan_runs
                        WHERE scanner_version='signalix/daily-state-v2'
                          AND source_lineage->>'source'='price_data'
                          AND COALESCE(source_lineage->>'mode','') <> 'historical_backfill'
                        ORDER BY scan_date DESC, run_timestamp DESC, id DESC LIMIT 1""")
         row = cur.fetchone()
         scan_date = row[0] if row else None
-        return eod_date, scan_date
+        scan_evaluated = row[1] if row else None
+        boundary = expected_date or eod_date
+        if boundary is None:
+            coverage = {
+                "active_ord": 0,
+                "current_session": 0,
+                "stale_history": 0,
+                "no_history": 0,
+                "future_session": 0,
+                "scan_evaluated": scan_evaluated,
+                "status": "NOT_VERIFIED",
+            }
+            return eod_date, scan_date, coverage
+        cur.execute("""
+            WITH active AS (
+                SELECT symbol
+                FROM symbol_master
+                WHERE status='active' AND instrument_type='ORD'
+            ), latest AS (
+                SELECT active.symbol, MAX(price_data.date) AS latest_date
+                FROM active
+                LEFT JOIN price_data
+                  ON price_data.symbol=active.symbol AND price_data.market='TH'
+                GROUP BY active.symbol
+            )
+            SELECT
+                COUNT(*),
+                COUNT(*) FILTER (WHERE latest_date=%s),
+                COUNT(*) FILTER (WHERE latest_date<%s),
+                COUNT(*) FILTER (WHERE latest_date IS NULL),
+                COUNT(*) FILTER (WHERE latest_date>%s)
+            FROM latest
+        """, (boundary, boundary, boundary))
+        active_ord, current_session, stale_history, no_history, future_session = cur.fetchone()
+        coverage = {
+            "active_ord": active_ord,
+            "current_session": current_session,
+            "stale_history": stale_history,
+            "no_history": no_history,
+            "future_session": future_session,
+            "scan_evaluated": scan_evaluated,
+            "status": "COMPLETE" if current_session == active_ord else "PARTIAL",
+        }
+        return eod_date, scan_date, coverage
     finally:
         cur.close()
 
@@ -180,11 +232,13 @@ def main(argv=None):
         service_state = read_service_state(args.service)
         pg = get_pg()
         try:
-            eod_date, scan_date = read_freshness(pg)
+            eod_date, scan_date, coverage = read_freshness(pg, expected)
         finally:
             pg.close()
         alerts = evaluate_health(service_state, eod_date, scan_date, expected, now)
-        payload = render_payload(alerts, expected, eod_date, scan_date, now, args.service)
+        payload = render_payload(
+            alerts, expected, eod_date, scan_date, now, args.service, coverage
+        )
         print(payload, flush=True)
         write_observation(payload, args.observation_file)
         return 1 if alerts else 0

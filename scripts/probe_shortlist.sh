@@ -1,38 +1,126 @@
 #!/usr/bin/env bash
-# scripts/probe_shortlist.sh — standard probe for Signalix live projection
+# Canonical live probe for Signalix owner MVP.
 # Usage: ./scripts/probe_shortlist.sh [output_dir]
-# Output: sl8000.json, slcompact.json, dashboard.html + grep report
-# Exit 0 = probe ok, 1 = stale wording found, 2 = endpoint unreachable
+# Exit 0 = all gates pass; 1 = contract/retirement/failure-state gate failed; 2 = endpoint unreachable.
 set -euo pipefail
+
 OUTDIR="${1:-.}"
+BACKEND_URL="${SIGNALIX_BACKEND_URL:-http://127.0.0.1:8000}"
+DASHBOARD_URL="${SIGNALIX_DASHBOARD_URL:-http://127.0.0.1:3001}"
 mkdir -p "$OUTDIR"
-echo "== probe :8000/dashboard/shortlist =="
-if ! curl -sf http://127.0.0.1:8000/dashboard/shortlist -o "$OUTDIR/sl8000.json" --max-time 10; then
-  echo "FAIL: :8000/dashboard/shortlist unreachable" >&2
-  exit 2
+
+fetch_code() {
+  local url="$1"
+  local output="$2"
+  curl -sS --max-time 30 -o "$output" -w '%{http_code}' "$url"
+}
+
+require_code() {
+  local label="$1"
+  local expected="$2"
+  local actual="$3"
+  if [[ "$actual" != "$expected" ]]; then
+    printf 'FAIL: %s expected HTTP %s, got %s\n' "$label" "$expected" "$actual" >&2
+    exit 2
+  fi
+}
+
+echo "== readiness =="
+code=$(fetch_code "$BACKEND_URL/health/readiness" "$OUTDIR/readiness.json")
+require_code "backend readiness" 200 "$code"
+
+echo "== canonical VCP finder + Daily VCP Watchlist =="
+code=$(fetch_code "$DASHBOARD_URL/api/vcp-finder?daily_watchlist=true" "$OUTDIR/vcp.json")
+require_code "VCP finder" 200 "$code"
+
+echo "== served MVP =="
+code=$(fetch_code "$DASHBOARD_URL/mvp" "$OUTDIR/mvp.html")
+require_code "MVP" 200 "$code"
+if ! grep -qi "Signalix" "$OUTDIR/mvp.html"; then
+  echo "FAIL: served MVP does not contain Signalix marker" >&2
+  exit 1
 fi
-echo "== probe :8000/dashboard/shortlist/compact =="
-curl -sf http://127.0.0.1:8000/dashboard/shortlist/compact -o "$OUTDIR/slcompact.json" --max-time 10 || echo "WARN: compact unreachable"
-echo "== probe :3001/dashboard.html =="
-curl -sf http://127.0.0.1:3001/dashboard.html -o "$OUTDIR/dashboard.html" --max-time 10 || echo "WARN: :3001 unreachable"
-echo "== check stale wording =="
-if grep -q "Trigger confirmed" "$OUTDIR/sl8000.json" 2>/dev/null; then
-  echo "STALE: 'Trigger confirmed' found in sl8000.json — REVISE stale_runtime"
-  grep -o '"why_now":"[^"]*Trigger confirmed[^"]*"' "$OUTDIR/sl8000.json" | head -5 || true
-  STALE=1
-else
-  echo "OK: no 'Trigger confirmed' in sl8000.json"
-  STALE=0
+
+echo "== retired dashboard route =="
+code=$(fetch_code "$DASHBOARD_URL/dashboard.html" "$OUTDIR/retired_dashboard_response.txt")
+if [[ "$code" != "404" ]]; then
+  echo "FAIL: dashboard.html must return 404, got $code" >&2
+  exit 1
 fi
-if grep -q "quality pass" "$OUTDIR/sl8000.json" 2>/dev/null; then
-  echo "STALE: 'quality pass' found — REVISE"
-  STALE=1
-else
-  echo "OK: no 'quality pass'"
+
+echo "== explicit missing-symbol state =="
+code=$(fetch_code "$DASHBOARD_URL/api/symbol/___SIGNALIX_PROBE_MISSING___" "$OUTDIR/missing_symbol.json")
+if [[ "$code" != "404" ]]; then
+  echo "FAIL: missing symbol must return 404, got $code" >&2
+  exit 1
 fi
-echo "== summary =="
-READY=$(python3 -c "import json; d=json.load(open('$OUTDIR/sl8000.json')); print(sum(1 for x in d.get('items',[]) if x.get('state')=='READY'))" 2>/dev/null || echo "?")
-echo "READY count: $READY"
-echo "Artifacts: $OUTDIR/sl8000.json $OUTDIR/slcompact.json $OUTDIR/dashboard.html"
-if [ "$STALE" = "1" ]; then exit 1; fi
-exit 0
+
+python3 - "$OUTDIR" <<'PY'
+import collections
+import json
+import sys
+from pathlib import Path
+
+out = Path(sys.argv[1])
+readiness = json.loads((out / "readiness.json").read_text(encoding="utf-8"))
+if readiness.get("status") != "ok":
+    raise SystemExit(f"FAIL: readiness status is {readiness.get('status')!r}")
+
+payload = json.loads((out / "vcp.json").read_text(encoding="utf-8"))
+required = {"schema_version", "run_id", "as_of", "universe", "coverage", "results", "daily_watchlist"}
+missing = sorted(required - payload.keys())
+if missing:
+    raise SystemExit(f"FAIL: VCP payload missing keys: {missing}")
+if payload.get("schema_version") != "signalix.vcp_finder_60m.v1":
+    raise SystemExit(f"FAIL: unexpected schema_version {payload.get('schema_version')!r}")
+
+universe = payload["universe"]
+for key in ("eligible", "evaluated", "returned"):
+    if not isinstance(universe.get(key), int) or universe[key] < 0:
+        raise SystemExit(f"FAIL: invalid universe.{key}: {universe.get(key)!r}")
+results = payload["results"]
+if not isinstance(results, list):
+    raise SystemExit("FAIL: results must be a list")
+if len(results) != universe["returned"]:
+    raise SystemExit(
+        f"FAIL: coverage mismatch: results={len(results)} returned={universe['returned']}"
+    )
+if universe["evaluated"] != universe["returned"]:
+    raise SystemExit(
+        f"FAIL: coverage mismatch: evaluated={universe['evaluated']} returned={universe['returned']}"
+    )
+coverage = payload["coverage"]
+for key in ("feed_unavailable", "no_data"):
+    if key not in coverage:
+        raise SystemExit(f"FAIL: coverage missing {key}")
+watchlist = payload["daily_watchlist"]
+if not isinstance(watchlist, dict) or not isinstance(watchlist.get("counts"), dict):
+    raise SystemExit("FAIL: Daily VCP Watchlist contract missing counts")
+
+states = collections.Counter(item.get("state") or "UNKNOWN" for item in results)
+report = {
+    "status": "PASS",
+    "run_id": payload["run_id"],
+    "as_of": payload["as_of"],
+    "universe": universe,
+    "coverage": coverage,
+    "state_counts": dict(sorted(states.items())),
+    "daily_watchlist_counts": watchlist["counts"],
+    "readiness": readiness,
+    "retired_dashboard_status": 404,
+    "missing_symbol_status": 404,
+}
+(out / "probe_report.json").write_text(
+    json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+)
+print(f"run_id: {payload['run_id']}")
+print(f"as_of: {payload['as_of']}")
+print(f"eligible: {universe['eligible']}")
+print(f"evaluated: {universe['evaluated']}")
+print(f"returned: {universe['returned']}")
+print(f"READY count: {states.get('READY', 0)}")
+print(f"feed unavailable: {coverage['feed_unavailable']}")
+print(f"no data: {coverage['no_data']}")
+print(f"Daily VCP Watchlist: {json.dumps(watchlist['counts'], sort_keys=True)}")
+print(f"Artifacts: {out / 'readiness.json'} {out / 'vcp.json'} {out / 'mvp.html'} {out / 'missing_symbol.json'} {out / 'probe_report.json'}")
+PY
