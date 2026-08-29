@@ -132,8 +132,8 @@ def test_mobile_interactive_targets_are_touch_safe():
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
 
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
-    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:26%;" in css
-    assert ".vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:18.5%;" in css
+    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:90px; min-width:90px; }" in css
+    assert ".vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:auto; }" in css
     assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css
 
 
