@@ -27,11 +27,19 @@ def result(state="READY", **overrides):
 
 
 def test_lifecycle_states_map_to_compact_decisions():
-    assert project_unified_vcp_decision(result("FORMING"))["decision"] == "WAIT"
-    assert project_unified_vcp_decision(result("READY"))["decision"] == "WAIT"
-    assert project_unified_vcp_decision(result("CONFIRMED"))["decision"] == "REVIEW"
-    assert project_unified_vcp_decision(result("EXTENDED"))["decision"] == "WAIT"
-    assert project_unified_vcp_decision(result("FAILED"))["decision"] == "AVOID"
+    expected = {
+        "FORMING": ("FORMING", "WAIT"),
+        "READY": ("READY", "WAIT"),
+        "NEAR_TRIGGER": ("READY", "WAIT"),
+        "BREAKOUT_WATCH": ("READY", "WAIT"),
+        "CONFIRMED": ("CONFIRMED", "REVIEW"),
+        "EXTENDED": ("EXTENDED", "WAIT"),
+        "FAILED": ("INVALIDATED", "AVOID"),
+    }
+    for raw_state, (state, decision) in expected.items():
+        output = project_unified_vcp_decision(result(raw_state))
+        assert output["state"] == state
+        assert output["decision"] == decision
 
 
 def test_extended_is_wait_not_avoid():
@@ -70,6 +78,17 @@ def test_quality_requires_all_60m_structural_evidence():
     assert output["quality"] == "PARTIAL"
     output = project_unified_vcp_decision(result("READY"))
     assert output["quality"] == "PASS"
+
+
+def test_quality_distinguishes_explicit_failure_from_missing_evidence():
+    missing = project_unified_vcp_decision(
+        result("READY", evidence={"prior_trend_pass": True})
+    )
+    explicit_failure = project_unified_vcp_decision(
+        result("READY", evidence={"prior_trend_pass": True, "base_pass": False})
+    )
+    assert missing["quality"] == "PARTIAL"
+    assert explicit_failure["quality"] == "FAIL"
 
 
 def test_event_partial_morphology_is_partial():

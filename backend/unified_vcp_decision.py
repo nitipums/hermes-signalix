@@ -10,15 +10,24 @@ _STRUCTURAL_KEYS = (
     "base_pass",
     "leg_volume_pass",
 )
+_STATES = {
+    "FORMING": "FORMING",
+    "READY": "READY",
+    "NEAR_TRIGGER": "READY",
+    "BREAKOUT_WATCH": "READY",
+    "CONFIRMED": "CONFIRMED",
+    "EXTENDED": "EXTENDED",
+    "FAILED": "INVALIDATED",
+}
 _DECISIONS = {
     "FORMING": "WAIT",
     "READY": "WAIT",
-    "NEAR_TRIGGER": "WAIT",
-    "BREAKOUT_WATCH": "WAIT",
     "CONFIRMED": "REVIEW",
     "EXTENDED": "WAIT",
-    "FAILED": "AVOID",
+    "INVALIDATED": "AVOID",
 }
+
+
 def _number(value):
     try:
         number = float(value) if value is not None else None
@@ -63,7 +72,10 @@ def _quality(result, sufficient):
     if state == "FAILED":
         return "FAIL"
     evidence = result.get("evidence") or {}
-    if all(evidence.get(key) is True for key in _STRUCTURAL_KEYS):
+    values = [evidence.get(key) for key in _STRUCTURAL_KEYS]
+    if any(value is False for value in values):
+        return "FAIL"
+    if all(value is True for value in values):
         return "PASS"
     return "PARTIAL"
 
@@ -77,7 +89,7 @@ def project_unified_vcp_decision(
     """Return one JSON-safe serving decision without mutating ``result``."""
     source = result if isinstance(result, dict) else {}
     sufficient = _data_is_sufficient(source, data_sufficient)
-    state = source.get("state") if sufficient else None
+    state = _STATES.get(source.get("state")) if sufficient else None
     price = source.get("price") or {}
     breakout = source.get("breakout") or {}
     evidence = source.get("evidence") or {}
