@@ -1,7 +1,15 @@
+import copy
 import json
 
 import mvp_routes
-from vcp_finder_db import daily_watchlist_query_states, load_latest_vcp_run, project_daily_vcp_watchlist
+from mvp_api import filter_price_band, project_explorer_response
+from unified_vcp_decision import project_unified_vcp_decision
+from vcp_finder_db import (
+    DAILY_VCP_MIN_LIQUIDITY,
+    daily_watchlist_query_states,
+    load_latest_vcp_run,
+    project_daily_vcp_watchlist,
+)
 
 
 class Handler:
@@ -188,46 +196,30 @@ def test_daily_watchlist_response_does_not_serialize_full_vcp_results(monkeypatc
 
 def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
     result = _vcp_result("AAA", "READY")
-    result["decision"] = {
-        "state": "READY",
-        "decision": "WAIT",
-        "quality": "PASS",
-        "data_sufficient": True,
-        "evidence": {
-            "timeframe": "60m",
-            "trigger": 50.0,
-            "invalidation": 48.0,
-            "distance_to_trigger_pct": 4.0,
-            "volume_confirmation": False,
-            "daily_context": {"trend_pass": True},
-        },
-    }
-    raw_state = result["state"]
-    payload = {
+    result["decision"] = project_unified_vcp_decision(result, {"trend_pass": True})
+    insufficient = _vcp_result("MISSING", "NOT_VERIFIED")
+    insufficient["decision"] = project_unified_vcp_decision(insufficient, {})
+
+    def serialized_payload():
+        # Each surface gets a separately deserialized object, as the API does
+        # when the completed run is read for a request.
+        results = copy.deepcopy([result, insufficient])
+        watchlist = project_daily_vcp_watchlist(copy.deepcopy([result]))
+        return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "run_id": "run-unified",
         "universe": {"eligible": 2, "evaluated": 2, "returned": 2},
         "coverage": {"feed_unavailable": 0, "no_data": 1},
-        "results": [result, {**_vcp_result("MISSING", "NOT_VERIFIED"), "decision": {
-            "state": None,
-            "decision": None,
-            "quality": "UNKNOWN",
-            "data_sufficient": False,
-            "evidence": {"timeframe": "60m"},
-        }}],
-        "daily_watchlist": {
-            "action_review": [result],
-            "near_trigger": [],
-            "breakout_watch": [],
-        },
-    }
+        "results": results,
+        "daily_watchlist": watchlist,
+        }
     class Conn:
         def close(self): pass
 
     monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
 
     def latest(pg, **kwargs):
-        return payload
+        return serialized_payload()
 
     monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", latest)
 
@@ -241,7 +233,7 @@ def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
     watchlist = json.loads(watchlist_handler.body)
 
     assert explorer["results"][0]["decision"] == watchlist["daily_watchlist"]["action_review"][0]["decision"]
-    assert explorer["results"][0]["state"] == raw_state == "READY"
+    assert explorer["results"][0]["state"] == "READY"
     assert explorer["results"][1]["state"] == "NOT_VERIFIED"
     assert watchlist["universe"] == {"eligible": 2, "evaluated": 2, "returned": 2}
 
@@ -249,22 +241,26 @@ def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
 def test_watchlist_caps_and_state_filters_do_not_rewrite_raw_vcp_state(monkeypatch):
     results = [_vcp_result(f"A{i}", "READY") for i in range(12)]
     results.append(_vcp_result("INSUFFICIENT", "NOT_VERIFIED"))
-    payload = {
+
+    def payload_for_request(pg, *, daily_watchlist, state=None, limit=None, **kwargs):
+        assert daily_watchlist is True
+        # The production boundary deliberately ignores these filters for the
+        # capped watchlist, so the full run is projected before serialization.
+        assert state == "FAILED"
+        assert limit == 1
+        serialized = copy.deepcopy(results)
+        return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "universe": {"eligible": 13, "evaluated": 13, "returned": 13},
         "coverage": {"feed_unavailable": 0, "no_data": 1},
-        "results": results,
-        "daily_watchlist": {
-            "action_review": results[:10],
-            "near_trigger": [],
-            "breakout_watch": [],
-        },
-    }
+        "results": serialized,
+        "daily_watchlist": project_daily_vcp_watchlist(copy.deepcopy(results)),
+        }
     class Conn:
         def close(self): pass
 
     monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
-    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", lambda *args, **kwargs: payload)
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", payload_for_request)
     handler = Handler()
     assert mvp_routes.handle_mvp_api(
         "/api/vcp-finder?interval=60m&daily_watchlist=true&state=FAILED&limit=1",
@@ -276,7 +272,50 @@ def test_watchlist_caps_and_state_filters_do_not_rewrite_raw_vcp_state(monkeypat
     assert len(body["daily_watchlist"]["action_review"]) == 10
     assert all(row["state"] == "READY" for row in body["daily_watchlist"]["action_review"])
     assert body["coverage"]["no_data"] == 1
-    assert payload["results"][-1]["state"] == "NOT_VERIFIED"
+    assert body["daily_watchlist"]["coverage"]["input"] == 13
+    assert body["daily_watchlist"]["coverage"]["rejection_counts"]["state_invalid_or_unverified"] == 1
+    assert results[-1]["state"] == "NOT_VERIFIED"
+
+
+def test_daily_vcp_projection_applies_liquidity_gate_and_retains_insufficient_row():
+    insufficient = _vcp_result(
+        "LOW_LIQUIDITY", "READY",
+        data={"daily_metrics": {"avg_trade_value_20": DAILY_VCP_MIN_LIQUIDITY - 1}},
+    )
+    eligible = _vcp_result(
+        "LIQUID", "READY",
+        data={"daily_metrics": {"avg_trade_value_20": DAILY_VCP_MIN_LIQUIDITY}},
+    )
+    serialized = copy.deepcopy([insufficient, eligible])
+    projected = project_daily_vcp_watchlist(serialized)
+
+    assert [row["symbol"] for row in projected["action_review"]] == ["LIQUID"]
+    assert projected["coverage"] == {
+        "input": 2,
+        "accepted": 1,
+        "rejected": 1,
+        "rejection_counts": {"liquidity_below_minimum": 1},
+        "candidate_counts": {"ACTION_REVIEW": 1, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0},
+        "cap_dropped": 0,
+        "duplicate_dropped": 0,
+    }
+    assert serialized[0]["state"] == "READY"
+
+
+def test_presentation_price_and_margin_filters_only_change_visible_items():
+    items = [
+        {"symbol": "3BBIF", "close": 1.50},
+        {"symbol": "NOT_IN_MARGINABLE_SNAPSHOT", "close": 12.00},
+    ]
+
+    assert [item["symbol"] for item in filter_price_band(items, "below_2")] == ["3BBIF"]
+    assert [item["symbol"] for item in filter_price_band(items, "above_10")] == ["NOT_IN_MARGINABLE_SNAPSHOT"]
+
+    marginable = project_explorer_response(items, marginable_filter="krungsri", price_band="all")
+    non_marginable = project_explorer_response(items, marginable_filter="non_marginable", price_band="all")
+    assert [item["symbol"] for item in marginable["items"]] == ["3BBIF"]
+    assert [item["symbol"] for item in non_marginable["items"]] == ["NOT_IN_MARGINABLE_SNAPSHOT"]
+    assert [item["symbol"] for item in items] == ["3BBIF", "NOT_IN_MARGINABLE_SNAPSHOT"]
 
 
 def test_confirmed_without_quality_is_excluded_from_action_review():
