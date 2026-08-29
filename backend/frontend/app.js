@@ -142,6 +142,7 @@
   let drawerTouchStartX = null;
   let chartRequestSeq = 0;
   let chartAbort = null;
+  var chartCache = {};
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -472,9 +473,13 @@
     decisionLine(chart.target, "#6ee7b7", "Target");
   }
 
-  function setChartTimeframeButtons(value) {
+  function setChartTimeframeButtons(value, isVcp) {
     $$(".chart-timeframe").forEach(function(btn) {
+      var supported = !(isVcp && btn.getAttribute("data-timeframe") !== "60M");
       btn.classList.toggle("is-active", btn.getAttribute("data-timeframe") === value);
+      btn.disabled = !supported;
+      btn.setAttribute("aria-disabled", supported ? "false" : "true");
+      btn.title = supported ? "" : "VCP charts support 60M only";
     });
   }
 
@@ -529,7 +534,6 @@
   }
 
   function openDrawer(item, symbol, navSymbols, navIndex) {
-    var sameSymbolOpen = chartSymbol === symbol && !dom.drawer.classList.contains("drawer--hidden");
     chartSymbol = symbol;
     if (Array.isArray(navSymbols)) drawerSymbols = navSymbols.slice();
     if (navIndex != null) drawerIndex = navIndex;
@@ -539,19 +543,20 @@
     }
     updateDrawerNav();
     var requestSeq = ++chartRequestSeq;
-    var requestedTimeframe = item.vcp_result ? "60M" : chartTimeframe;
-    if (item.vcp_result) chartTimeframe = "60M";
-    setChartTimeframeButtons(requestedTimeframe);
+    var isVcp = !!item.vcp_result;
+    var requestedTimeframe = isVcp ? "60M" : chartTimeframe;
+    if (isVcp) chartTimeframe = "60M";
+    var chartKey = symbol + "|" + requestedTimeframe;
+    setChartTimeframeButtons(requestedTimeframe, isVcp);
     if (chartAbort) chartAbort.abort();
     var chartController = new AbortController();
     chartAbort = chartController;
     // Immediate render from local card data (fast path).
     renderDrawerDetail(item);
 
-    if (sameSymbolOpen && window.__signalixLastChart && Array.isArray(window.__signalixLastChart.candles) && window.__signalixLastChart.candles.length >= 2) {
-      // Keep the last-good plot visible while a new timeframe request is in flight.
-      dom.drawerChartPH.style.display = "none";
-      if (dom.drawerCanvas) dom.drawerCanvas.style.display = "block";
+    var cachedChart = chartCache[chartKey];
+    if (cachedChart) {
+      renderDrawerChart(cachedChart);
     } else {
       dom.drawerChartPH.style.display = "block";
       dom.drawerChartPH.textContent = "Chart loading…";
@@ -596,6 +601,7 @@
             chart.provenance = chart.provenance || {};
             chart.provenance.note = chart.provenance.note || (requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source." : "Chart candles NOT_VERIFIED.");
           }
+          chartCache[chartKey] = chart;
           renderDrawerChart(chart);
         }
       })
@@ -1094,10 +1100,15 @@
   });
   $$(".chart-timeframe").forEach(function(btn) {
     btn.addEventListener("click", function() {
-      chartTimeframe = btn.getAttribute("data-timeframe") || "1D";
-      $$(".chart-timeframe").forEach(function(other) { other.classList.toggle("is-active", other === btn); });
+      var nextTimeframe = btn.getAttribute("data-timeframe") || "1D";
+      var currentItem = chartSymbol ? drawerItemForSymbol(chartSymbol) : null;
+      if (currentItem && currentItem.vcp_result && nextTimeframe !== "60M") {
+        setChartTimeframeButtons("60M", true);
+        return;
+      }
+      chartTimeframe = nextTimeframe;
       if (chartSymbol) {
-        openDrawer({symbol: chartSymbol, name: chartSymbol}, chartSymbol);
+        openDrawer(currentItem || {symbol: chartSymbol, name: chartSymbol}, chartSymbol, drawerSymbols, drawerIndex);
       }
     });
   });
