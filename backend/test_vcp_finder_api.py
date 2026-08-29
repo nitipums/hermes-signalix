@@ -107,6 +107,7 @@ def test_latest_run_query_requires_successful_completed_ingestion():
         def cursor(self, **kwargs): return self.cur
     pg = Conn()
     assert load_latest_vcp_run(pg) is None
+    assert "ingestion_run_id IS NOT NULL" in pg.cur.sql
     assert "ingestion_status = 'full_success'" in pg.cur.sql
     assert "fetch_completed_at IS NOT NULL" in pg.cur.sql
 

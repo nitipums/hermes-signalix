@@ -10,6 +10,18 @@ UTC = dt.timezone.utc
 
 
 class IntradayUpsertAccountingTests(unittest.TestCase):
+    def test_vcp_handoff_skips_provenance_incomplete_success(self):
+        pg = MagicMock()
+
+        result = update_data.run_vcp_after_ingestion(pg, {
+            "run_id": None,
+            "status": "full_success",
+            "fetch_completed_at": "2026-08-29T09:00:00+00:00",
+        })
+
+        self.assertIsNone(result)
+        pg.cursor.assert_not_called()
+
     @patch("update_data.psycopg2.extras.execute_values")
     def test_upsert_reports_inserted_and_updated_rows(self, execute_values):
         execute_values.return_value = [(True,), (False,), (False,)]

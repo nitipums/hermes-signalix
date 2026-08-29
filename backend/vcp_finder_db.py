@@ -49,6 +49,25 @@ LOW_CHEAT_MAX_DISTANCE_TO_PIVOT_PCT = 1.0
 LOW_CHEAT_MAX_RISK_PCT = 8.0
 LOW_CHEAT_MAX_RISK_ATR = 2.5
 LOW_CHEAT_STATES = frozenset({"READY", "NEAR_TRIGGER"})
+VCP_INGESTION_STATUSES = frozenset({"full_success", "partial_success"})
+
+
+def validate_vcp_run_provenance(*, ingestion_run_id, ingestion_status,
+                                fetch_completed_at):
+    """Return a diagnostic for incomplete VCP lineage, or None when valid."""
+    if not isinstance(ingestion_run_id, str) or not ingestion_run_id.strip():
+        return "missing_ingestion_run_id"
+    if ingestion_status not in VCP_INGESTION_STATUSES:
+        return "invalid_ingestion_status"
+    if fetch_completed_at is None or not str(fetch_completed_at).strip():
+        return "missing_fetch_completed_at"
+    try:
+        completed = datetime.fromisoformat(str(fetch_completed_at).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return "invalid_fetch_completed_at"
+    if completed.tzinfo is None or completed.utcoffset() is None:
+        return "invalid_fetch_completed_at"
+    return None
 
 
 def _canonical_rr_from_daily_payload(payload):
@@ -467,6 +486,7 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
                   ingestion_status, fetch_completed_at
            FROM vcp_finder_60m_runs
            WHERE market=%s
+             AND ingestion_run_id IS NOT NULL
              AND ingestion_status = 'full_success'
              AND fetch_completed_at IS NOT NULL
            ORDER BY created_at DESC LIMIT 1""",
@@ -871,6 +891,13 @@ def project_daily_vcp_watchlist(results):
 
 
 def persist_vcp_run(pg, payload):
+    provenance_error = validate_vcp_run_provenance(
+        ingestion_run_id=payload.get("ingestion_run_id"),
+        ingestion_status=payload.get("ingestion_status"),
+        fetch_completed_at=payload.get("fetch_completed_at"),
+    )
+    if provenance_error:
+        raise ValueError("cannot persist VCP run with incomplete provenance: " + provenance_error)
     init_vcp_schema(pg)
     cur = pg.cursor()
     cur.execute(

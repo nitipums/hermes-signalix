@@ -1118,6 +1118,18 @@ def run_vcp_after_ingestion(pg, summary):
     if summary.get("status") not in {"full_success", "partial_success"}:
         print("VCP_FINDER_SKIP " + json.dumps({"reason": "ingestion_not_eligible", "status": summary.get("status")}))
         return None
+    from vcp_finder_db import validate_vcp_run_provenance
+    provenance_error = validate_vcp_run_provenance(
+        ingestion_run_id=summary.get("run_id"),
+        ingestion_status=summary.get("status"),
+        fetch_completed_at=summary.get("fetch_completed_at"),
+    )
+    if provenance_error:
+        print("VCP_FINDER_SKIP " + json.dumps({
+            "reason": "ingestion_provenance_incomplete",
+            "detail": provenance_error,
+        }, sort_keys=True))
+        return None
     cur = pg.cursor()
     cur.execute("SELECT pg_try_advisory_lock(hashtext('signalix:vcp-finder-60m'))")
     locked = bool(cur.fetchone()[0])

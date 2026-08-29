@@ -13,7 +13,41 @@ from vcp_finder_db import (
     find_vcp_universe_60m,
     load_52_week_context,
     load_latest_vcp_run,
+    persist_vcp_run,
+    validate_vcp_run_provenance,
 )
+
+
+@pytest.mark.parametrize(
+    ("provenance", "expected"),
+    [
+        ({"ingestion_run_id": None, "ingestion_status": "full_success", "fetch_completed_at": "2026-08-29T09:00:00+00:00"}, "missing_ingestion_run_id"),
+        ({"ingestion_run_id": "i1", "ingestion_status": "unknown", "fetch_completed_at": "2026-08-29T09:00:00+00:00"}, "invalid_ingestion_status"),
+        ({"ingestion_run_id": "i1", "ingestion_status": "full_success", "fetch_completed_at": "not-a-timestamp"}, "invalid_fetch_completed_at"),
+    ],
+)
+def test_vcp_provenance_validation_is_fail_closed(provenance, expected):
+    assert validate_vcp_run_provenance(**provenance) == expected
+
+
+@pytest.mark.parametrize("status", ["full_success", "partial_success"])
+def test_vcp_provenance_accepts_complete_ingestion(status):
+    assert validate_vcp_run_provenance(
+        ingestion_run_id="ingest-1",
+        ingestion_status=status,
+        fetch_completed_at="2026-08-29T09:00:00+00:00",
+    ) is None
+
+
+def test_persist_vcp_run_rejects_incomplete_provenance_before_db_write():
+    pg = MagicMock()
+    with pytest.raises(ValueError, match="incomplete provenance"):
+        persist_vcp_run(pg, {
+            "run_id": "vcp-1", "market": "TH", "interval": "60m",
+            "policy_version": "v1", "as_of": "2026-08-29T09:00:00+00:00",
+            "universe": {"eligible": 1, "evaluated": 1}, "results": [],
+        })
+    pg.cursor.assert_not_called()
 
 
 @pytest.mark.parametrize(
