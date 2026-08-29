@@ -7,6 +7,7 @@ import psycopg2.extras
 
 from instruments import active_ord_symbols
 from mvp_api import _resolve_rr
+from unified_vcp_decision import project_unified_vcp_decision
 from vcp_finder import POLICY_VERSION, VCP60Config, find_vcp_60m, new_run_id
 
 
@@ -217,6 +218,13 @@ def load_52_week_context(pg, symbols, as_of=None, lookback=252):
     return rows
 
 
+def _attach_unified_decision(result):
+    """Attach the additive decision projection using result-local Daily context."""
+    daily_context = (result.get("trend") or {}).get("daily_context") or {}
+    result["decision"] = project_unified_vcp_decision(result, daily_context)
+    return result
+
+
 def _presentation_fields(result):
     state = result.get("state")
     evidence = result.get("evidence") or {}
@@ -235,7 +243,7 @@ def _presentation_fields(result):
     result["forming_rank"] = forming_rank
     result["review_rank"] = state_rank * 10 + forming_rank
     result["data"]["latest_closed_bar"] = result["data"].get("latest_closed_bar")
-    return result
+    return _attach_unified_decision(result)
 
 
 def _apply_52_week_presentation(result, context):
@@ -566,6 +574,7 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
             "source": "Krungsri Credit Balance" if record else None,
         }
         result["margin_rate_pct"] = record.get("margin_rate_pct") if record else None
+        _attach_unified_decision(result)
     results.sort(key=_result_sort_key)
     daily_projection = project_daily_vcp_watchlist(results) if daily_watchlist else None
     return {

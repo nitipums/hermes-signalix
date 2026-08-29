@@ -1,15 +1,70 @@
+import json
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock
+
+import pytest
 
 from vcp_finder_db import (
     _classify_types,
     _daily_context_from_rows,
     _daily_metrics_from_rows,
     _apply_52_week_presentation,
+    _presentation_fields,
     find_vcp_universe_60m,
     load_52_week_context,
     load_latest_vcp_run,
 )
+
+
+@pytest.mark.parametrize(
+    ("state", "expected_decision"),
+    [
+        ("FORMING", "WAIT"),
+        ("READY", "WAIT"),
+        ("NEAR_TRIGGER", "WAIT"),
+        ("BREAKOUT_WATCH", "WAIT"),
+        ("CONFIRMED", "REVIEW"),
+        ("EXTENDED", "WAIT"),
+        ("FAILED", "AVOID"),
+        ("STALE", None),
+        ("NOT_VERIFIED", None),
+    ],
+)
+def test_presentation_attaches_decision_without_changing_raw_vcp_fields(state, expected_decision):
+    raw_fields = {
+        "state": state,
+        "actionable": state in {"READY", "NEAR_TRIGGER", "CONFIRMED"},
+        "review_lane": "PRICE_VOLUME_BREAKOUT",
+        "pattern": {"base_depth_pct": 8.0, "pivots": [{"kind": "high"}]},
+        "breakout": {"close_confirmed": state == "CONFIRMED", "volume_confirmed": True},
+        "provenance": {"run_id": "run-1", "source": "vcp_finder_60m"},
+        "daily_context_watch": True,
+        "insurance_context_watch": False,
+        "last_watch_event": {"state": "BREAKOUT_WATCH"},
+        "late_watch": False,
+        "index_membership": ["SET50"],
+        "rr": 2.5,
+    }
+    result = {
+        **raw_fields,
+        "data": {"freshness": "fresh", "feed_status": "ok"},
+        "trend": {"daily_context": {"trend_pass": True, "as_of": "2026-08-29"}},
+        "evidence": {
+            "prior_trend_pass": True,
+            "price_contraction_pass": True,
+            "base_pass": True,
+            "leg_volume_pass": True,
+        },
+        "price": {"pivot_high": 10.0, "invalidation": 9.0, "distance_to_pivot_pct": 0.0},
+    }
+
+    out = _presentation_fields(result)
+
+    for key, value in raw_fields.items():
+        assert out[key] == value
+    assert out["decision"]["decision"] == expected_decision
+    assert out["decision"]["evidence"]["daily_context"] == result["trend"]["daily_context"]
+    json.dumps(out["decision"], allow_nan=False)
 
 
 def test_type_classification_is_separate_and_deterministic():
