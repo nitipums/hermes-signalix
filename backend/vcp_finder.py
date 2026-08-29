@@ -57,7 +57,7 @@ def _plain(value: Any):
 
 
 def _review_lane(*, close_pass, volume_confirmed, structure_pass, distance_pct, freshness, last_close, failure):
-    if freshness == "stale" or last_close < failure:
+    if freshness != "fresh" or last_close < failure:
         return None
     if close_pass and volume_confirmed and not structure_pass:
         return "PRICE_VOLUME_BREAKOUT"
@@ -411,7 +411,8 @@ def _evaluate_sequence_policy_shadow(work, sequences, *, cfg, trend_pass,
 
 
 def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None = None,
-                 daily_context=None, include_sequence_policy_shadow=False) -> dict:
+                 daily_context=None, include_sequence_policy_shadow=False,
+                 feed_status=None, ingestion_status=None) -> dict:
     cfg = config or VCP60Config()
     try:
         df, invalid_rows, duplicate_rows = _normalize(frame)
@@ -431,14 +432,26 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if observed_as_of.tzinfo is None:
         observed_as_of = observed_as_of.replace(tzinfo=timezone.utc)
     latest_local, as_of_local, latest_may_be_open = _closed_bar_context(latest, observed_as_of)
-    session_age = _session_age(latest_local.date(), as_of_local.date())
-    freshness = "fresh" if session_age <= cfg.freshness_sessions else "stale"
+    latest_closed = None if latest_may_be_open and len(df) < 2 else (
+        df.iloc[-2]["ts"].to_pydatetime() if latest_may_be_open else latest
+    )
+    session_age = _session_age(
+        latest_closed.astimezone(ZoneInfo("Asia/Bangkok")).date(), as_of_local.date()
+    ) if latest_closed is not None else None
+    health_known = feed_status in {"available", "ok"} and ingestion_status == "full_success"
+    freshness = (
+        "unknown" if not health_known or latest_closed is None
+        else ("fresh" if session_age <= cfg.freshness_sessions else "stale")
+    )
     data = {
         "bar_count": int(len(frame)), "valid_bar_count": int(len(df)),
         "invalid_rows": invalid_rows, "duplicate_rows": duplicate_rows,
         "first_bar_ts": _plain(df.iloc[0]["ts"]), "last_bar_ts": _plain(df.iloc[-1]["ts"]),
         "max_gap_hours": max([((df.iloc[i]["ts"] - df.iloc[i-1]["ts"]).total_seconds() / 3600) for i in range(1, len(df))] or [0]),
         "freshness": freshness, "freshness_session_age": session_age,
+        "latest_closed_bar": _plain(latest_closed),
+        "feed_status": feed_status or "unknown",
+        "ingestion_status": ingestion_status or "unknown",
         "session_timezone": "Asia/Bangkok", "latest_bar_may_be_open": latest_may_be_open,
         "in_progress_bar_excluded": latest_may_be_open,
     }
@@ -533,8 +546,8 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
         state = "FORMING"
     else:
         state = "FORMING"
-    if freshness == "stale" and state not in {"FAILED", "NOT_VERIFIED"}:
-        state = "STALE"
+    if freshness != "fresh" and state not in {"FAILED", "NOT_VERIFIED"}:
+        state = "STALE" if freshness == "stale" else "NOT_VERIFIED"
     review_lane = _review_lane(close_pass=close_pass, volume_confirmed=volume_confirmed, structure_pass=structure_pass, distance_pct=distance_pct, freshness=freshness, last_close=last_close, failure=failure)
     reasons = []
     if not trend_pass: reasons.append("prior_trend_not_confirmed")
@@ -546,6 +559,8 @@ def find_vcp_60m(frame: pd.DataFrame, *, as_of=None, config: VCP60Config | None 
     if not leg_volume_pass: reasons.append("leg_volume_not_contracted")
     if close_pass and not volume_confirmed: reasons.append("breakout_close_without_volume_confirmation")
     if state == "FAILED": reasons.append("below_structural_invalidation")
+    if freshness == "stale": reasons.append("stale_closed_bar_or_health")
+    elif freshness == "unknown": reasons.append("unknown_closed_bar_or_health")
     result_base.update({
         "state": state, "actionable": state in {"READY", "CONFIRMED", "NEAR_TRIGGER"}, "watchable": state == "BREAKOUT_WATCH",
         "review_lane": review_lane, "reviewable": bool(review_lane),

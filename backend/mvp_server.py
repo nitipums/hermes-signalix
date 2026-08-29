@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 from mvp_routes import handle_mvp_api
 
 PORT = int(os.getenv("DASHBOARD_PORT", "3001"))
+HOST = os.getenv("DASHBOARD_BIND_HOST", "127.0.0.1")
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR = os.getenv("FRONTEND_DIR", os.path.join(_BACKEND_DIR, "frontend"))
 
@@ -57,7 +58,7 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(DIR)
-    with socketserver.ThreadingTCPServer(("0.0.0.0", PORT), MVPHandler) as httpd:
+    with socketserver.ThreadingTCPServer((HOST, PORT), MVPHandler) as httpd:
         httpd.daemon_threads = True
-        print(f"Serving MVP dashboard on 0.0.0.0:{PORT}")
+        print(f"Serving MVP dashboard on {HOST}:{PORT}")
         httpd.serve_forever()

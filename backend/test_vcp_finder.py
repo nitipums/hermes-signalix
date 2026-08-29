@@ -32,6 +32,30 @@ def test_insufficient_history_is_explicit_and_json_safe():
     json.dumps(result)
 
 
+def test_freshness_requires_closed_bar_and_explicit_health():
+    as_of = datetime(2026, 8, 5, 4, tzinfo=timezone.utc)
+    unknown = find_vcp_60m(pd.DataFrame(bars(100)), as_of=as_of)
+    assert unknown["data"]["freshness"] == "unknown"
+    assert unknown["data"]["latest_closed_bar"] != unknown["data"]["last_bar_ts"]
+    assert unknown["state"] == "NOT_VERIFIED"
+
+    fresh = find_vcp_60m(
+        pd.DataFrame(bars(100)), as_of=as_of,
+        feed_status="available", ingestion_status="full_success",
+    )
+    assert fresh["data"]["freshness"] == "fresh"
+
+
+def test_open_latest_bar_is_not_reported_as_latest_closed_bar():
+    as_of = datetime(2026, 8, 5, 4, tzinfo=timezone.utc)
+    result = find_vcp_60m(
+        pd.DataFrame(bars(100)), as_of=as_of,
+        feed_status="available", ingestion_status="full_success",
+    )
+    assert result["data"]["latest_bar_may_be_open"] is True
+    assert result["data"]["latest_closed_bar"] != result["data"]["last_bar_ts"]
+
+
 def test_downtrend_with_shrinking_ranges_is_not_vcp():
     rows = []
     ts = datetime(2026, 8, 1, tzinfo=timezone.utc)

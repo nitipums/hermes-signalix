@@ -166,6 +166,38 @@ def load_daily_metrics(pg, symbols, as_of=None, lookback=20):
     return {symbol: _daily_metrics_from_rows(rows) for symbol, rows in grouped.items()}
 
 
+def load_52_week_context(pg, symbols, as_of=None, lookback=252):
+    """Load point-in-time daily high/low context for presentation only."""
+    if not symbols:
+        return {}
+    cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    query = """SELECT symbol, MAX(high) AS high52, MIN(low) AS low52, COUNT(*) AS bars
+               FROM (
+                 SELECT symbol, date, high, low,
+                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+                 FROM price_data
+                 WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
+               ) x WHERE rn <= %s"""
+    params = [symbols, int(lookback)]
+    if as_of is not None:
+        query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
+        params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
+    query += " GROUP BY symbol"
+    cur.execute(query, tuple(params))
+    rows = {
+        row["symbol"]: {
+            "high52": float(row["high52"]) if row["high52"] is not None else None,
+            "low52": float(row["low52"]) if row["low52"] is not None else None,
+            "bars": int(row["bars"] or 0),
+            "source": "price_data",
+            "as_of": str(as_of) if as_of else None,
+        }
+        for row in cur.fetchall()
+    }
+    cur.close()
+    return rows
+
+
 def _presentation_fields(result):
     state = result.get("state")
     evidence = result.get("evidence") or {}
@@ -183,7 +215,30 @@ def _presentation_fields(result):
     result["state_rank"] = state_rank
     result["forming_rank"] = forming_rank
     result["review_rank"] = state_rank * 10 + forming_rank
-    result["data"]["latest_closed_bar"] = result["data"].get("last_bar_ts")
+    result["data"]["latest_closed_bar"] = result["data"].get("latest_closed_bar")
+    return result
+
+
+def _apply_52_week_presentation(result, context):
+    """Attach as-of high/low proximity without changing lifecycle state."""
+    context = context or {}
+    price = result.setdefault("price", {})
+    result["high52"] = context.get("high52", result.get("high52"))
+    result["low52"] = context.get("low52", result.get("low52"))
+    price["high52"] = result["high52"]
+    price["low52"] = result["low52"]
+    close = price.get("last_close")
+    high52 = result["high52"]
+    proximity = ((float(close) / high52) - 1) * 100 if close is not None and high52 else None
+    price["distance_to_52w_high_pct"] = proximity
+    if proximity is not None and -5 <= proximity <= 0:
+        vcp_type = result.setdefault("vcp_type", {"overlays": [], "types": []})
+        vcp_type.setdefault("overlays", [])
+        vcp_type.setdefault("types", [])
+        if "near_52w_high" not in vcp_type["overlays"]:
+            vcp_type["overlays"].append("near_52w_high")
+        if "near_52w_high" not in vcp_type["types"]:
+            vcp_type["types"].append("near_52w_high")
     return result
 
 
@@ -199,7 +254,9 @@ def _result_sort_key(result):
     latest = (result.get("data") or {}).get("latest_closed_bar") or ""
     contraction = pattern.get("latest_contraction_pct")
     breakout = volume.get("breakout_volume_ratio")
-    return (result.get("state_rank", 9), result.get("forming_rank", 9), -int(bool((result.get("data") or {}).get("freshness") == "fresh")), distance_key, float(contraction) if contraction is not None else 999999.0, -(float(breakout) if breakout is not None else 0.0), -len(latest), result.get("symbol", ""))
+    high52_distance = (result.get("price") or {}).get("distance_to_52w_high_pct")
+    high52_key = abs(float(high52_distance)) if high52_distance is not None else 999999.0
+    return (result.get("state_rank", 9), result.get("forming_rank", 9), -int(bool((result.get("data") or {}).get("freshness") == "fresh")), high52_key, distance_key, float(contraction) if contraction is not None else 999999.0, -(float(breakout) if breakout is not None else 0.0), -len(latest), result.get("symbol", ""))
 
 
 def load_observed_ath(pg, symbols, as_of=None):
@@ -304,6 +361,7 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     rows = load_vcp_60m_rows(pg, eligible, as_of=observed_as_of)
     daily_context = load_daily_trend_context(pg, eligible, as_of=observed_as_of)
     daily_metrics = load_daily_metrics(pg, eligible, as_of=observed_as_of)
+    high52_context = load_52_week_context(pg, eligible, as_of=observed_as_of)
     ath_context = load_observed_ath(pg, eligible, as_of=observed_as_of)
     feed_status = {}
     if eligible:
@@ -319,14 +377,20 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     run_id = new_run_id()
     results = []
     for symbol in eligible:
-        result = find_vcp_60m(rows.get(symbol), as_of=observed_as_of, config=cfg, daily_context=daily_context.get(symbol))
+        symbol_feed_status = feed_status.get(symbol, {}).get("status")
+        result = find_vcp_60m(
+            rows.get(symbol), as_of=observed_as_of, config=cfg,
+            daily_context=daily_context.get(symbol), feed_status=symbol_feed_status,
+            ingestion_status=ingestion_status,
+        )
         result["symbol"] = symbol
-        result["data"]["feed_status"] = feed_status.get(symbol, {}).get("status", "unknown")
+        result["data"]["feed_status"] = symbol_feed_status or "unknown"
         result["data"]["feed_reason"] = feed_status.get(symbol, {}).get("reason")
         result["data"]["feed_retry_at"] = str(feed_status.get(symbol, {}).get("retry_at")) if feed_status.get(symbol, {}).get("retry_at") else None
         result["data"]["feed_last_success_at"] = str(feed_status.get(symbol, {}).get("last_success_at")) if feed_status.get(symbol, {}).get("last_success_at") else None
         result["data"]["daily_metrics"] = daily_metrics.get(symbol, {})
         result = _classify_types(result, ath_context=ath_context.get(symbol), listing_context=None)
+        _apply_52_week_presentation(result, high52_context.get(symbol))
         result["provenance"]["run_id"] = run_id
         result["provenance"]["market"] = market.upper()
         result["provenance"]["ingestion_run_id"] = ingestion_run_id
@@ -363,7 +427,10 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
                   eligible_count, evaluated_count, ingestion_run_id,
                   ingestion_status, fetch_completed_at
            FROM vcp_finder_60m_runs
-           WHERE market=%s ORDER BY created_at DESC LIMIT 1""",
+           WHERE market=%s
+             AND ingestion_status = 'full_success'
+             AND fetch_completed_at IS NOT NULL
+           ORDER BY created_at DESC LIMIT 1""",
         (market.upper(),),
     )
     run = cur.fetchone()
@@ -377,9 +444,8 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         actionable = focused = review = False
     clauses = ["run_id=%s"]
     params = [run["run_id"]]
-    if daily_watchlist:
-        clauses.append("state = ANY(%s)")
-        params.append(sorted(daily_watchlist_query_states()))
+    # Daily projection must inspect the full completed run so it can report
+    # machine-readable rejection coverage. _dv_lane remains fail-closed.
     if state:
         clauses.append("state=%s")
         params.append(state.upper())
@@ -399,6 +465,9 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
     cur.execute(query, params)
     results = [r["result"] for r in cur.fetchall()]
     symbols = [r.get("symbol") for r in results if r.get("symbol")]
+    high52_context = load_52_week_context(pg, symbols, as_of=run["as_of"])
+    for result in results:
+        _apply_52_week_presentation(result, high52_context.get(result.get("symbol")))
     daily_watch = set()
     if symbols:
         cur.execute("SELECT o.symbol FROM daily_scan_observations o JOIN daily_scan_runs d ON d.id=o.run_id WHERE d.id=(SELECT id FROM daily_scan_runs WHERE scanner_version='signalix/daily-state-v2' ORDER BY scan_date DESC,run_timestamp DESC LIMIT 1) AND o.classification='waiting_breakout' AND o.symbol=ANY(%s)", (symbols,))
@@ -616,6 +685,39 @@ def _dv_lane(result):
     return None
 
 
+def _dv_rejection_reason(result):
+    """Return one deterministic reason for a row omitted from the watchlist."""
+    state = result.get("state")
+    if state in {"EXTENDED", "FORMING"}:
+        return "state_not_watchlist_eligible"
+    if state in {"FAILED", "STALE", "NOT_VERIFIED"}:
+        return "state_invalid_or_unverified"
+    if not _dv_fresh(result):
+        return "freshness_or_feed_gate"
+    if not _dv_liquid(result):
+        return "liquidity_below_minimum"
+    if result.get("late_watch") is True:
+        return "late_watch"
+    if state in {"READY", "CONFIRMED"}:
+        if not _dv_quality_pass(result):
+            return "structural_quality_gate"
+        if not _dv_daily_context_pass(result):
+            return "daily_context_gate"
+        if not _dv_action_review_coherent(result):
+            return "close_trigger_coherence_gate"
+    elif state == "NEAR_TRIGGER":
+        if not _dv_quality_pass(result):
+            return "structural_quality_gate"
+        if not _dv_daily_context_pass(result):
+            return "daily_context_gate"
+    elif state == "BREAKOUT_WATCH":
+        if not _dv_daily_context_pass(result):
+            return "daily_context_gate"
+    else:
+        return "state_not_watchlist_eligible"
+    return None
+
+
 def _dv_sort_key(result):
     return (
         -(_dv_rank_score(result)),
@@ -645,26 +747,46 @@ def project_daily_vcp_watchlist(results):
         lane = _dv_lane(r)
         if lane:
             raw_lanes[lane].append(r)
+    candidate_counts = {lane: len(items) for lane, items in raw_lanes.items()}
+    capped_counts = {}
     for lane, items in raw_lanes.items():
         items.sort(key=_dv_sort_key)
         raw_lanes[lane] = items[:caps[lane]]
+        capped_counts[lane] = candidate_counts[lane] - len(raw_lanes[lane])
     seen = set()
     lanes = {}
     counts = {}
+    duplicate_count = 0
     for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH"):
         filtered = []
         for r in raw_lanes[lane]:
             sym = str(r.get("symbol", "")).upper()
             if not sym or sym in seen:
+                duplicate_count += 1
                 continue
             seen.add(sym)
             filtered.append(r)
         lanes[lane] = filtered
         counts[lane] = len(filtered)
+    rejection_counts = {}
+    for result in results or []:
+        reason = _dv_rejection_reason(result)
+        if reason:
+            rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+    accepted = sum(counts.values())
     return {
         "policy_version": DAILY_VCP_WATCHLIST_VERSION,
         "caps": caps,
         "counts": counts,
+        "coverage": {
+            "input": len(results or []),
+            "accepted": accepted,
+            "rejected": sum(rejection_counts.values()),
+            "rejection_counts": rejection_counts,
+            "candidate_counts": candidate_counts,
+            "cap_dropped": sum(capped_counts.values()),
+            "duplicate_dropped": duplicate_count,
+        },
         "action_review": lanes["ACTION_REVIEW"],
         "near_trigger": lanes["NEAR_TRIGGER"],
         "breakout_watch": lanes["BREAKOUT_WATCH"],

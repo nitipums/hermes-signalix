@@ -66,6 +66,8 @@ def test_vcp_drawer_fetches_canonical_metadata_without_overwriting_vcp_fields():
     assert "mergeCanonicalDailyMetadata(item, fresh)" in js
     assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol" in js
     assert "VCP owns intraday decision fields" in js
+    assert "trigger: (vp.breakout || {}).required_close" in js
+    assert "Required close" in js
 
 
 def test_vcp_drawer_distinguishes_pending_metadata_from_unverified_evidence():
@@ -77,6 +79,12 @@ def test_vcp_drawer_distinguishes_pending_metadata_from_unverified_evidence():
     assert "formatRange(item.high52, item.low52, metadataPending)" in js
     assert "formatRange(item.ath_high, item.ath_low, metadataPending)" in js
     assert "Metadata failure is distinct from VCP evidence being NOT_VERIFIED." in js
+
+
+def test_daily_vcp_surfaces_rejection_telemetry():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "rejection_counts" in js
+    assert "rejected:" in js
 
 
 def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
@@ -108,6 +116,22 @@ def test_vcp_type_filter_and_badges_are_presentation_only():
     assert '"FAILED", "STALE", "NOT_VERIFIED"' in js
     assert "No Low-Cheat setups in focused review." in js
     assert "Switch to All states." in js
+
+
+def test_vcp_defaults_to_all_states_and_keeps_focused_query_explicit():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert '<option value="ALL" selected>All states</option>' in html
+    assert '<option value="actionable">Focused review · actionable + watch</option>' in html
+    assert 'var selected = dom.vcpState.value || "ALL";' in js
+    assert 'if (selected === "actionable") endpoint += "&focused=true";' in js
+
+
+def test_vcp_cards_label_52_week_high_overlay_and_distance_without_state_change():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'if (type === "near_52w_high") { hasNear52wHigh = true; return; }' in js
+    assert 'var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH DISTANCE";' in js
+    assert 'result.state || "NOT_VERIFIED"' in js
 
 
 def test_daily_vcp_default_filters_are_literal_presentation_filters():

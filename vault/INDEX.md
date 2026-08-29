@@ -40,6 +40,7 @@
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | historical feedback retained; no retired-profile writes |
 | `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `e5c7139`; old Daily/Explorer contract superseded** |
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
+| `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
 | `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
@@ -67,7 +68,7 @@
 | `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | 🟡 **HISTORICAL** — design/migration evidence; current UI contract verified from source/artifact/browser |
 | `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
 | `Roadmap-Kanban.md` | Archived Kanban mirror | 🟡 historical | Audit only; Markdown pipeline is active work source |
-| `Team-Operating-Model.md` | Team roles, providers, review loop | 🟡 historical | Provider snapshot 2026-08-22; current work source is Markdown pipeline |
+| `Team-Operating-Model.md` | Current team roles, providers, review loop | ✅ current | Lite + Codex + Ploy; historical helper roster retained for audit |
 
 ## 4. สถานะซิงค์กับ fact_store
 
@@ -78,8 +79,8 @@
 - Test สถานะ ↔ fact 119 (126 unit + 6 integration)
 - A2A/Browser infra ↔ fact 71/122 + skills
 
-## 2026-08-28 — Profile and memory cleanup
-Retired `Prae`, `View`, and `Mali` profile references were marked historical. Current active review team is Lite, Khim, Nida, and Ploy; Wallie remains outside Signalix. Markdown Execution Pipeline remains product/acceptance authority; Kanban holds active named-worker execution state without status mirroring.
+## 2026-08-29 — Codex standard team adoption
+Codex CLI (`gpt-5.6-luna`) became the default Signalix coding/review/implementation agent. Current active team is Lite, Codex, and Ploy; Khim and Nida are no longer default active members. Lite remains the sole orchestrator and final quality gate. See [[Codex-Standard-Workflow-2026-08-29]] and [[Team-Operating-Model]].
 
 ## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~

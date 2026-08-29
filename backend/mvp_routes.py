@@ -83,7 +83,7 @@ def handle_mvp_api(path, handler) -> bool:
             finally:
                 pg.close()
             if payload is None:
-                json_response(handler, {"error": "vcp_finder_not_run"}, status=503)
+                json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
                 return True
             if daily_watchlist:
                 # The watchlist consumes only capped lanes. Preserve full-universe
@@ -91,20 +91,20 @@ def handle_mvp_api(path, handler) -> bool:
                 payload = {**payload, "results": []}
             json_response(handler, payload)
         except (ValueError, TypeError) as exc:
-            json_response(handler, {"error": str(exc)}, status=400)
+            json_response(handler, {"error": "invalid_request"}, status=400)
         except Exception as exc:
-            json_response(handler, {"error": "vcp_finder_unavailable", "detail": str(exc)[:200]}, status=503)
+            json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
     try:
         payload = load_payload()
         items = payload["items"]
     except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
-        json_response(handler, {"error": "snapshot unavailable", "detail": str(exc)[:200]}, status=503)
+        json_response(handler, {"error": "snapshot_unavailable"}, status=503)
         return True
     try:
         import mvp_api
     except ImportError as exc:
-        json_response(handler, {"error": "mvp_api module unavailable", "detail": str(exc)[:200]}, status=503)
+        json_response(handler, {"error": "mvp_api_unavailable"}, status=503)
         return True
 
     if route in ("/api/daily-shortlist", "/api/daily-shortlist/"):
@@ -145,7 +145,7 @@ def handle_mvp_api(path, handler) -> bool:
         try:
             result = mvp_chart_db.project_chart_db_response(symbol, timeframe=timeframe)
         except ValueError as exc:
-            json_response(handler, {"error": str(exc)}, status=400); return True
+            json_response(handler, {"error": "invalid_request"}, status=400); return True
         if result is None: _not_found(handler, symbol)
         else: json_response(handler, result)
         return True
@@ -161,7 +161,7 @@ def handle_mvp_api(path, handler) -> bool:
             try:
                 result = mvp_chart_db.project_chart_db_response(symbol, timeframe=timeframe) or result
             except ValueError as exc:
-                json_response(handler, {"error": str(exc)}, status=400); return True
+                json_response(handler, {"error": "invalid_request"}, status=400); return True
         if result is None: _not_found(handler, symbol)
         else: json_response(handler, result)
         return True

@@ -301,7 +301,7 @@
           marginBadge(item) +
         '</div>' +
         '<div class="decision-card__risk">' +
-          '<span>Trigger ' + escapeHTML(item.trigger || "NOT_VERIFIED") + '</span>' +
+          '<span>Required close ' + escapeHTML(item.trigger || "NOT_VERIFIED") + '</span>' +
           '<span>Stop ' + (item.risk_stop != null ? item.risk_stop.toFixed(2) : "NOT_VERIFIED") + '</span>' +
           '<span>Target ' + (item.target != null ? item.target.toFixed(2) : "NOT_VERIFIED") + '</span>' +
         '</div>' +
@@ -342,7 +342,7 @@
         action: vcpDecisionLabel(vr),
         close: vp.last_close,
         change_pct: vp.change_pct,
-        trigger: vp.pivot_high,
+        trigger: (vp.breakout || {}).required_close,
         risk_stop: vp.invalidation,
         avgDailyValue20: (vd.daily_metrics || {}).avg_trade_value_20,
         index_membership: vr.index_membership || [],
@@ -474,7 +474,7 @@
       ctx.setLineDash([]); ctx.fillStyle = color; ctx.font = "11px sans-serif";
       ctx.fillText(label + " " + value.toFixed(2), left + 4, Math.max(12, y - 4));
     }
-    decisionLine(chart.trigger, "#f4c95d", "Trigger");
+    decisionLine(chart.trigger, "#f4c95d", "Required close");
     decisionLine(chart.stop, "#ef7777", "Stop");
     decisionLine(chart.target, "#6ee7b7", "Target");
   }
@@ -764,7 +764,16 @@
     var typeTags = [];
     var baseType = vcpTypeLabel(result);
     if (baseType) typeTags.push(baseType);
-    (typeInfo.overlays || []).forEach(function(type){ typeTags.push(type === "break_ath" ? "BREAK ATH" : type === "new_stock" ? "NEW" : type); });
+    var hasNear52wHigh = false;
+    (typeInfo.overlays || []).forEach(function(type){
+      if (type === "near_52w_high") { hasNear52wHigh = true; return; }
+      typeTags.push(type === "break_ath" ? "BREAK ATH" : type === "new_stock" ? "NEW" : type);
+    });
+    if (hasNear52wHigh || price.distance_to_52w_high_pct != null) {
+      var high52Distance = price.distance_to_52w_high_pct == null ? null : Number(price.distance_to_52w_high_pct);
+      var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH DISTANCE";
+      typeTags.push(high52Label + (high52Distance == null ? "" : " · " + high52Distance.toFixed(2) + "%"));
+    }
     var tags = typeTags;
     if (state === "CONFIRMED") tags = tags.concat(vcpQualityFlags(result));
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
@@ -860,7 +869,10 @@
           });
         });
         var total = filtered.action_review.length + filtered.near_trigger.length + filtered.breakout_watch.length;
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " watchlist / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
+        var coverage = (lanes && lanes.coverage) || {};
+        var rejectionCounts = coverage.rejection_counts || {};
+        var rejectionSummary = Object.keys(rejectionCounts).sort(function(a, b) { return rejectionCounts[b] - rejectionCounts[a]; }).slice(0, 3).map(function(key) { return key + " " + rejectionCounts[key]; }).join(", ");
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " watchlist / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
       })
       .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
@@ -868,7 +880,7 @@
 
   function loadVcp() {
     show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
-    var selected = dom.vcpState.value || "actionable";
+    var selected = dom.vcpState.value || "ALL";
     var endpoint = "/api/vcp-finder?interval=60m&market=TH";
     if (selected === "actionable") endpoint += "&focused=true";
     else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
@@ -882,7 +894,7 @@
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
         (data.results || []).forEach(function(r) { vcpResultsBySymbol[r.symbol] = r; });
-        var selected = dom.vcpState.value || "actionable";
+        var selected = dom.vcpState.value || "ALL";
         var results = (data.results || []).filter(function(r){ return vcpTypeMatches(r, dom.vcpType.value); });
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
         results = results.filter(priceMatches);

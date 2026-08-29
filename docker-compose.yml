@@ -63,6 +63,8 @@ services:
     container_name: signalix_dashboard
     restart: unless-stopped
     env_file: .env
+    environment:
+      DASHBOARD_BIND_HOST: 0.0.0.0
     command: ["python", "-u", "mvp_server.py"]
     depends_on:
       backend:

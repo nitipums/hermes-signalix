@@ -5,7 +5,9 @@ from vcp_finder_db import (
     _classify_types,
     _daily_context_from_rows,
     _daily_metrics_from_rows,
+    _apply_52_week_presentation,
     find_vcp_universe_60m,
+    load_52_week_context,
 )
 
 
@@ -68,6 +70,48 @@ def test_universe_keeps_missing_and_insufficient_symbols(monkeypatch):
     assert all(x["provenance"]["legacy_scanner_used"] is False for x in result["results"])
     assert all("vcp_type" in x for x in result["results"])
     assert all("type_policy_version" in x["vcp_type"] for x in result["results"])
+
+
+def test_52_week_context_is_point_in_time_and_uses_price_data():
+    class Cursor:
+        sql = ""
+        params = None
+        def execute(self, sql, params):
+            self.sql, self.params = sql, params
+        def fetchall(self):
+            return [{"symbol": "AAA", "high52": 110, "low52": 80, "bars": 252}]
+        def close(self): pass
+    class Conn:
+        def __init__(self): self.cursor_obj = Cursor()
+        def cursor(self, **kwargs): return self.cursor_obj
+
+    pg = Conn()
+    out = load_52_week_context(pg, ["AAA"], as_of=date(2026, 8, 29))
+    assert out["AAA"]["high52"] == 110.0
+    assert out["AAA"]["low52"] == 80.0
+    assert "date <= %s" in pg.cursor_obj.sql
+    assert pg.cursor_obj.params[0] == date(2026, 8, 29)
+
+
+def test_universe_adds_high52_proximity_without_changing_state(monkeypatch):
+    pg = MagicMock()
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["AAA"])
+    monkeypatch.setattr("vcp_finder_db.load_vcp_60m_rows", lambda *_args, **_kwargs: {"AAA": []})
+    monkeypatch.setattr("vcp_finder_db.load_52_week_context", lambda *_args, **_kwargs: {"AAA": {"high52": 110.0, "low52": 80.0}})
+    result = find_vcp_universe_60m(pg)
+    row = result["results"][0]
+    assert row["state"] == "NOT_VERIFIED"
+    assert row["price"]["high52"] == 110.0
+    assert row["price"]["distance_to_52w_high_pct"] is None
+    assert "near_52w_high" not in row["vcp_type"]["overlays"]
+
+
+def test_52_week_proximity_is_presentation_only():
+    result = {"state": "EXTENDED", "price": {"last_close": 100.0}, "vcp_type": {"overlays": [], "types": []}}
+    out = _apply_52_week_presentation(result, {"high52": 105.0, "low52": 70.0})
+    assert out["state"] == "EXTENDED"
+    assert out["price"]["distance_to_52w_high_pct"] == (100 / 105 - 1) * 100
+    assert "near_52w_high" in out["vcp_type"]["overlays"]
 
 
 def test_daily_metrics_latest_close_is_newest_independent_of_input_order():

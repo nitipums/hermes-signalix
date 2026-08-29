@@ -1,7 +1,7 @@
 import json
 
 import mvp_routes
-from vcp_finder_db import daily_watchlist_query_states, project_daily_vcp_watchlist
+from vcp_finder_db import daily_watchlist_query_states, load_latest_vcp_run, project_daily_vcp_watchlist
 
 
 class Handler:
@@ -68,6 +68,38 @@ def test_vcp_route_rejects_non_60m_without_db():
     assert mvp_routes.handle_mvp_api("/api/vcp-finder?interval=1D", h) is True
     assert h.status == 400
     assert json.loads(h.body)["error"]
+
+
+def test_vcp_route_hides_internal_failure_details(monkeypatch):
+    class Conn:
+        def close(self): pass
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+    def fail(*args, **kwargs):
+        raise RuntimeError("password=should-not-leak")
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", fail)
+    h = Handler()
+    assert mvp_routes.handle_mvp_api("/api/vcp-finder", h) is True
+    body = json.loads(h.body)
+    assert h.status == 503
+    assert body == {"error": "vcp_finder_unavailable"}
+
+
+def test_latest_run_query_requires_successful_completed_ingestion():
+    class Cursor:
+        def __init__(self):
+            self.sql = ""
+        def execute(self, sql, params):
+            self.sql = sql
+        def fetchone(self):
+            return None
+        def close(self): pass
+    class Conn:
+        def __init__(self): self.cur = Cursor()
+        def cursor(self, **kwargs): return self.cur
+    pg = Conn()
+    assert load_latest_vcp_run(pg) is None
+    assert "ingestion_status = 'full_success'" in pg.cur.sql
+    assert "fetch_completed_at IS NOT NULL" in pg.cur.sql
 
 
 def test_vcp_route_evaluates_then_filters(monkeypatch):
@@ -233,3 +265,21 @@ def test_empty_results_are_safe():
     assert out["action_review"] == []
     assert out["near_trigger"] == []
     assert out["breakout_watch"] == []
+
+
+def test_watchlist_reports_machine_readable_rejection_coverage():
+    rejected = [
+        _vcp_result("EXT", "EXTENDED"),
+        _vcp_result("FORM", "FORMING"),
+        _vcp_result("LIQ", "READY", data={"daily_metrics": {"avg_trade_value_20": 1}}),
+        _vcp_result("QUAL", "READY", evidence={"base_pass": False}),
+    ]
+    out = project_daily_vcp_watchlist(rejected)
+    assert out["coverage"]["input"] == 4
+    assert out["coverage"]["accepted"] == 0
+    assert out["coverage"]["rejected"] == 4
+    assert out["coverage"]["rejection_counts"] == {
+        "state_not_watchlist_eligible": 2,
+        "liquidity_below_minimum": 1,
+        "structural_quality_gate": 1,
+    }

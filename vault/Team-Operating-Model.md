@@ -1,40 +1,40 @@
 # Signalix Team Operating Model & Provider Allocation
 
-**Status:** historical team model; current work source is `vault/Execution-Pipeline.md` (Kanban is audit/archive only).
+**Status:** CURRENT · standard team adopted 2026-08-29. Current work source is `vault/Execution-Pipeline.md` (Kanban is audit/archive only).
 
 ## Authority and workflow
 
 - **Arm** is owner.
-- **Bee / lite** is product lead and final quality gate. No helper declares a user-facing release ready.
-- **Prae / prae** is PM and review coordinator: owns Kanban hygiene, scope, dependencies, acceptance criteria, blockers, and review packets.
-- **Kanban board `signalix`** is the operational task-state source of truth. Its DB drives automation; `Roadmap-Kanban.md` is a human-readable mirror. Markdown remains for specs and decisions.
+- **Lite** is orchestrator, product lead, and final quality gate. No helper declares a user-facing release ready.
+- **Codex CLI** is the coding/review/implementation agent and must work from bounded briefs.
+- **Ploy** is the trader/product/risk challenger.
+- Khim and Nida are no longer active default Signalix team members; their historical outputs remain audit evidence only.
 
 ## Team lanes
 
-| Profile | Role | Provider/model | Boundary |
+| Member | Role | Provider/model | Boundary |
 |---|---|---|---|
-| `khim` | Implementation/coding | Nous `stealth/ox-alpha` | Implements only from approved cards; tests and reports evidence. Ox logic probes passed, but a credit-paused overlay appears in reasoning; specialist only, never final QA/PM. |
-| `ploy` | Investment/product challenger | Nous `upstage/solar-pro4:free` | Challenges thesis, setup/trigger/risk wording, and decision usefulness. |
-| `prae` | PM/review coordinator | Nous `upstage/solar-pro4:free` | Coordinates cards and review packets; does not decide product/release. |
-| `nida` | QA/evidence auditor | Nous `poolside/laguna-s-2.1:free` | Audits source→DB→scan→served UI; reports PASS/FAIL/BLOCKED/NOT VERIFIED. |
-| `mali` | Retail UX acceptance | OpenCode Free `laguna-s-2.1-free` | Tests user journeys and reports to Bee only. |
-| `view` | UI/UX designer | OpenRouter `nvidia/nemotron-3-ultra-550b-a55b:free` | Designs decision-first/mobile-first UI and prototypes; reports to Bee. |
+| `lite` | Orchestrator + final quality gate | Hermes / `gpt-5.6-luna-900k` | Defines briefs, controls scope, verifies source→tests→runtime→browser, and owns PASS/FAIL/REVISE/NOT VERIFIED. |
+| `codex` | Coding/review/implementation | Codex CLI / `gpt-5.6-luna` via ChatGPT subscription | Bounded code changes and review; no reset/stash/commit/push; never final release authority. |
+| `ploy` | Trader/product/risk challenger | On-demand helper | Challenges setup, trigger, risk wording, actionability, and trader usefulness. |
+
+Historical members `khim`, `nida`, `prae`, `mali`, and `view` are retained in dated notes for audit context but are not part of the default active team.
 
 ## Verified runtime
 
-- Local-only A2A services: Ploy `9900`, Bee `9901`, Mali `9902`, Khim `9903`, Nida `9904`, Prae `9907`, View `9908`.
-- All listed helper services had active agent cards and live A2A role responses verified at closeout.
-- View moved from `9906` to `9908` because `default` owns `9906`; do not reuse `9906`.
-- Prae and View have isolated Level 1/2 memory and no shared Level-3 fact store. Mali is also isolated. Vault writes stay role-scoped.
+- Codex CLI `0.150.1` is installed system-wide and ChatGPT subscription login is verified.
+- Standard Codex calls preserve Lite's Hermes HOME, set `CODEX_HOME=/root/.codex`, use `gpt-5.6-luna`, and run from `/root/signalix` or a disposable temp Git workspace.
+- Ploy remains an on-demand trader/product/risk challenger; no default coding or QA helper is required.
+- Vault writes stay under Lite/owner governance and never contain secrets.
 
 ## Review loop
 
-1. Bee/Prae clarify objective, card scope, owner, dependency, and acceptance.
-2. Khim implements; View designs/prototypes where UI scope exists.
-3. Ploy challenges market/product decision language.
-4. Mali runs retail UX journey; Nida audits evidence and regression.
-5. Bee verifies final live evidence and delivers to Arm.
+1. Lite clarifies objective, scope, dependencies, acceptance, and no-go areas.
+2. Codex reviews or implements bounded changes with focused tests; it does not self-approve release readiness.
+3. Ploy challenges market/product decision language, setup, trigger, risk, and actionability when relevant.
+4. Lite independently verifies diff, tests, source→DB→scan→API→served UI lineage, and desktop/mobile/error journeys.
+5. Lite delivers the final PASS/FAIL/REVISE/NOT VERIFIED verdict to Arm.
 
 ## Verification rule
 
-A service/card response is infrastructure evidence only. User-facing Signalix work still requires the applicable rendered UI and failure-state checks before Bee marks it ready.
+A Codex response or green test is implementation evidence only. User-facing Signalix work still requires the applicable rendered UI, live endpoint, freshness/lineage, and failure-state checks before Lite marks it ready.
