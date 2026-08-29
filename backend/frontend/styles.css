@@ -266,9 +266,9 @@ body {
 .explorer-controls { display:flex; align-items:end; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
 .marginable-filter-row { display:flex; align-items:end; gap:8px; flex-wrap:wrap; margin:0 0 12px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); }
 .watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; min-width:0; margin:0 0 8px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text-2); font-size:11px; }
-.watchlist-default-filters > label { display:inline-flex; align-items:center; gap:4px; min-height:32px; min-width:0; }
+.watchlist-default-filters > label { display:inline-flex; align-items:center; gap:4px; min-height:44px; min-width:0; }
 .watchlist-default-filters > label:last-child { flex:1 1 150px; }
-.watchlist-default-filters select { min-height:32px; max-width:100%; }
+.watchlist-default-filters select { min-height:44px; max-width:100%; min-width:0; }
 .marginable-filter-meta { font-size:10px; color:var(--text-3); padding-bottom:12px; }
 .margin-rate-options { display:flex; align-items:center; flex-wrap:wrap; gap:5px; border:0; margin:0; padding:0; }
 .margin-rate-options legend { font-size:10px; color:var(--text-3); font-weight:600; padding:0; margin-right:2px; }

@@ -94,7 +94,7 @@ def test_daily_vcp_surfaces_rejection_telemetry():
 def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'NOT_VERIFIED: "NOT VERIFIED"' in js
-    assert 'var state = result.state || "NOT_VERIFIED";' in js
+    assert 'return decision.state || "NOT_VERIFIED";' in js
     assert 'data.feed_status || "NOT_VERIFIED"' in js
 
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -120,7 +120,8 @@ def test_vcp_type_filter_and_badges_are_presentation_only():
     assert 'return base === "low_cheat_vcp" ? "Low-Cheat"' in js
     assert "vcpTypeMatches" in js
     assert '"STANDARD"' not in js
-    assert '"FAILED", "STALE", "NOT_VERIFIED"' in js
+    assert 'var state = canonicalDecisionState(result);' in js
+    assert 'canonicalDataSufficiency(result) !== "SUFFICIENT"' in js
     assert "No Low-Cheat setups in focused review." in js
     assert "Switch to All states." in js
 
@@ -138,7 +139,7 @@ def test_vcp_cards_label_52_week_high_overlay_and_distance_without_state_change(
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'if (type === "near_52w_high") { hasNear52wHigh = true; return; }' in js
     assert 'var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH";' in js
-    assert 'result.state || "NOT_VERIFIED"' in js
+    assert 'return decision.state || "NOT_VERIFIED";' in js
 
 
 def test_daily_vcp_default_filters_are_literal_presentation_filters():
@@ -148,7 +149,7 @@ def test_daily_vcp_default_filters_are_literal_presentation_filters():
     assert "dom.dailyFilterPrice.checked" in js
     assert (
         "if (dom.dailyFilterTradeValue.checked && "
-        "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return;"
     ) in js
     assert "&& !r.reviewable" not in js
 
@@ -253,30 +254,19 @@ def test_vcp_drawer_membership_and_chart_overlay_contracts():
 
 def test_vcp_primary_cards_use_unified_state_decision_and_evidence():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for status in (
-        'FORMING · WAIT',
-        'READY · WAIT',
-        'CONFIRMED · REVIEW',
-        'EXTENDED · WAIT',
-        'INVALIDATED · AVOID',
-    ):
-        assert status in js
-    assert 'var state = decision.state || (result && result.state);' in js
-    assert 'if (decision.data_sufficient === false) return "—";' in js
-    assert 'return state + " · " + decision.decision' in js
+    assert '["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"]' in js
+    assert 'function canonicalDecision(result)' in js
+    assert 'return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in js
+    assert 'canonicalDataSufficiency(result)' in js
+    assert 'Quality " + canonicalQuality(result) + " · Data " + canonicalDataSufficiency(result)' in js
     assert 'evidence.trigger' in js
     assert 'evidence.invalidation' in js
     assert 'vcpPrimaryStatus(result)' in js
     assert 'vcpPrimaryEvidence(result)' in js
     assert 'var groups = {};' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
     assert 'escapeHTML(status)' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
-    assert 'BREAKOUT_WATCH: ["READY", "WAIT"]' in js
-    assert 'NEAR_TRIGGER: ["READY", "WAIT"]' in js
-    assert 'FAILED: ["INVALIDATED", "AVOID"]' in js
-    assert 'if (["FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED"].indexOf(state) < 0) return "—";' in js
     assert 'var trigger = evidence.trigger == null ? "—"' in js
     assert 'var invalidation = evidence.invalidation == null ? "—"' in js
-    assert 'if (evidence.trigger == null && evidence.invalidation == null) return "—";' in js
     assert '(price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close))' in js
     primary_group = js[js.index('function vcpDisplayGroup'):js.index('function vcpEmptyState')]
     for legacy in (
@@ -316,17 +306,88 @@ def test_vcp_primary_render_cannot_read_legacy_decision_fields():
         assert legacy_field not in primary
     assert "function vcpDisplayGroup(result)" in js
     display_group = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
-    assert "return vcpPrimaryStatus(result);" in display_group
+    assert 'var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in display_group
+    assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in display_group
 
 
 def test_daily_watchlist_consolidates_duplicate_primary_status_sections():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     render = js[js.index("function renderDailyVcpWatchlist"):js.index("function loadDailyVcp")]
 
-    # Compatibility lanes are grouped into shared primary-status buckets before
-    # the ordered section render, so READY · WAIT cannot render twice.
+    # Daily lanes are grouped into canonical state buckets before rendering.
     assert render.index("var groups = {};") < render.index("order.forEach(function(key)")
     assert render.index("items.forEach(function(item)") < render.index("[\"FORMING · WAIT\"")
     assert render.count("html += '<section class=\"vcp-lane\">") == 1
     assert "(groups[status] || (groups[status] = [])).push(item);" in render
     assert "groupCaps[status] = (groupCaps[status] || 0) + Number(cap);" in render
+
+
+def test_canonical_vcp_controls_exist_on_both_surfaces_and_filter_client_side():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for prefix in ("daily-vcp", "vcp"):
+        for field in ("decision-state", "decision", "quality"):
+            assert f'id="{prefix}-{field}"' in html
+    for value in ("ALL", "FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED", "REVIEW", "WAIT", "AVOID", "PASS", "PARTIAL", "FAIL", "UNKNOWN"):
+        assert f'value="{value}"' in html
+    assert "function canonicalFilterMatches(result" in js
+    assert "canonicalFilterMatches(r, dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality)" in js
+    assert "canonicalFilterMatches(r, dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality)" in js
+    assert 'var results = (data.results || [])' in js
+    assert 'results = results.filter(function(r){ return canonicalFilterMatches' in js
+
+
+def test_daily_watchlist_hides_non_sufficient_data_and_reports_coverage():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'var insufficientCount = 0;' in js
+    assert 'if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }' in js
+    assert 'hidden: insufficient/unknown data' in js
+    assert 'reviewable / ' in js
+
+
+def test_canonical_card_evidence_and_mobile_controls_are_visible_and_touch_safe():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert 'Quality " + canonicalQuality(result)' in js
+    assert 'Data " + canonicalDataSufficiency(result)' in js
+    assert 'var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in js
+    assert '.watchlist-default-filters select { min-height:44px;' in css
+    assert '.explorer-control select, .explorer-control input { min-height:44px;' in css
+    assert 'flex-wrap:wrap' in css
+
+
+def test_vcp_grouping_uses_canonical_state_decision_pairs_on_both_surfaces():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
+    for pair in (
+        "FORMING · WAIT",
+        "READY · WAIT",
+        "CONFIRMED · REVIEW",
+        "EXTENDED · WAIT",
+        "INVALIDATED · AVOID",
+    ):
+        assert f'"{pair}"' in helper
+    assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in helper
+    assert 'var status = vcpDisplayGroup(item);' in js
+    assert 'var key = vcpDisplayGroup(result);' in js
+    assert '["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"]' in js
+
+
+def test_vcp_type_presentation_fails_closed_on_canonical_data_and_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    type_label = js[js.index("function vcpTypeLabel"):js.index("function vcpTypeMatches")]
+    assert "var state = canonicalDecisionState(result);" in type_label
+    assert 'if (canonicalDataSufficiency(result) !== "SUFFICIENT") return null;' in type_label
+    assert 'if (["INVALIDATED", "NOT_VERIFIED"].indexOf(state) >= 0) return null;' in type_label
+
+
+def test_daily_trade_value_filter_callback_fails_without_return_value():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return;"
+    ) in js
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
+    ) not in js

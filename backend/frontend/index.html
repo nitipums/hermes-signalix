@@ -45,6 +45,33 @@
               <option value="standard_vcp">VCP</option>
             </select>
           </label>
+          <label>Decision state
+            <select id="daily-vcp-decision-state" aria-label="Filter Daily VCP by canonical decision state">
+              <option value="ALL" selected>All decision states</option>
+              <option value="FORMING">Forming</option>
+              <option value="READY">Ready</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="EXTENDED">Extended</option>
+              <option value="INVALIDATED">Invalidated</option>
+            </select>
+          </label>
+          <label>Decision
+            <select id="daily-vcp-decision" aria-label="Filter Daily VCP by canonical decision">
+              <option value="ALL" selected>All decisions</option>
+              <option value="REVIEW">Review</option>
+              <option value="WAIT">Wait</option>
+              <option value="AVOID">Avoid</option>
+            </select>
+          </label>
+          <label>Quality
+            <select id="daily-vcp-quality" aria-label="Filter Daily VCP by canonical quality">
+              <option value="ALL" selected>All quality</option>
+              <option value="PASS">Pass</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="FAIL">Fail</option>
+              <option value="UNKNOWN">Unknown</option>
+            </select>
+          </label>
         </div>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
@@ -64,7 +91,7 @@
         <p class="explorer-note">Intraday 60m candidate finder · no Daily fallback · not an automatic buy signal.</p>
         <div class="explorer-controls" aria-label="VCP Finder filters">
           <label class="explorer-control">View
-            <select id="vcp-state" aria-label="VCP state filter">
+            <select id="vcp-state" aria-label="Legacy VCP state filter (audit)">
               <option value="ALL" selected>All states</option>
               <option value="actionable">Focused review · actionable + watch</option>
               <option value="READY">Ready · wait for breakout</option>
@@ -78,6 +105,33 @@
               <option value="FAILED">Failed</option>
               <option value="STALE">Stale</option>
               <option value="NOT_VERIFIED">Not verified</option>
+            </select>
+          </label>
+          <label class="explorer-control">Decision state
+            <select id="vcp-decision-state" aria-label="Filter VCP by canonical decision state">
+              <option value="ALL" selected>All decision states</option>
+              <option value="FORMING">Forming</option>
+              <option value="READY">Ready</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="EXTENDED">Extended</option>
+              <option value="INVALIDATED">Invalidated</option>
+            </select>
+          </label>
+          <label class="explorer-control">Decision
+            <select id="vcp-decision" aria-label="Filter VCP by canonical decision">
+              <option value="ALL" selected>All decisions</option>
+              <option value="REVIEW">Review</option>
+              <option value="WAIT">Wait</option>
+              <option value="AVOID">Avoid</option>
+            </select>
+          </label>
+          <label class="explorer-control">Quality
+            <select id="vcp-quality" aria-label="Filter VCP by canonical quality">
+              <option value="ALL" selected>All quality</option>
+              <option value="PASS">Pass</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="FAIL">Fail</option>
+              <option value="UNKNOWN">Unknown</option>
             </select>
           </label>
           <label class="explorer-control">Type

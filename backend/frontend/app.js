@@ -33,6 +33,9 @@
     dailyFilterTradeValue: $("#daily-filter-trade-value"),
     dailyFilterPrice: $("#daily-filter-price"),
     dailyVcpType:   $("#daily-vcp-type"),
+    dailyVcpDecisionState: $("#daily-vcp-decision-state"),
+    dailyVcpDecision: $("#daily-vcp-decision"),
+    dailyVcpQuality: $("#daily-vcp-quality"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -42,6 +45,9 @@
     vcpContent:      $("#vcp-content"),
     vcpCards:        $("#vcp-cards"),
     vcpState:        $("#vcp-state"),
+    vcpDecisionState: $("#vcp-decision-state"),
+    vcpDecision:     $("#vcp-decision"),
+    vcpQuality:      $("#vcp-quality"),
     vcpType:         $("#vcp-type"),
     vcpPriceBand:    $("#vcp-price-band"),
     vcpMeta:         $("#vcp-meta"),
@@ -190,13 +196,46 @@
   }
 
   function vcpTypeLabel(result) {
-    if (["FAILED", "STALE", "NOT_VERIFIED"].indexOf(result.state) >= 0) return null;
+    var state = canonicalDecisionState(result);
+    if (canonicalDataSufficiency(result) !== "SUFFICIENT") return null;
+    if (["INVALIDATED", "NOT_VERIFIED"].indexOf(state) >= 0) return null;
     var base = (result.vcp_type || {}).base_type;
     return base === "low_cheat_vcp" ? "Low-Cheat" : base === "standard_vcp" ? "VCP" : null;
   }
 
   function vcpTypeMatches(result, selected) {
     return !selected || selected === "all" || (result.vcp_type || {}).base_type === selected;
+  }
+
+  function canonicalDecision(result) {
+    return result && result.decision && typeof result.decision === "object" ? result.decision : {};
+  }
+
+  function canonicalDecisionState(result) {
+    var decision = canonicalDecision(result);
+    return decision.state || "NOT_VERIFIED";
+  }
+
+  function canonicalDecisionValue(result) {
+    return canonicalDecision(result).decision || "UNKNOWN";
+  }
+
+  function canonicalQuality(result) {
+    return canonicalDecision(result).quality || "UNKNOWN";
+  }
+
+  function canonicalDataSufficiency(result) {
+    var value = canonicalDecision(result).data_sufficient;
+    return value === true ? "SUFFICIENT" : value === false ? "INSUFFICIENT" : "UNKNOWN";
+  }
+
+  function canonicalFilterMatches(result, stateSelect, decisionSelect, qualitySelect) {
+    var decisionState = stateSelect && stateSelect.value || "ALL";
+    var decision = decisionSelect && decisionSelect.value || "ALL";
+    var quality = qualitySelect && qualitySelect.value || "ALL";
+    return (decisionState === "ALL" || canonicalDecisionState(result) === decisionState)
+      && (decision === "ALL" || canonicalDecisionValue(result) === decision)
+      && (quality === "ALL" || canonicalQuality(result) === quality);
   }
 
   function vcpRiskReward(result) {
@@ -796,33 +835,20 @@
   }
 
   function vcpPrimaryStatus(result) {
-    var decision = (result && result.decision) || {};
-    if (decision.data_sufficient === false) return "—";
-    var state = decision.state || (result && result.state);
-    var compatibility = {
-      BREAKOUT_WATCH: ["READY", "WAIT"],
-      NEAR_TRIGGER: ["READY", "WAIT"],
-      FAILED: ["INVALIDATED", "AVOID"]
-    };
-    var mapped = compatibility[state];
-    if (mapped) return mapped[0] + " · " + mapped[1];
-    if (["FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED"].indexOf(state) < 0) return "—";
-    if (["REVIEW", "WAIT", "AVOID"].indexOf(decision.decision) < 0) return "—";
-    return state + " · " + decision.decision;
+    return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
   }
 
   function vcpPrimaryEvidence(result) {
-    var evidence = ((result && result.decision) || {}).evidence || {};
-    if (evidence.trigger == null && evidence.invalidation == null) return "—";
+    var evidence = canonicalDecision(result).evidence || {};
     var trigger = evidence.trigger == null ? "—" : Number(evidence.trigger).toFixed(2);
     var invalidation = evidence.invalidation == null ? "—" : Number(evidence.invalidation).toFixed(2);
-    return "Trigger " + trigger + " · Invalidation " + invalidation;
+    return "Quality " + canonicalQuality(result) + " · Data " + canonicalDataSufficiency(result) + " · Trigger " + trigger + " · Invalidation " + invalidation;
   }
 
   function vcpCard(result) {
     var price = result.price || {}, pattern = result.pattern || {}, volume = result.volume || {}, data = result.data || {};
     var symbol = result.symbol || "–";
-    var state = result.state || "NOT_VERIFIED";
+    var state = canonicalDecisionState(result);
     var cls = state.toLowerCase().replace(/_/g, "-");
     var reason = (result.reasons || result.reason_codes || []).join(" · ");
     var feed = data.feed_status === "unavailable" ? "Feed unavailable · " + (data.feed_reason || "retry pending") : "60m feed " + (data.feed_status || "NOT_VERIFIED");
@@ -859,7 +885,15 @@
   }
 
   function vcpDisplayGroup(result) {
-    return vcpPrimaryStatus(result);
+    var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
+    var allowed = [
+      "FORMING · WAIT",
+      "READY · WAIT",
+      "CONFIRMED · REVIEW",
+      "EXTENDED · WAIT",
+      "INVALIDATED · AVOID"
+    ];
+    return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";
   }
 
   function vcpEmptyState(target) {
@@ -873,7 +907,7 @@
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"];
+    var order = ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -907,7 +941,7 @@
         }
       });
     });
-    ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"].forEach(function(status) {
+    ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
       if (!groups[status]) return;
       var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
       html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
@@ -926,13 +960,16 @@
         vcpResultsBySymbol = {};
         var lanes = data.daily_watchlist || {action_review: [], near_trigger: [], breakout_watch: []};
         var filtered = {action_review: [], near_trigger: [], breakout_watch: []};
+        var insufficientCount = 0;
         ["action_review", "near_trigger", "breakout_watch"].forEach(function(key) {
           (lanes[key] || []).forEach(function(r){
             var metrics = (r.data || {}).daily_metrics || {};
+            if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }
             if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return;
-            if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return false;
+            if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return;
             if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return;
             if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return;
+            if (!canonicalFilterMatches(r, dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality)) return;
             filtered[key].push(r);
             vcpResultsBySymbol[r.symbol] = r;
           });
@@ -941,7 +978,7 @@
         var coverage = (lanes && lanes.coverage) || {};
         var rejectionCounts = coverage.rejection_counts || {};
         var rejectionSummary = Object.keys(rejectionCounts).sort(function(a, b) { return rejectionCounts[b] - rejectionCounts[a]; }).slice(0, 3).map(function(key) { return key + " " + rejectionCounts[key]; }).join(", ");
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " watchlist / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
+        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " reviewable / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (insufficientCount ? " · " + insufficientCount + " hidden: insufficient/unknown data" : "") + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
       })
       .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
@@ -967,6 +1004,7 @@
         var results = (data.results || []).filter(function(r){ return vcpTypeMatches(r, dom.vcpType.value); });
         if (marginRates.length) results = results.filter(function(r){ return marginRates.indexOf(Number(r.margin_rate_pct)) >= 0; });
         results = results.filter(priceMatches);
+        results = results.filter(function(r){ return canonicalFilterMatches(r, dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality); });
         if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0 || (r.state === "FORMING" && r.forming_group === "maturing"); });
         else if (selected.indexOf("FORMING_") === 0) results = results.filter(function(r){ return r.state === "FORMING" && r.forming_group === selected.slice(8).toLowerCase(); });
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
@@ -980,6 +1018,9 @@
     if (input) input.addEventListener("change", loadDailyVcp);
   });
   if (dom.dailyVcpType) dom.dailyVcpType.addEventListener("change", loadDailyVcp);
+  [dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
+    if (input) input.addEventListener("change", loadDailyVcp);
+  });
   /* ── tab switching ── */
   function switchTab(tab) {
     currentTab = tab;
@@ -999,6 +1040,9 @@
   dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
   dom.vcpState.addEventListener("change", loadVcp);
   dom.vcpType.addEventListener("change", loadVcp);
+  [dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality].forEach(function(input) {
+    if (input) input.addEventListener("change", loadVcp);
+  });
   dom.vcpRetry.addEventListener("click", loadVcp);
 
   function marginRateQuery() {
