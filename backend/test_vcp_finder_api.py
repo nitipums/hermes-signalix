@@ -1,7 +1,7 @@
 import json
 
 import mvp_routes
-from vcp_finder_db import project_daily_vcp_watchlist
+from vcp_finder_db import daily_watchlist_query_states, project_daily_vcp_watchlist
 
 
 class Handler:
@@ -121,6 +121,39 @@ def test_daily_watchlist_route_passes_flag(monkeypatch):
     assert calls["daily_watchlist"] is True
 
 
+def test_daily_watchlist_response_does_not_serialize_full_vcp_results(monkeypatch):
+    payload = {
+        "schema_version": "signalix.vcp_finder_60m.v1",
+        "run_id": "run-large",
+        "universe": {"eligible": 931, "evaluated": 931, "returned": 931},
+        "coverage": {"feed_unavailable": 19, "no_data": 16},
+        "results": [{"symbol": "A"}] * 931,
+        "daily_watchlist": {
+            "policy_version": "signalix/daily-vcp-watchlist-v1",
+            "caps": {"ACTION_REVIEW": 10, "NEAR_TRIGGER": 10, "BREAKOUT_WATCH": 5},
+            "counts": {"ACTION_REVIEW": 0, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 1},
+            "action_review": [],
+            "near_trigger": [],
+            "breakout_watch": [{"symbol": "A"}],
+        },
+    }
+
+    class Conn:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", lambda *args, **kwargs: payload)
+    h = Handler()
+    assert mvp_routes.handle_mvp_api(
+        "/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true", h
+    ) is True
+    body = json.loads(h.body)
+    assert body["universe"] == {"eligible": 931, "evaluated": 931, "returned": 931}
+    assert body["results"] == []
+    assert len(h.body) < 20_000
+    assert body["daily_watchlist"]["breakout_watch"] == [{"symbol": "A"}]
+
+
 def test_confirmed_without_quality_is_excluded_from_action_review():
     confirmed = _vcp_result("CNF", "CONFIRMED", evidence={"base_pass": False})
     assert project_daily_vcp_watchlist([confirmed])["action_review"] == []
@@ -180,13 +213,18 @@ def test_ranking_orders_by_quality_not_percent_change():
     out = project_daily_vcp_watchlist([high_change_low_quality, low_change_high_quality])
     assert [r["symbol"] for r in out["action_review"]] == ["GOOD"]
 
-
 def test_no_cross_lane_duplicate_symbols():
     ready = _vcp_result("DUPE", "READY")
     watch = _vcp_result("DUPE", "BREAKOUT_WATCH")
     out = project_daily_vcp_watchlist([watch, ready])
     assert [r["symbol"] for r in out["action_review"]] == ["DUPE"]
     assert [r["symbol"] for r in out["breakout_watch"]] == []
+
+
+def test_daily_watchlist_query_only_needs_lane_eligible_states():
+    assert daily_watchlist_query_states() == {
+        "READY", "NEAR_TRIGGER", "CONFIRMED", "BREAKOUT_WATCH"
+    }
 
 
 def test_empty_results_are_safe():

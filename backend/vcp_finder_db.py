@@ -377,6 +377,9 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         actionable = focused = review = False
     clauses = ["run_id=%s"]
     params = [run["run_id"]]
+    if daily_watchlist:
+        clauses.append("state = ANY(%s)")
+        params.append(sorted(daily_watchlist_query_states()))
     if state:
         clauses.append("state=%s")
         params.append(state.upper())
@@ -427,6 +430,7 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         }
         result["margin_rate_pct"] = record.get("margin_rate_pct") if record else None
     results.sort(key=_result_sort_key)
+    daily_projection = project_daily_vcp_watchlist(results) if daily_watchlist else None
     return {
         "schema_version": "signalix.vcp_finder_60m.v1",
         "finder": "vcp_finder_60m",
@@ -438,10 +442,12 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         "ingestion_run_id": run["ingestion_run_id"],
         "ingestion_status": run["ingestion_status"],
         "fetch_completed_at": run["fetch_completed_at"].isoformat() if hasattr(run["fetch_completed_at"], "isoformat") else (str(run["fetch_completed_at"]) if run["fetch_completed_at"] else None),
-        "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": len(results)},
+        "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": run["evaluated_count"] if daily_watchlist else len(results)},
         "coverage": {"feed_unavailable": coverage_row["feed_unavailable"] or 0, "no_data": coverage_row["no_data"] or 0},
-        "results": results,
-        "daily_watchlist": project_daily_vcp_watchlist(results) if daily_watchlist else None,
+        # The Daily VCP Watchlist only needs capped lanes. Keep full-universe
+        # counts in metadata, but never ship the 931-row audit payload here.
+        "results": [] if daily_watchlist else results,
+        "daily_watchlist": daily_projection,
     }
 
 
@@ -454,6 +460,11 @@ DAILY_VCP_MIN_LIQUIDITY = 10_000_000
 DAILY_VCP_CAP_ACTION_REVIEW = 10
 DAILY_VCP_CAP_NEAR_TRIGGER = 10
 DAILY_VCP_CAP_BREAKOUT_WATCH = 5
+
+
+def daily_watchlist_query_states():
+    """States that can enter one of the three capped Daily VCP lanes."""
+    return {"READY", "NEAR_TRIGGER", "CONFIRMED", "BREAKOUT_WATCH"}
 
 
 def _dv_to_float(value, default=None):

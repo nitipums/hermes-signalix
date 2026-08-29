@@ -85,6 +85,10 @@ def handle_mvp_api(path, handler) -> bool:
             if payload is None:
                 json_response(handler, {"error": "vcp_finder_not_run"}, status=503)
                 return True
+            if daily_watchlist:
+                # The watchlist consumes only capped lanes. Preserve full-universe
+                # counts/coverage metadata, but do not serialize audit results.
+                payload = {**payload, "results": []}
             json_response(handler, payload)
         except (ValueError, TypeError) as exc:
             json_response(handler, {"error": str(exc)}, status=400)

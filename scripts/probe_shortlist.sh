@@ -29,9 +29,13 @@ echo "== readiness =="
 code=$(fetch_code "$BACKEND_URL/health/readiness" "$OUTDIR/readiness.json")
 require_code "backend readiness" 200 "$code"
 
-echo "== canonical VCP finder + Daily VCP Watchlist =="
-code=$(fetch_code "$DASHBOARD_URL/api/vcp-finder?daily_watchlist=true" "$OUTDIR/vcp.json")
-require_code "VCP finder" 200 "$code"
+echo "== canonical Daily VCP Watchlist (compact) =="
+code=$(fetch_code "$DASHBOARD_URL/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true" "$OUTDIR/daily_vcp.json")
+require_code "Daily VCP Watchlist" 200 "$code"
+
+echo "== canonical VCP audit coverage =="
+code=$(fetch_code "$DASHBOARD_URL/api/vcp-finder?interval=60m&market=TH" "$OUTDIR/vcp.json")
+require_code "VCP audit" 200 "$code"
 
 echo "== served MVP =="
 code=$(fetch_code "$DASHBOARD_URL/mvp" "$OUTDIR/mvp.html")
@@ -67,10 +71,11 @@ if readiness.get("status") != "ok":
     raise SystemExit(f"FAIL: readiness status is {readiness.get('status')!r}")
 
 payload = json.loads((out / "vcp.json").read_text(encoding="utf-8"))
-required = {"schema_version", "run_id", "as_of", "universe", "coverage", "results", "daily_watchlist"}
+daily_payload = json.loads((out / "daily_vcp.json").read_text(encoding="utf-8"))
+required = {"schema_version", "run_id", "as_of", "universe", "coverage", "results"}
 missing = sorted(required - payload.keys())
 if missing:
-    raise SystemExit(f"FAIL: VCP payload missing keys: {missing}")
+    raise SystemExit(f"FAIL: VCP audit payload missing keys: {missing}")
 if payload.get("schema_version") != "signalix.vcp_finder_60m.v1":
     raise SystemExit(f"FAIL: unexpected schema_version {payload.get('schema_version')!r}")
 
@@ -80,22 +85,27 @@ for key in ("eligible", "evaluated", "returned"):
         raise SystemExit(f"FAIL: invalid universe.{key}: {universe.get(key)!r}")
 results = payload["results"]
 if not isinstance(results, list):
-    raise SystemExit("FAIL: results must be a list")
+    raise SystemExit("FAIL: audit results must be a list")
 if len(results) != universe["returned"]:
     raise SystemExit(
-        f"FAIL: coverage mismatch: results={len(results)} returned={universe['returned']}"
+        f"FAIL: audit coverage mismatch: results={len(results)} returned={universe['returned']}"
     )
 if universe["evaluated"] != universe["returned"]:
     raise SystemExit(
-        f"FAIL: coverage mismatch: evaluated={universe['evaluated']} returned={universe['returned']}"
+        f"FAIL: audit coverage mismatch: evaluated={universe['evaluated']} returned={universe['returned']}"
     )
 coverage = payload["coverage"]
 for key in ("feed_unavailable", "no_data"):
     if key not in coverage:
         raise SystemExit(f"FAIL: coverage missing {key}")
-watchlist = payload["daily_watchlist"]
+
+if daily_payload.get("results") != []:
+    raise SystemExit("FAIL: Daily VCP Watchlist must not serialize audit results")
+watchlist = daily_payload.get("daily_watchlist")
 if not isinstance(watchlist, dict) or not isinstance(watchlist.get("counts"), dict):
     raise SystemExit("FAIL: Daily VCP Watchlist contract missing counts")
+if daily_payload.get("universe") != universe:
+    raise SystemExit("FAIL: Daily VCP Watchlist metadata universe differs from audit")
 
 states = collections.Counter(item.get("state") or "UNKNOWN" for item in results)
 report = {
@@ -106,6 +116,8 @@ report = {
     "coverage": coverage,
     "state_counts": dict(sorted(states.items())),
     "daily_watchlist_counts": watchlist["counts"],
+    "daily_payload_bytes": (out / "daily_vcp.json").stat().st_size,
+    "audit_payload_bytes": (out / "vcp.json").stat().st_size,
     "readiness": readiness,
     "retired_dashboard_status": 404,
     "missing_symbol_status": 404,
@@ -122,5 +134,6 @@ print(f"READY count: {states.get('READY', 0)}")
 print(f"feed unavailable: {coverage['feed_unavailable']}")
 print(f"no data: {coverage['no_data']}")
 print(f"Daily VCP Watchlist: {json.dumps(watchlist['counts'], sort_keys=True)}")
-print(f"Artifacts: {out / 'readiness.json'} {out / 'vcp.json'} {out / 'mvp.html'} {out / 'missing_symbol.json'} {out / 'probe_report.json'}")
+print(f"Payload bytes: daily={report['daily_payload_bytes']} audit={report['audit_payload_bytes']}")
+print(f"Artifacts: {out / 'readiness.json'} {out / 'daily_vcp.json'} {out / 'vcp.json'} {out / 'mvp.html'} {out / 'missing_symbol.json'} {out / 'probe_report.json'}")
 PY
