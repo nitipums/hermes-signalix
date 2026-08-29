@@ -16,6 +16,8 @@ READY_QUEUES = {"fresh_breakout", "qualified_pullback", "retest_watch"}
 PRE_READY_QUEUES = {"pre_breakout"}
 MIN_AVG_DAILY_VALUE_20 = 10_000_000  # THB 10m 20-day average daily value
 POLICY_VERSION = "daily-shortlist-v1"
+RANKING_POLICY_ID = "signalix/daily-shortlist-ranking"
+RANKING_POLICY_VERSION = "daily-shortlist-ranking-v1"
 LANE_POLICY_VERSION = "daily-shortlist-v2-lanes"
 
 # Canonical lane order for the compact shortlist table.
@@ -129,22 +131,31 @@ def _entry_readiness(item: dict) -> float:
 
 
 def _risk_reward(item: dict) -> float:
-    """20% — clear invalidation, risk distance, and available reward vs risk."""
-    close = _to_float(item.get("close"))
-    stop = _to_float(item.get("riskStop") or item.get("stop"))
-    breakout = _to_float(item.get("breakoutLevel"))
-    if not close or close <= 0:
+    """20% — use only an authoritative precomputed risk/reward ratio."""
+    rr = _to_float(item.get("risk_reward_ratio"))
+    if rr is None:
+        rr = _to_float((item.get("position_sizing") or {}).get("risk_reward_ratio"))
+    if rr is None or rr <= 0:
         return 0.0
-    if not stop or stop >= close:
-        # No valid risk boundary => cannot rank risk/reward.
-        return 0.0
-    risk = close - stop
-    if risk <= 0:
-        return 0.0
-    reward = abs(breakout - close) if breakout else risk
-    rr = reward / risk
-    # Saturating map: 1.0 RR => 0.25, 3.0+ RR => 1.0
     return round(min(1.0, max(0.0, (rr - 1.0) / 8.0 + 0.25)), 4)
+
+
+def _rank_components(item: dict) -> tuple[dict, list[str]]:
+    """Build the canonical Daily explanation from existing evidence only."""
+    components = {
+        "structure_quality": _structure_quality(item),
+        "entry_readiness": _entry_readiness(item),
+        "risk_reward": _risk_reward(item),
+        "liquidity": _liquidity_component(item),
+    }
+    missing = []
+    if not (item.get("setup_quality") or {}).get("pass"):
+        missing.append("structure_quality")
+    if not (item.get("setup_proximity") or {}).get("state"):
+        missing.append("entry_readiness")
+    if _to_float(item.get("risk_reward_ratio")) is None and _to_float((item.get("position_sizing") or {}).get("risk_reward_ratio")) is None:
+        missing.append("risk_reward")
+    return components, missing
 
 
 def _liquidity_component(item: dict) -> float:
@@ -380,12 +391,7 @@ def classify_shortlist(item: dict) -> dict:
         return _ineligible(["NON_DAILY_QUEUE"], symbol, POLICY_VERSION)
 
     # --- Ranking (explainable 40/30/20 + liquidity gate) ---
-    components = {
-        "structure_quality": _structure_quality(item),
-        "entry_readiness": _entry_readiness(item),
-        "risk_reward": _risk_reward(item),
-        "liquidity": _liquidity_component(item),
-    }
+    components, missing_components = _rank_components(item)
     total = round(
         0.4 * components["structure_quality"]
         + 0.3 * components["entry_readiness"]
@@ -396,8 +402,11 @@ def classify_shortlist(item: dict) -> dict:
         "publication_state": pub,
         "exclusion_reasons": [],
         "rank_components": components,
+        "missing_components": missing_components,
         "total_score": total,
         "policy_version": POLICY_VERSION,
+        "ranking_policy_id": RANKING_POLICY_ID,
+        "ranking_policy_version": RANKING_POLICY_VERSION,
     }
 
 
@@ -407,8 +416,11 @@ def _ineligible(reasons, symbol, policy_version):
         "publication_state": None,
         "exclusion_reasons": reasons,
         "rank_components": {},
+        "missing_components": [],
         "total_score": None,
         "policy_version": policy_version,
+        "ranking_policy_id": RANKING_POLICY_ID,
+        "ranking_policy_version": RANKING_POLICY_VERSION,
         "symbol": symbol,
     }
 
@@ -420,8 +432,7 @@ def project_shortlist(items: list[dict]) -> list[dict]:
     higher-liquidity names rank first and ties break by symbol (stable).
     """
     classified = []
-    for item in items or []:
-        result = classify_shortlist(item)
+    for item, result in rank_daily_shortlist(items):
         if result["eligible"]:
             components = result["rank_components"]
             pub = result["publication_state"]
@@ -435,7 +446,10 @@ def project_shortlist(items: list[dict]) -> list[dict]:
                 "action": normalized_action,
                 "source_action": source_action,
                 "rank_components": components,
+                "missing_components": result["missing_components"],
                 "policy_version": result["policy_version"],
+                "ranking_policy_id": result["ranking_policy_id"],
+                "ranking_policy_version": result["ranking_policy_version"],
                 "total_score": result["total_score"],
                 "trigger": _trigger(item),
                 "invalidation": _invalidation(item),
@@ -461,6 +475,28 @@ def project_shortlist(items: list[dict]) -> list[dict]:
         r["symbol"] or "",
     ))
     return classified
+
+
+def rank_daily_shortlist(items: list[dict]):
+    """Canonical Daily adapter: gate every item, then rank eligible items.
+
+    The adapter returns the source item alongside its classification so callers
+    can retain full-universe observations for audit/coverage purposes. It does
+    not mutate or discard the input collection; ``project_shortlist`` remains
+    the presentation projection that emits eligible candidates only.
+    """
+    classified = [(item, classify_shortlist(item)) for item in (items or [])]
+    eligible = [(item, result) for item, result in classified if result["eligible"]]
+    state_order = {"READY": 0, "PRE_READY": 1}
+    eligible.sort(key=lambda pair: (
+        state_order.get(pair[1]["publication_state"], 99),
+        -(pair[1]["total_score"] or 0.0),
+        -(_to_float(pair[0].get("avgDailyValue20")) or 0.0),
+        pair[0].get("symbol") or "",
+    ))
+    # Eligible rows are ranked; ineligible rows are retained after them for
+    # coverage/audit callers. The presentation projection filters explicitly.
+    return eligible + [(item, result) for item, result in classified if not result["eligible"]]
 
 
 # ---------------------------------------------------------------------------
