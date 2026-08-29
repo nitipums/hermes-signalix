@@ -18,6 +18,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Any
 
 from daily_shortlist import project_shortlist, project_shortlist_lanes
+from decision_dimensions import project_decision_dimensions
 from provenance_contract import (
     DECISION_STATE_OFFICIAL_DAILY,
     DECISION_STATE_PROVISIONAL,
@@ -222,6 +223,7 @@ def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str 
             "distance_pct": _number(sp.get("distance_pct")),
             "zone": sp.get("zone"),
         },
+        "decision_dimensions": project_decision_dimensions(item),
         "trigger": _resolve_trigger(item),
         "invalidation": _resolve_invalidation(item),
         "risk_stop": _number(item.get("riskStop") or item.get("stop")),

@@ -12,6 +12,7 @@ from reconciled_projection import PRIMARY_GROUPS, PRIMARY_META, apply_projection
 from artifact_writer import atomic_write_json, atomic_write_text, write_artifact_manifest
 from mvp_snapshot import build_mvp_snapshot, daily_freshness_from_run
 from stage_classifier import STAGE_LABELS, PHASE_LABELS
+from decision_dimensions import project_decision_dimensions
 
 try:
     from set_market_day_guard import SET_CLOSED_DATES
@@ -1074,6 +1075,18 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "quality": (row.get("daily_state") or {}).get("quality") or {},
         "setup_quality": setup_q,
         "setup_proximity": setup_p,
+        # Additive Daily contract: keep the source projection on every full
+        # universe card; mvp_api maps it through the canonical Daily route.
+        "decision_dimensions": project_decision_dimensions({
+            "stage": stage,
+            "phase": phase,
+            "action_queue": _queue,
+            "action": action,
+            "close": decision_snapshot.get("close", row.get("close")),
+            "breakoutLevel": readiness.get("breakout_level_20d"),
+            "setup_quality": setup_q,
+            "setup_proximity": setup_p,
+        }),
         "radar": radar,
         "action_queue": _queue,
         "action_queue_label": queue_label(_queue),
