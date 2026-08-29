@@ -234,3 +234,52 @@ def test_vcp_drawer_membership_and_chart_overlay_contracts():
     assert "Math.abs(previous - labelY) < 14" in js
     assert "FROM index_memberships" in db
     assert 'result["index_membership"] = memberships.get' in db
+
+
+def test_vcp_primary_cards_use_unified_state_decision_and_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for status in (
+        'FORMING · WAIT',
+        'READY · WAIT',
+        'CONFIRMED · REVIEW',
+        'EXTENDED · WAIT',
+        'INVALIDATED · AVOID',
+    ):
+        assert status in js
+    assert 'var state = decision.state || (result && result.state);' in js
+    assert 'if (decision.data_sufficient === false) return "—";' in js
+    assert 'return state + " · " + decision.decision' in js
+    assert 'evidence.trigger' in js
+    assert 'evidence.invalidation' in js
+    assert 'vcpPrimaryStatus(result)' in js
+    assert 'vcpPrimaryEvidence(result)' in js
+    assert 'var groups = {};' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    assert 'escapeHTML(status)' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    assert 'BREAKOUT_WATCH: ["READY", "WAIT"]' in js
+    assert 'NEAR_TRIGGER: ["READY", "WAIT"]' in js
+    assert 'FAILED: ["INVALIDATED", "AVOID"]' in js
+    assert 'if (["FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED"].indexOf(state) < 0) return "—";' in js
+    assert 'var trigger = evidence.trigger == null ? "—"' in js
+    assert 'var invalidation = evidence.invalidation == null ? "—"' in js
+    assert 'if (evidence.trigger == null && evidence.invalidation == null) return "—";' in js
+    assert '(price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close))' in js
+    primary_group = js[js.index('function vcpDisplayGroup'):js.index('function vcpEmptyState')]
+    for legacy in (
+        'TRIGGER CONFIRMED',
+        'PRICE-VOLUME BREAKOUT',
+        'PIVOT TOUCH',
+        'DO NOT CHASE',
+        'STALE DATA',
+        'NOT VERIFIED',
+        'BREAKOUT_WATCH · WAIT',
+        'NEAR_TRIGGER · WAIT',
+        'FAILED · AVOID',
+        'DATA UNAVAILABLE',
+    ):
+        assert legacy not in primary_group
+    primary_helpers = js[js.index('function vcpPrimaryStatus'):js.index('function vcpCard')]
+    for implementation_label in ('DATA UNAVAILABLE', 'NOT_VERIFIED', 'STALE DATA', 'INSUFFICIENT DATA'):
+        assert implementation_label not in primary_helpers
+    daily_render = js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    for implementation_label in ('ACTION / REVIEW', 'NEAR TRIGGER · VOLUME CHECK', 'BREAKOUT WATCH · INTRABAR'):
+        assert implementation_label not in daily_render

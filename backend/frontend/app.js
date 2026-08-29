@@ -795,6 +795,30 @@
     return vcpStateLabel(result && result.state);
   }
 
+  function vcpPrimaryStatus(result) {
+    var decision = (result && result.decision) || {};
+    if (decision.data_sufficient === false) return "—";
+    var state = decision.state || (result && result.state);
+    var compatibility = {
+      BREAKOUT_WATCH: ["READY", "WAIT"],
+      NEAR_TRIGGER: ["READY", "WAIT"],
+      FAILED: ["INVALIDATED", "AVOID"]
+    };
+    var mapped = compatibility[state];
+    if (mapped) return mapped[0] + " · " + mapped[1];
+    if (["FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED"].indexOf(state) < 0) return "—";
+    if (["REVIEW", "WAIT", "AVOID"].indexOf(decision.decision) < 0) return "—";
+    return state + " · " + decision.decision;
+  }
+
+  function vcpPrimaryEvidence(result) {
+    var evidence = ((result && result.decision) || {}).evidence || {};
+    if (evidence.trigger == null && evidence.invalidation == null) return "—";
+    var trigger = evidence.trigger == null ? "—" : Number(evidence.trigger).toFixed(2);
+    var invalidation = evidence.invalidation == null ? "—" : Number(evidence.invalidation).toFixed(2);
+    return "Trigger " + trigger + " · Invalidation " + invalidation;
+  }
+
   function vcpCard(result) {
     var price = result.price || {}, pattern = result.pattern || {}, volume = result.volume || {}, data = result.data || {};
     var state = result.state || "NOT_VERIFIED";
@@ -822,9 +846,11 @@
     var avgTrade = Number((data.daily_metrics || {}).avg_trade_value_20);
     if (result.reviewable && Number.isFinite(avgTrade) && avgTrade <= 10000000) tags.push("Liquidity < THB 10M");
     var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
+    var primaryStatus = vcpPrimaryStatus(result);
+    var primaryEvidence = vcpPrimaryEvidence(result);
     return '<tr class="vcp-row vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<td class="vcp-row__symbol"><strong>' + escapeHTML(result.symbol || "–") + '</strong>' + tagHTML + '</td>' +
-      '<td>' + displayValue(price.last_close) + '</td>' +
+      '<td class="vcp-row__symbol"><span class="vcp-card__primary"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__decision">' + escapeHTML(primaryStatus) + '</span><span class="vcp-card__evidence">' + escapeHTML(primaryEvidence) + '</span></span>' + tagHTML + '</td>' +
+      '<td>' + (price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close)) + '</td>' +
       '<td class="vcp-row__change">' + (price.change_pct == null ? "—" : Number(price.change_pct).toFixed(2) + "%") + '</td>' +
       '<td>' + (price.distance_to_pivot_pct == null ? "—" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</td>' +
       '<td>' + (vcpRiskReward(result) == null ? "—" : vcpRiskReward(result).toFixed(2) + "R") + '</td>' +
@@ -832,15 +858,7 @@
   }
 
   function vcpDisplayGroup(result) {
-    var lane = result.review_lane;
-    if (result.state === "CONFIRMED" && vcpQualityFlags(result).length) return "TRIGGER CONFIRMED · QUALITY INCOMPLETE";
-    if (lane === "PRICE_VOLUME_BREAKOUT") return "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK";
-    if (lane === "PIVOT_TOUCH_VOLUME_WATCH") return "PIVOT TOUCH · VOLUME WATCH";
-    if (lane === "CLOSE_BREAKOUT_VOLUME_PENDING") return "CLOSE BREAKOUT · VOLUME PENDING";
-    if (result.insurance_context_watch) return "INSURANCE · CONTEXT WATCH";
-    if (result.late_watch) return "LATE WATCH · DO NOT CHASE";
-    if (result.state === "FORMING") return "FORMING · " + ({maturing: "MATURING", early: "EARLY", needs_work: "NEEDS WORK"}[result.forming_group] || "NEEDS WORK");
-    return ({BREAKOUT_WATCH: "BREAKOUT WATCH · INTRABAR", CONFIRMED: "CONFIRMED · REVIEW", NEAR_TRIGGER: "NEAR TRIGGER · VOLUME CHECK", READY: "READY · WAIT FOR BREAKOUT", EXTENDED: "EXTENDED · DO NOT CHASE", FAILED: "FAILED / INVALIDATED", STALE: "STALE DATA", NOT_VERIFIED: "NOT VERIFIED"}[result.state] || result.state || "OTHER");
+    return vcpPrimaryStatus(result);
   }
 
   function vcpEmptyState(target) {
@@ -854,7 +872,7 @@
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["BREAKOUT WATCH · INTRABAR", "TRIGGER CONFIRMED · QUALITY INCOMPLETE", "CONFIRMED · REVIEW", "NEAR TRIGGER · VOLUME CHECK", "READY · WAIT FOR BREAKOUT", "PRICE-VOLUME BREAKOUT · STRUCTURE CHECK", "PIVOT TOUCH · VOLUME WATCH", "CLOSE BREAKOUT · VOLUME PENDING", "INSURANCE · CONTEXT WATCH", "DAILY CONTEXT WATCH", "LATE WATCH · DO NOT CHASE", "FORMING · MATURING", "FORMING · EARLY", "FORMING · NEEDS WORK", "EXTENDED · DO NOT CHASE", "FAILED / INVALIDATED", "STALE DATA", "NOT VERIFIED"];
+    var order = ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -865,11 +883,6 @@
   function renderDailyVcpWatchlist(lanes, target) {
     target = target || dom.dailyVcpCards;
     var order = ["action_review", "near_trigger", "breakout_watch"];
-    var labels = {
-      action_review: "ACTION / REVIEW",
-      near_trigger: "NEAR TRIGGER · VOLUME CHECK",
-      breakout_watch: "BREAKOUT WATCH · INTRABAR"
-    };
     var capKeys = {
       action_review: "ACTION_REVIEW",
       near_trigger: "NEAR_TRIGGER",
@@ -881,8 +894,16 @@
       var items = (lanes && lanes[key]) || [];
       if (!items.length) return;
       var cap = caps[capKeys[key]];
-      var subhead = cap != null ? String(items.length) + " / " + String(cap) : String(items.length);
-      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(labels[key]) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + items.map(vcpCard).join("") + '</tbody></table></div></section>';
+      var groups = {};
+      items.forEach(function(item) {
+        var status = vcpDisplayGroup(item);
+        (groups[status] || (groups[status] = [])).push(item);
+      });
+      ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"].forEach(function(status) {
+        if (!groups[status]) return;
+        var subhead = cap != null ? String(groups[status].length) + " / " + String(cap) : String(groups[status].length);
+        html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
+      });
     });
     target.innerHTML = html || vcpEmptyState(target);
   }
