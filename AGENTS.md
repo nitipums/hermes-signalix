@@ -63,9 +63,10 @@ Full ORD universe
 ## Agent roles
 
 - **Lite** is the sole orchestrator and final quality gate. Lite owns final
-  synthesis and the `PASS` / `FAIL` / `NOT VERIFIED` decision.
-- **Codex CLI** is a bounded coding worker for repository investigation,
-  root-cause analysis, implementation, and focused review.
+  synthesis and the `PASS` / `FAIL` / `NOT VERIFIED` decision, with focus on
+  change quality and independent evidence review.
+- **Codex CLI** is a bounded coding worker for Signalix investigation,
+  root-cause analysis, implementation, and focused tests.
 - **Ploy** is the trader / product / risk challenger. Ploy's feedback is input,
   not acceptance authority.
 

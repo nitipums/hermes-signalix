@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import psycopg2.extras
 
 from instruments import active_ord_symbols
+from mvp_api import _resolve_rr
 from vcp_finder import POLICY_VERSION, VCP60Config, find_vcp_60m, new_run_id
 
 
@@ -47,6 +48,17 @@ LOW_CHEAT_MAX_DISTANCE_TO_PIVOT_PCT = 1.0
 LOW_CHEAT_MAX_RISK_PCT = 8.0
 LOW_CHEAT_MAX_RISK_ATR = 2.5
 LOW_CHEAT_STATES = frozenset({"READY", "NEAR_TRIGGER"})
+
+
+def _canonical_rr_from_daily_payload(payload):
+    """Project the persisted Daily producer fields through the MVP rr rule."""
+    readiness = payload.get("trade_readiness") or {}
+    targets = readiness.get("targets") or {}
+    item = dict(payload)
+    item["riskStop"] = item.get("riskStop") or readiness.get("stop_loss")
+    item["t161"] = item.get("t161") or targets.get("161")
+    item["t127"] = item.get("t127") or targets.get("127")
+    return _resolve_rr(item)
 
 
 def init_vcp_schema(pg):
@@ -171,18 +183,25 @@ def load_52_week_context(pg, symbols, as_of=None, lookback=252):
     if not symbols:
         return {}
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    query = """SELECT symbol, MAX(high) AS high52, MIN(low) AS low52, COUNT(*) AS bars
-               FROM (
-                 SELECT symbol, date, high, low,
-                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
-                 FROM price_data
-                 WHERE market='TH' AND instrument_type='ORD' AND symbol=ANY(%s)
-               ) x WHERE rn <= %s"""
-    params = [symbols, int(lookback)]
+    # Bound the work per requested symbol.  The window-function form makes
+    # PostgreSQL rank all matching price_data rows before retaining 252 rows;
+    # the lateral lookup can use the symbol/date index and stop at lookback.
+    query = """SELECT x.symbol, MAX(x.high) AS high52, MIN(x.low) AS low52, COUNT(*) AS bars
+               FROM unnest(%s::text[]) AS requested(symbol)
+               CROSS JOIN LATERAL (
+                 SELECT p.symbol, p.high, p.low
+                 FROM price_data p
+                 WHERE p.market='TH' AND p.instrument_type='ORD'
+                   AND UPPER(p.symbol) = UPPER(requested.symbol)"""
+    params = [symbols]
     if as_of is not None:
-        query = query.replace("WHERE market='TH'", "WHERE market='TH' AND date <= %s")
-        params = [as_of.date() if hasattr(as_of, "date") else as_of, symbols, int(lookback)]
-    query += " GROUP BY symbol"
+        query += " AND p.date <= %s"
+        params.append(as_of.date() if hasattr(as_of, "date") else as_of)
+    query += """ ORDER BY p.date DESC
+                 LIMIT %s
+               ) x
+               GROUP BY x.symbol"""
+    params.append(int(lookback))
     cur.execute(query, tuple(params))
     rows = {
         row["symbol"]: {
@@ -420,6 +439,18 @@ def find_vcp_universe_60m(pg, *, market="TH", symbols=None, as_of=None, config=N
     }
 
 
+def _presentation_symbols_for_run(results, *, daily_watchlist):
+    """Return symbols that need presentation enrichment for this response."""
+    if not daily_watchlist:
+        return [r.get("symbol") for r in results if r.get("symbol")]
+    eligible_states = daily_watchlist_query_states()
+    return [
+        r.get("symbol")
+        for r in results
+        if r.get("symbol") and r.get("state") in eligible_states
+    ]
+
+
 def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, symbol=None, limit=None, actionable=False, focused=False, review=False):
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
@@ -465,7 +496,8 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
     cur.execute(query, params)
     results = [r["result"] for r in cur.fetchall()]
     symbols = [r.get("symbol") for r in results if r.get("symbol")]
-    high52_context = load_52_week_context(pg, symbols, as_of=run["as_of"])
+    presentation_symbols = _presentation_symbols_for_run(results, daily_watchlist=daily_watchlist)
+    high52_context = load_52_week_context(pg, presentation_symbols, as_of=run["as_of"])
     for result in results:
         _apply_52_week_presentation(result, high52_context.get(result.get("symbol")))
     daily_watch = set()
@@ -486,6 +518,42 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         result["last_watch_event"] = event_context.get(result.get("symbol"))
         dist = (result.get("price") or {}).get("distance_to_pivot_pct")
         result["late_watch"] = bool(result.get("last_watch_event") and dist is not None and float(dist) > 3 and result.get("state") not in {"BREAKOUT_WATCH","CONFIRMED"})
+    # VCP rows are the drawer's authoritative context. Resolve membership at
+    # the run's as-of date from the normalized historical index table rather
+    # than fetching retired Daily symbol detail in the browser.
+    if symbols:
+        cur.execute(
+            """SELECT symbol, index_name FROM index_memberships
+               WHERE symbol=ANY(%s) AND effective_from <= %s
+                 AND (effective_to IS NULL OR effective_to >= %s)
+               ORDER BY symbol, index_name""",
+            (symbols, run["as_of"].date() if hasattr(run["as_of"], "date") else run["as_of"],
+             run["as_of"].date() if hasattr(run["as_of"], "date") else run["as_of"]),
+        )
+        memberships = {}
+        for row in cur.fetchall():
+            memberships.setdefault(row["symbol"], []).append(row["index_name"])
+        for result in results:
+            result["index_membership"] = memberships.get(result.get("symbol"), [])
+        # The VCP producer has no R/R field.  Enrich only a missing row value
+        # from the same canonical Daily projection used by the drawer.  This
+        # is metadata enrichment: VCP price/trigger/invalidation stay intact.
+        cur.execute(
+            """SELECT DISTINCT ON (o.symbol) o.symbol, o.raw_payload
+               FROM daily_scan_observations o
+               JOIN daily_scan_runs d ON d.id = o.run_id
+               WHERE o.symbol=ANY(%s) AND d.run_timestamp <= %s
+               ORDER BY o.symbol, d.scan_date DESC, d.run_timestamp DESC""",
+            (symbols, run["as_of"]),
+        )
+        canonical_rr = {}
+        for row in cur.fetchall():
+            rr = _canonical_rr_from_daily_payload(row.get("raw_payload") or {})
+            if rr is not None:
+                canonical_rr[row["symbol"]] = rr
+        for result in results:
+            if result.get("rr") is None and result.get("symbol") in canonical_rr:
+                result["rr"] = canonical_rr[result["symbol"]]
     cur.execute("SELECT COUNT(*) FILTER (WHERE result->'data'->>'feed_status' = 'unavailable') AS feed_unavailable, COUNT(*) FILTER (WHERE COALESCE((result->'data'->>'bar_count')::int, 0) = 0) AS no_data FROM vcp_finder_60m_results WHERE run_id=%s", (run["run_id"],))
     coverage_row = cur.fetchone()
     cur.close()

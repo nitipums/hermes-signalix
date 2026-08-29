@@ -442,3 +442,6 @@ body {
   .vcp-row__symbol .vcp-card__tags { width:100%; max-width:100%; margin:0; }
   .vcp-row__symbol .tag { max-width:100%; padding:2px 4px; font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
+.vcp-table .vcp-card__tags { flex:1 1 auto; gap:3px; margin:0; min-width:0; overflow:hidden; }
+.vcp-table .vcp-card__tags .tag { padding:1px 4px; font-size:.6rem; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vcp-table .vcp-row__symbol { gap:5px; }

@@ -66,7 +66,11 @@ def test_vcp_drawer_fetches_canonical_metadata_without_overwriting_vcp_fields():
     assert "mergeCanonicalDailyMetadata(item, fresh)" in js
     assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol" in js
     assert "VCP owns intraday decision fields" in js
-    assert "trigger: (vp.breakout || {}).required_close" in js
+    assert "function vcpChartOverlay(item)" in js
+    assert "trigger: breakout.required_close != null ? breakout.required_close : item.trigger" in js
+    assert "stop: price.invalidation != null ? price.invalidation : item.risk_stop" in js
+    assert "function mergeChartDecisionOverlay(chart, item)" in js
+    assert "mergeChartDecisionOverlay(chart, item);" in js
     assert "Required close" in js
 
 
@@ -130,7 +134,7 @@ def test_vcp_defaults_to_all_states_and_keeps_focused_query_explicit():
 def test_vcp_cards_label_52_week_high_overlay_and_distance_without_state_change():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'if (type === "near_52w_high") { hasNear52wHigh = true; return; }' in js
-    assert 'var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH DISTANCE";' in js
+    assert 'var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH";' in js
     assert 'result.state || "NOT_VERIFIED"' in js
 
 
@@ -197,3 +201,36 @@ def test_watchlist_table_and_filters_are_contained_on_mobile():
     assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
     assert ".watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap;" in css
     assert ".watchlist-default-filters > label { display:inline-flex; align-items:center;" in css
+
+
+def test_vcp_tables_use_canonical_rr_and_compact_tags():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "function vcpRiskReward(result)" in js
+    assert "var value = result && result.rr;" in js
+    assert "risk_reward_ratio" not in js
+    assert 'Number(result.margin_rate_pct).toFixed(0) + "%"' in js
+    assert '"NEAR 52W HIGH"' in js
+    assert ".vcp-table .vcp-card__tags" in css
+
+
+def test_vcp_filter_events_render_the_selected_client_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "dom.dailyVcpType.addEventListener(\"change\", loadDailyVcp)" in js
+    assert "dom.vcpState.addEventListener(\"change\", loadVcp)" in js
+    assert "dom.vcpType.addEventListener(\"change\", loadVcp)" in js
+    assert "results = results.filter(priceMatches)" in js
+    assert "if (marginRates.length) results = results.filter" in js
+    assert 'if (dom.vcpFilterApply) dom.vcpFilterApply.addEventListener("click", function() {' in js
+    assert 'if (!apply && surface === "vcp") return;' in js
+    assert 'updateMarginRates("vcp", true);' in js
+
+
+def test_vcp_drawer_membership_and_chart_overlay_contracts():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    db = (Path(__file__).parent / "vcp_finder_db.py").read_text(encoding="utf-8")
+    assert 'index_membership: vr.index_membership || []' in js
+    assert "var decisionLabelYs = [];" in js
+    assert "Math.abs(previous - labelY) < 14" in js
+    assert "FROM index_memberships" in db
+    assert 'result["index_membership"] = memberships.get' in db

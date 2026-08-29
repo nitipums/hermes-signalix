@@ -199,6 +199,13 @@
     return !selected || selected === "all" || (result.vcp_type || {}).base_type === selected;
   }
 
+  function vcpRiskReward(result) {
+    // VCP rows may carry the canonical Daily projection's rr enrichment.
+    // Never calculate R/R or interpret scoring fields as a ratio here.
+    var value = result && result.rr;
+    return value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+  }
+
   function escapeHTML(str) {
     var div = document.createElement("div");
     div.appendChild(document.createTextNode(str));
@@ -331,19 +338,40 @@
     if (row) row.hidden = !present;
   }
 
+  function vcpChartOverlay(item) {
+    var vr = item && item.vcp_result;
+    if (!vr) return {};
+    var price = vr.price || {};
+    var breakout = vr.breakout || {};
+    return {
+      trigger: breakout.required_close != null ? breakout.required_close : item.trigger,
+      stop: price.invalidation != null ? price.invalidation : item.risk_stop,
+      target: item.target != null ? item.target : vr.target
+    };
+  }
+
+  function mergeChartDecisionOverlay(chart, item) {
+    var overlay = vcpChartOverlay(item);
+    ["trigger", "stop", "target"].forEach(function(field) {
+      if (overlay[field] != null) chart[field] = overlay[field];
+    });
+    return chart;
+  }
+
   function renderDrawerDetail(item) {
     if (item.vcp_result) {
       var vr = item.vcp_result;
       var vp = vr.price || {};
       var vd = vr.data || {};
       var vm = vcpRunMeta || {};
+      var overlay = vcpChartOverlay(item);
       item = Object.assign({}, item, {
         name: item.symbol,
         action: vcpDecisionLabel(vr),
         close: vp.last_close,
         change_pct: vp.change_pct,
-        trigger: (vp.breakout || {}).required_close,
-        risk_stop: vp.invalidation,
+        trigger: overlay.trigger,
+        risk_stop: overlay.stop,
         avgDailyValue20: (vd.daily_metrics || {}).avg_trade_value_20,
         index_membership: vr.index_membership || [],
         margin_rate_pct: vr.margin_rate_pct,
@@ -465,6 +493,7 @@
       ctx.strokeStyle=colors.grid;ctx.setLineDash([3,3]);[30,70].forEach(function(v){var y=top+priceH+volH+rsiH-(v/100)*rsiH;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});ctx.setLineDash([]);
     }
     // Decision levels live on the price chart; no duplicate metric boxes below it.
+    var decisionLabelYs = [];
     function decisionLine(value, color, label) {
       value = Number(value);
       if (!Number.isFinite(value)) return;
@@ -472,7 +501,15 @@
       ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([7, 5]);
       ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w - right, y); ctx.stroke();
       ctx.setLineDash([]); ctx.fillStyle = color; ctx.font = "11px sans-serif";
-      ctx.fillText(label + " " + value.toFixed(2), left + 4, Math.max(12, y - 4));
+      var labelY = Math.max(top + 12, Math.min(top + priceH - 2, y - 4));
+      var attempts = 0;
+      while (decisionLabelYs.some(function(previous) { return Math.abs(previous - labelY) < 14; }) && attempts < 20) {
+        labelY += 14;
+        if (labelY > top + priceH - 2) labelY = Math.max(top + 12, labelY - 28);
+        attempts += 1;
+      }
+      decisionLabelYs.push(labelY);
+      ctx.fillText(label + " " + value.toFixed(2), left + 4, labelY);
     }
     decisionLine(chart.trigger, "#f4c95d", "Required close");
     decisionLine(chart.stop, "#ef7777", "Stop");
@@ -573,7 +610,7 @@
 
     var cachedChart = chartCache[chartKey];
     if (cachedChart) {
-      renderDrawerChart(cachedChart);
+      renderDrawerChart(mergeChartDecisionOverlay(cachedChart, item));
     } else {
       dom.drawerChartPH.style.display = "block";
       dom.drawerChartPH.textContent = "Chart loading…";
@@ -593,6 +630,12 @@
         if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
         if (fresh && fresh.symbol) {
           renderDrawerDetail(item.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : fresh);
+          var currentChart = chartCache[chartKey];
+          if (currentChart && item.vcp_result) {
+            // Daily metadata can arrive after candles. It can provide an
+            // optional target, but never supplies VCP trigger/invalidation.
+            renderDrawerChart(mergeChartDecisionOverlay(currentChart, item));
+          }
         }
       })
       .catch(function() {
@@ -621,9 +664,7 @@
         .then(function(chart) {
           if (requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe) return;
           if (chart && chart.symbol) {
-            chart.trigger = chart.trigger != null ? chart.trigger : item.trigger;
-            chart.stop = chart.stop != null ? chart.stop : item.risk_stop;
-            chart.target = chart.target != null ? chart.target : item.target;
+            mergeChartDecisionOverlay(chart, item);
             if (!Array.isArray(chart.candles) || chart.candles.length < 2) {
               chart.candles = [];
               chart.provenance = chart.provenance || {};
@@ -771,13 +812,13 @@
     });
     if (hasNear52wHigh || price.distance_to_52w_high_pct != null) {
       var high52Distance = price.distance_to_52w_high_pct == null ? null : Number(price.distance_to_52w_high_pct);
-      var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH DISTANCE";
+      var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH";
       typeTags.push(high52Label + (high52Distance == null ? "" : " · " + high52Distance.toFixed(2) + "%"));
     }
     var tags = typeTags;
     if (state === "CONFIRMED") tags = tags.concat(vcpQualityFlags(result));
     if (Array.isArray(result.index_membership)) tags = tags.concat(result.index_membership);
-    if (result.margin_rate_pct != null) tags.push("%Margin " + Number(result.margin_rate_pct).toFixed(0) + "%");
+    if (result.margin_rate_pct != null) tags.push(Number(result.margin_rate_pct).toFixed(0) + "%");
     var avgTrade = Number((data.daily_metrics || {}).avg_trade_value_20);
     if (result.reviewable && Number.isFinite(avgTrade) && avgTrade <= 10000000) tags.push("Liquidity < THB 10M");
     var tagHTML = tags.length ? '<div class="vcp-card__tags">' + tags.map(function(tag){ return '<span class="tag">' + escapeHTML(tag) + '</span>'; }).join("") + '</div>' : '';
@@ -786,7 +827,7 @@
       '<td>' + displayValue(price.last_close) + '</td>' +
       '<td class="vcp-row__change">' + (price.change_pct == null ? "—" : Number(price.change_pct).toFixed(2) + "%") + '</td>' +
       '<td>' + (price.distance_to_pivot_pct == null ? "—" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</td>' +
-      '<td>' + (result.rr == null ? "—" : Number(result.rr).toFixed(2) + "R") + '</td>' +
+      '<td>' + (vcpRiskReward(result) == null ? "—" : vcpRiskReward(result).toFixed(2) + "R") + '</td>' +
     '</tr>';
   }
 
@@ -1084,13 +1125,13 @@
   dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
   });
-  function updateMarginRates(surface) {
+  function updateMarginRates(surface, apply) {
     marginRates = Array.from(document.querySelectorAll('.margin-rate-toggle[data-surface="' + surface + '"]:checked'))
       .map(function(input) { return Number(input.value); }).sort(function(a, b) { return a - b; });
-    $$(".margin-rate-toggle").forEach(function(input) {
+    $$( '.margin-rate-toggle[data-surface="' + surface + '"]' ).forEach(function(input) {
       input.checked = marginRates.indexOf(Number(input.value)) >= 0;
     });
-    if (surface === "vcp") return;
+    if (!apply && surface === "vcp") return;
     if (surface === "shortlist") loadShortlist();
     else if (surface === "vcp") loadVcp();
     else loadExplorer(1);
@@ -1102,13 +1143,15 @@
   });
   if (dom.vcpMarginAll) dom.vcpMarginAll.addEventListener("click", function() {
     $$(".margin-rate-toggle[data-surface=\"vcp\"]").forEach(function(input){ input.checked = true; });
-    updateMarginRates("vcp");
+    updateMarginRates("vcp", false);
   });
   if (dom.vcpMarginClear) dom.vcpMarginClear.addEventListener("click", function() {
     $$(".margin-rate-toggle[data-surface=\"vcp\"]").forEach(function(input){ input.checked = false; });
-    updateMarginRates("vcp");
+    updateMarginRates("vcp", false);
   });
-  if (dom.vcpFilterApply) dom.vcpFilterApply.addEventListener("click", function() { loadVcp(); });
+  if (dom.vcpFilterApply) dom.vcpFilterApply.addEventListener("click", function() {
+    updateMarginRates("vcp", true);
+  });
   function updatePriceBand(value) {
     priceBand = Array.isArray(value) ? value : (value ? [value] : []);
     [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) { if (select) Array.from(select.options).forEach(function(option){ option.selected = priceBand.indexOf(option.value) >= 0; }); });
