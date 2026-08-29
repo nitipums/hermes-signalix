@@ -473,13 +473,12 @@
     decisionLine(chart.target, "#6ee7b7", "Target");
   }
 
-  function setChartTimeframeButtons(value, isVcp) {
+  function setChartTimeframeButtons(value) {
     $$(".chart-timeframe").forEach(function(btn) {
-      var supported = !(isVcp && btn.getAttribute("data-timeframe") !== "60M");
       btn.classList.toggle("is-active", btn.getAttribute("data-timeframe") === value);
-      btn.disabled = !supported;
-      btn.setAttribute("aria-disabled", supported ? "false" : "true");
-      btn.title = supported ? "" : "VCP charts support 60M only";
+      btn.disabled = false;
+      btn.removeAttribute("aria-disabled");
+      btn.removeAttribute("title");
     });
   }
 
@@ -543,11 +542,9 @@
     }
     updateDrawerNav();
     var requestSeq = ++chartRequestSeq;
-    var isVcp = !!item.vcp_result;
-    var requestedTimeframe = isVcp ? "60M" : chartTimeframe;
-    if (isVcp) chartTimeframe = "60M";
+    var requestedTimeframe = chartTimeframe;
     var chartKey = symbol + "|" + requestedTimeframe;
-    setChartTimeframeButtons(requestedTimeframe, isVcp);
+    setChartTimeframeButtons(requestedTimeframe);
     if (chartAbort) chartAbort.abort();
     var chartController = new AbortController();
     chartAbort = chartController;
@@ -577,41 +574,43 @@
       })
       .catch(function() { /* keep card-local detail on failure */ });
 
-    // Fetch DB-backed candles first; snapshot overlay is fallback only.
-    fetch("/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal})
-      .then(function(res) {
-        if (!res.ok) throw new Error("DB chart HTTP " + res.status);
-        return res.json();
-      })
-      .catch(function(err) {
-        if (err && err.name === "AbortError") throw err;
-        return fetch("/api/chart/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal}).then(function(res) {
-          if (!res.ok) throw new Error("snapshot chart HTTP " + res.status);
+    if (!cachedChart) {
+      // Fetch DB-backed candles first; snapshot overlay is fallback only.
+      fetch("/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal})
+        .then(function(res) {
+          if (!res.ok) throw new Error("DB chart HTTP " + res.status);
           return res.json();
-        });
-      })
-      .then(function(chart) {
-        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe) return;
-        if (chart && chart.symbol) {
-          chart.trigger = chart.trigger != null ? chart.trigger : item.trigger;
-          chart.stop = chart.stop != null ? chart.stop : item.risk_stop;
-          chart.target = chart.target != null ? chart.target : item.target;
-          if (!Array.isArray(chart.candles) || chart.candles.length < 2) {
-            chart.candles = [];
-            chart.provenance = chart.provenance || {};
-            chart.provenance.note = chart.provenance.note || (requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source." : "Chart candles NOT_VERIFIED.");
+        })
+        .catch(function(err) {
+          if (err && err.name === "AbortError") throw err;
+          return fetch("/api/chart/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal}).then(function(res) {
+            if (!res.ok) throw new Error("snapshot chart HTTP " + res.status);
+            return res.json();
+          });
+        })
+        .then(function(chart) {
+          if (requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe) return;
+          if (chart && chart.symbol) {
+            chart.trigger = chart.trigger != null ? chart.trigger : item.trigger;
+            chart.stop = chart.stop != null ? chart.stop : item.risk_stop;
+            chart.target = chart.target != null ? chart.target : item.target;
+            if (!Array.isArray(chart.candles) || chart.candles.length < 2) {
+              chart.candles = [];
+              chart.provenance = chart.provenance || {};
+              chart.provenance.note = chart.provenance.note || (requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source." : "Chart candles NOT_VERIFIED.");
+            }
+            chartCache[chartKey] = chart;
+            renderDrawerChart(chart);
           }
-          chartCache[chartKey] = chart;
-          renderDrawerChart(chart);
-        }
-      })
-      .catch(function(err) {
-        if (err && err.name === "AbortError") return;
-        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
-        dom.drawerChartPH.style.display = "block";
-        dom.drawerChartPH.textContent = requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "Chart data unavailable";
-        if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
-      });
+        })
+        .catch(function(err) {
+          if (err && err.name === "AbortError") return;
+          if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
+          dom.drawerChartPH.style.display = "block";
+          dom.drawerChartPH.textContent = requestedTimeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "Chart data unavailable";
+          if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
+        });
+    }
   }
 
   function closeDrawer() {
@@ -1102,10 +1101,6 @@
     btn.addEventListener("click", function() {
       var nextTimeframe = btn.getAttribute("data-timeframe") || "1D";
       var currentItem = chartSymbol ? drawerItemForSymbol(chartSymbol) : null;
-      if (currentItem && currentItem.vcp_result && nextTimeframe !== "60M") {
-        setChartTimeframeButtons("60M", true);
-        return;
-      }
       chartTimeframe = nextTimeframe;
       if (chartSymbol) {
         openDrawer(currentItem || {symbol: chartSymbol, name: chartSymbol}, chartSymbol, drawerSymbols, drawerIndex);

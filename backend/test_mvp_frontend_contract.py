@@ -34,8 +34,8 @@ def test_chart_timeframes_are_real_controls_not_labels_only():
     assert "?timeframe=" in js
     assert "chart-timeframe" in js
     assert 'let chartTimeframe = "60M"' in js
-    assert 'var requestedTimeframe = isVcp ? "60M" : chartTimeframe;' in js
-    assert "setChartTimeframeButtons(requestedTimeframe, isVcp)" in js
+    assert 'var requestedTimeframe = chartTimeframe;' in js
+    assert "setChartTimeframeButtons(requestedTimeframe)" in js
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
@@ -46,7 +46,9 @@ def test_drawer_timeframe_switch_preserves_surface_item_and_discards_stale_chart
     assert "var chartCache = {}" in js
     assert "chartCache[chartKey]" in js
     assert "requestSeq !== chartRequestSeq" in js
-    assert "VCP charts support 60M only" in js
+    assert "if (!cachedChart) {" in js
+    assert "VCP charts support 60M only" not in js
+    assert "btn.disabled = !supported" not in js
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "function drawerItemForSymbol(symbol)" in js
     assert "Both VCP surfaces feed the same drawer contract" in js
