@@ -367,7 +367,7 @@
       var overlay = vcpChartOverlay(item);
       item = Object.assign({}, item, {
         name: item.symbol,
-        action: vcpDecisionLabel(vr),
+        action: vcpPrimaryStatus(vr),
         close: vp.last_close,
         change_pct: vp.change_pct,
         trigger: overlay.trigger,
@@ -560,7 +560,7 @@
       // Both VCP surfaces feed the same drawer contract, including navigation.
       return Object.assign({symbol: symbol, vcp_result: vcp}, vcp, {
         name: symbol,
-        action: vcpDecisionLabel(vcp),
+        action: vcpPrimaryStatus(vcp),
         description: null
       });
     }

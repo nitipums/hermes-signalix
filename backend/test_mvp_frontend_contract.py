@@ -102,7 +102,10 @@ def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
     assert 'flags.push("NO VOLUME DRY-UP")' in js
     assert 'flags.push("DAILY CONTEXT FAIL")' in js
     assert 'return "TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
-    assert "vcpDecisionLabel(vr)" in js
+    assert "action: vcpPrimaryStatus(vr)" in js
+    assert "action: vcpPrimaryStatus(vcp)" in js
+    assert "action: vcpDecisionLabel(vr)" not in js
+    assert "action: vcpDecisionLabel(vcp)" not in js
     assert 'item.vcp_result ? item.action : shortAction(item.action || item.phase)' in js
     assert '"TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
 
