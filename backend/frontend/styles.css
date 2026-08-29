@@ -438,6 +438,6 @@ body {
   .vcp-table th:first-child, .vcp-table td:first-child { width:26%; }
   .vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:18.5%; }
   .vcp-row__symbol { flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
-  .vcp-row__symbol .vcp-card__tags { max-width:100%; margin:0; }
-  .vcp-row__symbol .tag { padding:2px 4px; font-size:.6rem; white-space:normal; }
+  .vcp-row__symbol .vcp-card__tags { width:100%; max-width:100%; margin:0; }
+  .vcp-row__symbol .tag { max-width:100%; padding:2px 4px; font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
