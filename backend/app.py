@@ -326,18 +326,23 @@ def list_excluded_symbols():
 @app.get("/instruments")
 def list_instruments(limit: int = 200):
     """Return bounded authoritative active-ORD identity/taxonomy records."""
-    from instruments import instrument_master, profile_taxonomy
+    from instruments import instrument_master, instrument_quality_summary, profile_taxonomy, validate_instrument_record
     limit = max(1, min(int(limit), 1000))
     pg = get_pg()
     try:
         records = instrument_master(pg)[:limit]
         profiles = profile_taxonomy(pg, [r["symbol"] for r in records])
         for record in records:
+            record["quality"] = validate_instrument_record(record)
             record["profile"] = profiles.get(record["symbol"], {
                 "symbol": record["symbol"], "missing": True,
                 "source": None,
             })
-        return {"count": len(records), "limit": limit, "source": "symbol_master", "instruments": records}
+        return {
+            "count": len(records), "limit": limit, "source": "symbol_master",
+            "quality": instrument_quality_summary(records),
+            "instruments": records,
+        }
     finally:
         pg.close()
 
