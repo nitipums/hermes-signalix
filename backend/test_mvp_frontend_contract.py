@@ -283,3 +283,22 @@ def test_vcp_primary_cards_use_unified_state_decision_and_evidence():
     daily_render = js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
     for implementation_label in ('ACTION / REVIEW', 'NEAR TRIGGER · VOLUME CHECK', 'BREAKOUT WATCH · INTRABAR'):
         assert implementation_label not in daily_render
+
+
+def test_vcp_primary_render_cannot_read_legacy_decision_fields():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    primary = js[js.index("function vcpPrimaryStatus"):js.index("function vcpEmptyState")]
+    for legacy_field in (
+        "trade_readiness",
+        "daily_state",
+        "setup_proximity",
+        "action_queue",
+        "shortlist_lane",
+        "review_lane",
+        "insurance_context_watch",
+        "late_watch",
+    ):
+        assert legacy_field not in primary
+    assert "function vcpDisplayGroup(result)" in js
+    display_group = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
+    assert "return vcpPrimaryStatus(result);" in display_group

@@ -238,6 +238,48 @@ def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
     assert watchlist["universe"] == {"eligible": 2, "evaluated": 2, "returned": 2}
 
 
+def test_vcp_api_preserves_legacy_fields_without_making_them_the_decision(monkeypatch):
+    result = _vcp_result("AAA", "READY")
+    result.update({
+        "actionable": False,
+        "trade_readiness": {"status": "BREAK"},
+        "daily_state": {"primary_state": "broken"},
+        "setup_proximity": {"state": "extended"},
+        "action_queue": "avoid_chase",
+        "shortlist_lane": "CAUTION",
+        "decision": project_unified_vcp_decision(result, {"trend_pass": True}),
+    })
+
+    class Conn:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+    monkeypatch.setattr(
+        "vcp_finder_db.load_latest_vcp_run",
+        lambda *args, **kwargs: {
+            "schema_version": "signalix.vcp_finder_60m.v1",
+            "run_id": "run-one-symbol",
+            "universe": {"eligible": 1, "evaluated": 1, "returned": 1},
+            "coverage": {"feed_unavailable": 0, "no_data": 0},
+            "results": [result],
+            "daily_watchlist": None,
+        },
+    )
+
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/vcp-finder?interval=60m&symbol=AAA", handler) is True
+    item = json.loads(handler.body)["results"][0]
+
+    assert item["decision"]["state"] == "READY"
+    assert item["decision"]["decision"] == "WAIT"
+    assert item["actionable"] is False
+    assert item["trade_readiness"]["status"] == "BREAK"
+    assert item["daily_state"]["primary_state"] == "broken"
+    assert item["setup_proximity"]["state"] == "extended"
+    assert item["action_queue"] == "avoid_chase"
+    assert item["shortlist_lane"] == "CAUTION"
+
+
 def test_watchlist_caps_and_state_filters_do_not_rewrite_raw_vcp_state(monkeypatch):
     results = [_vcp_result(f"A{i}", "READY") for i in range(12)]
     results.append(_vcp_result("INSUFFICIENT", "NOT_VERIFIED"))

@@ -67,6 +67,51 @@ def test_presentation_attaches_decision_without_changing_raw_vcp_fields(state, e
     json.dumps(out["decision"], allow_nan=False)
 
 
+def test_one_symbol_unified_decision_cannot_be_overridden_by_legacy_fields():
+    result = {
+        "symbol": "AAA",
+        "state": "READY",
+        "actionable": False,
+        "trade_readiness": {"status": "BREAK", "stop_loss": 1.0},
+        "daily_state": {"primary_state": "broken"},
+        "setup_proximity": {"state": "extended"},
+        "action_queue": "avoid_chase",
+        "shortlist_lane": "CAUTION",
+        "data": {"freshness": "fresh", "feed_status": "ok"},
+        "trend": {"daily_context": {"trend_pass": True}},
+        "evidence": {
+            "prior_trend_pass": True,
+            "price_contraction_pass": True,
+            "base_pass": True,
+            "leg_volume_pass": True,
+        },
+        "price": {"pivot_high": 10.0, "invalidation": 9.0},
+    }
+
+    out = _presentation_fields(result)
+
+    assert out["decision"] == {
+        "state": "READY",
+        "decision": "WAIT",
+        "quality": "PASS",
+        "data_sufficient": True,
+        "evidence": {
+            "timeframe": "60m",
+            "trigger": 10.0,
+            "invalidation": 9.0,
+            "distance_to_trigger_pct": None,
+            "volume_confirmation": None,
+            "daily_context": {"trend_pass": True},
+        },
+    }
+    assert out["actionable"] is False
+    assert out["trade_readiness"]["status"] == "BREAK"
+    assert out["daily_state"]["primary_state"] == "broken"
+    assert out["setup_proximity"]["state"] == "extended"
+    assert out["action_queue"] == "avoid_chase"
+    assert out["shortlist_lane"] == "CAUTION"
+
+
 def test_type_classification_is_separate_and_deterministic():
     result = {"state": "READY", "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 0.5, "invalidation": 95, "atr14": 2}, "pattern": {"pivots": [{"kind": kind} for kind in ("high", "low", "high", "low", "high")], "base_depth_pct": 10, "latest_contraction_pct": 5}, "evidence": {"prior_trend_pass": True, "price_contraction_pass": True, "base_pass": True, "leg_volume_pass": True}}
     out = _classify_types(result, ath_context={"observed_ath_all_time": 99}, listing_context=None)
