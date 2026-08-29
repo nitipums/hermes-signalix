@@ -112,6 +112,38 @@ def test_one_symbol_unified_decision_cannot_be_overridden_by_legacy_fields():
     assert out["shortlist_lane"] == "CAUTION"
 
 
+def test_task5_vcp_call_site_inventory_and_legacy_ruling():
+    """Record the Task 5 serving boundary and retained rollback/audit paths.
+
+    Visible VCP MVP serving is vcp_finder_db._presentation_fields ->
+    project_unified_vcp_decision, and the VCP frontend consumes ``decision``.
+    The legacy consumers in app.py, screening.py, daily_shortlist.py, and
+    build_dashboard.py are compatibility/retired Daily paths. They remain
+    available for rollback and audit and must not be deleted or refactored as
+    part of this VCP boundary change.
+    """
+    from pathlib import Path
+
+    backend = Path(__file__).parent
+    vcp_db = (backend / "vcp_finder_db.py").read_text(encoding="utf-8")
+    frontend = (backend / "frontend" / "app.js").read_text(encoding="utf-8")
+
+    assert "def _presentation_fields(result):" in vcp_db
+    assert "return _attach_unified_decision(result)" in vcp_db
+    assert "result[\"decision\"] = project_unified_vcp_decision" in vcp_db
+    assert "decision" in frontend
+
+    retained_legacy = {
+        "app.py": ("trade_readiness", "classify_daily_state", "setup_proximity"),
+        "screening.py": ("trade_readiness", "classify_daily_state", "classify_stage"),
+        "daily_shortlist.py": ("setup_proximity", "action_queue", "shortlist_lane"),
+        "build_dashboard.py": ("trade_readiness", "setup_proximity", "assign_action_queue", "action_queue"),
+    }
+    for filename, markers in retained_legacy.items():
+        source = (backend / filename).read_text(encoding="utf-8")
+        assert all(marker in source for marker in markers), filename
+
+
 def test_type_classification_is_separate_and_deterministic():
     result = {"state": "READY", "price": {"last_close": 100, "pivot_high": 98, "distance_to_pivot_pct": 0.5, "invalidation": 95, "atr14": 2}, "pattern": {"pivots": [{"kind": kind} for kind in ("high", "low", "high", "low", "high")], "base_depth_pct": 10, "latest_contraction_pct": 5}, "evidence": {"prior_trend_pass": True, "price_contraction_pass": True, "base_pass": True, "leg_volume_pass": True}}
     out = _classify_types(result, ath_context={"observed_ath_all_time": 99}, listing_context=None)

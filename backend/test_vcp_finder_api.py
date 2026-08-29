@@ -6,6 +6,7 @@ from mvp_api import filter_price_band, project_explorer_response
 from unified_vcp_decision import project_unified_vcp_decision
 from vcp_finder_db import (
     DAILY_VCP_MIN_LIQUIDITY,
+    _presentation_fields,
     daily_watchlist_query_states,
     load_latest_vcp_run,
     project_daily_vcp_watchlist,
@@ -239,7 +240,10 @@ def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
 
 
 def test_vcp_api_preserves_legacy_fields_without_making_them_the_decision(monkeypatch):
-    result = _vcp_result("AAA", "READY")
+    # Exercise the real persisted-result projection before the HTTP boundary.
+    # This keeps the test able to catch removal/regression of the adapter.
+    result = _presentation_fields(_vcp_result("AAA", "READY"))
+    adapter_decision = copy.deepcopy(result["decision"])
     result.update({
         "actionable": False,
         "trade_readiness": {"status": "BREAK"},
@@ -247,7 +251,6 @@ def test_vcp_api_preserves_legacy_fields_without_making_them_the_decision(monkey
         "setup_proximity": {"state": "extended"},
         "action_queue": "avoid_chase",
         "shortlist_lane": "CAUTION",
-        "decision": project_unified_vcp_decision(result, {"trend_pass": True}),
     })
 
     class Conn:
@@ -270,8 +273,7 @@ def test_vcp_api_preserves_legacy_fields_without_making_them_the_decision(monkey
     assert mvp_routes.handle_mvp_api("/api/vcp-finder?interval=60m&symbol=AAA", handler) is True
     item = json.loads(handler.body)["results"][0]
 
-    assert item["decision"]["state"] == "READY"
-    assert item["decision"]["decision"] == "WAIT"
+    assert item["decision"] == adapter_decision
     assert item["actionable"] is False
     assert item["trade_readiness"]["status"] == "BREAK"
     assert item["daily_state"]["primary_state"] == "broken"
