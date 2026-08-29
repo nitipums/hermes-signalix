@@ -135,3 +135,15 @@ def test_mobile_interactive_targets_are_touch_safe():
     assert ".vcp-table th:first-child, .vcp-table td:first-child { width:26%;" in css
     assert ".vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:18.5%;" in css
     assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css
+
+
+def test_watchlist_table_and_filters_are_contained_on_mobile():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert ".vcp-table-wrap { max-width:100%; overflow:hidden;" in css
+    assert ".vcp-table { width:100%; max-width:100%;" in css
+    assert "min-width:0; padding:10px 12px;" in css
+    assert "text-overflow:ellipsis;" in css
+    assert ".vcp-row__symbol { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }" in css
+    assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
+    assert ".watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap;" in css
+    assert ".watchlist-default-filters > label { display:inline-flex; align-items:center;" in css
