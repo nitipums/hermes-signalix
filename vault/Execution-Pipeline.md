@@ -43,6 +43,7 @@ The product must let a user answer, quickly and honestly:
 - Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
 - VCP drawer enrichment preserves VCP decision fields, fetches missing Daily metadata from `/api/symbol/{symbol}`, and distinguishes `Loading…`/`Unavailable` metadata from genuine `NOT_VERIFIED` evidence; covered by frontend contract tests and served click-path verification.
 - The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
+- **2026-08-29 decision contract:** Serving VCP cards now use one compact state/quality/decision projection sourced from the 60m VCP Finder. Daily EOD remains supporting context/lifecycle evidence and cannot promote a 60m result to `CONFIRMED`; stale, unverified, and insufficient evidence share one internal `data_sufficient=false` gate. Legacy Daily labels remain compatibility/audit paths, not the visible VCP primary status. Public `/mvp`, VCP API contract, 931/931 evaluated coverage, desktop/mobile layout, and VCP drawer parity were rechecked after backend/dashboard recreation; final source is committed on the stable branch.
 
 ## Current reliability status — 2026-08-21
 
