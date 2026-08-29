@@ -1,4 +1,5 @@
 import json
+import math
 
 from unified_vcp_decision import project_unified_vcp_decision
 
@@ -53,6 +54,17 @@ def test_insufficient_data_is_unknown_and_clears_state():
     assert output["data_sufficient"] is False
 
 
+def test_stale_and_not_verified_are_insufficient_even_with_override():
+    for state in ("STALE", "NOT_VERIFIED"):
+        output = project_unified_vcp_decision(
+            result(state), data_sufficient=True
+        )
+        assert output["state"] is None
+        assert output["decision"] is None
+        assert output["quality"] == "UNKNOWN"
+        assert output["data_sufficient"] is False
+
+
 def test_quality_requires_all_60m_structural_evidence():
     output = project_unified_vcp_decision(result("READY", evidence={"prior_trend_pass": True}))
     assert output["quality"] == "PARTIAL"
@@ -89,7 +101,34 @@ def test_daily_context_is_copy_only_and_cannot_promote_state():
     assert confirmed["decision"] == "REVIEW"
 
 
-def test_projection_is_json_safe_and_does_not_mutate_result():
+def test_projection_has_exact_keys_and_strictly_json_safe_nested_context():
+    class Unsupported:
+        pass
+
+    context = {
+        "finite": 1.5,
+        "nested": {"nan": math.nan, "infinity": math.inf, "object": Unsupported()},
+        "items": (math.inf, Unsupported()),
+    }
+    output = project_unified_vcp_decision(
+        result("CONFIRMED", price={"pivot_high": math.nan}), context
+    )
+
+    assert set(output) == {"state", "decision", "quality", "data_sufficient", "evidence"}
+    assert set(output["evidence"]) == {
+        "timeframe", "trigger", "invalidation", "distance_to_trigger_pct",
+        "volume_confirmation", "daily_context",
+    }
+    assert output["evidence"]["trigger"] is None
+    assert output["evidence"]["daily_context"] == {
+        "finite": 1.5,
+        "nested": {"nan": None, "infinity": None, "object": None},
+        "items": [None, None],
+    }
+    json.dumps(output, allow_nan=False)
+
+
+def test_projection_does_not_mutate_result():
     source = result("CONFIRMED")
     before = json.dumps(source, sort_keys=True)
     output = project_unified_vcp_decision(source)

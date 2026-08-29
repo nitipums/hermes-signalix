@@ -1,7 +1,7 @@
 """Pure compact serving projection for one 60m VCP result."""
 from __future__ import annotations
 
-from copy import deepcopy
+import math
 
 
 _STRUCTURAL_KEYS = (
@@ -19,18 +19,27 @@ _DECISIONS = {
     "EXTENDED": "WAIT",
     "FAILED": "AVOID",
 }
-_EVENT_LANES = {
-    "PRICE_VOLUME_BREAKOUT",
-    "PIVOT_TOUCH_VOLUME_WATCH",
-    "CLOSE_BREAKOUT_VOLUME_PENDING",
-}
-
-
 def _number(value):
     try:
-        return float(value) if value is not None else None
+        number = float(value) if value is not None else None
+        return number if number is None or math.isfinite(number) else None
     except (TypeError, ValueError):
         return None
+
+
+def _json_safe(value):
+    if value is None or isinstance(value, (bool, int, str)):
+        return value
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            key if isinstance(key, str) else str(key): _json_safe(item)
+            for key, item in value.items()
+        }
+    return None
 
 
 def _data_is_sufficient(result, override):
@@ -56,8 +65,6 @@ def _quality(result, sufficient):
     evidence = result.get("evidence") or {}
     if all(evidence.get(key) is True for key in _STRUCTURAL_KEYS):
         return "PASS"
-    if result.get("review_lane") in _EVENT_LANES or state == "BREAKOUT_WATCH":
-        return "PARTIAL"
     return "PARTIAL"
 
 
@@ -90,6 +97,6 @@ def project_unified_vcp_decision(
             "invalidation": _number(price.get("invalidation")),
             "distance_to_trigger_pct": _number(price.get("distance_to_pivot_pct")),
             "volume_confirmation": volume_confirmation,
-            "daily_context": deepcopy(daily_context) if isinstance(daily_context, dict) else {},
+            "daily_context": _json_safe(daily_context) if isinstance(daily_context, dict) else {},
         },
     }
