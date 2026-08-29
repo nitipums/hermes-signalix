@@ -433,17 +433,27 @@ body {
 .vcp-card__tags .tag { border:1px solid rgba(201,168,76,.45); border-radius:999px; padding:3px 8px; color:#d8bc65; font-size:.72rem; }
 .vcp-card__evidence { font-size:.78rem; line-height:1.45; color:var(--text-2); overflow-wrap:anywhere; }
 .vcp-card__provenance { margin-top:9px; font-size:.7rem; color:var(--text-3); line-height:1.4; overflow-wrap:anywhere; }
+.vcp-row__details { display:none; }
 @media (max-width: 767px) {
+  .explorer-controls { align-items:stretch; }
+  .explorer-control, .explorer-search { width:100%; min-width:0; }
+  .explorer-control select, .explorer-control input { width:100%; }
+  .margin-rate-options { width:100%; }
   #panel-vcp .card-list { display:flex; flex-direction:column; gap:8px; }
   #panel-vcp .vcp-card__grid { grid-template-columns:1fr; }
   #panel-vcp .vcp-card__state { max-width:52%; }
   .vcp-table th, .vcp-table td { padding:8px 4px; }
   .vcp-table { table-layout:auto; }
-  .vcp-table th:first-child, .vcp-table td:first-child { width:90px; min-width:90px; }
-  .vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:auto; }
+  .vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }
+  .vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:18%; }
+  .vcp-table th:nth-child(3), .vcp-table td:nth-child(3) { width:18%; }
+  .vcp-table th:nth-child(4), .vcp-table td:nth-child(4) { width:22%; }
+  .vcp-table .vcp-row__rr { display:none; }
   .vcp-row__symbol { flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
   .vcp-row__symbol .vcp-card__tags { width:100%; max-width:100%; margin:0; }
   .vcp-row__symbol .tag { max-width:100%; padding:2px 4px; font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vcp-card__decision { white-space:normal; overflow:visible; text-overflow:clip; overflow-wrap:normal; word-break:normal; line-height:1.25; }
+  .vcp-row__details { display:inline-flex; min-height:32px; align-items:center; padding:0 7px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--accent); font:inherit; font-size:.65rem; font-weight:600; cursor:pointer; }
 }
 .vcp-table .vcp-card__tags { flex:1 1 auto; gap:3px; margin:0; min-width:0; overflow:hidden; }
 .vcp-table .vcp-card__tags .tag { padding:1px 4px; font-size:.6rem; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

@@ -821,6 +821,7 @@
 
   function vcpCard(result) {
     var price = result.price || {}, pattern = result.pattern || {}, volume = result.volume || {}, data = result.data || {};
+    var symbol = result.symbol || "–";
     var state = result.state || "NOT_VERIFIED";
     var cls = state.toLowerCase().replace(/_/g, "-");
     var reason = (result.reasons || result.reason_codes || []).join(" · ");
@@ -849,11 +850,11 @@
     var primaryStatus = vcpPrimaryStatus(result);
     var primaryEvidence = vcpPrimaryEvidence(result);
     return '<tr class="vcp-row vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<td class="vcp-row__symbol"><span class="vcp-card__primary"><strong>' + escapeHTML(result.symbol || "–") + '</strong><span class="vcp-card__decision">' + escapeHTML(primaryStatus) + '</span><span class="vcp-card__evidence">' + escapeHTML(primaryEvidence) + '</span></span>' + tagHTML + '</td>' +
+      '<td class="vcp-row__symbol"><span class="vcp-card__primary"><strong>' + escapeHTML(symbol) + '</strong><span class="vcp-card__decision">' + escapeHTML(primaryStatus) + '</span><span class="vcp-card__evidence">' + escapeHTML(primaryEvidence) + '</span><button type="button" class="vcp-row__details" aria-label="View details for ' + escapeHTML(symbol) + '">Details</button></span>' + tagHTML + '</td>' +
       '<td>' + (price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close)) + '</td>' +
       '<td class="vcp-row__change">' + (price.change_pct == null ? "—" : Number(price.change_pct).toFixed(2) + "%") + '</td>' +
       '<td>' + (price.distance_to_pivot_pct == null ? "—" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</td>' +
-      '<td>' + (vcpRiskReward(result) == null ? "—" : vcpRiskReward(result).toFixed(2) + "R") + '</td>' +
+      '<td class="vcp-row__rr">' + (vcpRiskReward(result) == null ? "—" : vcpRiskReward(result).toFixed(2) + "R") + '</td>' +
     '</tr>';
   }
 
@@ -876,7 +877,7 @@
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
-      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
+      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
     }).join("") || vcpEmptyState(target);
   }
 
@@ -909,7 +910,7 @@
     ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"].forEach(function(status) {
       if (!groups[status]) return;
       var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
-      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
+      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
     });
     target.innerHTML = html || vcpEmptyState(target);
   }

@@ -186,8 +186,8 @@ def test_mobile_interactive_targets_are_touch_safe():
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
 
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
-    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:90px; min-width:90px; }" in css
-    assert ".vcp-table th:not(:first-child), .vcp-table td:not(:first-child) { width:auto; }" in css
+    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }" in css
+    assert ".vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:18%; }" in css
     assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css
 
 
@@ -201,6 +201,18 @@ def test_watchlist_table_and_filters_are_contained_on_mobile():
     assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
     assert ".watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap;" in css
     assert ".watchlist-default-filters > label { display:inline-flex; align-items:center;" in css
+
+
+def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert '.vcp-card__decision { white-space:normal; overflow:visible;' in css
+    assert '.vcp-table .vcp-row__rr { display:none; }' in css
+    assert '.vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }' in css
+    assert 'class="vcp-row__details" aria-label="View details for ' in js
+    assert 'class="vcp-row__rr">' in js
+    assert '<th class="vcp-row__rr">R/R</th>' in js
+    assert '<div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>' in (ROOT / "index.html").read_text(encoding="utf-8")
 
 
 def test_vcp_tables_use_canonical_rr_and_compact_tags():
