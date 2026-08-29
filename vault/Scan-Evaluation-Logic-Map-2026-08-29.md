@@ -1,9 +1,51 @@
 # Signalix Scan & Evaluation Logic Map
 
-> **STATUS: REVIEW_REQUIRED**
+> **STATUS: CURRENT_WITH_REMAINING_GAPS**
 > **Date:** 2026-08-29
 > **Purpose:** อธิบายว่า Signalix ตอนนี้ scan/evaluate อะไร อย่างไร และจุดไหนซ้ำซ้อน
-> **Scope:** source review ของ branch `release/signalix-mvp-stable`; ยังไม่ใช่ runtime acceptance
+> **Scope:** source + served-runtime map; current runtime evidence is recorded below
+
+## Current status (owner-approved implementation)
+
+Serving spine ที่เลือกและ implement แล้วคือ:
+
+```text
+60m VCP setup authority
++ official Daily EOD context/lifecycle
++ intraday overlay
+→ one unified VCP decision contract
+```
+
+Shadow/replay paths ยังเป็น non-serving และไม่ใช่ authority ของผลที่แสดงแก่ผู้ใช้
+
+Verified implemented slices:
+
+- unified VCP UI/filters/grouping — `eb29742`
+- Active ORD instrument quality — `c10c475`
+- VCP provenance — `cb19afa`
+- Daily dimensions — `fd8205b`
+- Daily no-60m fallback — `2c58256`
+- active-master full-universe source — `453badb`
+- explicit snapshot rows — `82fbb99`
+- policy/ranking slice — `2fe9a18`
+- completed-session scan on 2026-08-29 produced run `3c344183-563e-408f-b069-d73140d29c88`, with `931/931` observations and `53` `INSUFFICIENT_HISTORY`
+
+The source map below preserves the historical findings that led to this
+decision. Remaining work is the shadow multi-week replay/promotion gate, plus
+any explicitly non-blocking cleanup.
+
+Current served verification after the latest release:
+
+- Public `/mvp` returns HTTP 200 and renders the canonical VCP decision/filter
+  surface; `READY · WAIT` cards show `Quality` and `Data` evidence.
+- Public VCP API reports `931` evaluated symbols and the valid `full_success`
+  run `vcp60-20260828T094803Z-db4c9073`.
+- Public mobile target at 390px reports `clientWidth=390`,
+  `scrollWidth=390`, and `bodyScrollWidth=390`.
+- Local analytical readiness reports `{"status":"ok","db":"up","redis":"up"}`.
+- Completed-session Daily scan run `3c344183-563e-408f-b069-d73140d29c88`
+  persisted `931/931` observations, including `53` explicit
+  `INSUFFICIENT_HISTORY` rows and no null `analysis_date` snapshot rows.
 
 ## 0. Executive summary
 
@@ -296,22 +338,28 @@ FULL universe → Stage → VCP quality → Proximity → Trigger + Invalidation
 
 ## 8. ข้อเสนอแนะเรียงลำดับ
 
-### P0 — กำหนด decision spine เดียวก่อนเพิ่ม indicator
+### สถานะของข้อเสนอแนะ
 
-เลือกให้ชัดว่า serving authority คือ:
+- **Implemented:** unified VCP serving spine and UI/filters/grouping; Active ORD instrument quality; VCP provenance; Daily dimensions; Daily no-60m fallback; active-master full-universe source; explicit snapshot rows; and the policy/ranking slice in `2fe9a18`.
+- **Remaining:** shadow multi-week replay and the owner promotion gate. Replay must remain non-serving until point-in-time comparisons and owner acceptance are complete.
+- **Non-blocking:** explicitly identified cleanup may continue without changing the serving contract.
+
+### P0 — กำหนด decision spine เดียวก่อนเพิ่ม indicator — implemented
+
+เลือกและ implement แล้วว่า serving authority คือ:
 
 ```text
-Daily EOD structure/context
-+ isolated 60m VCP morphology
-→ one decision contract
-→ one action lane
+60m VCP setup authority
++ official Daily EOD context/lifecycle
++ intraday overlay
+→ one unified VCP decision contract
 ```
 
-หรือให้ Daily path เป็น authority แล้ว 60m VCP เป็น evidence enrichment — แต่ต้องเลือก ไม่ใช่ให้สอง path สร้าง actionability ของตัวเอง
+Daily ทำหน้าที่ official EOD context/lifecycle, 60m VCP เป็น setup authority และ intraday เป็น overlay ภายใต้ unified VCP decision contract
 
-### P1 — ลด label ที่ trader ต้องอ่าน
+### P1 — ลด label ที่ trader ต้องอ่าน — implemented in the unified VCP slice
 
-ภายในยังเก็บ evidence ได้เต็ม แต่ UI/export ให้มี primary contract เดียว:
+ภายในยังเก็บ evidence ได้เต็ม และ UI/export ใช้ primary contract เดียว:
 
 ```text
 stage: S1-S4
@@ -322,23 +370,23 @@ decision: REVIEW / WAIT / AVOID / DATA_BLOCKED
 
 `trade_readiness.status`, legacy `primary_state`, scan group และ VCP lane ควรเป็น compatibility/audit fields หรือ map เข้าสู่ contract เดียว
 
-### P1 — แยก timeframe ใน schema ให้เห็นชัด
+### P1 — แยก timeframe ใน schema ให้เห็นชัด — implemented in the Daily-dimensions/no-fallback slices
 
 ห้ามเอา 60m bars ไปคำนวณ Daily-labelled metrics โดยไม่ประกาศเด็ดขาด แยก `daily_evidence` กับ `intraday_evidence` และถ้า Daily history ไม่พอให้เป็น `INSUFFICIENT_HISTORY` หรือใช้ classifier ที่ชื่อ intraday โดยตรง
 
-### P1 — รวม threshold ownership
+### P1 — รวม threshold ownership — implemented in the policy/ranking slice
 
-สร้าง policy table กลาง แยก `daily_eod` กับ `60m` แต่ละค่ามี owner/version: breakout buffer, volume, extension, RSI, liquidity, invalidation, freshness
+มี policy table กลาง แยก `daily_eod` กับ `60m` และกำหนด owner/version ของ breakout buffer, volume, extension, RSI, liquidity, invalidation, freshness แล้ว
 
-### P2 — รวม ranking
+### P2 — รวม ranking — implemented in `2fe9a18`
 
-เลือก canonical ordering หนึ่งชุด; ส่วน lane cap/filter เป็น presentation และต้องอธิบายเหตุผลที่แยกจาก ranking
+มี policy/ranking slice แล้ว; ส่วน lane cap/filter ยังคงเป็น presentation และต้องอธิบายเหตุผลที่แยกจาก ranking
 
-### P2 — ทำ full-universe audit ให้ครบ
+### P2 — ทำ full-universe audit ให้ครบ — implemented for the verified completed session
 
-แทน silent `continue` ด้วย explicit observation status เพื่อให้ count ที่เห็นใน dashboard อธิบายได้ว่า evaluated / no data / error / insufficient history เท่าไร
+ใช้ active-master full-universe source และ explicit snapshot rows แล้ว โดย completed-session run `3c344183-563e-408f-b069-d73140d29c88` มี observation `931/931` และ `53` `INSUFFICIENT_HISTORY`; ต้องคงการตรวจซ้ำใน session/replay ต่อไป
 
-### P2 — Shadow ต้องมี promotion gate
+### P2 — Shadow ต้องมี promotion gate — remaining
 
 ใช้ replay แบบ point-in-time เทียบ pivot, state, invalidation, confirmation และ outcome ก่อน promote; จนกว่าจะผ่าน owner acceptance ให้ติด `shadow_only` ชัดใน API/docs
 
@@ -364,14 +412,14 @@ decision: REVIEW / WAIT / AVOID / DATA_BLOCKED
 - Codex CLI read-only architecture review, model `gpt-5.6-luna`
 - Ploy product/trader challenge (product-level, no code access)
 - Git baseline and `git diff --check`
+- Owner-approved implementation evidence: commits `eb29742`, `c10c475`, `cb19afa`, `fd8205b`, `2c58256`, `453badb`, `82fbb99`, and `2fe9a18`
+- Completed-session scan 2026-08-29: run `3c344183-563e-408f-b069-d73140d29c88`, `931/931` observations, `53` `INSUFFICIENT_HISTORY`
 
 ### Not verified
 
-- Live API response, live DB counts, container/runtime version
-- Served desktop/mobile rendered behavior
-- Current production snapshot contents
-- End-to-end tests: Codex attempted focused pytest but collection failed with `FileNotFoundError: No usable temporary directory found`
-- No code/deploy/database changes were made for this review
+- Shadow multi-week replay promotion outcome remains NOT VERIFIED: the bounded run persisted 18 snapshots / 16,758 rows for 931 symbols, all shadow rows were `DATA_BLOCKED`, and finalization was stopped after excessive runtime; no v1 switch was made.
+- Forced-offline browser failure-state journey remains NOT VERIFIED because the browser served cached content.
+- The completed-session scan and public MVP/API/runtime evidence above are verified; this document update itself changes no runtime state.
 
 ## Appendix — source map
 
