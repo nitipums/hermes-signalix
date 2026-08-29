@@ -238,6 +238,11 @@
     return value == null || value === "" ? "NOT_VERIFIED" : value;
   }
 
+  function displayMetadataValue(value, pending) {
+    if (value != null && value !== "") return value;
+    return pending ? "Loading…" : "Unavailable";
+  }
+
   function marginBadge(item) {
     var rate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
     return rate == null ? "" : '<span class="marginable-badge">%Margin ' + Number(rate).toFixed(0) + '%</span>';
@@ -252,8 +257,8 @@
     return "Krungsri list · " + total + " securities (" + ord + " ORD + " + dr + " DR) · effective " + date;
   }
 
-  function formatRange(high, low) {
-    if (high == null && low == null) return "NOT_VERIFIED";
+  function formatRange(high, low, pending) {
+    if (high == null && low == null) return pending ? "Loading…" : "Unavailable";
     return (high == null ? "–" : Number(high).toFixed(2)) + " / " + (low == null ? "–" : Number(low).toFixed(2));
   }
 
@@ -360,12 +365,13 @@
     dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
     var drawerChg = fmtChange(item.change_pct);
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
-    dom.drawerRR.textContent = displayValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null);
+    var metadataPending = item._canonicalMetadataPending === true;
+    dom.drawerRR.textContent = displayMetadataValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null, metadataPending);
     setOptionalDrawerField(dom.drawerMembership, (item.index_membership || []).join(" · "));
     var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
     setOptionalDrawerField(dom.drawerMargin, marginRate != null ? Number(marginRate).toFixed(0) + "%" : null);
-    dom.drawer52W.textContent = formatRange(item.high52, item.low52);
-    dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low);
+    dom.drawer52W.textContent = formatRange(item.high52, item.low52, metadataPending);
+    dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low, metadataPending);
     var prov = item.provenance || {};
     dom.drawerProv.textContent = formatProvenance(prov.scan_time || item.as_of);
   }
@@ -524,6 +530,19 @@
     return localShortlistItem(symbol) || {symbol: symbol, name: symbol, provenance: {}};
   }
 
+  function mergeCanonicalDailyMetadata(item, canonical) {
+    // VCP remains authoritative for intraday price/action/trigger/invalidation.
+    // Fill only drawer metadata that the VCP finder payload does not carry.
+    var fields = ["name", "sector", "industry", "market_cap", "description",
+                  "high52", "low52", "ath_high", "ath_low", "rr", "target",
+                  "change_amount", "trade_value", "index_membership"];
+    fields.forEach(function(field) {
+      if (canonical[field] != null && item[field] == null) item[field] = canonical[field];
+    });
+    item._canonicalMetadataPending = false;
+    return item;
+  }
+
   function navigateDrawer(delta) {
     var nextIndex = drawerIndex + delta;
     if (nextIndex < 0 || nextIndex >= drawerSymbols.length) return;
@@ -549,6 +568,7 @@
     var chartController = new AbortController();
     chartAbort = chartController;
     // Immediate render from local card data (fast path).
+    if (item.vcp_result) item._canonicalMetadataPending = true;
     renderDrawerDetail(item);
 
     var cachedChart = chartCache[chartKey];
@@ -563,16 +583,26 @@
     dom.drawer.classList.remove("drawer--hidden");
     document.body.style.overflow = "hidden";
 
-    // Daily/Explorer details are intentionally not fetched for VCP: card payload is the authoritative VCP detail.
-    if (!item.vcp_result) fetch("/api/symbol/" + encodeURIComponent(symbol))
+    // VCP owns intraday decision fields; canonical Daily detail fills metadata.
+    fetch("/api/symbol/" + encodeURIComponent(symbol), {signal: chartController.signal})
       .then(function(res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
       })
       .then(function(fresh) {
-        if (fresh && fresh.symbol) renderDrawerDetail(fresh);
+        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
+        if (fresh && fresh.symbol) {
+          renderDrawerDetail(item.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : fresh);
+        }
       })
-      .catch(function() { /* keep card-local detail on failure */ });
+      .catch(function() {
+        // Metadata failure is distinct from VCP evidence being NOT_VERIFIED.
+        if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
+        if (item.vcp_result) {
+          item._canonicalMetadataPending = false;
+          renderDrawerDetail(item);
+        }
+      });
 
     if (!cachedChart) {
       // Fetch DB-backed candles first; snapshot overlay is fallback only.

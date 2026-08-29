@@ -58,7 +58,33 @@ def test_drawer_timeframe_switch_preserves_surface_item_and_discards_stale_chart
     assert "avgDailyValue20: (vd.daily_metrics || {}).avg_trade_value_20" in js
 
 
-def test_vcp_confirmed_quality_gaps_are_decision_visible():
+def test_vcp_drawer_fetches_canonical_metadata_without_overwriting_vcp_fields():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "function mergeCanonicalDailyMetadata(item, canonical)" in js
+    assert '"high52", "low52", "ath_high", "ath_low", "rr", "target"' in js
+    assert 'fetch("/api/symbol/" + encodeURIComponent(symbol), {signal: chartController.signal})' in js
+    assert "mergeCanonicalDailyMetadata(item, fresh)" in js
+    assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol" in js
+    assert "VCP owns intraday decision fields" in js
+
+
+def test_vcp_drawer_distinguishes_pending_metadata_from_unverified_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "function displayMetadataValue(value, pending)" in js
+    assert 'return pending ? "Loading…" : "Unavailable";' in js
+    assert "if (item.vcp_result) item._canonicalMetadataPending = true;" in js
+    assert "item._canonicalMetadataPending = false;" in js
+    assert "formatRange(item.high52, item.low52, metadataPending)" in js
+    assert "formatRange(item.ath_high, item.ath_low, metadataPending)" in js
+    assert "Metadata failure is distinct from VCP evidence being NOT_VERIFIED." in js
+
+
+def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'NOT_VERIFIED: "NOT VERIFIED"' in js
+    assert 'var state = result.state || "NOT_VERIFIED";' in js
+    assert 'data.feed_status || "NOT_VERIFIED"' in js
+
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "function vcpQualityFlags(result)" in js
     assert 'flags.push("NO VOLUME DRY-UP")' in js

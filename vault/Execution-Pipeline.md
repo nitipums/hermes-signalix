@@ -28,6 +28,7 @@ The product must let a user answer, quickly and honestly:
 - Public Signalix and the owner-only Portfolio Copilot remain isolated.
 - No live auto-trading. Paper/pilot execution comes before any real execution.
 - The overview must be usable before detail/chart data load; unknown compact-card data must never cause all symbols to disappear.
+- Drawer metadata and decision evidence are separate contracts: genuine missing/insufficient VCP evidence remains `NOT_VERIFIED`; optional canonical metadata shows `Loading…` while `/api/symbol/{symbol}` is pending and `Unavailable` when that request fails. Chart unavailability is reported separately.
 
 ## Current verified baseline
 
@@ -40,6 +41,7 @@ The product must let a user answer, quickly and honestly:
 - VCP full-universe persistence retains every evaluated symbol. Forming presentation lanes are maturing/early/needs_work; contraction and breakout volume are deterministic sort inputs, not primary table columns.
 - VCP runs after committed full/partial 60m ingestion with ingestion lineage and overlap lock; failed/skipped ingestion does not create a new VCP run. Missing optional index/margin data is omitted rather than rendered as `NOT_VERIFIED`.
 - Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
+- VCP drawer enrichment preserves VCP decision fields, fetches missing Daily metadata from `/api/symbol/{symbol}`, and distinguishes `Loading…`/`Unavailable` metadata from genuine `NOT_VERIFIED` evidence; covered by frontend contract tests and served click-path verification.
 - The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
 
 ## Current reliability status — 2026-08-21
