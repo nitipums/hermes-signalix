@@ -174,9 +174,8 @@ def load_symbol(symbol, pg=None, lookback=None, market="TH", as_of_date=None):
 def load_symbol_intraday(symbol, pg=None, interval="60m", lookback=400, market="TH"):
     """Return an interval-scoped OHLCV DataFrame (timestamp-indexed), or None.
 
-    Used as a fallback when a symbol lacks enough DAILY bars (< 200) to compute
-    a 200-day MA: the 60m series still yields a valid trend structure, flagged
-    as a new listing via trend_source='intraday_60m'.
+    This loader is reserved for explicitly intraday paths. It must not be used
+    as a fallback for Daily/stage calculations.
     """
     own = pg is None
     if own:
@@ -636,32 +635,32 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
                        _active_scan_symbols(pg, instrument_types=("ORD",)))
         symbol_list = [s for s in symbol_list if s not in excluded]
         closes, rel_returns, trend_sources = {}, {}, {}
+        insufficient_daily = {}
         m_ret = (market_series["Close"].iloc[-1] / market_series["Close"].iloc[-RS_LOOKBACK] - 1
                  if market_series is not None and len(market_series) >= RS_LOOKBACK else 0.0)
         for sym in symbol_list:
             df = load_symbol(sym, pg=pg, lookback=SCAN_LOOKBACK, market=market,
                              as_of_date=as_of_date)
-            trend_source = "daily"
-            # New listings / thin daily history: fall back to 60m intraday so the
-            # stage scan still runs. RS vs the daily benchmark is approximate.
             if df is None or len(df) < MIN_DAYS:
-                idf = load_symbol_intraday(sym, pg=pg, interval="60m",
-                                           lookback=SCAN_LOOKBACK, market=market)
-                if idf is not None and len(idf) >= 50:
-                    df, trend_source = idf, "intraday_60m"
-            if df is None or len(df) < 1:
+                # Daily/stage metrics must never be calculated from 60m bars.
+                # Keep the symbol visible as an explicit fail-closed observation.
+                insufficient_daily[sym] = df
                 continue
+            trend_source = "daily"
             c = df["Close"]
-            look = min(RS_LOOKBACK, len(c))
-            rel_returns[sym] = c.iloc[-1] / c.iloc[-look] - 1 - m_ret
+            rel_returns[sym] = c.iloc[-1] / c.iloc[-RS_LOOKBACK] - 1 - m_ret
             closes[sym] = df
             trend_sources[sym] = trend_source
         ranks = pd.Series(rel_returns).rank(pct=True) * 100
         results, all_results = [], []
-        for sym, df in closes.items():
+        for sym in symbol_list:
+            df = closes.get(sym)
             try:
-                row = analyze_symbol_db(sym, pg=pg, market_series=market_series,
-                                        rs_rating=ranks.get(sym, 0.0), df=df)
+                if sym in insufficient_daily:
+                    row = insufficient_history_row(sym, insufficient_daily[sym])
+                else:
+                    row = analyze_symbol_db(sym, pg=pg, market_series=market_series,
+                                            rs_rating=ranks.get(sym, 0.0), df=df)
             except Exception:
                 continue
             if row is None:
