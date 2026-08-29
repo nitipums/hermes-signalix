@@ -186,6 +186,99 @@ def test_daily_watchlist_response_does_not_serialize_full_vcp_results(monkeypatc
     assert body["daily_watchlist"]["breakout_watch"] == [{"symbol": "A"}]
 
 
+def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
+    result = _vcp_result("AAA", "READY")
+    result["decision"] = {
+        "state": "READY",
+        "decision": "WAIT",
+        "quality": "PASS",
+        "data_sufficient": True,
+        "evidence": {
+            "timeframe": "60m",
+            "trigger": 50.0,
+            "invalidation": 48.0,
+            "distance_to_trigger_pct": 4.0,
+            "volume_confirmation": False,
+            "daily_context": {"trend_pass": True},
+        },
+    }
+    raw_state = result["state"]
+    payload = {
+        "schema_version": "signalix.vcp_finder_60m.v1",
+        "run_id": "run-unified",
+        "universe": {"eligible": 2, "evaluated": 2, "returned": 2},
+        "coverage": {"feed_unavailable": 0, "no_data": 1},
+        "results": [result, {**_vcp_result("MISSING", "NOT_VERIFIED"), "decision": {
+            "state": None,
+            "decision": None,
+            "quality": "UNKNOWN",
+            "data_sufficient": False,
+            "evidence": {"timeframe": "60m"},
+        }}],
+        "daily_watchlist": {
+            "action_review": [result],
+            "near_trigger": [],
+            "breakout_watch": [],
+        },
+    }
+    class Conn:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+
+    def latest(pg, **kwargs):
+        return payload
+
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", latest)
+
+    explorer_handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/vcp-finder?interval=60m", explorer_handler) is True
+    explorer = json.loads(explorer_handler.body)
+    watchlist_handler = Handler()
+    assert mvp_routes.handle_mvp_api(
+        "/api/vcp-finder?interval=60m&daily_watchlist=true", watchlist_handler
+    ) is True
+    watchlist = json.loads(watchlist_handler.body)
+
+    assert explorer["results"][0]["decision"] == watchlist["daily_watchlist"]["action_review"][0]["decision"]
+    assert explorer["results"][0]["state"] == raw_state == "READY"
+    assert explorer["results"][1]["state"] == "NOT_VERIFIED"
+    assert watchlist["universe"] == {"eligible": 2, "evaluated": 2, "returned": 2}
+
+
+def test_watchlist_caps_and_state_filters_do_not_rewrite_raw_vcp_state(monkeypatch):
+    results = [_vcp_result(f"A{i}", "READY") for i in range(12)]
+    results.append(_vcp_result("INSUFFICIENT", "NOT_VERIFIED"))
+    payload = {
+        "schema_version": "signalix.vcp_finder_60m.v1",
+        "universe": {"eligible": 13, "evaluated": 13, "returned": 13},
+        "coverage": {"feed_unavailable": 0, "no_data": 1},
+        "results": results,
+        "daily_watchlist": {
+            "action_review": results[:10],
+            "near_trigger": [],
+            "breakout_watch": [],
+        },
+    }
+    class Conn:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", lambda *args, **kwargs: payload)
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api(
+        "/api/vcp-finder?interval=60m&daily_watchlist=true&state=FAILED&limit=1",
+        handler,
+    ) is True
+    body = json.loads(handler.body)
+
+    assert body["universe"] == {"eligible": 13, "evaluated": 13, "returned": 13}
+    assert len(body["daily_watchlist"]["action_review"]) == 10
+    assert all(row["state"] == "READY" for row in body["daily_watchlist"]["action_review"])
+    assert body["coverage"]["no_data"] == 1
+    assert payload["results"][-1]["state"] == "NOT_VERIFIED"
+
+
 def test_confirmed_without_quality_is_excluded_from_action_review():
     confirmed = _vcp_result("CNF", "CONFIRMED", evidence={"base_pass": False})
     assert project_daily_vcp_watchlist([confirmed])["action_review"] == []
