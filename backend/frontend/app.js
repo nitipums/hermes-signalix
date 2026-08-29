@@ -889,21 +889,27 @@
       breakout_watch: "BREAKOUT_WATCH"
     };
     var caps = (lanes && lanes.caps) || {};
+    var groups = {};
+    var groupCaps = {};
+    var groupHasCaps = {};
     var html = "";
     order.forEach(function(key) {
       var items = (lanes && lanes[key]) || [];
       if (!items.length) return;
       var cap = caps[capKeys[key]];
-      var groups = {};
       items.forEach(function(item) {
         var status = vcpDisplayGroup(item);
         (groups[status] || (groups[status] = [])).push(item);
+        if (cap != null) {
+          groupCaps[status] = (groupCaps[status] || 0) + Number(cap);
+          groupHasCaps[status] = true;
+        }
       });
-      ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"].forEach(function(status) {
-        if (!groups[status]) return;
-        var subhead = cap != null ? String(groups[status].length) + " / " + String(cap) : String(groups[status].length);
-        html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
-      });
+    });
+    ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "—"].forEach(function(status) {
+      if (!groups[status]) return;
+      var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
+      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th>R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
     });
     target.innerHTML = html || vcpEmptyState(target);
   }

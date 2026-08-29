@@ -302,3 +302,16 @@ def test_vcp_primary_render_cannot_read_legacy_decision_fields():
     assert "function vcpDisplayGroup(result)" in js
     display_group = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
     assert "return vcpPrimaryStatus(result);" in display_group
+
+
+def test_daily_watchlist_consolidates_duplicate_primary_status_sections():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    render = js[js.index("function renderDailyVcpWatchlist"):js.index("function loadDailyVcp")]
+
+    # Compatibility lanes are grouped into shared primary-status buckets before
+    # the ordered section render, so READY · WAIT cannot render twice.
+    assert render.index("var groups = {};") < render.index("order.forEach(function(key)")
+    assert render.index("items.forEach(function(item)") < render.index("[\"FORMING · WAIT\"")
+    assert render.count("html += '<section class=\"vcp-lane\">") == 1
+    assert "(groups[status] || (groups[status] = [])).push(item);" in render
+    assert "groupCaps[status] = (groupCaps[status] || 0) + Number(cap);" in render
