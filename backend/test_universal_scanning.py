@@ -178,3 +178,65 @@ def test_scan_universe_normal_daily_row_does_not_change_without_fallback(monkeyp
     assert "analysis_status" not in results[0]
     assert results[0]["trend_source"] == "daily"
     assert results[0]["close"] == 152.9
+
+
+def test_scan_universe_preserves_full_daily_accounting_when_analysis_raises(monkeypatch):
+    daily = _bars(close=123.0)
+
+    def load(symbol, pg=None, lookback=None, market="TH", **kwargs):
+        return _bars() if symbol == "SPY" else (None if symbol == "MISSING" else daily)
+
+    original_analyze = screening.analyze_symbol_db
+
+    def analyze(symbol, **kwargs):
+        if symbol == "ERROR":
+            raise RuntimeError("synthetic analysis failure")
+        return original_analyze(symbol, **kwargs)
+
+    monkeypatch.setattr(screening, "load_symbol", load)
+    monkeypatch.setattr(screening, "analyze_symbol_db", analyze)
+    monkeypatch.setattr(screening, "annotate_all_time_highs", lambda *args, **kwargs: None)
+
+    results, near = screening.scan_universe(
+        min_conditions=0,
+        limit=1,
+        pg=_Pg(),
+        market="US",
+        benchmark_symbol="SPY",
+        symbols=("NORMAL", "MISSING", "ERROR"),
+        min_price=None,
+        min_today_trade_value=None,
+    )
+
+    assert near == []
+    assert {row["symbol"] for row in results} == {"NORMAL", "MISSING", "ERROR"}
+    by_symbol = {row["symbol"]: row for row in results}
+    assert by_symbol["NORMAL"].get("analysis_status") is None
+    assert by_symbol["MISSING"]["analysis_status"] == "INSUFFICIENT_HISTORY"
+    assert by_symbol["ERROR"]["analysis_status"] == "NOT_VERIFIED"
+    assert by_symbol["ERROR"]["trend_source"] == "daily"
+    assert by_symbol["ERROR"]["reason_codes"] == ["analysis_exception"]
+    assert by_symbol["ERROR"]["close"] is None
+    assert by_symbol["ERROR"]["trend_template"]["conditions_met"] == 0
+    assert by_symbol["ERROR"]["trade_readiness"]["status"] == "NOT_VERIFIED"
+
+
+def test_not_verified_daily_row_is_never_projected_as_actionable_group():
+    row = screening.analysis_error_row("ERROR")
+
+    groups = screening.group_scan_results([row])
+
+    assert [item["symbol"] for item in groups["base"]] == ["ERROR"]
+    assert all(not groups[name] for name in ("breakout_new", "uptrend_pullback", "waiting_breakout"))
+    assert row["daily_state"]["primary_state"] == "not_verified"
+    assert row["daily_state"]["setup_quality"] == {
+        "pass": False, "reasons": ["analysis_exception"]
+    }
+
+    from action_queue import assign_action_queue
+    assert assign_action_queue(
+        stage=row["daily_state"]["stage"],
+        phase=row["daily_state"]["phase"],
+        quality_pass=row["daily_state"]["setup_quality"]["pass"],
+        proximity_state=row["daily_state"]["setup_proximity"]["state"],
+    ) == "monitor_only"

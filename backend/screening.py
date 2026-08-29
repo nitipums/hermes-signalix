@@ -359,6 +359,50 @@ def insufficient_history_row(symbol, df, rs_rating=0.0):
     }
 
 
+def analysis_error_row(symbol, reason_code="analysis_exception"):
+    """Keep a failed Daily analysis visible without inventing evidence.
+
+    This is an observation of unavailable/invalid analysis, not a market
+    signal.  In particular, all price and indicator fields remain unknown.
+    """
+    return {
+        "symbol": symbol,
+        "analysis_status": "NOT_VERIFIED",
+        "reason_codes": [reason_code],
+        "reason": "Daily analysis failed; no actionable state was produced.",
+        "close": None,
+        "change": None,
+        "volume": 0.0,
+        "trade_value": None,
+        "last_date": None,
+        "trend_source": "daily",
+        "trend_template": {
+            "pass": False, "conditions_met": 0,
+            "reason": reason_code, "conditions": {},
+            "ma": {}, "rs_rating": 0.0,
+        },
+        "vcp": {"is_vcp": False, "contractions": [], "latest_contraction_pct": 0.0},
+        "buy_zone": {"50": None, "62": None},
+        "trade_readiness": {
+            "status": "NOT_VERIFIED",
+            "readiness_status": "NOT_VERIFIED",
+            "reason": "Daily analysis failed; no actionable state was produced.",
+            "buy_zones_90d": {}, "near_buy_zone": False,
+        },
+        "position_sizing": {},
+        "suggested_stop": None,
+        "daily_state": {
+            "stage": "S1_basing", "phase": "not_verified",
+            "primary_state": "not_verified",
+            "stage_label": "Stage 1 · Basing", "phase_label": "Not verified",
+            "setup_quality": {"pass": False, "reasons": [reason_code]},
+            "setup_proximity": {"state": None, "pivot": None,
+                                 "distance_pct": None, "zone": None},
+            "trend_source": "daily", "data_freshness": "unknown",
+        },
+    }
+
+
 def analyze_symbol_db(symbol, pg=None, market_series=None, rel_return=None, rs_rating=None, df=None):
     """Full Minervini pipeline for one symbol, reading from PostgreSQL.
 
@@ -493,11 +537,17 @@ def group_scan_results(results, events=None):
             state["primary_state"] = "base_forming"
             state["setup_quality"] = {"pass": False, "reasons": ["insufficient_history"]}
             state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
+        elif row.get("analysis_status") == "NOT_VERIFIED":
+            state["phase"] = "not_verified"
+            state["phase_label"] = "Not verified"
+            state["primary_state"] = "not_verified"
+            state["setup_quality"] = {"pass": False, "reasons": row.get("reason_codes", ["analysis_exception"])}
+            state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
         # Two-layer actionable setup state (quality gate + proximity timing).
         # Attached at source so every serialization path (build/snapshot) inherits it.
         # Insufficient-history rows already have an explicit fail/null contract;
         # never let the generic classifier overwrite it.
-        if row.get("analysis_status") != "INSUFFICIENT_HISTORY":
+        if row.get("analysis_status") not in ("INSUFFICIENT_HISTORY", "NOT_VERIFIED"):
             _setup = compute_setup_state(state["stage"], evidence)
             state["setup_quality"] = _setup["quality"]
             state["setup_proximity"] = _setup["proximity"]
@@ -632,15 +682,22 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
         market_series = load_market(pg=pg, lookback=400, market=market,
                                     benchmark_symbol=benchmark_symbol, as_of_date=as_of_date)
         symbol_list = (list(symbols) if symbols is not None else
-                       _active_scan_symbols(pg, instrument_types=("ORD",)))
+                       _active_scan_symbols(pg, instrument_types=("ORD",), market=market))
         symbol_list = [s for s in symbol_list if s not in excluded]
         closes, rel_returns, trend_sources = {}, {}, {}
         insufficient_daily = {}
+        daily_load_errors = {}
         m_ret = (market_series["Close"].iloc[-1] / market_series["Close"].iloc[-RS_LOOKBACK] - 1
                  if market_series is not None and len(market_series) >= RS_LOOKBACK else 0.0)
         for sym in symbol_list:
-            df = load_symbol(sym, pg=pg, lookback=SCAN_LOOKBACK, market=market,
-                             as_of_date=as_of_date)
+            try:
+                df = load_symbol(sym, pg=pg, lookback=SCAN_LOOKBACK, market=market,
+                                 as_of_date=as_of_date)
+            except Exception:
+                # Preserve coverage even when the Daily loader fails for one
+                # symbol. No fallback timeframe is permitted here.
+                daily_load_errors[sym] = "daily_load_exception"
+                continue
             if df is None or len(df) < MIN_DAYS:
                 # Daily/stage metrics must never be calculated from 60m bars.
                 # Keep the symbol visible as an explicit fail-closed observation.
@@ -658,21 +715,21 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
             try:
                 if sym in insufficient_daily:
                     row = insufficient_history_row(sym, insufficient_daily[sym])
+                elif sym in daily_load_errors:
+                    row = analysis_error_row(sym, daily_load_errors[sym])
                 else:
                     row = analyze_symbol_db(sym, pg=pg, market_series=market_series,
                                             rs_rating=ranks.get(sym, 0.0), df=df)
             except Exception:
-                continue
+                row = analysis_error_row(sym)
             if row is None:
-                continue
+                row = analysis_error_row(sym, "analysis_unavailable")
             row["market"] = market
             row["benchmark_symbol"] = benchmark_symbol
             row["trend_source"] = trend_sources.get(sym, "daily")
             all_results.append(row)
             if row["trend_template"]["conditions_met"] >= min_conditions:
                 results.append(row)
-            if limit and len(results) >= limit:
-                break
         if annotate_ath:
             annotate_all_time_highs(pg, all_results, market=market)
     finally:
