@@ -19,6 +19,43 @@ class _Pg:
         pass
 
 
+class _MasterPg:
+    """Small query-contract fixture for the authoritative scan universe."""
+
+    def __init__(self, active_rows, excluded_rows=()):
+        self.active_rows = active_rows
+        self.excluded_rows = excluded_rows
+
+    def cursor(self):
+        cur = MagicMock()
+        state = {"rows": [], "one": (None,)}
+
+        def execute(sql, params=None):
+            if "to_regclass" in sql:
+                state["one"] = ("symbol_master",)
+                state["rows"] = []
+            elif "COUNT(*) FROM symbol_master" in sql:
+                state["one"] = (len(self.active_rows) + len(self.excluded_rows),)
+                state["rows"] = []
+            elif "WHERE status <> 'active'" in sql:
+                state["rows"] = [(symbol,) for symbol in self.excluded_rows]
+            elif "FROM symbol_master" in sql:
+                state["rows"] = [(symbol,) for symbol in self.active_rows]
+            else:
+                state["rows"] = []
+
+        cur.execute.side_effect = execute
+        cur.fetchone.side_effect = lambda: state["one"]
+        cur.fetchall.side_effect = lambda: state["rows"]
+        return cur
+
+    def close(self):
+        pass
+
+    def commit(self):
+        pass
+
+
 def _bars(close=100.0):
     index = pd.date_range("2025-01-01", periods=300, freq="B")
     values = [close + i * 0.1 for i in range(300)]
@@ -62,6 +99,43 @@ def test_scan_universe_uses_explicit_symbols_and_benchmark(monkeypatch):
     assert near == []
     assert requested[0] == ("SPY", "US")
     assert ("MU", "US") in requested
+
+
+def test_active_scan_symbols_uses_master_and_preserves_order_and_exclusions():
+    pg = _MasterPg(("AAA", "ZZZ", "DROP"), excluded_rows=("DROP",))
+
+    symbols = screening._active_scan_symbols(pg, instrument_types=("ORD",), market="TH")
+
+    assert symbols == ["AAA", "ZZZ"]
+
+
+def test_master_symbol_without_price_data_is_explicitly_insufficient(monkeypatch):
+    pg = _MasterPg(("MISSING",))
+    captured = []
+
+    def load(symbol, pg=None, lookback=None, market="TH", **kwargs):
+        return _bars() if symbol == "SET" else None
+
+    monkeypatch.setattr(screening, "load_symbol", load)
+    monkeypatch.setattr(
+        screening,
+        "annotate_all_time_highs",
+        lambda pg, rows, **kwargs: captured.extend(rows),
+    )
+
+    results, near = screening.scan_universe(
+        min_conditions=0,
+        pg=pg,
+        market="TH",
+        symbols=None,
+        min_price=None,
+        min_today_trade_value=None,
+        annotate_ath=False,
+    )
+
+    assert near == []
+    assert [row["symbol"] for row in results] == ["MISSING"]
+    assert results[0]["analysis_status"] == "INSUFFICIENT_HISTORY"
 
 
 def test_scan_universe_keeps_short_daily_history_fail_closed(monkeypatch):

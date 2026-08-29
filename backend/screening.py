@@ -244,13 +244,28 @@ def _active_scan_symbols(pg, min_history=0, instrument_types=("ORD",),
     """
     excluded = excluded_symbols(pg, market=market)
     cur = pg.cursor()
-    cur.execute("""\
-        SELECT symbol
-        FROM price_data
-        WHERE market = %s AND instrument_type = ANY(%s)
-        GROUP BY symbol
-        ORDER BY symbol
-    """, (market.upper(), list(instrument_types),))
+    # symbol_master is the authoritative universe.  Keep the price_data query
+    # only as a compatibility fallback for databases predating the master;
+    # missing price rows must remain visible to scan_universe as insufficient
+    # Daily evidence rather than disappearing from coverage.
+    cur.execute("SELECT to_regclass('public.symbol_master')")
+    master_exists = bool(cur.fetchone()[0])
+    if master_exists:
+        cur.execute("""\
+            SELECT symbol
+            FROM symbol_master
+            WHERE instrument_type = ANY(%s)
+              AND (status IS NULL OR status = 'active')
+            ORDER BY symbol
+        """, (list(instrument_types),))
+    else:
+        cur.execute("""\
+            SELECT symbol
+            FROM price_data
+            WHERE market = %s AND instrument_type = ANY(%s)
+            GROUP BY symbol
+            ORDER BY symbol
+        """, (market.upper(), list(instrument_types),))
     rows = cur.fetchall()
     cur.close()
     return [r[0] for r in rows if r[0] not in excluded]
