@@ -496,9 +496,12 @@ def group_scan_results(results, events=None):
             state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
         # Two-layer actionable setup state (quality gate + proximity timing).
         # Attached at source so every serialization path (build/snapshot) inherits it.
-        _setup = compute_setup_state(state["stage"], evidence)
-        state["setup_quality"] = _setup["quality"]
-        state["setup_proximity"] = _setup["proximity"]
+        # Insufficient-history rows already have an explicit fail/null contract;
+        # never let the generic classifier overwrite it.
+        if row.get("analysis_status") != "INSUFFICIENT_HISTORY":
+            _setup = compute_setup_state(state["stage"], evidence)
+            state["setup_quality"] = _setup["quality"]
+            state["setup_proximity"] = _setup["proximity"]
         if row.get("last_date") and evidence.get("latest_scan_date") and row["last_date"] != evidence["latest_scan_date"]:
             state["data_freshness"] = "stale"
         # New-listing flag: trend derived from 60m intraday, not daily history.
