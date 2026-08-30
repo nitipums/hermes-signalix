@@ -26,6 +26,7 @@
     dailyVcpLoading: $("#daily-vcp-loading"),
     dailyVcpError:   $("#daily-vcp-error"),
     dailyVcpErrorMsg: $("#daily-vcp-error-msg"),
+    dailyVcpRetry:   $("#daily-vcp-retry"),
     dailyVcpContent: $("#daily-vcp-content"),
     dailyVcpCards:   $("#daily-vcp-cards"),
     dailyVcpMeta:    $("#daily-vcp-meta"),
@@ -121,6 +122,8 @@
     drawerTrigger:  $("#drawer-trigger"),
     drawerStop:     $("#drawer-stop"),
     drawerRR:       $("#drawer-rr"),
+    drawerV2Decision: $("#drawer-v2-decision"),
+    drawerRawState: $("#drawer-raw-state"),
     drawerMembership: $("#drawer-membership"),
     drawerMargin:   $("#drawer-margin"),
     drawer52W:      $("#drawer-52w"),
@@ -215,6 +218,20 @@
     return result && result.decision && typeof result.decision === "object" ? result.decision : {};
   }
 
+  function decisionShadowV2(result) {
+    return result && result.decision_shadow_v2 && typeof result.decision_shadow_v2 === "object" ? result.decision_shadow_v2 : {};
+  }
+
+  function decisionLane(result) {
+    var shadow = decisionShadowV2(result);
+    return shadow.decision_lane || (result && result.decision_lane) || "DATA_BLOCKED";
+  }
+
+  function actionability(result) {
+    var shadow = decisionShadowV2(result);
+    return shadow.actionability || (result && result.actionability) || "NO_ACTION";
+  }
+
   function canonicalDecisionState(result) {
     var decision = canonicalDecision(result);
     return decision.state || "NOT_VERIFIED";
@@ -305,6 +322,15 @@
     var dr = source.dr_total == null ? "–" : source.dr_total;
     var date = source.effective_date || "NOT_VERIFIED";
     return "Krungsri list · " + total + " securities (" + ord + " ORD + " + dr + " DR) · effective " + date;
+  }
+
+  function marginableUniverseMeta(data) {
+    var universe = data && data.universe || {};
+    var selected = data && data.eligible_count != null ? data.eligible_count : universe.eligible;
+    var filter = data && data.universe_filter || "marginable_long";
+    var source = data && (data.margin_source_document || data.margin_source) || "NOT_VERIFIED";
+    var effective = data && data.margin_effective_date || "NOT_VERIFIED";
+    return "Universe " + filter + " · " + (selected == null ? "NOT_VERIFIED" : selected) + " selected · source " + source + " · effective " + effective;
   }
 
   function formatRange(high, low, pending) {
@@ -427,6 +453,8 @@
     dom.drawerName.textContent = item.name || "–";
     dom.drawerTrend.textContent = shortStage(item.stage);
     dom.drawerAction.textContent = item.vcp_result ? item.action : shortAction(item.action || item.phase);
+    if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
+    if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
     dom.drawerSector.textContent = item.sector || "Sector –";
     dom.drawerIndustry.textContent = item.industry || "Industry –";
     dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap);
@@ -839,14 +867,26 @@
   }
 
   function vcpPrimaryStatus(result) {
-    return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
+    if (!decisionShadowV2(result).policy_version && !(result && result.decision_lane)) {
+      return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
+    }
+    return decisionLane(result) + " · " + actionability(result);
   }
 
   function vcpPrimaryEvidence(result) {
-    var evidence = canonicalDecision(result).evidence || {};
-    var trigger = evidence.trigger == null ? "—" : Number(evidence.trigger).toFixed(2);
-    var invalidation = evidence.invalidation == null ? "—" : Number(evidence.invalidation).toFixed(2);
-    return "Quality " + canonicalQuality(result) + " · Data " + canonicalDataSufficiency(result) + " · Trigger " + trigger + " · Invalidation " + invalidation;
+    if (!decisionShadowV2(result).policy_version && !(result && result.decision_lane)) {
+      var legacyEvidence = canonicalDecision(result).evidence || {};
+      var legacyTrigger = legacyEvidence.trigger == null ? "—" : Number(legacyEvidence.trigger).toFixed(2);
+      var legacyInvalidation = legacyEvidence.invalidation == null ? "—" : Number(legacyEvidence.invalidation).toFixed(2);
+      return "Quality " + canonicalQuality(result) + " · Data " + canonicalDataSufficiency(result) + " · Trigger " + legacyTrigger + " · Invalidation " + legacyInvalidation;
+    }
+    var shadow = decisionShadowV2(result);
+    var quality = shadow.quality || {};
+    var entry = shadow.entry || {};
+    var trigger = entry.pivot == null ? "—" : Number(entry.pivot).toFixed(2);
+    var invalidation = entry.invalidation == null ? "—" : Number(entry.invalidation).toFixed(2);
+    var passCount = quality.structural_pass_count == null ? "—" : quality.structural_pass_count + "/" + (quality.structural_required_count || 4);
+    return "V2 " + decisionLane(result) + " · " + actionability(result) + " · Structure " + passCount + " · Trigger " + trigger + " · Invalidation " + invalidation;
   }
 
   function vcpCard(result) {
@@ -889,13 +929,19 @@
   }
 
   function vcpDisplayGroup(result) {
-    var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
+    if (!decisionShadowV2(result).policy_version && !(result && result.decision_lane)) {
+      var legacyPair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);
+      var legacyAllowed = ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID"];
+      return legacyAllowed.indexOf(legacyPair) >= 0 ? legacyPair : "UNKNOWN";
+    }
+    var pair = decisionLane(result) + " · " + actionability(result);
     var allowed = [
-      "FORMING · WAIT",
-      "READY · WAIT",
-      "CONFIRMED · REVIEW",
-      "EXTENDED · WAIT",
-      "INVALIDATED · AVOID"
+      "REVIEW_NOW · ACTIONABLE_REVIEW",
+      "PREPARE · WATCH_ONLY",
+      "EVENT_WATCH · WATCH_ONLY",
+      "RESEARCH · NO_ACTION",
+      "DO_NOT_CHASE · NO_ACTION",
+      "DATA_BLOCKED · NO_ACTION"
     ];
     return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";
   }
@@ -906,12 +952,12 @@
     if (type === "low_cheat_vcp" && focused) {
       return '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No Low-Cheat setups in focused review.</p><p class="state-hint">Low-Cheat patterns may exist outside focused review. Switch to All states.</p></div>';
     }
-    return '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No VCP results for this filter.</p></div>';
+    return '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No candidates in the marginable-long universe for this filter.</p><p class="state-hint">The universe loaded successfully; zero candidates matched the current presentation filters.</p></div>';
   }
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"];
+    var order = ["REVIEW_NOW · ACTIONABLE_REVIEW", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -945,7 +991,7 @@
         }
       });
     });
-    ["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
+    ["REVIEW_NOW · ACTIONABLE_REVIEW", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
       if (!groups[status]) return;
       var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
       html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
@@ -958,7 +1004,7 @@
     if (dailyVcpAbort) dailyVcpAbort.abort();
     var ac = dailyVcpAbort = new AbortController();
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true", {signal: ac.signal})
+    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long", {signal: ac.signal})
       .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data){
         if (requestSeq !== dailyVcpRequestSeq) return;
@@ -986,7 +1032,7 @@
         var coverage = (lanes && lanes.coverage) || {};
         var rejectionCounts = coverage.rejection_counts || {};
         var rejectionSummary = Object.keys(rejectionCounts).sort(function(a, b) { return rejectionCounts[b] - rejectionCounts[a]; }).slice(0, 3).map(function(key) { return key + " " + rejectionCounts[key]; }).join(", ");
-        dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " reviewable / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (insufficientCount ? " · " + insufficientCount + " hidden: insufficient/unknown data" : "") + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
+        dom.dailyVcpMeta.textContent = marginableUniverseMeta(data) + " · Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " reviewable / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (insufficientCount ? " · " + insufficientCount + " hidden: insufficient/unknown data" : "") + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
       })
       .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
@@ -998,7 +1044,7 @@
     var ac = vcpAbort = new AbortController();
     show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
     var selected = dom.vcpState.value || "ALL";
-    var endpoint = "/api/vcp-finder?interval=60m&market=TH";
+    var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";
     if (selected === "actionable") endpoint += "&focused=true";
     else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
     else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
@@ -1020,7 +1066,7 @@
         if (selected === "actionable") results = results.filter(function(r){ return ["READY","NEAR_TRIGGER","CONFIRMED","BREAKOUT_WATCH"].indexOf(r.state) >= 0 || (r.state === "FORMING" && r.forming_group === "maturing"); });
         else if (selected.indexOf("FORMING_") === 0) results = results.filter(function(r){ return r.state === "FORMING" && r.forming_group === selected.slice(8).toLowerCase(); });
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
-        dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
+        dom.vcpMeta.textContent = marginableUniverseMeta(data) + " · Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
         renderVcpResults(results);
       })
       .catch(function(err) { if (err.name === "AbortError" || requestSeq !== vcpRequestSeq) return; hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
@@ -1056,6 +1102,7 @@
     if (input) input.addEventListener("change", loadVcp);
   });
   dom.vcpRetry.addEventListener("click", loadVcp);
+  if (dom.dailyVcpRetry) dom.dailyVcpRetry.addEventListener("click", loadDailyVcp);
 
   function marginRateQuery() {
     return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";

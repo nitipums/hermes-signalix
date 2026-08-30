@@ -31,9 +31,9 @@
     <!-- ── Daily VCP Watchlist panel ── -->
     <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
       <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading VCP Watchlist…</p></section>
-      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load VCP Watchlist.</p></section>
+      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load VCP Watchlist.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
       <section id="daily-vcp-content" class="state--hidden">
-        <p class="explorer-note">60m review queue · actionable setups + breakout watch · not an automatic buy signal.</p>
+        <p class="explorer-note">Marginable-long operational universe · 60m review queue · not an automatic buy signal.</p>
         <div class="watchlist-default-filters" aria-label="Watchlist default filters">
           <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
           <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
@@ -88,7 +88,7 @@
         <button id="vcp-retry" class="btn btn--retry">Retry</button>
       </section>
       <section id="vcp-content">
-        <p class="explorer-note">Intraday 60m candidate finder · no Daily fallback · not an automatic buy signal.</p>
+        <p class="explorer-note">Marginable-long universe · intraday 60m candidate finder · no Daily fallback · not an automatic buy signal.</p>
         <div class="explorer-controls" aria-label="VCP Finder filters">
           <label class="explorer-control">View
             <select id="vcp-state" aria-label="Legacy VCP state filter (audit)">
@@ -358,6 +358,8 @@
           </div>
 
           <dl class="drawer-fields">
+            <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>
+            <div class="drawer-field"><dt>Raw V1 state</dt><dd id="drawer-raw-state">–</dd></div>
             <div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>
             <div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div>
             <div class="drawer-field"><dt>Marginable</dt><dd id="drawer-margin">–</dd></div>

@@ -5,6 +5,37 @@ from pathlib import Path
 ROOT = Path(__file__).parent / "frontend"
 
 
+def test_v2_serving_contract_has_explicit_marginable_long_requests_and_metadata():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert js.count("universe=marginable_long") >= 2
+    for marker in (
+        "decision_shadow_v2", "decision_lane", "actionability",
+        "eligible_count", "universe_filter", "margin_source_document",
+        "margin_effective_date", "selected",
+    ):
+        assert marker in js
+    assert "Marginable-long operational universe" in html
+    assert 'id="daily-vcp-retry"' in html
+
+
+def test_v2_primary_label_and_drawer_keep_raw_lifecycle_evidence():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'return decisionLane(result) + " · " + actionability(result);' in js
+    assert 'id="drawer-v2-decision"' in html
+    assert 'id="drawer-raw-state"' in html
+    assert 'item.vcp_result.state || "NOT_VERIFIED"' in js
+
+
+def test_v2_success_empty_and_transport_error_states_are_distinct():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "zero candidates matched the current presentation filters" in js
+    assert 'show(dom.dailyVcpError)' in js
+    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message' in js
+    assert 'dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message' in js
+
+
 def test_stage_colors_and_rising_lane_are_declared():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
@@ -97,7 +128,8 @@ def test_vcp_refreshes_abort_previous_requests_and_ignore_stale_results():
     assert "let vcpRequestSeq = 0;" in js
     assert "dailyVcpAbort.abort()" in js
     assert "vcpAbort.abort()" in js
-    assert 'fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true", {signal: ac.signal})' in js
+    assert 'fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long", {signal: ac.signal})' in js
+    assert 'var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";' in js
     assert "if (requestSeq !== dailyVcpRequestSeq) return;" in js
     assert "if (requestSeq !== vcpRequestSeq) return;" in js
     assert 'err.name === "AbortError"' in js
@@ -266,19 +298,20 @@ def test_vcp_drawer_membership_and_chart_overlay_contracts():
 
 def test_vcp_primary_cards_use_unified_state_decision_and_evidence():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert '["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"]' in js
+    assert 'decision_shadow_v2' in js
+    assert 'return decisionLane(result) + " · " + actionability(result);' in js
     assert 'function canonicalDecision(result)' in js
     assert 'return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in js
     assert 'canonicalDataSufficiency(result)' in js
-    assert 'Quality " + canonicalQuality(result) + " · Data " + canonicalDataSufficiency(result)' in js
-    assert 'evidence.trigger' in js
-    assert 'evidence.invalidation' in js
+    assert 'return "V2 " + decisionLane(result) + " · " + actionability(result)' in js
+    assert 'var entry = shadow.entry || {};' in js
+    assert 'entry.pivot' in js
     assert 'vcpPrimaryStatus(result)' in js
     assert 'vcpPrimaryEvidence(result)' in js
     assert 'var groups = {};' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
     assert 'escapeHTML(status)' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
-    assert 'var trigger = evidence.trigger == null ? "—"' in js
-    assert 'var invalidation = evidence.invalidation == null ? "—"' in js
+    assert 'var trigger = entry.pivot == null ? "—"' in js
+    assert 'var invalidation = entry.invalidation == null ? "—"' in js
     assert '(price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close))' in js
     primary_group = js[js.index('function vcpDisplayGroup'):js.index('function vcpEmptyState')]
     for legacy in (
@@ -318,7 +351,8 @@ def test_vcp_primary_render_cannot_read_legacy_decision_fields():
         assert legacy_field not in primary
     assert "function vcpDisplayGroup(result)" in js
     display_group = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
-    assert 'var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in display_group
+    assert 'var legacyPair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in display_group
+    assert 'var pair = decisionLane(result) + " · " + actionability(result);' in display_group
     assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in display_group
 
 
@@ -328,7 +362,7 @@ def test_daily_watchlist_consolidates_duplicate_primary_status_sections():
 
     # Daily lanes are grouped into canonical state buckets before rendering.
     assert render.index("var groups = {};") < render.index("order.forEach(function(key)")
-    assert render.index("items.forEach(function(item)") < render.index("[\"FORMING · WAIT\"")
+    assert render.index("items.forEach(function(item)") < render.index("[\"REVIEW_NOW · ACTIONABLE_REVIEW\"")
     assert render.count("html += '<section class=\"vcp-lane\">") == 1
     assert "(groups[status] || (groups[status] = [])).push(item);" in render
     assert "groupCaps[status] = (groupCaps[status] || 0) + Number(cap);" in render
@@ -360,9 +394,9 @@ def test_daily_watchlist_hides_non_sufficient_data_and_reports_coverage():
 def test_canonical_card_evidence_and_mobile_controls_are_visible_and_touch_safe():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
-    assert 'Quality " + canonicalQuality(result)' in js
-    assert 'Data " + canonicalDataSufficiency(result)' in js
-    assert 'var pair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in js
+    assert 'V2 " + decisionLane(result)' in js
+    assert 'Structure " + passCount' in js
+    assert 'var pair = decisionLane(result) + " · " + actionability(result);' in js
     assert '.watchlist-default-filters select { min-height:44px;' in css
     assert '.explorer-control select, .explorer-control input { min-height:44px;' in css
     assert 'flex-wrap:wrap' in css
@@ -382,7 +416,8 @@ def test_vcp_grouping_uses_canonical_state_decision_pairs_on_both_surfaces():
     assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in helper
     assert 'var status = vcpDisplayGroup(item);' in js
     assert 'var key = vcpDisplayGroup(result);' in js
-    assert '["FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"]' in js
+    assert '"REVIEW_NOW · ACTIONABLE_REVIEW"' in js
+    assert '"DATA_BLOCKED · NO_ACTION"' in js
 
 
 def test_vcp_type_presentation_fails_closed_on_canonical_data_and_state():
