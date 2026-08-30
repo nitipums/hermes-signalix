@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 
 import mvp_routes
 from mvp_api import project_setup_candidates_response
@@ -118,6 +120,30 @@ def test_setup_candidate_data_build_is_cached(monkeypatch):
     second = mvp_routes._load_setup_candidates_cached(builder, pg)
     assert first is second
     assert len(calls) == 1
+    mvp_routes.clear_setup_candidates_cache()
+
+
+def test_setup_candidate_concurrent_build_is_single_flight():
+    import mvp_routes
+    calls = []
+    barrier = threading.Barrier(3)
+
+    def builder(pg, market="TH"):
+        calls.append(1)
+        time.sleep(0.05)
+        return [candidate("SINGLE")], {"scan_time": "2026-08-30", "freshness": {"status": "fresh"}}
+
+    mvp_routes.clear_setup_candidates_cache()
+    results = []
+    threads = [threading.Thread(target=lambda: (barrier.wait(), results.append(
+        mvp_routes._load_setup_candidates_cached(builder, object())
+    ))) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert len(calls) == 1
+    assert len(results) == 3
     mvp_routes.clear_setup_candidates_cache()
 
 

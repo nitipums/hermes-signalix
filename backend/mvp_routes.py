@@ -26,6 +26,7 @@ _vcp_watchlist_inflight = {}
 _vcp_watchlist_cache_lock = threading.Lock()
 _SETUP_CANDIDATES_CACHE_TTL_SECONDS = 300.0
 _setup_candidates_cache = None
+_setup_candidates_inflight = None
 _setup_candidates_cache_lock = threading.Lock()
 
 
@@ -44,18 +45,38 @@ def clear_setup_candidates_cache():
 
 
 def _load_setup_candidates_cached(builder, pg, *, market="TH"):
-    """Reuse one bounded read-only build during dashboard refresh bursts."""
-    global _setup_candidates_cache
-    now = time.monotonic()
-    with _setup_candidates_cache_lock:
-        cached = _setup_candidates_cache
-        if cached and cached[0] > now:
-            return cached[1]
-    items, source_meta = builder(pg, market=market)
-    payload = {"items": items, **source_meta}
-    with _setup_candidates_cache_lock:
-        _setup_candidates_cache = (time.monotonic() + _SETUP_CANDIDATES_CACHE_TTL_SECONDS, payload)
-    return payload
+    """Reuse one bounded read-only build and coalesce concurrent requests."""
+    global _setup_candidates_cache, _setup_candidates_inflight
+    while True:
+        now = time.monotonic()
+        with _setup_candidates_cache_lock:
+            cached = _setup_candidates_cache
+            if cached and cached[0] > now:
+                return cached[1]
+            waiter = _setup_candidates_inflight
+            if waiter is None:
+                waiter = threading.Event()
+                _setup_candidates_inflight = waiter
+                owner = True
+            else:
+                owner = False
+        if owner:
+            break
+        waiter.wait()
+
+    try:
+        items, source_meta = builder(pg, market=market)
+        payload = {"items": items, **source_meta}
+        with _setup_candidates_cache_lock:
+            _setup_candidates_cache = (
+                time.monotonic() + _SETUP_CANDIDATES_CACHE_TTL_SECONDS,
+                payload,
+            )
+        return payload
+    finally:
+        with _setup_candidates_cache_lock:
+            _setup_candidates_inflight = None
+            waiter.set()
 
 
 
