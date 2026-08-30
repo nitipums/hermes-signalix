@@ -24,12 +24,40 @@ _VCP_WATCHLIST_CACHE_MAX_ENTRIES = 4
 _vcp_watchlist_cache = {}
 _vcp_watchlist_inflight = {}
 _vcp_watchlist_cache_lock = threading.Lock()
+_SETUP_CANDIDATES_CACHE_TTL_SECONDS = 300.0
+_setup_candidates_cache = None
+_setup_candidates_cache_lock = threading.Lock()
 
 
 def clear_vcp_watchlist_cache():
     """Clear the bounded presentation cache (used by deterministic tests)."""
     with _vcp_watchlist_cache_lock:
         _vcp_watchlist_cache.clear()
+        _vcp_watchlist_inflight.clear()
+
+
+def clear_setup_candidates_cache():
+    """Clear the bounded setup-candidate cache (used by deterministic tests)."""
+    global _setup_candidates_cache
+    with _setup_candidates_cache_lock:
+        _setup_candidates_cache = None
+
+
+def _load_setup_candidates_cached(builder, pg, *, market="TH"):
+    """Reuse one bounded read-only build during dashboard refresh bursts."""
+    global _setup_candidates_cache
+    now = time.monotonic()
+    with _setup_candidates_cache_lock:
+        cached = _setup_candidates_cache
+        if cached and cached[0] > now:
+            return cached[1]
+    items, source_meta = builder(pg, market=market)
+    payload = {"items": items, **source_meta}
+    with _setup_candidates_cache_lock:
+        _setup_candidates_cache = (time.monotonic() + _SETUP_CANDIDATES_CACHE_TTL_SECONDS, payload)
+    return payload
+
+
 
 
 def _load_daily_watchlist_cached(loader, params):
@@ -182,8 +210,10 @@ def handle_mvp_api(path, handler) -> bool:
                     raise ValueError("legacy snapshot is not a canonical setup-candidate artifact")
             except (FileNotFoundError, ValueError, json.JSONDecodeError, KeyError):
                 pg = _vcp_pg()
-                items, source_meta = mvp_api.build_setup_candidates_from_data(pg, market="TH")
-                payload = {"items": items, **source_meta}
+                payload = _load_setup_candidates_cached(
+                    mvp_api.build_setup_candidates_from_data, pg, market="TH"
+                )
+                items = payload["items"]
             page = int(qs.get("page", ["1"])[0])
             page_size = int(qs.get("page_size", ["50"])[0])
             result = mvp_api.project_setup_candidates_response(

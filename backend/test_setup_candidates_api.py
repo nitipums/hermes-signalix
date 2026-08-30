@@ -99,6 +99,23 @@ def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypat
     assert meta["source"] == "price_data+intraday_price_data"
 
 
+def test_setup_candidate_data_build_is_cached(monkeypatch):
+    import mvp_routes
+    calls = []
+
+    def builder(pg, market="TH"):
+        calls.append((pg, market))
+        return [candidate("CACHED")], {"scan_time": "2026-08-30", "freshness": {"status": "fresh"}}
+
+    mvp_routes.clear_setup_candidates_cache()
+    pg = object()
+    first = mvp_routes._load_setup_candidates_cached(builder, pg)
+    second = mvp_routes._load_setup_candidates_cached(builder, pg)
+    assert first is second
+    assert len(calls) == 1
+    mvp_routes.clear_setup_candidates_cache()
+
+
 def test_route_uses_data_source_when_snapshot_is_legacy(monkeypatch):
     row = candidate("REAL_SOURCE")
     calls = []
