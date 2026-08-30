@@ -289,6 +289,15 @@ def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
     assert '<div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>' in (ROOT / "index.html").read_text(encoding="utf-8")
 
 
+def test_mobile_vcp_secondary_evidence_and_freshness_have_containment_contracts():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert ".vcp-card__primary { display:flex; flex-direction:column; width:100%; max-width:100%; min-width:0;" in css
+    assert ".vcp-card__primary .vcp-card__evidence { display:block; width:100%; max-width:100%; min-width:0;" in css
+    assert "overflow:hidden; text-overflow:ellipsis;" in css
+    assert ".freshness { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 58%;" in css
+    assert ".freshness-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" in css
+
+
 def test_vcp_mobile_390_contract_uses_fixed_five_column_layout_without_page_overflow():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
