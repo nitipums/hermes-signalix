@@ -31,8 +31,8 @@ Verified implemented slices:
 - completed-session scan on 2026-08-29 produced run `3c344183-563e-408f-b069-d73140d29c88`, with `931/931` observations and `53` `INSUFFICIENT_HISTORY`
 
 The source map below preserves the historical findings that led to this
-decision. Remaining work is the shadow multi-week replay/promotion gate, plus
-any explicitly non-blocking cleanup.
+ decision. The shadow multi-week replay is now complete as an evidence run;
+ promotion remains blocked pending a separate owner-approved review.
 
 Current served verification after the latest release:
 
@@ -341,7 +341,7 @@ FULL universe → Stage → VCP quality → Proximity → Trigger + Invalidation
 ### สถานะของข้อเสนอแนะ
 
 - **Implemented:** unified VCP serving spine and UI/filters/grouping; Active ORD instrument quality; VCP provenance; Daily dimensions; Daily no-60m fallback; active-master full-universe source; explicit snapshot rows; and the policy/ranking slice in `2fe9a18`.
-- **Remaining:** shadow multi-week replay and the owner promotion gate. Replay must remain non-serving until point-in-time comparisons and owner acceptance are complete.
+- **Replay status:** multi-week evidence run complete; promotion gate is `REVISE/BLOCKED`.
 - **Non-blocking:** explicitly identified cleanup may continue without changing the serving contract.
 
 ### P0 — กำหนด decision spine เดียวก่อนเพิ่ม indicator — implemented
@@ -386,9 +386,15 @@ decision: REVIEW / WAIT / AVOID / DATA_BLOCKED
 
 ใช้ active-master full-universe source และ explicit snapshot rows แล้ว โดย completed-session run `3c344183-563e-408f-b069-d73140d29c88` มี observation `931/931` และ `53` `INSUFFICIENT_HISTORY`; ต้องคงการตรวจซ้ำใน session/replay ต่อไป
 
-### P2 — Shadow ต้องมี promotion gate — remaining
+### P2 — Shadow ต้องมี promotion gate — replay complete; promotion remaining
 
-ใช้ replay แบบ point-in-time เทียบ pivot, state, invalidation, confirmation และ outcome ก่อน promote; จนกว่าจะผ่าน owner acceptance ให้ติด `shadow_only` ชัดใน API/docs
+Replay ใหม่ใช้ 10 completed Bangkok trading dates (`2026-08-17` ถึง
+`2026-08-28`) ที่ daily cadence, 10 snapshots × 931 symbols = 9,310
+persisted rows. ทุก snapshot มี `eligible=evaluated=931` และทุก row มี
+`decision_shadow_v2`; outcomes เป็น descriptive evidence เท่านั้น ไม่ใช่ win
+rate. Ploy ให้ `REPLAY COMPLETE` แต่ `PROMOTION REVISE/BLOCKED` เพราะ
+actionable evidence ยังบางและ target/stop edge ยังไม่พอสำหรับการเปลี่ยน v1.
+ให้คง `shadow_only` และ `promotion_allowed=false` จนกว่าจะมี owner approval.
 
 ## 9. Practical mental model สำหรับพี่อาร์ม
 
