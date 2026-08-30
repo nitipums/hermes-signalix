@@ -2,6 +2,10 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
+## 2026-08-30 — Marginable-long v2 serving scope
+Decision: Serve `signalix/vcp-decision-shadow-v2` as the decision-facing projection on the owner dashboard, using `marginable_long` as the current operational universe: active Thai ORD intersected with the owner-supplied marginable dataset and `can_buy=true` (currently 237 symbols). Keep the 931-symbol active-ORD path only as an explicit audit/rollback mode; it is not the default dashboard scope. Do not expand replay to three months, promote Low-Cheat, enable alerts, or enable auto-trading.
+Reason: Arm wants the new decision version used now on the real trading surface, limited to instruments that can be bought through the current margin workflow. Replay evidence is sufficient for this bounded operational scope; broader-universe generalization and sequence A/B promotion are deferred.
+
 ## 2026-08-28 — Dashboard-first scope; alerts paused
 Decision: For the current MVP focus, keep only the dashboard surfaces: **Daily VCP Watchlist** for fast actionable review and **All VCP · 60m / Explorer** for full-universe research and audit. Pause alert delivery; the Docker `delivery` service is stopped and assigned to Compose profile `alerts`, so normal `docker compose up -d` does not start it. Backend, dashboard, PostgreSQL, and Redis remain active.
 

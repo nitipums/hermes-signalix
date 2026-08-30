@@ -6,8 +6,8 @@
 ## Product surface
 
 - `/mvp` opens on **Daily VCP Watchlist**, the fast review view.
-- **All VCP · 60m** is the full current VCP universe view with forming/state filters and audit coverage.
-- The current visible MVP focus is dashboard-only: Daily VCP Watchlist is the fast review view; All VCP · 60m / Explorer is the full current VCP universe view with forming/state filters and audit coverage. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation; backend/API and historical notes remain preserved for rollback/audit.
+- **All VCP · 60m** defaults to the current `marginable_long` operational universe (237 active Thai ORD symbols with `can_buy=true`); explicit `active_ord` remains the full 931-symbol audit/rollback view with forming/state filters.
+- The current visible MVP focus is dashboard-only: Daily VCP Watchlist is the fast review view; All VCP · 60m / Explorer defaults to `marginable_long` and exposes the selected universe metadata. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation; backend/API and historical notes remain preserved for rollback/audit.
 - Alert delivery is paused. The delivery source remains preserved, but the Docker service is gated under Compose profile `alerts` and is not started by default.
 
 ## VCP type taxonomy — candidate implementation
@@ -95,4 +95,4 @@ Display order:
 - Provenance displays VCP run `as_of`/`fetch_completed_at` and latest closed bar.
 - Daily VCP Shortlist polls for a newer run while open; it shows review count separately from full-universe evaluation and feed coverage.
 - Missing optional company description is hidden; it is not required for the core decision surface.
-- **2026-08-29 unified decision migration:** The serving VCP projection now exposes one compact `decision` object per sufficient-data result: canonical `state` (`FORMING`, `READY`, `CONFIRMED`, `EXTENDED`, `INVALIDATED`), `quality` (`PASS`, `PARTIAL`, `FAIL`, `UNKNOWN`), and `decision` (`REVIEW`, `WAIT`, `AVOID`). `NEAR_TRIGGER`/`BREAKOUT_WATCH` map to `READY`; `FAILED` maps to `INVALIDATED`. Stale/unverified/insufficient evidence is one internal `data_sufficient=false` gate and is not a competing primary UI state. Daily context cannot promote 60m confirmation; raw VCP/lifecycle fields remain available for audit. Public `/mvp` and `/api/vcp-finder` were rechecked after service recreation on 2026-08-29; visual desktop/mobile evidence is recorded in the execution handoff/session, with no alert or threshold changes.
+- **2026-08-29 unified decision migration, updated 2026-08-30:** The serving VCP projection exposes one compact v2 decision projection per sufficient-data result through `decision_shadow_v2`, with lane/actionability labels. The operational default is `marginable_long` (237 `can_buy=true` symbols); `active_ord` is explicit audit/rollback. Stale/unverified/insufficient evidence remains fail-closed. Daily context cannot promote 60m confirmation; raw VCP/lifecycle fields remain available for audit. Public `/mvp` and `/api/vcp-finder` were rechecked after service recreation on 2026-08-30, including real desktop/mobile checks, with no alert or threshold changes.
