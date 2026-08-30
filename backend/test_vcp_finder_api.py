@@ -370,7 +370,7 @@ def test_daily_vcp_projection_applies_liquidity_gate_and_retains_insufficient_ro
         "accepted": 1,
         "rejected": 1,
         "rejection_counts": {"liquidity_below_minimum": 1},
-        "candidate_counts": {"ACTION_REVIEW": 1, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0},
+        "candidate_counts": {"ACTION_REVIEW": 1, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0, "EVENT_WATCH": 0},
         "cap_dropped": 0,
         "duplicate_dropped": 0,
     }
@@ -450,6 +450,53 @@ def test_structure_watch_lane_is_capped_and_deterministically_ordered():
     assert out["caps"]["STRUCTURE_WATCH"] == 10
 
 
+@pytest.mark.parametrize("symbol", ["KKP", "BCP", "BGRIM"])
+def test_forming_event_watch_is_retained_as_watch_only_without_promotion(symbol):
+    candidate = _vcp_result(
+        symbol,
+        "FORMING",
+        evidence={"leg_volume_pass": False, "base_pass": False},
+        breakout={"volume_confirmed": False},
+    )
+    candidate["decision_shadow_v2"] = {
+        "decision_lane": "EVENT_WATCH",
+        "actionability": "WATCH_ONLY",
+        "reason_codes": ["STRUCTURE_INCOMPLETE", "EVENT_EVIDENCE_ONLY"],
+    }
+    candidate["decision_lane"] = "EVENT_WATCH"
+    candidate["actionability"] = "WATCH_ONLY"
+
+    out = project_daily_vcp_watchlist([candidate])
+
+    assert [row["symbol"] for row in out["event_watch"]] == [symbol]
+    assert out["event_watch"][0]["state"] == "FORMING"
+    assert out["event_watch"][0]["decision_lane"] == "EVENT_WATCH"
+    assert out["event_watch"][0]["actionability"] == "WATCH_ONLY"
+    assert out["event_watch"][0]["breakout"]["volume_confirmed"] is False
+    assert out["action_review"] == []
+
+
+def test_event_watch_lane_is_capped_and_ordered_by_existing_rank():
+    candidates = []
+    for i in range(12):
+        row = _vcp_result(
+            f"E{i:02d}",
+            "FORMING",
+            data={"daily_metrics": {"avg_trade_value_20": 20_000_000 - i * 100_000}},
+        )
+        row["decision_shadow_v2"] = {"decision_lane": "EVENT_WATCH", "actionability": "WATCH_ONLY"}
+        row["decision_lane"] = "EVENT_WATCH"
+        row["actionability"] = "WATCH_ONLY"
+        candidates.append(row)
+
+    out = project_daily_vcp_watchlist(candidates)
+
+    assert len(out["event_watch"]) == 10
+    assert [row["symbol"] for row in out["event_watch"]] == [f"E{i:02d}" for i in range(10)]
+    assert out["caps"]["EVENT_WATCH"] == 10
+    assert out["coverage"]["candidate_counts"]["EVENT_WATCH"] == 12
+
+
 def test_action_review_requires_close_trigger_coherent():
     # READY is pre-breakout, so close_confirmed=False is allowed.
     ready = _vcp_result("RNC", "READY", breakout={"close_confirmed": False})
@@ -494,7 +541,7 @@ def test_daily_watchlist_query_only_needs_lane_eligible_states():
 
 def test_empty_results_are_safe():
     out = project_daily_vcp_watchlist([])
-    assert out["counts"] == {"ACTION_REVIEW": 0, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0}
+    assert out["counts"] == {"ACTION_REVIEW": 0, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0, "EVENT_WATCH": 0}
     assert out["action_review"] == []
     assert out["near_trigger"] == []
     assert out["breakout_watch"] == []

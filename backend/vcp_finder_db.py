@@ -728,6 +728,7 @@ DAILY_VCP_CAP_ACTION_REVIEW = 10
 DAILY_VCP_CAP_NEAR_TRIGGER = 10
 DAILY_VCP_CAP_BREAKOUT_WATCH = 5
 DAILY_VCP_CAP_STRUCTURE_WATCH = 10
+DAILY_VCP_CAP_EVENT_WATCH = 10
 
 
 def daily_watchlist_query_states():
@@ -814,6 +815,12 @@ def _dv_invalidation_coherent(result):
     return close is not None and close > 0 and invalidation is not None and 0 < invalidation < close
 
 
+def _dv_event_watch(result):
+    """Return true only for an explicit v2/live EVENT_WATCH classification."""
+    shadow = result.get("decision_shadow_v2") or {}
+    return shadow.get("decision_lane") == "EVENT_WATCH" or result.get("decision_lane") == "EVENT_WATCH"
+
+
 def _dv_risk_reward_score(result):
     price = result.get("price") or {}
     close = _dv_to_float(price.get("last_close"))
@@ -871,6 +878,10 @@ def _dv_rank_score(result):
 
 def _dv_lane(result):
     """Return canonical Daily VCP lane or None (fail-closed)."""
+    if _dv_event_watch(result):
+        if _dv_fresh(result) and _dv_liquid(result) and result.get("late_watch") is not True:
+            return "EVENT_WATCH"
+        return None
     state = result.get("state")
     if state in {"EXTENDED", "FAILED", "STALE", "NOT_VERIFIED", "FORMING"}:
         return None
@@ -949,17 +960,23 @@ def project_daily_vcp_watchlist(results):
       - NEAR_TRIGGER: NEAR_TRIGGER with quality pass.
       - BREAKOUT_WATCH: intrabar watch-only, never actionable.
       - STRUCTURE_WATCH: structurally valid but volume/context evidence pending.
+      - EVENT_WATCH: explicit v2 event evidence, including FORMING rows, always
+        watch-only and never actionable.
 
     Hard caps: ACTION_REVIEW <= 10, NEAR_TRIGGER <= 10, BREAKOUT_WATCH <= 5,
-    STRUCTURE_WATCH <= 10.
+    STRUCTURE_WATCH <= 10, EVENT_WATCH <= 10.
     Cross-lane duplicate symbols are removed, keeping the highest-priority lane.
     """
-    raw_lanes = {"ACTION_REVIEW": [], "NEAR_TRIGGER": [], "BREAKOUT_WATCH": [], "STRUCTURE_WATCH": []}
+    raw_lanes = {
+        "ACTION_REVIEW": [], "NEAR_TRIGGER": [], "BREAKOUT_WATCH": [],
+        "STRUCTURE_WATCH": [], "EVENT_WATCH": [],
+    }
     caps = {
         "ACTION_REVIEW": DAILY_VCP_CAP_ACTION_REVIEW,
         "NEAR_TRIGGER": DAILY_VCP_CAP_NEAR_TRIGGER,
         "BREAKOUT_WATCH": DAILY_VCP_CAP_BREAKOUT_WATCH,
         "STRUCTURE_WATCH": DAILY_VCP_CAP_STRUCTURE_WATCH,
+        "EVENT_WATCH": DAILY_VCP_CAP_EVENT_WATCH,
     }
     for r in results or []:
         lane = _dv_lane(r)
@@ -975,7 +992,7 @@ def project_daily_vcp_watchlist(results):
     lanes = {}
     counts = {}
     duplicate_count = 0
-    for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH", "STRUCTURE_WATCH"):
+    for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH", "STRUCTURE_WATCH", "EVENT_WATCH"):
         filtered = []
         for r in raw_lanes[lane]:
             sym = str(r.get("symbol", "")).upper()
@@ -1011,6 +1028,7 @@ def project_daily_vcp_watchlist(results):
         "near_trigger": lanes["NEAR_TRIGGER"],
         "breakout_watch": lanes["BREAKOUT_WATCH"],
         "structure_watch": lanes["STRUCTURE_WATCH"],
+        "event_watch": lanes["EVENT_WATCH"],
     }
 
 

@@ -968,12 +968,13 @@
 
   function renderDailyVcpWatchlist(lanes, target) {
     target = target || dom.dailyVcpCards;
-    var order = ["action_review", "near_trigger", "breakout_watch", "structure_watch"];
+    var order = ["action_review", "near_trigger", "breakout_watch", "structure_watch", "event_watch"];
     var capKeys = {
       action_review: "ACTION_REVIEW",
       near_trigger: "NEAR_TRIGGER",
       breakout_watch: "BREAKOUT_WATCH",
-      structure_watch: "STRUCTURE_WATCH"
+      structure_watch: "STRUCTURE_WATCH",
+      event_watch: "EVENT_WATCH"
     };
     var caps = (lanes && lanes.caps) || {};
     var groups = {};
@@ -1014,10 +1015,10 @@
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
-        var lanes = data.daily_watchlist || {action_review: [], near_trigger: [], breakout_watch: []};
-        var filtered = {action_review: [], near_trigger: [], breakout_watch: [], structure_watch: []};
+        var lanes = data.daily_watchlist || {action_review: [], near_trigger: [], breakout_watch: [], structure_watch: [], event_watch: []};
+        var filtered = {action_review: [], near_trigger: [], breakout_watch: [], structure_watch: [], event_watch: []};
         var insufficientCount = 0;
-        ["action_review", "near_trigger", "breakout_watch", "structure_watch"].forEach(function(key) {
+        ["action_review", "near_trigger", "breakout_watch", "structure_watch", "event_watch"].forEach(function(key) {
           (lanes[key] || []).forEach(function(r){
             var metrics = (r.data || {}).daily_metrics || {};
             if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }
@@ -1030,7 +1031,7 @@
             vcpResultsBySymbol[r.symbol] = r;
           });
         });
-        var total = filtered.action_review.length + filtered.near_trigger.length + filtered.breakout_watch.length;
+        var total = filtered.action_review.length + filtered.near_trigger.length + filtered.breakout_watch.length + filtered.structure_watch.length + filtered.event_watch.length;
         var coverage = (lanes && lanes.coverage) || {};
         var rejectionCounts = coverage.rejection_counts || {};
         var rejectionSummary = Object.keys(rejectionCounts).sort(function(a, b) { return rejectionCounts[b] - rejectionCounts[a]; }).slice(0, 3).map(function(key) { return key + " " + rejectionCounts[key]; }).join(", ");

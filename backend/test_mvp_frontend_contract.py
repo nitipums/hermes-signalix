@@ -122,6 +122,13 @@ def test_daily_vcp_surfaces_rejection_telemetry():
     assert "rejected:" in js
 
 
+def test_daily_vcp_renders_explicit_event_watch_lane_as_watch_only():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert '"event_watch"' in js
+    assert 'event_watch: "EVENT_WATCH"' in js
+    assert '"EVENT_WATCH · WATCH_ONLY"' in js
+
+
 def test_vcp_refreshes_abort_previous_requests_and_ignore_stale_results():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "let dailyVcpRequestSeq = 0;" in js
