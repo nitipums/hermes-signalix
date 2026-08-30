@@ -518,8 +518,12 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
     page = max(1, int(page)); page_size = max(1, min(int(page_size), 100))
     total = len(filtered); start = (page - 1) * page_size
     page_items = filtered[start:start + page_size]
-    projected = project_setup_candidate_list(page_items, as_of=(snapshot_meta or {}).get("scan_time"),
-                                              provenance={"policy_version": "setup-candidates-v1"}, universe="TH-ORD")
+    projected = project_setup_candidate_list(
+        page_items,
+        as_of=(snapshot_meta or {}).get("scan_time"),
+        provenance={"policy_version": "setup-candidates-v1"},
+        universe=(snapshot_meta or {}).get("universe_filter") or "marginable_long",
+    )
     projected.update({
         "page": page, "page_size": page_size, "total_items": total,
         "total_pages": math.ceil(total / page_size) if total else 0,
@@ -528,6 +532,14 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         "counts": {decision: sum(x.get("decision") == decision for x in candidates)
                    for decision in ("REVIEW", "WAIT", "AVOID", "DATA_BLOCKED")},
         "freshness": (snapshot_meta or {}).get("freshness") or _resolve_freshness(items),
+        "universe_filter": (snapshot_meta or {}).get("universe_filter") or "marginable_long",
+        "base_active_ord_count": (snapshot_meta or {}).get("base_active_ord_count"),
+        "eligible_count": (snapshot_meta or {}).get("eligible_count", len(candidates)),
+        "excluded_count": (snapshot_meta or {}).get("excluded_count"),
+        "excluded_reason": (snapshot_meta or {}).get("excluded_reason"),
+        "marginable_schema_version": (snapshot_meta or {}).get("schema_version"),
+        "marginable_source_document": (snapshot_meta or {}).get("source_document"),
+        "marginable_effective_date": (snapshot_meta or {}).get("effective_date"),
     })
     return projected
 
