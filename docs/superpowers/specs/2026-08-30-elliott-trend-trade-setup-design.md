@@ -101,7 +101,11 @@ exceptional:         1:8–1:10
 
 R:R alone does not make a setup valid. A setup also needs a coherent trigger, a technically meaningful invalidation, sufficient data, and a target derived from an explicit method.
 
-### 2.7 User decision boundary
+### 2.7 Elliott v1 detection policy
+
+Elliott v1 uses a conservative observable proxy. It derives candidates only from measurable prior advance, retracement/Fib zone, correction duration, confirmed swing structure, structure integrity, and 60m breakout/confirmation evidence. It must not claim that a wave count is objectively confirmed. Broad discovery or owner-specific Elliott thresholds require a later, separately approved policy change.
+
+### 2.8 User decision boundary
 
 Signalix prepares a candidate and displays evidence. It does not issue an automatic BUY or create an executable order.
 
