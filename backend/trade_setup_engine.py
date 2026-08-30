@@ -64,7 +64,7 @@ def _valid_ohlcv(df: pd.DataFrame | None) -> bool:
         return False
     if not ((values["High"] >= values[["Open", "Close"]].max(axis=1)) &
             (values["Low"] <= values[["Open", "Close"]].min(axis=1)) &
-            (values["High"] > values["Low"])).all():
+            (values["High"] >= values["Low"])).all():
         return False
     return True
 
@@ -181,7 +181,12 @@ def build_trade_setup(
         return _empty_setup(state, "DATA_BLOCKED", reason="missing or mismatched Daily timeframe")
     anchors = _intraday_anchors(intraday_df) if intraday_df is not None else {}
     if not anchors:
-        return _empty_setup(state, "DATA_BLOCKED", reason="missing or invalid 60m OHLCV")
+        reason = (
+            "missing or invalid 60m OHLCV"
+            if not _valid_ohlcv(intraday_df)
+            else "insufficient recent 60m structural anchors"
+        )
+        return _empty_setup(state, "DATA_BLOCKED", reason=reason)
 
     setup = _empty_setup(state, "FORMING", anchors["freshness"])
     trigger = anchors["trigger"]

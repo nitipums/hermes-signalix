@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 from elliott_structure_engine import classify_wave_candidate
-from trade_setup_engine import build_trade_setup
+from trade_setup_engine import _valid_ohlcv, build_trade_setup
 from trend_strength_engine import compute_trend_strength
 
 
@@ -94,6 +94,11 @@ def test_missing_daily_history_is_unknown_and_fail_closed():
     assert result["state"] == "UNKNOWN"
     assert result["confidence"] == "INSUFFICIENT"
     assert "daily_ohlcv" in result["evidence"]["missing_evidence"]
+
+
+def test_flat_ohlcv_candle_is_valid():
+    flat = frame([10, 10, 10])
+    assert _valid_ohlcv(flat)
 
 
 def test_wave_candidate_is_structural_only():
@@ -301,11 +306,11 @@ def test_malformed_or_non_positive_ohlcv_is_blocked():
         assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
 
 
-def test_invalid_structural_anchor_is_blocked():
+def test_flat_structural_break_is_invalidated_not_data_blocked():
     frame_ = rising_60m_frame()
     frame_.loc[frame_.index[-2], ["Open", "High", "Low", "Close"]] = [50, 50, 50, 50]
     frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [50, 50, 50, 50]
-    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "INVALIDATED"
 
 
 def test_non_positive_reward_or_risk_is_blocked():
