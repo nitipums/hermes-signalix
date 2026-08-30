@@ -75,6 +75,34 @@ def lookup(symbol: str | None) -> dict | None:
     return dict(record) if record else None
 
 
+def eligible_symbols(active_symbols, filter_value: str = "marginable_long") -> tuple[list[str], dict]:
+    """Resolve the active, buyable ORD universe for a replay filter."""
+    data = load_marginable_data()
+    normalized_active = {
+        str(symbol).strip().upper()
+        for symbol in active_symbols
+        if str(symbol).strip()
+    }
+    eligible = sorted(
+        symbol
+        for symbol in normalized_active
+        if (record := data["by_symbol"].get(symbol))
+        and record.get("instrument_type") == "ORD"
+        and record.get("can_buy") is True
+    )
+    manifest = {
+        "universe_filter": filter_value,
+        "base_active_ord_count": len(normalized_active),
+        "eligible_count": len(eligible),
+        "excluded_count": len(normalized_active) - len(eligible),
+        "excluded_reason": "not_marginable_long",
+        "schema_version": data["schema_version"],
+        "source_document": data.get("source_document"),
+        "effective_date": data.get("effective_date"),
+    }
+    return eligible, manifest
+
+
 def enrich_item(item: dict) -> dict:
     """Add margin metadata without changing scan/group/lifecycle fields."""
     out = dict(item)

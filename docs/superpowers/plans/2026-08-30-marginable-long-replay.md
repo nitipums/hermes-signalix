@@ -41,9 +41,9 @@ Add tests to `backend/test_marginable.py` that load the real dataset and assert:
 
 ```python
 def test_marginable_long_resolver_returns_only_buyable_active_ord():
-    active = {"ADVANC", "INET", "AIE", "ZZZ_NOT_IN_LIST"}
+    active = {"ADVANC", "INET", "AAI", "ZZZ_NOT_IN_LIST"}
     symbols, manifest = eligible_symbols(active)
-    assert symbols == ["ADVANC", "AIE"]
+    assert symbols == ["AAI", "ADVANC"]
     assert manifest["universe_filter"] == "marginable_long"
     assert manifest["base_active_ord_count"] == 4
     assert manifest["eligible_count"] == 2
@@ -59,7 +59,7 @@ def test_marginable_long_rejects_non_ord_and_cannot_buy_records():
     assert symbols == ["ADVANC"]
 ```
 
-Use the existing real dataset records: `ADVANC` is buyable; `INET` and `OSP` are on the ORD list but have `can_buy=False`.
+Use the existing real dataset records: `ADVANC` and `AAI` are buyable; `INET` and `OSP` are on the ORD list but have `can_buy=False`.
 
 - [ ] **Step 2: Run the focused tests and confirm they fail**
 

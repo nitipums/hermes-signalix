@@ -1,7 +1,13 @@
 import json
 from pathlib import Path
 
-from marginable import filter_items, load_marginable_data, lookup, normalize_rates
+from marginable import (
+    eligible_symbols,
+    filter_items,
+    load_marginable_data,
+    lookup,
+    normalize_rates,
+)
 from mvp_api import project_explorer_response
 from mvp_api import filter_price_band
 
@@ -25,6 +31,25 @@ def test_rights_markers_are_preserved():
     assert lookup("INET")["can_buy"] is False
     assert lookup("INET")["can_short"] is False
     assert lookup("AIE")["margin_rate_pct"] == 100
+
+
+def test_marginable_long_resolver_returns_only_buyable_active_ord():
+    active = {"ADVANC", "INET", "AAI", "ZZZ_NOT_IN_LIST"}
+    symbols, manifest = eligible_symbols(active)
+    assert symbols == ["AAI", "ADVANC"]
+    assert manifest["universe_filter"] == "marginable_long"
+    assert manifest["base_active_ord_count"] == 4
+    assert manifest["eligible_count"] == 2
+    assert manifest["excluded_count"] == 2
+    assert manifest["excluded_reason"] == "not_marginable_long"
+
+
+def test_marginable_long_rejects_non_ord_and_cannot_buy_records():
+    active = {"INET", "OSP", "ADVANC"}
+    symbols, _ = eligible_symbols(active)
+    assert "INET" not in symbols
+    assert "OSP" not in symbols
+    assert symbols == ["ADVANC"]
 
 
 def test_filter_default_is_krungsri_and_all_is_explicit():
