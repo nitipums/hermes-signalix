@@ -32,7 +32,10 @@ from marginable import (
     normalize_filter,
     normalize_rates,
 )
-from setup_candidate_contract import build_setup_candidate, project_setup_candidate_list
+from setup_candidate_contract import build_peer_context, build_setup_candidate, project_setup_candidate_list
+from elliott_structure_engine import classify_wave_candidate
+from trade_setup_engine import build_trade_setup
+from trend_strength_engine import compute_trend_strength
 
 
 def _number(value, default=None):
@@ -395,38 +398,90 @@ def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
 
 
 def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
-    """Adapt an older MVP card without dropping it from canonical coverage."""
-    if all(key in item for key in ("trend", "wave", "setup", "context", "bonus_evidence", "decision")):
-        return item
-    daily = item.get("daily_state") or item.get("dailyState") or {}
-    readiness = item.get("trade_readiness") or {}
-    vcp = item.get("vcp_result") or item.get("vcp") or {}
-    trend = item.get("trend") or {
-        "state": "uptrend" if (item.get("stage") in {"S2_uptrend", "S3_distributing"}) else "UNKNOWN",
-        "rise_20d_pct": item.get("rise_20d_pct"), "rise_60d_pct": item.get("rise_60d_pct"),
-        "relative_strength": item.get("rs"), "near_52w_high": item.get("high52") is not None,
-        "is_52w_high_breakout": False, "is_ath_breakout": False,
+    """Accept only an already canonical artifact; never relabel legacy cards."""
+    required = ("symbol", "as_of", "data_status", "trend", "wave", "setup",
+                "context", "bonus_evidence", "decision", "provenance")
+    if not all(key in item for key in required):
+        raise ValueError("snapshot is not a canonical setup-candidate artifact")
+    return item
+
+
+def _wave_inputs(daily_df):
+    """Derive only observable v1 evidence from the Daily OHLCV series."""
+    if daily_df is None or "Close" not in daily_df:
+        return {}
+    close = daily_df["Close"].astype(float).dropna()
+    if len(close) < 21:
+        return {}
+    prior_advance = float(close.iloc[-1]) > float(close.iloc[-21])
+    anchors = close.iloc[-20:]
+    confirmed = anchors.nunique() >= 3
+    structure_intact = float(close.iloc[-1]) >= float(anchors.min())
+    return {
+        "prior_advance": prior_advance,
+        "confirmed_swing_anchors": confirmed,
+        "structure_intact": structure_intact,
     }
-    wave = item.get("wave") or {"timeframe": "daily", "state": daily.get("wave_state") or "UNKNOWN", "evidence": {}}
-    setup = item.get("setup") or {
-        "timeframe": "60m", "state": "UNKNOWN", "status": "DATA_BLOCKED",
-        "trigger": readiness.get("breakout_level_20d") or item.get("trigger"),
-        "invalidation": readiness.get("cut_level") or item.get("riskStop"),
-    }
-    data_status = item.get("data_status") or {
-        "sufficient": bool(item.get("symbol")),
-        "freshness": item.get("dataFreshness") or "unknown",
-        "source": item.get("priceSource") or "Daily EOD",
-    }
-    as_of = item.get("as_of") or item.get("date") or (item.get("daily_eod_freshness") or {}).get("as_of")
-    provenance = dict(item.get("provenance") or {})
-    provenance.setdefault("policy_version", "setup-candidates-v1")
-    provenance.setdefault("daily_source", item.get("priceSource") or "Daily EOD")
-    return build_setup_candidate(
-        str(item.get("symbol") or ""), str(as_of or ""), data_status, trend, wave, setup,
-        item.get("context") or {"sector": item.get("sector"), "industry": item.get("industry")},
-        item.get("bonus_evidence") or {"vcp": vcp}, provenance,
-    )
+
+
+def build_setup_candidates_from_data(pg, *, market="TH"):
+    """Build the canonical source from the authoritative read-only data path."""
+    import screening
+    from instruments import profile_taxonomy
+
+    symbols = screening._active_scan_symbols(pg, min_history=0, instrument_types=("ORD",), market=market)
+    profiles = profile_taxonomy(pg, symbols=symbols)
+    market_df = screening.load_market(pg, lookback=400, market=market)
+    rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
+    candidates = []
+    latest_daily = None
+    today = datetime.now(timezone(timedelta(hours=7))).date()
+    freshness_statuses = []
+    for symbol in symbols:
+        daily_df = screening.load_symbol(symbol, pg=pg, lookback=400, market=market)
+        intraday_df = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
+        if intraday_df is not None:
+            intraday_df.attrs["timeframe"] = "60m"
+            intraday_df.attrs["as_of"] = intraday_df.index[-1]
+        as_of = daily_df.index[-1].isoformat() if daily_df is not None and len(daily_df) else None
+        if as_of and (latest_daily is None or as_of > latest_daily):
+            latest_daily = as_of
+        prior_ath = None
+        if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
+            prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
+            prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
+        trend = compute_trend_strength(daily_df, relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath)
+        wave = classify_wave_candidate(daily_df, _wave_inputs(daily_df))
+        setup = build_trade_setup(wave, intraday_df)
+        profile = profiles.get(symbol) or {}
+        context = build_peer_context(symbol, {
+            "sector": profile.get("sector"), "industry": profile.get("industry"),
+            "peer_data_status": "UNKNOWN",
+        })
+        daily_ok = daily_df is not None and len(daily_df) > 0
+        intraday_ok = intraday_df is not None and len(intraday_df) >= 3
+        freshness = "unknown"
+        if daily_ok:
+            daily_date = daily_df.index[-1].date()
+            age_days = (today - daily_date).days
+            freshness = "fresh" if 0 <= age_days <= 10 else "stale"
+        data_status = {
+            "sufficient": bool(daily_ok and intraday_ok),
+            "freshness": freshness,
+            "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
+            "daily_available": daily_ok, "intraday_60m_available": intraday_ok,
+        }
+        freshness_statuses.append(freshness)
+        candidates.append(build_setup_candidate(
+            symbol, as_of, data_status, trend, wave, setup, context,
+            {"vcp": {"present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"}},
+            {"policy_version": "setup-candidates-v1", "daily_source": "price_data",
+             "intraday_source": "intraday_price_data", "as_of": as_of},
+        ))
+    overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
+                         else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
+    return candidates, {"scan_time": latest_daily, "freshness": {"status": overall_freshness},
+                        "source": "price_data+intraday_price_data", "universe": "TH-ORD"}
 
 
 def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,

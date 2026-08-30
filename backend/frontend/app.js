@@ -1018,12 +1018,17 @@
     var decision = item.decision || "DATA_BLOCKED";
     var evidence = "Trend " + (trend.state || "UNKNOWN") + " · " +
       (trend.rise_20d_pct == null ? "20D –" : "20D " + Number(trend.rise_20d_pct).toFixed(1) + "%") +
-      " · RS " + (trend.relative_strength == null ? "–" : trend.relative_strength);
-    var waveEvidence = wave.state || "UNKNOWN";
+      " · 60D " + (trend.rise_60d_pct == null ? "–" : Number(trend.rise_60d_pct).toFixed(1) + "%") +
+      " · RS " + (trend.relative_strength == null ? "–" : trend.relative_strength) +
+      " · 52W " + (trend.is_52w_high_breakout ? "BREAKOUT" : trend.near_52w_high ? "NEAR HIGH" : "–") +
+      " · ATH " + (trend.is_ath_breakout == null ? "UNKNOWN" : trend.is_ath_breakout ? "BREAKOUT" : "NO BREAKOUT");
+    var waveEvidence = (wave.state || "UNKNOWN") + " · " +
+      ((wave.evidence || {}).structure_intact == null ? "structure unknown" :
+       (wave.evidence || {}).structure_intact ? "structure intact" : "structure broken");
     var setupEvidence = (setup.status || "UNKNOWN") + " · trigger " + displayValue(setup.trigger) +
       " · invalidation " + displayValue(setup.invalidation);
     var targetText = targets.length ? targets.map(displayValue).join(" / ") : "–";
-    var vcp = bonus.vcp ? (bonus.vcp.present ? "VCP bonus" : "VCP not present") : "VCP bonus unknown";
+    var vcp = bonus.vcp ? (bonus.vcp.present === true ? "VCP bonus" : bonus.vcp.present === false ? "VCP not present" : "VCP bonus unknown") : "VCP bonus unknown";
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b>' + escapeHTML(decision) + '</b></div>' +
       '<p class="setup-candidate__evidence">' + escapeHTML(evidence) + ' · 52W/ATH ' + (trend.is_52w_high_breakout ? "breakout" : trend.near_52w_high ? "near high" : "–") + '</p>' +

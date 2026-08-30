@@ -53,3 +53,63 @@ def test_setup_candidate_filters_are_presentation_only():
     result = project_setup_candidates_response([candidate(), candidate("XYZ", sector="Energy")], sector="Energy")
     assert [item["symbol"] for item in result["items"]] == ["XYZ"]
     assert result["evaluated_count"] == 2
+
+
+def test_legacy_snapshot_is_not_disguised_as_canonical():
+    import pytest
+    with pytest.raises(ValueError, match="canonical"):
+        from mvp_api import _setup_candidate_from_snapshot
+        _setup_candidate_from_snapshot({"symbol": "LEGACY", "stage": "S2_uptrend"})
+
+
+def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypatch):
+    import mvp_api
+    import screening
+    import instruments
+    import pandas as pd
+
+    daily = pd.DataFrame({"Open": [1.0] * 25, "High": [1.1] * 25,
+                          "Low": [0.9] * 25, "Close": list(range(1, 26)),
+                          "Volume": [10] * 25},
+                         index=pd.date_range("2026-07-01", periods=25))
+    calls = []
+    monkeypatch.setattr(screening, "_active_scan_symbols", lambda *a, **k: ["AAA"])
+    monkeypatch.setattr(instruments, "profile_taxonomy", lambda *a, **k: {
+        "AAA": {"sector": "Technology", "industry": "Components"}})
+    monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
+    monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {"AAA": 91})
+    monkeypatch.setattr(screening, "load_symbol", lambda *a, **k: daily)
+    monkeypatch.setattr(screening, "load_symbol_intraday", lambda *a, **k: None)
+    original_wave = mvp_api.classify_wave_candidate
+    original_setup = mvp_api.build_trade_setup
+    monkeypatch.setattr(mvp_api, "classify_wave_candidate", lambda df, evidence: (calls.append("wave") or original_wave(df, evidence)))
+    monkeypatch.setattr(mvp_api, "build_trade_setup", lambda wave, intra: (calls.append("setup") or original_setup(wave, intra)))
+
+    rows, meta = mvp_api.build_setup_candidates_from_data(object())
+    assert calls == ["wave", "setup"]
+    item = rows[0]
+    assert item["trend"]["rise_20d_pct"] is not None
+    assert set(("near_52w_high", "is_52w_high_breakout", "is_ath_breakout")) <= item["trend"].keys()
+    assert item["wave"]["timeframe"] == "daily"
+    assert item["setup"]["timeframe"] == "60m"
+    assert item["setup"]["status"] == "DATA_BLOCKED"
+    assert item["context"]["sector"] == "Technology"
+    assert "peer_symbols" in item["context"]
+    assert item["bonus_evidence"]["vcp"]["source"] == "legacy_audit_only"
+    assert meta["source"] == "price_data+intraday_price_data"
+
+
+def test_route_uses_data_source_when_snapshot_is_legacy(monkeypatch):
+    row = candidate("REAL_SOURCE")
+    calls = []
+    class PG:
+        def close(self):
+            pass
+    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": [{"symbol": "OLD", "stage": "S2_uptrend"}]})
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    monkeypatch.setattr(mvp_routes, "json_response", lambda handler, data, status=200: calls.append((status, data)))
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data", lambda pg, market="TH": ([row], {"scan_time": "2026-08-30", "freshness": {}}))
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert calls[0][0] == 200
+    assert calls[0][1]["items"][0]["symbol"] == "REAL_SOURCE"
