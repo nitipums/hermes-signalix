@@ -97,19 +97,25 @@ def classify_wave_candidate(
         "measurable_breakout": breakout,
     })
 
-    # Markers can corroborate an observable shape, but never create one.
-    if rebound and (evidence.get("breakout_confirmed") or evidence.get("early_wave_3")):
-        state = "EARLY_WAVE_3"
-    elif rebound and (evidence.get("wave_3_continuation") or evidence.get("continuation_confirmed")):
+    claimed_state = str(evidence.get("candidate_state") or evidence.get("phase") or "").upper()
+    if (
+        evidence.get("wave_4_correction")
+        or evidence.get("wave_5_advance")
+        or claimed_state in {"WAVE_4_CORRECTION", "WAVE_5_ADVANCE"}
+    ):
+        # V1 cannot distinguish these waves from the measured frame.
+        return result
+
+    # Caller labels are retained as review context, but cannot select a state.
+    # The observable frame can identify an advance, pullback, or rebound; it
+    # cannot objectively distinguish Wave 4 from Wave 2, or Wave 5 from a
+    # generic advance, so those marker-only claims remain UNKNOWN.
+    if rebound and breakout:
         state = "WAVE_3_CONTINUATION"
-    elif pullback and evidence.get("wave_4_correction"):
-        state = "WAVE_4_CORRECTION"
+    elif rebound:
+        state = "EARLY_WAVE_3"
     elif pullback:
         state = "WAVE_2_NEAR_COMPLETION" if evidence.get("fib_zone") else "WAVE_2_FORMING"
-    elif advance and evidence.get("wave_5_advance"):
-        state = "WAVE_5_ADVANCE"
-    elif advance and evidence.get("wave_3_continuation") and breakout:
-        state = "WAVE_3_CONTINUATION"
     elif advance:
         state = "WAVE_1_ADVANCE"
     else:

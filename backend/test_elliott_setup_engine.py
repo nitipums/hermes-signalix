@@ -88,9 +88,23 @@ def test_wave_candidates_cover_observable_phases():
     assert classify_wave_candidate(wave_two_frame(), wave_evidence(fib_zone=None))["state"] == "WAVE_2_FORMING"
     assert classify_wave_candidate(wave_two_frame(), wave_evidence())["state"] == "WAVE_2_NEAR_COMPLETION"
     assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(breakout_confirmed=True))["state"] == "EARLY_WAVE_3"
-    assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(wave_3_continuation=True))["state"] == "WAVE_3_CONTINUATION"
-    assert classify_wave_candidate(wave_two_frame(), wave_evidence(wave_4_correction=True))["state"] == "WAVE_4_CORRECTION"
-    assert classify_wave_candidate(wave_frame(), wave_evidence(wave_5_advance=True))["state"] == "WAVE_5_ADVANCE"
+    assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(wave_3_continuation=True))["state"] == "EARLY_WAVE_3"
+    assert classify_wave_candidate(wave_two_frame(), wave_evidence(wave_4_correction=True))["state"] == "UNKNOWN"
+    assert classify_wave_candidate(wave_frame(), wave_evidence(wave_5_advance=True))["state"] == "UNKNOWN"
+
+
+def test_wave_four_and_five_markers_do_not_force_states_on_generic_rise():
+    result = classify_wave_candidate(
+        wave_frame(),
+        wave_evidence(
+            phase="WAVE_4_CORRECTION",
+            candidate_state="WAVE_5_ADVANCE",
+            wave_4_correction=True,
+            wave_5_advance=True,
+        ),
+    )
+    assert result["state"] == "UNKNOWN"
+    assert result["state"] not in {"WAVE_4_CORRECTION", "WAVE_5_ADVANCE"}
 
 
 def test_arbitrary_markers_cannot_force_wave_state_on_flat_or_falling_data():

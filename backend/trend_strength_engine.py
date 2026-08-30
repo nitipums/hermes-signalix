@@ -39,8 +39,8 @@ def compute_trend_strength(
     """Return conservative Daily trend/strength evidence.
 
     The function deliberately leaves unavailable calculations as ``None``.
-    ``prior_ath`` is an optional authoritative all-time-high reference; when it
-    is absent, the observed Daily close history is used as a bounded fallback.
+    ``prior_ath`` is an optional explicit all-time-high reference. Without it,
+    an observed ATH comparison is available only after 252 prior sessions.
     """
     empty = {
         "state": "UNKNOWN",
