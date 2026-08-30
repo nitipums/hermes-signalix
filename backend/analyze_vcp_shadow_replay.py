@@ -49,6 +49,33 @@ def _as_of(value):
     return parsed.astimezone(timezone.utc)
 
 
+def _row_as_of(row):
+    """Return a persisted row's canonical snapshot timestamp, if available."""
+    value = row.get("as_of")
+    if value is not None:
+        return value
+    provenance = row.get("provenance")
+    if isinstance(provenance, dict):
+        return provenance.get("replay_as_of")
+    return None
+
+
+def _timeline_sort_key(row):
+    value = _row_as_of(row)
+    try:
+        parsed = _as_of(value)
+    except (TypeError, ValueError):
+        parsed = None
+    # Valid timestamps sort chronologically; missing/invalid values remain
+    # explicit and sort deterministically after valid observations. The
+    # canonical row content, rather than input position, resolves ties.
+    timestamp_key = (0, parsed) if parsed is not None else (1, "")
+    content_key = json.dumps(row, sort_keys=True, separators=(",", ":"),
+                             ensure_ascii=True)
+    return (timestamp_key, str(row.get("symbol") or ""),
+            str(row.get("state") or "NOT_VERIFIED"), content_key)
+
+
 def _metric(result, path):
     value = result
     for key in path:
@@ -66,7 +93,7 @@ def _first_activation(rows, evaluation_key):
             # timeline timestamp is still the snapshot at which it activated.
             return (evaluation.get("entry_ts")
                     if evaluation.get("entry_ts") not in (None, "detection")
-                    else row.get("as_of"))
+                    else _row_as_of(row))
     return None
 
 
@@ -106,7 +133,9 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
     if max_diagnostic_items < 1:
         raise ValueError("max_diagnostic_items must be positive")
     grouped = {}
-    for row in sorted(rows, key=lambda item: (str(item.get("symbol") or ""), str(item.get("as_of") or ""))):
+    timeline_rows = sorted(rows, key=_timeline_sort_key)
+    for row in sorted(timeline_rows, key=lambda item: (str(item.get("symbol") or ""),
+                                                        _timeline_sort_key(item))):
         symbol = row.get("symbol")
         if not symbol:
             continue
@@ -134,13 +163,13 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
         })
         state = row.get("state") or "NOT_VERIFIED"
         if item["first_event_as_of"] is None:
-            item["first_event_as_of"] = row.get("as_of")
+            item["first_event_as_of"] = _row_as_of(row)
         if not item["states"] or item["states"][-1] != state:
             if item["states"]:
                 item["transition_count"] += 1
                 if len(item["transitions"]) < max_diagnostic_items:
                     item["transitions"].append({
-                        "as_of": row.get("as_of"),
+                        "as_of": _row_as_of(row),
                         "from": item["states"][-1],
                         "to": state,
                     })
@@ -148,11 +177,11 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
         shadow = row.get("decision_shadow_v2") or {}
         actionability = shadow.get("actionability")
         if item["first_watch"] is None and actionability not in (None, "NO_ACTION"):
-            item["first_watch"] = row.get("as_of")
+            item["first_watch"] = _row_as_of(row)
         lane = shadow.get("decision_lane")
         if item["first_action_lane"] is None and lane in ACTION_LANES:
             item["first_action_lane"] = lane
-            item["first_action_as_of"] = row.get("as_of")
+            item["first_action_as_of"] = _row_as_of(row)
         if row.get("late_watch") is True:
             item["late_chase_observations"]["late_watch"] += 1
         if lane == "DO_NOT_CHASE":
@@ -167,11 +196,14 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
         # is represented as zero, while absent source metrics remain None.
         # Reconstructing from the sorted source keeps this deterministic and
         # avoids exposing internal rows in the public timeline contract.
-        symbol_rows = [r for r in sorted(rows, key=lambda r: str(r.get("as_of") or ""))
+        symbol_rows = [r for r in timeline_rows
                        if r.get("symbol") == next(
                            s for s, value in grouped.items() if value is item)]
         for current, following in zip(symbol_rows, symbol_rows[1:]):
-            start, end = _as_of(current.get("as_of")), _as_of(following.get("as_of"))
+            try:
+                start, end = _as_of(_row_as_of(current)), _as_of(_row_as_of(following))
+            except (TypeError, ValueError):
+                start, end = None, None
             if start is not None and end is not None:
                 state = current.get("state") or "NOT_VERIFIED"
                 item["observed_time_in_state_hours"][state] = (
@@ -191,10 +223,13 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
                     and ((r.get(key) or {}).get("entry_ts") not in (None, "detection")
                          and (r.get(key) or {}).get("entry_ts") == activation
                          or (r.get(key) or {}).get("entry_ts") in (None, "detection")
-                         and r.get("as_of") == activation)
+                         and _row_as_of(r) == activation)
                 )
-                detected = _as_of(activation_row.get("as_of"))
-                entered = _as_of(activation)
+                try:
+                    detected = _as_of(_row_as_of(activation_row))
+                    entered = _as_of(activation)
+                except (TypeError, ValueError):
+                    detected, entered = None, None
                 item["time_to_entry_hours"][version] = (
                     (entered - detected).total_seconds() / 3600
                     if detected is not None and entered is not None else None)

@@ -94,6 +94,67 @@ def test_summarize_timeline_orders_states_and_counts_transitions():
     assert out["AAA"]["outcome_counts"] == {"target_hit": 1, "NOT_VERIFIED": 1}
 
 
+def test_summarize_timeline_is_independent_of_input_order_for_same_timestamp_rows():
+    records = [
+        {
+            "symbol": "AAA", "as_of": "2026-08-01T09:45:00+00:00",
+            "state": "READY",
+            "decision_shadow_v2": {"decision_lane": "PREPARE",
+                                    "actionability": "ACTIONABLE_REVIEW"},
+        },
+        {
+            "symbol": "AAA", "as_of": "2026-08-01T09:45:00+00:00",
+            "state": "FORMING",
+            "decision_shadow_v2": {"decision_lane": "RESEARCH",
+                                    "actionability": "NO_ACTION"},
+        },
+    ]
+
+    assert summarize_timeline(records) == summarize_timeline(list(reversed(records)))
+
+
+def test_summarize_timeline_uses_persisted_replay_as_of_for_timeline_metrics():
+    records = [
+        {
+            "symbol": "AAA", "state": "READY",
+            "provenance": {"replay_as_of": "2026-08-01T09:45:00+00:00"},
+            "decision_shadow_v2": {"decision_lane": "PREPARE",
+                                    "actionability": "ACTIONABLE_REVIEW"},
+            "replay_evaluation": {"entry_activated": True,
+                                   "entry_ts": "2026-08-01T10:45:00+00:00"},
+        },
+        {
+            "symbol": "AAA", "state": "FORMING",
+            "provenance": {"replay_as_of": "2026-08-01T05:30:00+00:00"},
+            "decision_shadow_v2": {"decision_lane": "RESEARCH",
+                                    "actionability": "NO_ACTION"},
+            "replay_evaluation": {"entry_activated": False},
+        },
+    ]
+
+    item = summarize_timeline(records)["AAA"]
+
+    assert item["states"] == ["FORMING", "READY"]
+    assert item["first_event_as_of"] == "2026-08-01T05:30:00+00:00"
+    assert item["first_watch"] == "2026-08-01T09:45:00+00:00"
+    assert item["first_action_as_of"] == "2026-08-01T09:45:00+00:00"
+    assert item["transitions"] == [{
+        "as_of": "2026-08-01T09:45:00+00:00", "from": "FORMING", "to": "READY",
+    }]
+    assert item["observed_time_in_state_hours"] == {"FORMING": 4.25}
+    assert item["time_to_entry_hours"] == {"v1": 1.0, "sequence_v2": None}
+
+
+def test_summarize_timeline_keeps_missing_timestamps_explicit():
+    item = summarize_timeline([{"symbol": "EMPTY", "state": "FORMING"}])["EMPTY"]
+
+    assert item["first_event_as_of"] is None
+    assert item["first_watch"] is None
+    assert item["first_action_as_of"] is None
+    assert item["transitions"] == []
+    assert item["observed_time_in_state_hours"] == {}
+
+
 def test_summarize_timeline_repeated_states_and_bounded_diagnostics():
     records = [
         {"symbol": "AAA", "as_of": f"2026-08-01T{hour:02d}:00:00+00:00", "state": state}
