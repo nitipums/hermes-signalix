@@ -1,4 +1,7 @@
 import json
+from decimal import Decimal
+
+import numpy as np
 
 from setup_candidate_contract import (
     build_peer_context,
@@ -29,6 +32,25 @@ def test_candidate_contract_keeps_layers_separate():
     assert item["setup"]["timeframe"] == "60m"
     assert item["decision"] == "REVIEW"
     json.dumps(item)
+
+
+def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
+    inputs = sample_inputs()
+    inputs["wave"] = {"timeframe": "60m", "state": "WAVE_2_NEAR_COMPLETION"}
+    inputs["setup"] = {"timeframe": "15m", "status": "READY"}
+    item = build_setup_candidate(**inputs)
+    assert item["wave"]["timeframe"] == "60m"
+    assert item["setup"]["timeframe"] == "15m"
+    assert item["decision"] == "DATA_BLOCKED"
+
+
+def test_missing_timeframes_are_defaulted_by_contract_construction():
+    inputs = sample_inputs()
+    inputs["wave"].pop("timeframe", None)
+    inputs["setup"].pop("timeframe", None)
+    item = build_setup_candidate(**inputs)
+    assert item["wave"]["timeframe"] == "daily"
+    assert item["setup"]["timeframe"] == "60m"
 
 
 def test_peer_context_derives_breadth_breakouts_and_leadership():
@@ -77,6 +99,35 @@ def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
     assert build_setup_candidate(**non_vcp)["decision"] == "REVIEW"
 
 
+def test_explicit_failed_structure_and_risk_statuses_avoid():
+    for status in ("FAILED", "BROKEN", "DO_NOT_CHASE", "FAILED_STRUCTURE"):
+        inputs = sample_inputs()
+        inputs["setup"] = {"status": status}
+        assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+    inputs = sample_inputs()
+    inputs["setup"] = {"status": "FORMING", "risk_status": "RISK_FAILED"}
+    assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+
+
+def test_blocked_data_precedes_failed_statuses():
+    inputs = sample_inputs()
+    inputs["data_status"] = {"sufficient": False, "freshness": "stale"}
+    inputs["setup"] = {"status": "DO_NOT_CHASE"}
+    assert build_setup_candidate(**inputs)["decision"] == "DATA_BLOCKED"
+
+
+def test_recursive_json_conversion_returns_plain_primitives_or_null():
+    inputs = sample_inputs()
+    inputs["trend"] = {
+        "nested": [np.int64(4), np.float32(2.5), Decimal("3.25"), np.nan],
+    }
+    item = build_setup_candidate(**inputs)
+    nested = item["trend"]["nested"]
+    assert nested == [4, 2.5, 3.25, None]
+    assert [type(value) for value in nested] == [int, float, float, type(None)]
+    json.dumps(item)
+
+
 def test_list_projection_preserves_unknown_and_non_vcp_rows():
     first = build_setup_candidate(**sample_inputs())
     second = dict(first, symbol="XYZ", decision="DATA_BLOCKED")
@@ -94,11 +145,13 @@ def test_screening_adapter_does_not_apply_vcp_filter(monkeypatch):
     def fake_scan_universe(**kwargs):
         captured.update(kwargs)
         return ([{"symbol": "AAA", "vcp": {"is_vcp": False}},
-                 {"symbol": "BBB", "analysis_status": "INSUFFICIENT_HISTORY"}], [])
+                 {"symbol": "BBB", "analysis_status": "INSUFFICIENT_HISTORY",
+                  "trend_template": {"conditions_met": 0}},
+                 {"symbol": "CCC", "vcp": {"is_vcp": True}}], [])
 
     monkeypatch.setattr(screening, "scan_universe", fake_scan_universe)
     rows = screening.load_evaluated_ord_rows(object(), market="TH")
-    assert [row["symbol"] for row in rows] == ["AAA", "BBB"]
+    assert [row["symbol"] for row in rows] == ["AAA", "BBB", "CCC"]
     assert captured["min_conditions"] == -1
     assert captured["market"] == "TH"
     assert captured["annotate_ath"] is False

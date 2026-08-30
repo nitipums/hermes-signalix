@@ -7,7 +7,9 @@ does not calculate indicators, query a database, or use VCP as a gate.
 from __future__ import annotations
 
 import math
+import numbers
 from collections.abc import Iterable
+from decimal import Decimal
 from typing import Any
 
 
@@ -17,16 +19,26 @@ DECISIONS = {"REVIEW", "WAIT", "AVOID", "DATA_BLOCKED"}
 
 def _json_value(value: Any):
     """Convert pandas/numpy-like values to ordinary JSON-safe values."""
+    if value is None:
+        return None
     if isinstance(value, dict):
         return {str(key): _json_value(item) for key, item in value.items()}
     if isinstance(value, (list, tuple, set)):
         return [_json_value(item) for item in value]
-    if value is None or isinstance(value, (str, bool, int)):
+    if isinstance(value, (str, bool)):
         return value
+    if isinstance(value, int):
+        return int(value)
     if isinstance(value, float):
-        return value if math.isfinite(value) else None
+        return float(value) if math.isfinite(value) else None
     if hasattr(value, "item"):
         return _json_value(value.item())
+    if isinstance(value, (Decimal, numbers.Number)):
+        number = float(value)
+        return number if math.isfinite(number) else None
+    # pandas.NA/NaT and similar scalar sentinels are missing values, not text.
+    if type(value).__name__ in {"NAType", "NaTType"}:
+        return None
     if hasattr(value, "isoformat"):
         return value.isoformat()
     return str(value)
@@ -117,8 +129,16 @@ def _has_blocked_data(data_status: dict, wave: dict, setup: dict) -> bool:
         return True
     if str(setup.get("status", "")).upper() == "DATA_BLOCKED":
         return True
+    if wave.get("timeframe", "daily") not in {None, "daily"}:
+        return True
+    if setup.get("timeframe", "60m") not in {None, "60m"}:
+        return True
     return (wave.get("state") == "UNKNOWN" or
             str(wave.get("confidence", "")).upper() == "INSUFFICIENT")
+
+
+def _status_token(value: Any) -> str:
+    return str(value or "").upper().replace("-", "_").replace(" ", "_")
 
 
 def _decision(data_status: dict, wave: dict, setup: dict) -> str:
@@ -126,9 +146,17 @@ def _decision(data_status: dict, wave: dict, setup: dict) -> str:
         return "DATA_BLOCKED"
     setup_status = str(setup.get("status", "")).upper()
     evidence = wave.get("evidence") or {}
-    if (setup_status in {"INVALIDATED", "AVOID"} or
+    failed_statuses = {
+        "INVALIDATED", "AVOID", "FAILED", "BROKEN", "DO_NOT_CHASE",
+        "FAILED_STRUCTURE", "STRUCTURE_FAILED", "BROKEN_STRUCTURE",
+        "FAILED_RISK", "RISK_FAILED", "UNACCEPTABLE_RISK",
+    }
+    risk_status = _status_token(setup.get("risk_status"))
+    if (setup_status in failed_statuses or
             setup.get("risk_acceptable") is False or
-            str(setup.get("risk_status", "")).upper() in {"UNACCEPTABLE", "INVALID"} or
+            risk_status in {"UNACCEPTABLE", "INVALID", "FAILED", "BROKEN",
+                             "DO_NOT_CHASE", "FAILED_RISK", "RISK_FAILED",
+                             "UNACCEPTABLE_RISK"} or
             evidence.get("structure_intact") is False):
         return "AVOID"
     if setup_status in {"READY", "TRIGGERED"}:
@@ -149,9 +177,11 @@ def build_setup_candidate(
 ) -> dict:
     """Build one canonical, JSON-safe setup-candidate item."""
     wave_out = dict(wave or {})
-    wave_out["timeframe"] = "daily"
+    if wave_out.get("timeframe") is None:
+        wave_out["timeframe"] = "daily"
     setup_out = dict(setup or {})
-    setup_out["timeframe"] = "60m"
+    if setup_out.get("timeframe") is None:
+        setup_out["timeframe"] = "60m"
     item = {
         "symbol": str(symbol),
         "as_of": as_of,
