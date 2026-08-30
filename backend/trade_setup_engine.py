@@ -70,9 +70,20 @@ def _valid_ohlcv(df: pd.DataFrame | None) -> bool:
 
 
 def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
-    """Return validated recent leg anchors, excluding the latest observation."""
+    """Return confirmed recent pullback/advance anchors, excluding observation."""
     if not _valid_ohlcv(df) or df.attrs.get("timeframe") != "60m":
         return {}
+    if not isinstance(df.index, pd.DatetimeIndex) or df.index.hasnans:
+        return {}
+    if not df.index.is_monotonic_increasing or not df.index.is_unique:
+        return {}
+    as_of = df.attrs.get("as_of")
+    if as_of is not None:
+        try:
+            if pd.Timestamp(as_of) != df.index[-1]:
+                return {}
+        except (TypeError, ValueError):
+            return {}
     # A bounded recent window prevents an old 90-bar extreme from becoming the
     # current setup anchor. The latest candle is the observation under test.
     prior = df.iloc[:-1].tail(30)
@@ -86,22 +97,53 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     for index in range(1, len(closes)):
         step = 1 if closes[index] > closes[index - 1] else -1 if closes[index] < closes[index - 1] else 0
         if not step:
+            if direction:
+                legs.append((direction, start, index - 1))
+            direction = 0
+            start = index - 1
             continue
         if direction and step != direction:
             legs.append((direction, start, index - 1))
             start = index - 1
+        elif not direction:
+            start = index - 1
         direction = step
     legs.append((direction, start, len(closes) - 1))
-    up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] > leg[1]]
+    up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] - leg[1] >= 3]
     if not up_legs:
         return {}
     _, leg_start, leg_end = up_legs[-1]
+    preceding = [leg for leg in legs if leg[2] <= leg_start and leg[0] == -1]
+    if not preceding:
+        return {}
+    _, pullback_start, pullback_end = preceding[-1]
+    if pullback_end - pullback_start < 3:
+        return {}
+    pullback_start_close = _number(closes[pullback_start])
+    pullback_end_close = _number(closes[pullback_end])
+    advance_start_close = _number(closes[leg_start])
+    advance_end_close = _number(closes[leg_end])
+    if any(value is None for value in (
+        pullback_start_close, pullback_end_close, advance_start_close, advance_end_close
+    )):
+        return {}
+    # A structural pullback and advance need price significance as well as
+    # direction. This rejects one/two-bar noise and a merely drifting close.
+    if pullback_end_close > pullback_start_close * 0.97:
+        return {}
+    if advance_end_close < advance_start_close * 1.03:
+        return {}
     leg = prior.iloc[leg_start:leg_end + 1]
+    pivot = prior.iloc[pullback_end]
+    pivot_low = _number(pivot["Low"])
     swing_low = _number(leg["Low"].min())
     swing_high = _number(leg["High"].max())
     close = _number(df["Close"].iloc[-1])
-    if swing_low is None or swing_high is None or close is None or swing_low <= 0 or swing_high <= swing_low:
+    if (pivot_low is None or swing_low is None or swing_high is None or close is None or
+            pivot_low <= 0 or swing_low <= 0 or swing_high <= swing_low or
+            abs(swing_low - pivot_low) > max(pivot_low * 0.02, 1e-12)):
         return {}
+    swing_low = pivot_low
     pullback_low = swing_low + (swing_high - swing_low) * 0.5
     if not _number(pullback_low) or pullback_low <= swing_low:
         return {}

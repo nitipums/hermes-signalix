@@ -173,7 +173,7 @@ def daily_wave_two_evidence():
 
 
 def rising_60m_frame():
-    close = [100 + i for i in range(40)]
+    close = list(range(100, 120)) + list(range(119, 109, -1)) + list(range(110, 118)) + [119]
     result = pd.DataFrame(
         {"Open": close, "High": [v + 1 for v in close], "Low": [v - 1 for v in close], "Close": close},
         # Volume is part of the 60m OHLCV contract, even though setup math
@@ -183,6 +183,46 @@ def rising_60m_frame():
     result["Volume"] = 100
     result.attrs["timeframe"] = "60m"
     return result
+
+
+def test_weak_one_or_two_bar_rise_is_data_blocked():
+    frame_ = rising_60m_frame().iloc[:-5].copy()
+    frame_.index = pd.date_range("2026-08-30", periods=len(frame_), freq="h")
+    frame_.attrs["timeframe"] = "60m"
+    result = build_trade_setup(daily_wave_two_evidence(), frame_)
+    assert result["status"] == "DATA_BLOCKED"
+
+
+def test_degenerate_leg_and_missing_pivot_confirmation_are_blocked():
+    close = list(range(100, 111)) + list(range(109, 103, -1)) + [104, 105, 106]
+    frame_ = pd.DataFrame(
+        {"Open": close, "High": [v + 1 for v in close],
+         "Low": [v - 1 for v in close], "Close": close,
+         "Volume": 100},
+        index=pd.date_range("2026-08-30", periods=len(close), freq="h"),
+    )
+    frame_.attrs["timeframe"] = "60m"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_invalid_timestamp_metadata_is_blocked():
+    frame_ = rising_60m_frame()
+    frame_.attrs["as_of"] = "not-a-timestamp"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+    frame_ = rising_60m_frame()
+    frame_.index = frame_.index[::-1]
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_invalid_non_finite_helper_output_is_blocked():
+    class BadFib:
+        @staticmethod
+        def compute_fib_targets(*args):
+            return {"fib_1272": float("nan"), "fib_1618": float("inf")}
+
+    result = build_trade_setup(daily_wave_two_evidence(), rising_60m_frame(), risk_helper=BadFib)
+    assert result["status"] == "DATA_BLOCKED"
 
 
 def test_early_wave_three_setup_has_trigger_stop_targets_and_rr():
@@ -280,9 +320,9 @@ def test_status_precedence_and_boundaries_are_deterministic():
     assert result["status"] == "INVALIDATED"  # invalidation precedes extension
 
     frame_ = rising_60m_frame()
-    frame_.loc[frame_.index[-1], ["High", "Close"]] = [139, 139]
+    frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [117, 118, 116, 118]
     assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "TRIGGERED"
 
     frame_ = rising_60m_frame()
-    frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [138, 138, 137, 138]
+    frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [116, 117, 115, 117]
     assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "READY"
