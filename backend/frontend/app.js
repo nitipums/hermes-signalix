@@ -937,6 +937,7 @@
     var pair = decisionLane(result) + " · " + actionability(result);
     var allowed = [
       "REVIEW_NOW · ACTIONABLE_REVIEW",
+      "STRUCTURE_WATCH · WATCH_ONLY",
       "PREPARE · WATCH_ONLY",
       "EVENT_WATCH · WATCH_ONLY",
       "RESEARCH · NO_ACTION",
@@ -957,7 +958,7 @@
 
   function renderVcpResults(results, target) {
     target = target || dom.vcpCards;
-    var order = ["REVIEW_NOW · ACTIONABLE_REVIEW", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"];
+    var order = ["REVIEW_NOW · ACTIONABLE_REVIEW", "STRUCTURE_WATCH · WATCH_ONLY", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"];
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
@@ -967,11 +968,12 @@
 
   function renderDailyVcpWatchlist(lanes, target) {
     target = target || dom.dailyVcpCards;
-    var order = ["action_review", "near_trigger", "breakout_watch"];
+    var order = ["action_review", "near_trigger", "breakout_watch", "structure_watch"];
     var capKeys = {
       action_review: "ACTION_REVIEW",
       near_trigger: "NEAR_TRIGGER",
-      breakout_watch: "BREAKOUT_WATCH"
+      breakout_watch: "BREAKOUT_WATCH",
+      structure_watch: "STRUCTURE_WATCH"
     };
     var caps = (lanes && lanes.caps) || {};
     var groups = {};
@@ -991,7 +993,7 @@
         }
       });
     });
-    ["REVIEW_NOW · ACTIONABLE_REVIEW", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
+    ["REVIEW_NOW · ACTIONABLE_REVIEW", "STRUCTURE_WATCH · WATCH_ONLY", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
       if (!groups[status]) return;
       var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
       html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
@@ -1013,9 +1015,9 @@
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
         vcpResultsBySymbol = {};
         var lanes = data.daily_watchlist || {action_review: [], near_trigger: [], breakout_watch: []};
-        var filtered = {action_review: [], near_trigger: [], breakout_watch: []};
+        var filtered = {action_review: [], near_trigger: [], breakout_watch: [], structure_watch: []};
         var insufficientCount = 0;
-        ["action_review", "near_trigger", "breakout_watch"].forEach(function(key) {
+        ["action_review", "near_trigger", "breakout_watch", "structure_watch"].forEach(function(key) {
           (lanes[key] || []).forEach(function(r){
             var metrics = (r.data || {}).daily_metrics || {};
             if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }

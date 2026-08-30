@@ -9,7 +9,12 @@ from instruments import active_ord_symbols
 from marginable import eligible_symbols, metadata as marginable_metadata
 from mvp_api import _resolve_rr
 from unified_vcp_decision import project_unified_vcp_decision
-from vcp_decision_policy import POLICY_VERSION as DECISION_SHADOW_POLICY_VERSION, project_vcp_decision_shadow
+from vcp_decision_policy import (
+    CANDIDATE_POLICY,
+    POLICY_VERSION as DECISION_SHADOW_POLICY_VERSION,
+    PROJECTION_MARKER,
+    project_vcp_decision_shadow,
+)
 from vcp_finder import POLICY_VERSION, VCP60Config, find_vcp_60m, new_run_id
 
 
@@ -716,14 +721,17 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
 # ---------------------------------------------------------------------------
 
 DAILY_VCP_WATCHLIST_VERSION = "signalix/daily-vcp-watchlist-v1"
+DAILY_VCP_PROJECTION_MARKER = PROJECTION_MARKER
+DAILY_VCP_CANDIDATE_POLICY = CANDIDATE_POLICY
 DAILY_VCP_MIN_LIQUIDITY = 10_000_000
 DAILY_VCP_CAP_ACTION_REVIEW = 10
 DAILY_VCP_CAP_NEAR_TRIGGER = 10
 DAILY_VCP_CAP_BREAKOUT_WATCH = 5
+DAILY_VCP_CAP_STRUCTURE_WATCH = 10
 
 
 def daily_watchlist_query_states():
-    """States that can enter one of the three capped Daily VCP lanes."""
+    """States that can enter one of the capped Daily VCP lanes."""
     return {"READY", "NEAR_TRIGGER", "CONFIRMED", "BREAKOUT_WATCH"}
 
 
@@ -745,6 +753,11 @@ def _dv_quality_pass(result):
         and ev.get("base_pass")
         and ev.get("leg_volume_pass")
     )
+
+
+def _dv_structure_pass(result):
+    ev = result.get("evidence") or {}
+    return bool(ev.get("prior_trend_pass") and ev.get("price_contraction_pass") and ev.get("base_pass"))
 
 
 def _dv_daily_context_pass(result):
@@ -792,6 +805,13 @@ def _dv_action_review_coherent(result):
         # CONFIRMED. Anything at/above invalidation is coherent.
         return True
     return False
+
+
+def _dv_invalidation_coherent(result):
+    price = result.get("price") or {}
+    close = _dv_to_float(price.get("last_close"))
+    invalidation = _dv_to_float(price.get("invalidation"))
+    return close is not None and close > 0 and invalidation is not None and 0 < invalidation < close
 
 
 def _dv_risk_reward_score(result):
@@ -860,15 +880,17 @@ def _dv_lane(result):
         return None
     quality = _dv_quality_pass(result)
     if state in {"READY", "CONFIRMED"}:
-        if not quality or not _dv_daily_context_pass(result):
-            return None
-        if not _dv_action_review_coherent(result):
-            return None
-        return "ACTION_REVIEW"
+        if quality and _dv_daily_context_pass(result) and _dv_action_review_coherent(result):
+            return "ACTION_REVIEW"
+        if _dv_structure_pass(result) and _dv_invalidation_coherent(result):
+            return "STRUCTURE_WATCH"
+        return None
     if state == "NEAR_TRIGGER":
-        if not quality or not _dv_daily_context_pass(result):
-            return None
-        return "NEAR_TRIGGER"
+        if quality and _dv_daily_context_pass(result):
+            return "NEAR_TRIGGER"
+        if _dv_structure_pass(result) and _dv_invalidation_coherent(result):
+            return "STRUCTURE_WATCH"
+        return None
     if state == "BREAKOUT_WATCH":
         if not _dv_daily_context_pass(result):
             return None
@@ -878,6 +900,8 @@ def _dv_lane(result):
 
 def _dv_rejection_reason(result):
     """Return one deterministic reason for a row omitted from the watchlist."""
+    if _dv_lane(result) is not None:
+        return None
     state = result.get("state")
     if state in {"EXTENDED", "FORMING"}:
         return "state_not_watchlist_eligible"
@@ -924,15 +948,18 @@ def project_daily_vcp_watchlist(results):
       - ACTION_REVIEW: READY/CONFIRMED with quality pass + coherent close/trigger.
       - NEAR_TRIGGER: NEAR_TRIGGER with quality pass.
       - BREAKOUT_WATCH: intrabar watch-only, never actionable.
+      - STRUCTURE_WATCH: structurally valid but volume/context evidence pending.
 
-    Hard caps: ACTION_REVIEW <= 10, NEAR_TRIGGER <= 10, BREAKOUT_WATCH <= 5.
+    Hard caps: ACTION_REVIEW <= 10, NEAR_TRIGGER <= 10, BREAKOUT_WATCH <= 5,
+    STRUCTURE_WATCH <= 10.
     Cross-lane duplicate symbols are removed, keeping the highest-priority lane.
     """
-    raw_lanes = {"ACTION_REVIEW": [], "NEAR_TRIGGER": [], "BREAKOUT_WATCH": []}
+    raw_lanes = {"ACTION_REVIEW": [], "NEAR_TRIGGER": [], "BREAKOUT_WATCH": [], "STRUCTURE_WATCH": []}
     caps = {
         "ACTION_REVIEW": DAILY_VCP_CAP_ACTION_REVIEW,
         "NEAR_TRIGGER": DAILY_VCP_CAP_NEAR_TRIGGER,
         "BREAKOUT_WATCH": DAILY_VCP_CAP_BREAKOUT_WATCH,
+        "STRUCTURE_WATCH": DAILY_VCP_CAP_STRUCTURE_WATCH,
     }
     for r in results or []:
         lane = _dv_lane(r)
@@ -948,7 +975,7 @@ def project_daily_vcp_watchlist(results):
     lanes = {}
     counts = {}
     duplicate_count = 0
-    for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH"):
+    for lane in ("ACTION_REVIEW", "NEAR_TRIGGER", "BREAKOUT_WATCH", "STRUCTURE_WATCH"):
         filtered = []
         for r in raw_lanes[lane]:
             sym = str(r.get("symbol", "")).upper()
@@ -967,6 +994,8 @@ def project_daily_vcp_watchlist(results):
     accepted = sum(counts.values())
     return {
         "policy_version": DAILY_VCP_WATCHLIST_VERSION,
+        "projection_marker": DAILY_VCP_PROJECTION_MARKER,
+        "candidate_policy": DAILY_VCP_CANDIDATE_POLICY,
         "caps": caps,
         "counts": counts,
         "coverage": {
@@ -981,6 +1010,7 @@ def project_daily_vcp_watchlist(results):
         "action_review": lanes["ACTION_REVIEW"],
         "near_trigger": lanes["NEAR_TRIGGER"],
         "breakout_watch": lanes["BREAKOUT_WATCH"],
+        "structure_watch": lanes["STRUCTURE_WATCH"],
     }
 
 

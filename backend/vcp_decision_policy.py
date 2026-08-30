@@ -9,6 +9,13 @@ from copy import deepcopy
 
 
 POLICY_VERSION = "signalix/vcp-decision-shadow-v2"
+PROJECTION_MARKER = "signalix/structure-first-candidate-v1"
+CANDIDATE_POLICY = "structure_first/volume_not_required_for_candidate"
+CORE_STRUCTURE_KEYS = (
+    "prior_trend_pass",
+    "price_contraction_pass",
+    "base_pass",
+)
 STRUCTURAL_KEYS = (
     "prior_trend_pass",
     "price_contraction_pass",
@@ -30,6 +37,7 @@ LANE_RANK = {
     "REVIEW_NOW": 0,
     "PREPARE": 1,
     "EVENT_WATCH": 2,
+    "STRUCTURE_WATCH": 2,
     "RESEARCH": 3,
     "DO_NOT_CHASE": 4,
     "DATA_BLOCKED": 5,
@@ -51,8 +59,10 @@ def _quality(result):
     failing = [FAILURE_CODES[key] for key in STRUCTURAL_KEYS if not evidence.get(key)]
     return {
         "structural_pass": len(passed) == len(STRUCTURAL_KEYS),
+        "structure_pass": all(bool(evidence.get(key)) for key in CORE_STRUCTURE_KEYS),
         "structural_pass_count": len(passed),
         "structural_required_count": len(STRUCTURAL_KEYS),
+        "structure_failing_evidence": [FAILURE_CODES[key] for key in CORE_STRUCTURE_KEYS if not evidence.get(key)],
         "failing_evidence": failing,
         "volume_contraction_pass": bool(evidence.get("volume_contraction_pass")),
     }
@@ -164,6 +174,10 @@ def _lane(result, quality, entry):
         reasons.append("STRUCTURE_AND_ENTRY_REVIEWABLE")
         return "REVIEW_NOW", "ACTIONABLE_REVIEW", reasons
 
+    if quality["structure_pass"] and entry["invalidation_coherent"] and eligible_state:
+        reasons.append("STRUCTURE_CANDIDATE_VOLUME_PENDING")
+        return "STRUCTURE_WATCH", "WATCH_ONLY", reasons
+
     if _event_evidence(result):
         if not quality["structural_pass"]:
             reasons.append("STRUCTURE_INCOMPLETE")
@@ -212,6 +226,8 @@ def project_vcp_decision_shadow(result: dict) -> dict:
     lane, actionability, reasons = _lane(source, quality, entry)
     return {
         "policy_version": POLICY_VERSION,
+        "projection_marker": PROJECTION_MARKER,
+        "candidate_policy": CANDIDATE_POLICY,
         "symbol": source.get("symbol"),
         "lifecycle_state": source.get("state") or "NOT_VERIFIED",
         "decision_lane": lane,

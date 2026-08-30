@@ -2,6 +2,8 @@ import copy
 import json
 import threading
 
+import pytest
+
 import mvp_routes
 from mvp_api import filter_price_band, project_explorer_response
 from unified_vcp_decision import project_unified_vcp_decision
@@ -368,7 +370,7 @@ def test_daily_vcp_projection_applies_liquidity_gate_and_retains_insufficient_ro
         "accepted": 1,
         "rejected": 1,
         "rejection_counts": {"liquidity_below_minimum": 1},
-        "candidate_counts": {"ACTION_REVIEW": 1, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0},
+        "candidate_counts": {"ACTION_REVIEW": 1, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0},
         "cap_dropped": 0,
         "duplicate_dropped": 0,
     }
@@ -422,6 +424,32 @@ def test_breakout_watch_is_watch_only_and_not_actionable():
     assert out["near_trigger"] == []
 
 
+@pytest.mark.parametrize("symbol", ["KKP", "BCP", "BGRIM"])
+def test_structure_watch_retains_structural_candidate_without_leg_volume(symbol):
+    candidate = _vcp_result(symbol, "READY", evidence={"leg_volume_pass": False})
+    out = project_daily_vcp_watchlist([candidate])
+
+    assert out["policy_version"] == "signalix/daily-vcp-watchlist-v1"
+    assert out["projection_marker"] == "signalix/structure-first-candidate-v1"
+    assert out["candidate_policy"] == "structure_first/volume_not_required_for_candidate"
+    assert [row["symbol"] for row in out["structure_watch"]] == [symbol]
+    assert out["action_review"] == []
+    assert out["structure_watch"][0]["evidence"]["leg_volume_pass"] is False
+
+
+def test_structure_watch_lane_is_capped_and_deterministically_ordered():
+    candidates = [
+        _vcp_result(f"S{i:02d}", "READY", evidence={"leg_volume_pass": False},
+                    data={"daily_metrics": {"avg_trade_value_20": 20_000_000 - i * 100_000}})
+        for i in range(12)
+    ]
+    out = project_daily_vcp_watchlist(candidates)
+
+    assert len(out["structure_watch"]) == 10
+    assert [row["symbol"] for row in out["structure_watch"]] == [f"S{i:02d}" for i in range(10)]
+    assert out["caps"]["STRUCTURE_WATCH"] == 10
+
+
 def test_action_review_requires_close_trigger_coherent():
     # READY is pre-breakout, so close_confirmed=False is allowed.
     ready = _vcp_result("RNC", "READY", breakout={"close_confirmed": False})
@@ -466,7 +494,7 @@ def test_daily_watchlist_query_only_needs_lane_eligible_states():
 
 def test_empty_results_are_safe():
     out = project_daily_vcp_watchlist([])
-    assert out["counts"] == {"ACTION_REVIEW": 0, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0}
+    assert out["counts"] == {"ACTION_REVIEW": 0, "NEAR_TRIGGER": 0, "BREAKOUT_WATCH": 0, "STRUCTURE_WATCH": 0}
     assert out["action_review"] == []
     assert out["near_trigger"] == []
     assert out["breakout_watch"] == []

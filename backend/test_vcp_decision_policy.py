@@ -148,7 +148,7 @@ def test_missing_invalidation_cannot_be_actionable():
     assert "INVALIDATION_NOT_COHERENT" in out["reason_codes"]
 
 
-def test_partial_quality_near_trigger_is_prepare_not_actionable():
+def test_partial_quality_near_trigger_is_structure_watch_not_actionable():
     item = result_fixture("NEAR_TRIGGER")
     item["evidence"]["leg_volume_pass"] = False
     item["vcp_type"]["base_type"] = None
@@ -156,8 +156,22 @@ def test_partial_quality_near_trigger_is_prepare_not_actionable():
     out = project_vcp_decision_shadow(item)
 
     assert out["quality"]["structural_pass_count"] == 3
-    assert out["decision_lane"] == "PREPARE"
+    assert out["decision_lane"] == "STRUCTURE_WATCH"
     assert out["actionability"] == "WATCH_ONLY"
+    assert "LEG_VOLUME_NOT_CONTRACTED" in out["quality"]["failing_evidence"]
+
+
+def test_structure_first_candidate_does_not_require_leg_volume_and_is_watch_only():
+    item = result_fixture("READY")
+    item["evidence"]["leg_volume_pass"] = False
+
+    out = project_vcp_decision_shadow(item)
+
+    assert out["projection_marker"] == "signalix/structure-first-candidate-v1"
+    assert out["candidate_policy"] == "structure_first/volume_not_required_for_candidate"
+    assert out["decision_lane"] == "STRUCTURE_WATCH"
+    assert out["actionability"] == "WATCH_ONLY"
+    assert out["quality"]["structure_pass"] is True
     assert "LEG_VOLUME_NOT_CONTRACTED" in out["quality"]["failing_evidence"]
 
 
