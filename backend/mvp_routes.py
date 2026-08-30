@@ -166,6 +166,28 @@ def handle_mvp_api(path, handler) -> bool:
         except Exception as exc:
             json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
+    if route in ("/api/setup-candidates", "/api/setup-candidates/"):
+        try:
+            payload = load_payload()
+            import mvp_api
+            page = int(qs.get("page", ["1"])[0])
+            page_size = int(qs.get("page_size", ["50"])[0])
+            result = mvp_api.project_setup_candidates_response(
+                payload["items"], snapshot_meta=payload,
+                lifecycle=(qs.get("lifecycle", [None])[0] or None),
+                state=(qs.get("state", [None])[0] or None),
+                sector=(qs.get("sector", [None])[0] or None),
+                search=(qs.get("search", [None])[0] or None),
+                page=page, page_size=page_size,
+            )
+            json_response(handler, result)
+        except (ValueError, TypeError):
+            json_response(handler, {"error": "invalid_request"}, status=400)
+        except (FileNotFoundError, json.JSONDecodeError, ImportError, KeyError, RuntimeError):
+            json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        except Exception:
+            json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        return True
     try:
         payload = load_payload()
         items = payload["items"]

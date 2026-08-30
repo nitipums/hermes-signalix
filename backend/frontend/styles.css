@@ -162,6 +162,13 @@ body {
 .card-list { display: flex; flex-direction: column; gap: 8px; }
 .card-list--explorer { gap: 6px; }
 
+.setup-candidate-card { min-width: 0; overflow: hidden; }
+.setup-candidate-card b { color: var(--text); }
+.setup-candidate__evidence, .setup-candidate__bonus { color: var(--text-2); font-size: .78rem; overflow-wrap: anywhere; }
+.setup-candidate__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 12px; margin:10px 0; font-size:.78rem; }
+.setup-candidate__grid span { min-width:0; overflow-wrap:anywhere; color:var(--text-2); }
+.setup-candidate__grid b { display:block; overflow-wrap:anywhere; }
+
 /* ── decision cards ── */
 .decision-card {
   background: var(--surface);
@@ -399,6 +406,8 @@ body {
     padding-right: 4px;
     overflow: hidden;
   }
+  .setup-candidate__grid { grid-template-columns: 1fr; gap: 6px; }
+  .setup-candidate-card { width: 100%; max-width: 100%; }
 }
 
 /* ── reduced motion ── */

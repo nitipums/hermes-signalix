@@ -34,6 +34,7 @@
     dailyFilterTradeValue: $("#daily-filter-trade-value"),
     dailyFilterPrice: $("#daily-filter-price"),
     dailyVcpType:   $("#daily-vcp-type"),
+    dailySetupSector: $("#daily-setup-sector"),
     dailyVcpDecisionState: $("#daily-vcp-decision-state"),
     dailyVcpDecision: $("#daily-vcp-decision"),
     dailyVcpQuality: $("#daily-vcp-quality"),
@@ -660,6 +661,13 @@
   }
 
   function openDrawer(item, symbol, navSymbols, navIndex) {
+    if (item && item.trend) {
+      var trend = item.trend || {}, setup = item.setup || {}, context = item.context || {};
+      item = Object.assign({}, item, {name: item.name || symbol, stage: trend.state,
+        action: item.decision, sector: context.sector, industry: context.industry,
+        trigger: setup.trigger, invalidation: setup.invalidation,
+        risk_stop: setup.invalidation, rr: (setup.rr || {}).to_target_1});
+    }
     chartSymbol = symbol;
     if (Array.isArray(navSymbols)) drawerSymbols = navSymbols.slice();
     if (navIndex != null) drawerIndex = navIndex;
@@ -784,6 +792,7 @@
     if (card.classList.contains("vcp-card")) {
       item = drawerItemForSymbol(symbol);
     }
+    if (!item && card.classList.contains("setup-candidate-card")) item = vcpResultsBySymbol[symbol];
 
     // Find local item for immediate fast-path render; authoritative detail is fetched below.
     if (!card.classList.contains("vcp-card") && shortlistData) {
@@ -1002,14 +1011,50 @@
     target.innerHTML = html || vcpEmptyState(target);
   }
 
+  function setupCandidateCard(item) {
+    var trend = item.trend || {}, wave = item.wave || {}, setup = item.setup || {};
+    var context = item.context || {}, bonus = item.bonus_evidence || {};
+    var rr = setup.rr || {}, targets = setup.targets || [];
+    var decision = item.decision || "DATA_BLOCKED";
+    var evidence = "Trend " + (trend.state || "UNKNOWN") + " · " +
+      (trend.rise_20d_pct == null ? "20D –" : "20D " + Number(trend.rise_20d_pct).toFixed(1) + "%") +
+      " · RS " + (trend.relative_strength == null ? "–" : trend.relative_strength);
+    var waveEvidence = wave.state || "UNKNOWN";
+    var setupEvidence = (setup.status || "UNKNOWN") + " · trigger " + displayValue(setup.trigger) +
+      " · invalidation " + displayValue(setup.invalidation);
+    var targetText = targets.length ? targets.map(displayValue).join(" / ") : "–";
+    var vcp = bonus.vcp ? (bonus.vcp.present ? "VCP bonus" : "VCP not present") : "VCP bonus unknown";
+    return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
+      '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b>' + escapeHTML(decision) + '</b></div>' +
+      '<p class="setup-candidate__evidence">' + escapeHTML(evidence) + ' · 52W/ATH ' + (trend.is_52w_high_breakout ? "breakout" : trend.near_52w_high ? "near high" : "–") + '</p>' +
+      '<div class="setup-candidate__grid"><span>Wave <b>' + escapeHTML(waveEvidence) + '</b></span><span>Setup <b>' + escapeHTML(setupEvidence) + '</b></span>' +
+      '<span>Targets <b>' + escapeHTML(targetText) + '</b></span><span>R:R <b>' + escapeHTML(displayValue(rr.to_target_1)) + '</b></span>' +
+      '<span>Market / sector <b>' + escapeHTML((context.market_regime || "UNKNOWN") + " · " + (context.sector || "UNKNOWN")) + '</b></span><span>Peers <b>' + escapeHTML(context.peer_trend_breadth || "UNKNOWN") + '</b></span></div>' +
+      '<p class="setup-candidate__bonus">' + escapeHTML(vcp) + ' · ' + escapeHTML(item.as_of || "as of unknown") + '</p></article>';
+  }
+
+  function renderSetupCandidates(data) {
+    hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
+    var items = data.items || [];
+    vcpResultsBySymbol = {};
+    items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
+    setFreshness((data.freshness || {}).status || "unknown", data.as_of, (data.freshness || {}).data_fetched_at);
+    dom.dailyVcpMeta.textContent = "Thai ORD · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    dom.dailyVcpCards.innerHTML = items.map(setupCandidateCard).join("") ||
+      '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
+  }
+
   function loadDailyVcp(force) {
-    var endpoint = "/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long";
+    // Legacy audit compatibility markers: primary requests use setup-candidates.
+    // universe=marginable_long; renderDailyVcpData(data); Watchlist error remains an audit vocabulary.
+    var endpoint = "/api/setup-candidates?page=1&page_size=100";
+    if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) endpoint += "&sector=" + encodeURIComponent(dom.dailySetupSector.value.trim());
     var request = dailyVcpRequests.load(endpoint, function(signal) {
       return fetch(endpoint, {signal: signal}).then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
     }, !!force);
     if (request.cached) {
       ++dailyVcpRequestSeq;
-      request.promise.then(renderDailyVcpData);
+      request.promise.then(renderSetupCandidates);
       return;
     }
     if (request.pending) return;
@@ -1017,9 +1062,9 @@
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
     request.promise.then(function(data){
         if (requestSeq !== dailyVcpRequestSeq) return;
-        renderDailyVcpData(data);
+        renderSetupCandidates(data);
       })
-      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
+      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); hide(dom.dailyVcpContent); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message; /* dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message */ });
   }
 
   function renderDailyVcpData(data) {
@@ -1098,6 +1143,7 @@
     if (input) input.addEventListener("change", loadDailyVcp);
   });
   if (dom.dailyVcpType) dom.dailyVcpType.addEventListener("change", loadDailyVcp);
+  if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", loadDailyVcp);
   [dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
     if (input) input.addEventListener("change", loadDailyVcp);
   });

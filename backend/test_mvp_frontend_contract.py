@@ -514,3 +514,26 @@ def test_daily_trade_value_filter_callback_fails_without_return_value():
         "if (dom.dailyFilterTradeValue.checked && "
         "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
     ) not in js
+
+
+def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'var endpoint = "/api/setup-candidates?page=1&page_size=100";' in js
+    assert "function renderSetupCandidates(data)" in js
+    assert "setupCandidateCard" in js
+    assert "Trend " in js and "Wave" in js and "Targets" in js and "VCP bonus" in js
+    assert 'id="daily-setup-sector"' in html
+    assert "legacy/audit" in html
+
+
+def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mobile_safe():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "empty result, not an API failure" in js
+    assert "Unable to load setup candidates:" in js
+    assert 'decision = item.decision || "DATA_BLOCKED"' in js
+    assert ".setup-candidate-card { width: 100%; max-width: 100%; }" in css
+    assert "overflow-x: hidden" in css
+    assert "390px" not in html or 'meta name="viewport"' in html

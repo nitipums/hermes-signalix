@@ -32,6 +32,7 @@ from marginable import (
     normalize_filter,
     normalize_rates,
 )
+from setup_candidate_contract import build_setup_candidate, project_setup_candidate_list
 
 
 def _number(value, default=None):
@@ -391,6 +392,80 @@ def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
         elif band == "above_10" and price > 10:
             result.append(item)
     return result
+
+
+def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
+    """Adapt an older MVP card without dropping it from canonical coverage."""
+    if all(key in item for key in ("trend", "wave", "setup", "context", "bonus_evidence", "decision")):
+        return item
+    daily = item.get("daily_state") or item.get("dailyState") or {}
+    readiness = item.get("trade_readiness") or {}
+    vcp = item.get("vcp_result") or item.get("vcp") or {}
+    trend = item.get("trend") or {
+        "state": "uptrend" if (item.get("stage") in {"S2_uptrend", "S3_distributing"}) else "UNKNOWN",
+        "rise_20d_pct": item.get("rise_20d_pct"), "rise_60d_pct": item.get("rise_60d_pct"),
+        "relative_strength": item.get("rs"), "near_52w_high": item.get("high52") is not None,
+        "is_52w_high_breakout": False, "is_ath_breakout": False,
+    }
+    wave = item.get("wave") or {"timeframe": "daily", "state": daily.get("wave_state") or "UNKNOWN", "evidence": {}}
+    setup = item.get("setup") or {
+        "timeframe": "60m", "state": "UNKNOWN", "status": "DATA_BLOCKED",
+        "trigger": readiness.get("breakout_level_20d") or item.get("trigger"),
+        "invalidation": readiness.get("cut_level") or item.get("riskStop"),
+    }
+    data_status = item.get("data_status") or {
+        "sufficient": bool(item.get("symbol")),
+        "freshness": item.get("dataFreshness") or "unknown",
+        "source": item.get("priceSource") or "Daily EOD",
+    }
+    as_of = item.get("as_of") or item.get("date") or (item.get("daily_eod_freshness") or {}).get("as_of")
+    provenance = dict(item.get("provenance") or {})
+    provenance.setdefault("policy_version", "setup-candidates-v1")
+    provenance.setdefault("daily_source", item.get("priceSource") or "Daily EOD")
+    return build_setup_candidate(
+        str(item.get("symbol") or ""), str(as_of or ""), data_status, trend, wave, setup,
+        item.get("context") or {"sector": item.get("sector"), "industry": item.get("industry")},
+        item.get("bonus_evidence") or {"vcp": vcp}, provenance,
+    )
+
+
+def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,
+                                      lifecycle: str | None = None, state: str | None = None,
+                                      sector: str | None = None, search: str | None = None,
+                                      page: int = 1, page_size: int = 50) -> dict:
+    """Serve the complete canonical candidate list with presentation filters only."""
+    candidates = [_setup_candidate_from_snapshot(item, snapshot_meta) for item in items]
+    filtered = candidates
+    if lifecycle:
+        token = lifecycle.upper()
+        filtered = [x for x in filtered if str((x.get("setup") or {}).get("status", "")).upper() == token
+                    or str(x.get("decision", "")).upper() == token]
+    if state:
+        token = state.upper()
+        filtered = [x for x in filtered if str((x.get("wave") or {}).get("state", "")).upper() == token
+                    or str((x.get("setup") or {}).get("state", "")).upper() == token]
+    if sector:
+        token = sector.strip().casefold()
+        filtered = [x for x in filtered if token in str((x.get("context") or {}).get("sector", "")).casefold()]
+    if search:
+        token = search.strip().casefold()
+        filtered = [x for x in filtered if token in str(x.get("symbol", "")).casefold()
+                    or token in str((x.get("context") or {}).get("sector", "")).casefold()]
+    page = max(1, int(page)); page_size = max(1, min(int(page_size), 100))
+    total = len(filtered); start = (page - 1) * page_size
+    page_items = filtered[start:start + page_size]
+    projected = project_setup_candidate_list(page_items, as_of=(snapshot_meta or {}).get("scan_time"),
+                                              provenance={"policy_version": "setup-candidates-v1"}, universe="TH-ORD")
+    projected.update({
+        "page": page, "page_size": page_size, "total_items": total,
+        "total_pages": math.ceil(total / page_size) if total else 0,
+        "evaluated_count": len(candidates),
+        "returned_count": len(page_items),
+        "counts": {decision: sum(x.get("decision") == decision for x in candidates)
+                   for decision in ("REVIEW", "WAIT", "AVOID", "DATA_BLOCKED")},
+        "freshness": (snapshot_meta or {}).get("freshness") or _resolve_freshness(items),
+    })
+    return projected
 
 
 def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,
