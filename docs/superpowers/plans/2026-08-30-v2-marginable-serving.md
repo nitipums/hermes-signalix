@@ -1,5 +1,7 @@
 # Serve Decision v2 on Marginable Long Dashboard — Implementation Plan
 
+> **STATUS: COMPLETE WITH PERFORMANCE FOLLOW-UP** · Closeout: `vault/2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md`
+
 > **Owner approval:** Arm, 2026-08-30. This plan changes the current served dashboard decision contract and default operational universe.
 
 **Goal:** Serve the v2 decision projection on the real MVP dashboard with `marginable_long` (237 `can_buy=true` active Thai ORD symbols) as the default universe, without enabling alerts or auto-trading.
@@ -48,10 +50,10 @@
 
 ## Acceptance
 
-- [ ] Default served API/UI uses `marginable_long`, 237 eligible symbols, and v2 decision policy.
-- [ ] Live `full_success` run provenance is preserved; replay rows are not served as current data.
-- [ ] V2 lane/actionability is visible and consistent with raw evidence; Daily context cannot promote 60m state.
-- [ ] Explicit `active_ord` audit mode works and is not the default.
-- [ ] Alerts remain paused and no auto-trade path changes.
-- [ ] Focused/full relevant tests pass; served API/UI and failure state are verified.
-- [ ] Ploy challenge is recorded after live dashboard verification; Lite issues final PASS/FAIL/NOT VERIFIED.
+- [x] Default served API/UI uses `marginable_long`, 237 eligible symbols, and v2 decision policy.
+- [x] Live `full_success` run provenance is preserved; replay rows are not served as current data.
+- [x] V2 lane/actionability is visible and consistent with raw evidence; Daily context cannot promote 60m state.
+- [x] Explicit `active_ord` audit mode works and is not the default.
+- [x] Alerts remain paused and no auto-trade path changes.
+- [x] Focused/full relevant tests pass; served API/UI and failure state are verified.
+- [x] Ploy challenge is recorded after live dashboard verification; Lite final gate is PASS with cold API latency follow-up.

@@ -2,7 +2,7 @@
 
 > **Date:** 2026-08-28
 > **Verdict:** PASS for non-serving shadow implementation; NOT APPROVED for replacing served v1.
-> **Deployment:** NOT DEPLOYED. Docker/runtime source remains `/root/signalix` served v1.
+> **Deployment boundary updated 2026-08-30:** Historical shadow replay remains non-serving; the owner-approved v2 decision projection is now served on live VCP results under `marginable_long`. Raw VCP source policy remains v1; Low-Cheat/sequence-policy promotion remains blocked.
 
 ## Scope
 

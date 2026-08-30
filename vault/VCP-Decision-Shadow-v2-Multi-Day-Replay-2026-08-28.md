@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT EVIDENCE** · 2026-08-28
 > **Verdict:** `REVISE` — v2 lane integrity passes; v1 sequence policy and Low-Cheat entry profile are not accepted for a served-policy switch.
-> **Deployment:** NOT DEPLOYED. Served `signalix/vcp-finder-60m-v1` remains unchanged.
+> **Deployment boundary updated 2026-08-30:** Historical replay/shadow fields remain non-serving. The owner-approved `decision_shadow_v2` projection is now applied to live VCP results under `marginable_long`; raw morphology/source policy remains `signalix/vcp-finder-60m-v1`.
 
 ## Replay identity and no-lookahead boundary
 

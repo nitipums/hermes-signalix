@@ -38,8 +38,9 @@ Current served verification after the latest release:
 
 - Public `/mvp` returns HTTP 200 and renders the canonical VCP decision/filter
   surface; `READY · WAIT` cards show `Quality` and `Data` evidence.
-- Public VCP API reports `931` evaluated symbols and the valid `full_success`
-  run `vcp60-20260828T094803Z-db4c9073`.
+- Public VCP API defaults to `marginable_long` and reports `237` evaluated
+  symbols with the valid `full_success` run `vcp60-20260828T094803Z-db4c9073`;
+  explicit `active_ord` remains the 931-symbol audit/rollback mode.
 - Public mobile target at 390px reports `clientWidth=390`,
   `scrollWidth=390`, and `bodyScrollWidth=390`.
 - Local analytical readiness reports `{"status":"ok","db":"up","redis":"up"}`.
@@ -54,7 +55,7 @@ Current served verification after the latest release:
 1. **Daily legacy/stage-first pipeline** — สแกน ORD ทั้งตลาดด้วย Trend Template + Daily VCP + Fib/RSI/readiness แล้วจัด Stage/Phase/Queue
 2. **Isolated 60m VCP Finder** — ตรวจ VCP morphology จากแท่ง 60m โดยตรง แล้วสร้าง VCP state/lane แยกอีกชุด
 3. **Intraday overlay** — เอาราคา 60m ล่าสุดมาเทียบ reference ของ Daily แล้วเปลี่ยน effective group/action ชั่วคราว โดยตั้งใจไม่เปลี่ยน Daily truth
-4. **Shadow/replay policies** — ทดลอง sequence ล่าสุดและ decision lanes ใหม่ แต่ยังไม่ควรเป็น serving authority
+4. **Shadow/replay policies** — sequence policy remains replay-only; the owner-approved decision v2 projection is now served on live VCP results under `marginable_long`.
 
 **ข้อสรุปสั้น:** ความซับซ้อนไม่ได้มาจาก indicator เยอะอย่างเดียว แต่มาจากการมี **หลายระบบตัดสินใจที่อธิบายคำว่า “พร้อม/รอ/ไม่ทำ” คนละภาษา** แล้วนำมาแสดงใกล้กัน
 
