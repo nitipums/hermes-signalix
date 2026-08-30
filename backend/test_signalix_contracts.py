@@ -7,6 +7,36 @@ import json
 import urllib.error
 import urllib.request
 
+
+def test_canonical_items_do_not_expose_legacy_primary_labels():
+    from mvp_snapshot import sanitize_mvp_item
+
+    item = {
+        "symbol": "AAA", "as_of": "2026-08-30", "data_status": {}, "trend": {},
+        "wave": {}, "setup": {}, "context": {}, "bonus_evidence": {},
+        "decision": "WAIT", "provenance": {}, "primary_group": "fresh",
+        "action": "BUY", "vcp": {"is_vcp": True},
+    }
+    result = sanitize_mvp_item(item)
+    assert result["decision"] == "WAIT"
+    assert "primary_group" not in result and "action" not in result
+    assert result["bonus_evidence"]["vcp"]["is_vcp"] is True
+
+
+def test_reconciled_projection_keeps_canonical_item_primary(monkeypatch):
+    import reconciled_projection
+
+    monkeypatch.setattr(reconciled_projection, "artifact_map", lambda path: {})
+    item = {
+        "symbol": "AAA", "as_of": "2026-08-30", "data_status": {}, "trend": {},
+        "wave": {}, "setup": {}, "context": {}, "bonus_evidence": {},
+        "decision": "WAIT", "provenance": {}, "group": "fresh", "action": "BUY",
+    }
+    result = reconciled_projection.apply_projection([item])[0]
+    assert result["decision"] == "WAIT"
+    assert "group" not in result and "action" not in result
+    assert result["audit"]["legacy_projection"]["action"] == "BUY"
+
 BASE = "http://127.0.0.1:8000"
 MVP = "http://127.0.0.1:3001/mvp?contract-test=1"
 

@@ -166,6 +166,45 @@ def handle_mvp_api(path, handler) -> bool:
         except Exception as exc:
             json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
+    if route in ("/api/setup-candidates", "/api/setup-candidates/"):
+        pg = None
+        try:
+            import mvp_api
+            try:
+                payload = load_payload()
+                items = payload["items"]
+                # A snapshot is usable here only when its producer serialized
+                # the complete canonical contract. Legacy MVP cards must use
+                # the real OHLCV source below, never a shape-changing adapter.
+                required = {"symbol", "as_of", "data_status", "trend", "wave", "setup",
+                            "context", "bonus_evidence", "decision", "provenance"}
+                if not all(required.issubset(item) for item in items):
+                    raise ValueError("legacy snapshot is not a canonical setup-candidate artifact")
+            except (FileNotFoundError, ValueError, json.JSONDecodeError, KeyError):
+                pg = _vcp_pg()
+                items, source_meta = mvp_api.build_setup_candidates_from_data(pg, market="TH")
+                payload = {"items": items, **source_meta}
+            page = int(qs.get("page", ["1"])[0])
+            page_size = int(qs.get("page_size", ["50"])[0])
+            result = mvp_api.project_setup_candidates_response(
+                items, snapshot_meta=payload,
+                lifecycle=(qs.get("lifecycle", [None])[0] or None),
+                state=(qs.get("state", [None])[0] or None),
+                sector=(qs.get("sector", [None])[0] or None),
+                search=(qs.get("search", [None])[0] or None),
+                page=page, page_size=page_size,
+            )
+            json_response(handler, result)
+        except (ValueError, TypeError):
+            json_response(handler, {"error": "invalid_request"}, status=400)
+        except (FileNotFoundError, json.JSONDecodeError, ImportError, KeyError, RuntimeError, ConnectionError):
+            json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        except Exception:
+            json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        finally:
+            if pg is not None:
+                pg.close()
+        return True
     try:
         payload = load_payload()
         items = payload["items"]

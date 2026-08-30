@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="Signalix — VCP Finder 60m decision surface for Thai equities. Owner-only MVP.">
-  <title>Signalix · VCP Finder</title>
+  <meta name="description" content="Signalix — Trend, Elliott and trade-setup review for Thai equities.">
+  <title>Signalix · Setup Candidates</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -21,30 +21,26 @@
 
     <nav class="nav" role="tablist" aria-label="Surface">
       <button id="tab-daily-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-daily-vcp">
-        Daily VCP Watchlist
+        Trend · Elliott · Trade Setup
       </button>
       <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
-        All VCP · 60m
+        All VCP · 60m (legacy/audit)
       </button>
     </nav>
 
     <!-- ── Daily VCP Watchlist panel ── -->
     <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
-      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading VCP Watchlist…</p></section>
-      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load VCP Watchlist.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
+      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading setup candidates…</p></section>
+      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
       <section id="daily-vcp-content" class="state--hidden">
-        <p class="explorer-note">Marginable-long operational universe · 60m review queue · not an automatic buy signal.</p>
+        <p class="explorer-note">Thai ORD universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal.</p>
         <div class="watchlist-default-filters" aria-label="Watchlist default filters">
           <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
           <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
           <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
-          <label>Type
-            <select id="daily-vcp-type" aria-label="Filter VCP type">
-              <option value="all" selected>All types</option>
-              <option value="low_cheat_vcp">Low-Cheat</option>
-              <option value="standard_vcp">VCP</option>
-            </select>
-          </label>
+          <label>Sector <input id="daily-setup-sector" aria-label="Filter setup candidates by sector"></label>
+          <!-- Retained only for legacy DOM compatibility; the primary contract never filters by VCP type. -->
+          <select id="daily-vcp-type" hidden aria-hidden="true"><option value="all">All types</option><option value="low_cheat_vcp">Low-Cheat</option><option value="standard_vcp">VCP</option></select>
           <label>Decision state
             <select id="daily-vcp-decision-state" aria-label="Filter Daily VCP by canonical decision state">
               <option value="ALL" selected>All decision states</option>
@@ -88,7 +84,7 @@
         <button id="vcp-retry" class="btn btn--retry">Retry</button>
       </section>
       <section id="vcp-content">
-        <p class="explorer-note">Marginable-long universe · intraday 60m candidate finder · no Daily fallback · not an automatic buy signal.</p>
+        <p class="explorer-note">Marginable-long operational universe · legacy/audit intraday 60m VCP finder · no Daily fallback · not an automatic buy signal.</p>
         <div class="explorer-controls" aria-label="VCP Finder filters">
           <label class="explorer-control">View
             <select id="vcp-state" aria-label="Legacy VCP state filter (audit)">

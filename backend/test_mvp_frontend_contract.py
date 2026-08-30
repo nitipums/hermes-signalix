@@ -514,3 +514,58 @@ def test_daily_trade_value_filter_callback_fails_without_return_value():
         "if (dom.dailyFilterTradeValue.checked && "
         "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
     ) not in js
+
+
+def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'var endpoint = "/api/setup-candidates?page=1&page_size=100";' in js
+    assert "function renderSetupCandidates(data)" in js
+    assert "setupCandidateCard" in js
+    assert "Trend " in js and "Wave" in js and "Targets" in js and "VCP bonus" in js
+    assert 'id="daily-setup-sector"' in html
+    assert "legacy/audit" in html
+
+
+def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mobile_safe():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "empty result, not an API failure" in js
+    assert "Unable to load setup candidates:" in js
+    assert 'decision = item.decision || "DATA_BLOCKED"' in js
+    assert ".setup-candidate-card { width: 100%; max-width: 100%; }" in css
+    assert "overflow-x: hidden" in css
+    assert "390px" not in html or 'meta name="viewport"' in html
+
+
+def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
+    """Use a real layout engine for the mobile overflow contract."""
+    import glob
+    import pytest
+    playwright = pytest.importorskip("playwright.sync_api")
+    executables = glob.glob("/root/.cache/ms-playwright/*/chrome-linux64/chrome")
+    if not executables:
+        pytest.skip("Chromium executable is not installed")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    markup = """
+      <main class="app"><article class="decision-card setup-candidate-card">
+        <div class="decision-card__top"><strong>LONGSYMBOL</strong><b>DATA_BLOCKED</b></div>
+        <p class="setup-candidate__evidence">Trend emerging_uptrend · 20D 18.4% · 60D 42.1% · RS 91 · 52W BREAKOUT · ATH NO BREAKOUT</p>
+        <div class="setup-candidate__grid"><span>Wave <b>WAVE_2_NEAR_COMPLETION · structure intact</b></span><span>Setup <b>DATA_BLOCKED · trigger – · invalidation –</b></span><span>Targets <b>– / –</b></span><span>R:R <b>–</b></span><span>Market / sector <b>UNKNOWN · Electronic Components</b></span><span>Peers <b>6/10</b></span></div>
+      </article></main>
+    """
+    with playwright.sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, executable_path=executables[0])
+        page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+        page.set_content(f"<style>{css}</style>{markup}")
+        result = page.evaluate("""() => ({
+          viewport: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth,
+          card: document.querySelector('.setup-candidate-card').getBoundingClientRect().width,
+          grid: document.querySelector('.setup-candidate__grid').getBoundingClientRect().width
+        })""")
+        browser.close()
+    assert result["scroll"] <= result["viewport"]
+    assert result["card"] <= 390
+    assert result["grid"] <= result["card"]
