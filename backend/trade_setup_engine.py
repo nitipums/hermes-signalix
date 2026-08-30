@@ -55,24 +55,56 @@ def _empty_setup(state: str, status: str, freshness=None, reason=None) -> dict:
     return setup
 
 
+def _valid_ohlcv(df: pd.DataFrame | None) -> bool:
+    required = {"Open", "High", "Low", "Close", "Volume"}
+    if df is None or len(df) < 3 or not required.issubset(df.columns):
+        return False
+    values = df[list(required)].apply(pd.to_numeric, errors="coerce")
+    if not values.apply(lambda column: column.map(lambda value: _number(value) is not None and value > 0)).all().all():
+        return False
+    if not ((values["High"] >= values[["Open", "Close"]].max(axis=1)) &
+            (values["Low"] <= values[["Open", "Close"]].min(axis=1)) &
+            (values["High"] > values["Low"])).all():
+        return False
+    return True
+
+
 def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
-    """Return prior-structure anchors, excluding the observation being tested."""
-    if df is None or len(df) < 2 or not {"High", "Low", "Close"}.issubset(df.columns):
+    """Return validated recent leg anchors, excluding the latest observation."""
+    if not _valid_ohlcv(df) or df.attrs.get("timeframe") != "60m":
         return {}
-    recent = df.tail(90)
-    prior = recent.iloc[:-1]
-    if prior.empty:
+    # A bounded recent window prevents an old 90-bar extreme from becoming the
+    # current setup anchor. The latest candle is the observation under test.
+    prior = df.iloc[:-1].tail(30)
+    closes = [float(value) for value in prior["Close"]]
+    if len(closes) < 2:
         return {}
-    high = pd.to_numeric(prior["High"], errors="coerce").dropna()
-    low = pd.to_numeric(prior["Low"], errors="coerce").dropna()
+
+    legs = []
+    start = 0
+    direction = 0
+    for index in range(1, len(closes)):
+        step = 1 if closes[index] > closes[index - 1] else -1 if closes[index] < closes[index - 1] else 0
+        if not step:
+            continue
+        if direction and step != direction:
+            legs.append((direction, start, index - 1))
+            start = index - 1
+        direction = step
+    legs.append((direction, start, len(closes) - 1))
+    up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] > leg[1]]
+    if not up_legs:
+        return {}
+    _, leg_start, leg_end = up_legs[-1]
+    leg = prior.iloc[leg_start:leg_end + 1]
+    swing_low = _number(leg["Low"].min())
+    swing_high = _number(leg["High"].max())
     close = _number(df["Close"].iloc[-1])
-    if high.empty or low.empty or close is None:
-        return {}
-    swing_high = _number(high.max())
-    swing_low = _number(low.min())
-    if swing_high is None or swing_low is None or swing_high <= swing_low:
+    if swing_low is None or swing_high is None or close is None or swing_low <= 0 or swing_high <= swing_low:
         return {}
     pullback_low = swing_low + (swing_high - swing_low) * 0.5
+    if not _number(pullback_low) or pullback_low <= swing_low:
+        return {}
     timestamp = df.index[-1]
     freshness = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
     return {
@@ -103,6 +135,8 @@ def build_trade_setup(
     """Prepare, but never authorize, a 60m trade setup."""
     daily_wave = daily_wave or {}
     state = daily_wave.get("state") or "UNKNOWN"
+    if daily_wave.get("timeframe") != "daily":
+        return _empty_setup(state, "DATA_BLOCKED", reason="missing or mismatched Daily timeframe")
     anchors = _intraday_anchors(intraday_df) if intraday_df is not None else {}
     if not anchors:
         return _empty_setup(state, "DATA_BLOCKED", reason="missing or invalid 60m OHLCV")
@@ -119,8 +153,9 @@ def build_trade_setup(
         anchors["swing_low"], anchors["swing_high"], anchors["pullback_low"]
     )
     targets = [fib.get("fib_1272"), fib.get("fib_1618")]
-    targets = [target for target in targets if _number(target) is not None]
-    if not targets or trigger <= invalidation:
+    targets = [target for target in targets if _number(target) is not None and target > trigger]
+    risk = trigger - invalidation
+    if not targets or not _number(risk) or risk <= 0:
         setup["status"] = "DATA_BLOCKED"
         setup["reason"] = "invalid Fib or risk anchors"
         return _json_value(setup)
@@ -137,7 +172,8 @@ def build_trade_setup(
         "exceptional": [8, 10],
     }
 
-    if current < invalidation:
+    observation_low = _number(intraday_df["Low"].iloc[-1])
+    if observation_low is None or observation_low <= invalidation:
         setup["status"] = "INVALIDATED"
     elif current > trigger * 1.03:
         setup["status"] = "EXTENDED"

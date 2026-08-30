@@ -174,10 +174,15 @@ def daily_wave_two_evidence():
 
 def rising_60m_frame():
     close = [100 + i for i in range(40)]
-    return pd.DataFrame(
+    result = pd.DataFrame(
         {"Open": close, "High": [v + 1 for v in close], "Low": [v - 1 for v in close], "Close": close},
+        # Volume is part of the 60m OHLCV contract, even though setup math
+        # currently uses price fields only.
         index=pd.date_range("2026-08-30", periods=len(close), freq="h"),
     )
+    result["Volume"] = 100
+    result.attrs["timeframe"] = "60m"
+    return result
 
 
 def test_early_wave_three_setup_has_trigger_stop_targets_and_rr():
@@ -224,3 +229,60 @@ def test_missing_60m_data_is_blocked_and_json_safe():
     result = build_trade_setup(daily_wave_two_evidence(), None)
     assert result["status"] == "DATA_BLOCKED"
     json.dumps(result)
+
+
+def test_daily_timeframe_is_required_and_mismatch_is_blocked():
+    frame_ = rising_60m_frame()
+    assert build_trade_setup({"state": "EARLY_WAVE_3"}, frame_)["status"] == "DATA_BLOCKED"
+    assert build_trade_setup({"timeframe": "1d", "state": "EARLY_WAVE_3"}, frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_intraday_timeframe_metadata_is_required_and_mismatch_is_blocked():
+    frame_ = rising_60m_frame()
+    frame_.attrs.pop("timeframe")
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+    frame_.attrs["timeframe"] = "15m"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_malformed_or_non_positive_ohlcv_is_blocked():
+    for column, value in (("Open", float("nan")), ("High", float("inf")),
+                          ("Low", 0), ("Close", -1), ("Volume", 0)):
+        frame_ = rising_60m_frame()
+        frame_[column] = frame_[column].astype(float)
+        frame_.loc[frame_.index[-1], column] = value
+        assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_invalid_structural_anchor_is_blocked():
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-2], ["Open", "High", "Low", "Close"]] = [50, 50, 50, 50]
+    frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [50, 50, 50, 50]
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+
+
+def test_non_positive_reward_or_risk_is_blocked():
+    frame_ = rising_60m_frame()
+
+    class BadFib:
+        @staticmethod
+        def compute_fib_targets(*args):
+            return {"fib_1272": args[0], "fib_1618": args[0], "status": "OK"}
+
+    assert build_trade_setup(daily_wave_two_evidence(), frame_, risk_helper=BadFib)["status"] == "DATA_BLOCKED"
+
+
+def test_status_precedence_and_boundaries_are_deterministic():
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-1], ["High", "Close"]] = [160, 159]
+    frame_.loc[frame_.index[-1], "Low"] = 90
+    result = build_trade_setup(daily_wave_two_evidence(), frame_)
+    assert result["status"] == "INVALIDATED"  # invalidation precedes extension
+
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-1], ["High", "Close"]] = [139, 139]
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "TRIGGERED"
+
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [138, 138, 137, 138]
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "READY"
