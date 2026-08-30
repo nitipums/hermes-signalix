@@ -391,6 +391,16 @@ body {
   body { max-width: 960px; }
 }
 
+@media (max-width: 620px) {
+  /* Keep the header status inside the viewport while its label ellipsizes. */
+  .freshness {
+    box-sizing: border-box;
+    max-width: calc(58% - 4px);
+    padding-right: 4px;
+    overflow: hidden;
+  }
+}
+
 /* ── reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .freshness-dot--loading { animation: none; }

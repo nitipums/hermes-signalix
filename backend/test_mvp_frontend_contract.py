@@ -55,6 +55,16 @@ def test_stage_colors_and_rising_lane_are_declared():
     assert "S2_uptrend" in js
 
 
+def test_mobile_freshness_stays_inside_viewport_and_ellipsizes():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    mobile = css[css.index("@media (max-width: 620px)"):]
+    assert ".freshness" in mobile
+    assert "box-sizing: border-box" in mobile
+    assert "padding-right: 4px" in mobile
+    assert "overflow: hidden" in mobile
+    assert "text-overflow: ellipsis" in css
+
+
 def test_explorer_filters_are_sent_to_api():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
