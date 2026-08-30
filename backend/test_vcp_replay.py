@@ -6,6 +6,8 @@ from run_vcp_replay_1m import (
     attach_sequence_v2_evaluation,
     append_bounded_diagnostic,
     build_replay_result,
+    daily_context_boundary,
+    load_replay_daily_context,
     evaluate_trade,
     insert_replay_run,
     load_replay_rows,
@@ -417,11 +419,60 @@ def test_build_replay_result_passes_point_in_time_daily_context(monkeypatch):
     }
     assert result["data"]["daily_metrics"]["avg_trade_value_20"] == 20_000_000
     assert result["provenance"]["replay_id"] == "replay-1"
+    assert result["provenance"]["daily_context_as_of"] == "2026-08-26"
     assert result["decision_shadow_v2"]["policy_version"] == "signalix/vcp-decision-shadow-v2"
     assert result["decision_shadow_v2"]["symbol"] == "AAA"
     assert result["marginable"] == {"is_marginable": True, "margin_rate_pct": 50}
     assert result["decision_shadow_v2"]["tradability"]["marginable_pass"] is True
     assert "sequence_v2_trade_plan" in result
+
+
+def test_midday_daily_context_boundary_excludes_same_day_and_eod_is_explicit():
+    midday = datetime(2026, 8, 27, 5, 30, tzinfo=timezone.utc)  # 12:30 BKK
+    eod = datetime(2026, 8, 27, 9, 45, tzinfo=timezone.utc)  # 16:45 BKK
+
+    assert daily_context_boundary(midday) == datetime(2026, 8, 26).date()
+    assert daily_context_boundary(eod) == datetime(2026, 8, 27).date()
+    assert daily_context_boundary(midday, cadence="60m") == datetime(2026, 8, 26).date()
+    assert daily_context_boundary(eod, cadence="60m") == datetime(2026, 8, 27).date()
+
+
+def test_replay_daily_context_loaders_receive_point_in_time_boundaries(monkeypatch):
+    calls = []
+
+    def trend(pg, symbols, *, as_of):
+        calls.append(("trend", as_of))
+        return {}
+
+    def metrics(pg, symbols, *, as_of):
+        calls.append(("metrics", as_of))
+        return {}
+
+    monkeypatch.setattr(run_vcp_replay_1m, "load_daily_trend_context", trend)
+    monkeypatch.setattr(run_vcp_replay_1m, "load_daily_metrics", metrics)
+    midday = datetime(2026, 8, 27, 5, 30, tzinfo=timezone.utc)
+    _, _, boundary = load_replay_daily_context(None, ["AAA"], midday)
+
+    assert boundary.isoformat() == "2026-08-26"
+    assert calls == [("trend", boundary), ("metrics", boundary)]
+
+    calls.clear()
+    _, _, boundary = load_replay_daily_context(
+        None, ["AAA"], midday, cadence="60m")
+    assert boundary.isoformat() == "2026-08-26"
+    assert calls == [("trend", boundary), ("metrics", boundary)]
+
+    calls.clear()
+    eod = datetime(2026, 8, 27, 9, 45, tzinfo=timezone.utc)
+    _, _, boundary = load_replay_daily_context(None, ["AAA"], eod)
+    assert boundary.isoformat() == "2026-08-27"
+    assert calls == [("trend", boundary), ("metrics", boundary)]
+
+    calls.clear()
+    _, _, boundary = load_replay_daily_context(
+        None, ["AAA"], eod, cadence="60m")
+    assert boundary.isoformat() == "2026-08-27"
+    assert calls == [("trend", boundary), ("metrics", boundary)]
 
 
 def test_replay_id_prefix_is_explicit_and_isolated():

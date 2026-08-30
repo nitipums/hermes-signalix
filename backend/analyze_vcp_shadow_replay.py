@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from collections import Counter
+from datetime import datetime, timezone
 
 import psycopg2
 import psycopg2.extras
@@ -39,6 +40,66 @@ def _replay_metadata(envelope):
     return metadata
 
 
+def _as_of(value):
+    if value is None:
+        return None
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _metric(result, path):
+    value = result
+    for key in path:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
+
+
+def _first_activation(rows, evaluation_key):
+    for row in rows:
+        evaluation = row.get(evaluation_key)
+        if isinstance(evaluation, dict) and evaluation.get("entry_activated") is True:
+            # Low-Cheat uses the descriptive sentinel "detection"; the
+            # timeline timestamp is still the snapshot at which it activated.
+            return (evaluation.get("entry_ts")
+                    if evaluation.get("entry_ts") not in (None, "detection")
+                    else row.get("as_of"))
+    return None
+
+
+def _distance_summary(rows, *, shadow=False):
+    values = []
+    for row in rows:
+        root = row.get("sequence_policy_shadow_v2") or {} if shadow else row
+        price = root.get("price") or {}
+        value = price.get("distance_to_pivot_pct")
+        if value is not None:
+            values.append(float(value))
+    if not values:
+        return {"first": None, "last": None, "min": None, "max": None, "observations": 0}
+    return {"first": values[0], "last": values[-1], "min": min(values),
+            "max": max(values), "observations": len(values)}
+
+
+def _invalidation_summary(rows, *, shadow=False):
+    values = []
+    for row in rows:
+        root = row.get("sequence_policy_shadow_v2") or {} if shadow else row
+        price = root.get("price") or {}
+        close, invalidation = price.get("last_close"), price.get("invalidation")
+        if close is not None and invalidation is not None:
+            distance = float(close) - float(invalidation)
+            values.append({"distance": distance,
+                           "risk": abs(distance),
+                           "distance_pct": distance / float(close) * 100 if float(close) else None})
+    if not values:
+        return {"first": None, "last": None, "observations": 0}
+    return {"first": values[0], "last": values[-1], "observations": len(values)}
+
+
 def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_ITEMS):
     """Summarize deterministic per-symbol lifecycle timelines."""
     rows, _ = _results_and_envelope(records)
@@ -58,6 +119,18 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
             "first_action_lane": None,
             "first_action_as_of": None,
             "outcome_counts": {},
+            "entry_activation": {"v1": None, "sequence_v2": None},
+            "time_to_entry_hours": {"v1": None, "sequence_v2": None},
+            "observed_time_in_state_hours": {},
+            "late_chase_observations": {
+                "late_watch": 0, "do_not_chase": 0, "observations": 0,
+                "late_watch_rate": None, "do_not_chase_rate": None,
+            },
+            "pivot_distance_pct": {"v1": None, "sequence_v2": None},
+            "invalidation_distance_risk": {"v1": None, "sequence_v2": None},
+            "v1_sequence_v2_divergence": {
+                "state": 0, "pivot": 0, "outcome": 0, "comparable": 0,
+            },
         })
         state = row.get("state") or "NOT_VERIFIED"
         if item["first_event_as_of"] is None:
@@ -80,10 +153,78 @@ def summarize_timeline(records, *, max_diagnostic_items=DEFAULT_MAX_DIAGNOSTIC_I
         if item["first_action_lane"] is None and lane in ACTION_LANES:
             item["first_action_lane"] = lane
             item["first_action_as_of"] = row.get("as_of")
+        if row.get("late_watch") is True:
+            item["late_chase_observations"]["late_watch"] += 1
+        if lane == "DO_NOT_CHASE":
+            item["late_chase_observations"]["do_not_chase"] += 1
+        item["late_chase_observations"]["observations"] += 1
         evaluation = row.get("replay_evaluation") or {}
         outcome = evaluation.get("outcome") if isinstance(evaluation, dict) else None
         outcome = outcome or "NOT_VERIFIED"
         item["outcome_counts"][outcome] = item["outcome_counts"].get(outcome, 0) + 1
+    for item in grouped.values():
+        # Durations are observed intervals only; an unobserved final interval
+        # is represented as zero, while absent source metrics remain None.
+        # Reconstructing from the sorted source keeps this deterministic and
+        # avoids exposing internal rows in the public timeline contract.
+        symbol_rows = [r for r in sorted(rows, key=lambda r: str(r.get("as_of") or ""))
+                       if r.get("symbol") == next(
+                           s for s, value in grouped.items() if value is item)]
+        for current, following in zip(symbol_rows, symbol_rows[1:]):
+            start, end = _as_of(current.get("as_of")), _as_of(following.get("as_of"))
+            if start is not None and end is not None:
+                state = current.get("state") or "NOT_VERIFIED"
+                item["observed_time_in_state_hours"][state] = (
+                    item["observed_time_in_state_hours"].get(state, 0)
+                    + (end - start).total_seconds() / 3600
+                )
+        item["entry_activation"]["v1"] = _first_activation(symbol_rows, "replay_evaluation")
+        item["entry_activation"]["sequence_v2"] = _first_activation(
+            symbol_rows, "sequence_v2_replay_evaluation")
+        for version, key in (("v1", "replay_evaluation"),
+                             ("sequence_v2", "sequence_v2_replay_evaluation")):
+            activation = item["entry_activation"][version]
+            if activation is not None:
+                activation_row = next(
+                    r for r in symbol_rows
+                    if (r.get(key) or {}).get("entry_activated") is True
+                    and ((r.get(key) or {}).get("entry_ts") not in (None, "detection")
+                         and (r.get(key) or {}).get("entry_ts") == activation
+                         or (r.get(key) or {}).get("entry_ts") in (None, "detection")
+                         and r.get("as_of") == activation)
+                )
+                detected = _as_of(activation_row.get("as_of"))
+                entered = _as_of(activation)
+                item["time_to_entry_hours"][version] = (
+                    (entered - detected).total_seconds() / 3600
+                    if detected is not None and entered is not None else None)
+        item["pivot_distance_pct"]["v1"] = _distance_summary(symbol_rows)
+        item["pivot_distance_pct"]["sequence_v2"] = _distance_summary(symbol_rows, shadow=True)
+        item["invalidation_distance_risk"]["v1"] = _invalidation_summary(symbol_rows)
+        item["invalidation_distance_risk"]["sequence_v2"] = _invalidation_summary(symbol_rows, shadow=True)
+        observations = item["late_chase_observations"]["observations"]
+        item["late_chase_observations"]["late_watch_rate"] = (
+            item["late_chase_observations"]["late_watch"] / observations
+            if observations else None
+        )
+        item["late_chase_observations"]["do_not_chase_rate"] = (
+            item["late_chase_observations"]["do_not_chase"] / observations
+            if observations else None
+        )
+        for current in symbol_rows:
+            shadow = current.get("sequence_policy_shadow_v2") or {}
+            if shadow:
+                item["v1_sequence_v2_divergence"]["comparable"] += 1
+                if current.get("state") != shadow.get("state"):
+                    item["v1_sequence_v2_divergence"]["state"] += 1
+                v1_pivot = _metric(current, ("price", "distance_to_pivot_pct"))
+                v2_pivot = _metric(shadow, ("price", "distance_to_pivot_pct"))
+                if v1_pivot is not None and v2_pivot is not None and float(v1_pivot) != float(v2_pivot):
+                    item["v1_sequence_v2_divergence"]["pivot"] += 1
+                v1_outcome = (current.get("replay_evaluation") or {}).get("outcome")
+                v2_outcome = (current.get("sequence_v2_replay_evaluation") or {}).get("outcome")
+                if v1_outcome is not None and v2_outcome is not None and v1_outcome != v2_outcome:
+                    item["v1_sequence_v2_divergence"]["outcome"] += 1
     return grouped
 
 

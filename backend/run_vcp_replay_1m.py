@@ -229,6 +229,32 @@ def point_in_time_rows(rows, as_of):
     return [row for row in rows if _utc_timestamp(row["ts"]) <= as_of_utc]
 
 
+def daily_context_boundary(as_of, *, cadence="daily"):
+    """Return the Daily date boundary permitted for a replay snapshot.
+
+    A midday observation cannot see that session's Daily EOD row.  The
+    official EOD snapshot is the one exception: at the Bangkok 16:45
+    boundary the completed same-day Daily row is available.
+    """
+    instant = _utc_timestamp(as_of).astimezone(LOCAL_TZ)
+    # Both daily two-point and 60m replay snapshots are blind to the same-day
+    # Daily close until the explicit Bangkok EOD boundary.  In particular,
+    # cadence must not make a 60m EOD snapshot permanently stale.
+    if instant.time() >= datetime.min.replace(hour=16, minute=45).time():
+        return instant.date()
+    return instant.date() - timedelta(days=1)
+
+
+def load_replay_daily_context(pg, symbols, as_of, *, cadence="daily"):
+    """Load Daily evidence at the replay-safe boundary for this snapshot."""
+    boundary = daily_context_boundary(as_of, cadence=cadence)
+    return (
+        load_daily_trend_context(pg, symbols, as_of=boundary),
+        load_daily_metrics(pg, symbols, as_of=boundary),
+        boundary,
+    )
+
+
 def append_bounded_diagnostic(items, item, limit):
     """Keep diagnostics bounded while callers retain exact aggregate counts."""
     if len(items) < limit:
@@ -299,9 +325,12 @@ def sequence_v2_trade_plan(result, *, rr_multiple=TARGET_R_MULTIPLE):
 
 def build_replay_result(symbol, rows, *, as_of, replay_id,
                         daily_context=None, daily_metrics=None,
+                        daily_context_as_of=None,
                         marginable_record=None,
                         rr_multiple=TARGET_R_MULTIPLE):
     """Build one point-in-time replay result with the same Daily inputs as live."""
+    if daily_context_as_of is None:
+        daily_context_as_of = daily_context_boundary(as_of)
     result = find_vcp_60m(
         pd.DataFrame(rows), as_of=as_of,
         daily_context=daily_context or {},
@@ -316,6 +345,10 @@ def build_replay_result(symbol, rows, *, as_of, replay_id,
     result = _classify_types(result, ath_context={}, listing_context=None)
     result.setdefault("provenance", {})["replay_id"] = replay_id
     result["provenance"]["replay_as_of"] = as_of.isoformat()
+    result["provenance"]["daily_context_as_of"] = (
+        daily_context_as_of.isoformat()
+        if hasattr(daily_context_as_of, "isoformat") else daily_context_as_of
+    )
     result["replay_trade_plan"] = trade_plan(result, rr_multiple=rr_multiple)
     result["sequence_v2_trade_plan"] = sequence_v2_trade_plan(
         result, rr_multiple=rr_multiple)
@@ -457,14 +490,15 @@ def main():
         sequence_v2_outcome_counts = defaultdict(int)
         for idx, as_of, replay_id in pending_points:
             results = []
-            daily_contexts = load_daily_trend_context(pg, symbols, as_of=as_of)
-            daily_metrics = load_daily_metrics(pg, symbols, as_of=as_of)
+            daily_contexts, daily_metrics, daily_as_of = load_replay_daily_context(
+                pg, symbols, as_of, cadence=args.cadence)
             for symbol in symbols:
                 rows = point_in_time_rows(grouped.get(symbol, []), as_of)[-400:]
                 result = build_replay_result(
                     symbol, rows, as_of=as_of, replay_id=replay_id,
                     daily_context=daily_contexts.get(symbol),
                     daily_metrics=daily_metrics.get(symbol),
+                    daily_context_as_of=daily_as_of,
                     marginable_record=marginable_records.get(symbol),
                     rr_multiple=args.rr,
                 )

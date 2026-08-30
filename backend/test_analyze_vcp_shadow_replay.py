@@ -120,6 +120,79 @@ def test_summarize_timeline_legacy_summary_keys_remain_present():
     assert legacy_keys <= out.keys()
 
 
+def test_summarize_timeline_reports_replay_metrics_and_sequence_divergence():
+    base_shadow = {
+        "state": "READY",
+        "price": {"distance_to_pivot_pct": 2.0, "last_close": 102.0,
+                  "invalidation": 96.0},
+    }
+    records = [
+        {
+            "symbol": "AAA", "as_of": "2026-08-01T05:30:00+00:00",
+            "state": "FORMING", "late_watch": True,
+            "price": {"distance_to_pivot_pct": -1.0, "last_close": 99.0,
+                      "invalidation": 95.0},
+            "decision_shadow_v2": {"decision_lane": "DO_NOT_CHASE",
+                                    "actionability": "NO_ACTION"},
+            "replay_evaluation": {"entry_activated": False,
+                                   "outcome": "entry_not_activated"},
+            "sequence_policy_shadow_v2": {**base_shadow},
+            "sequence_v2_replay_evaluation": {"entry_activated": True,
+                                               "entry_ts": "2026-08-01T09:45:00+00:00"},
+        },
+        {
+            "symbol": "AAA", "as_of": "2026-08-01T09:45:00+00:00",
+            "state": "READY", "late_watch": False,
+            "price": {"distance_to_pivot_pct": 3.0, "last_close": 105.0,
+                      "invalidation": 96.0},
+            "decision_shadow_v2": {"decision_lane": "PREPARE",
+                                    "actionability": "ACTIONABLE_REVIEW"},
+            "replay_evaluation": {"entry_activated": True,
+                                   "entry_ts": "2026-08-01T10:45:00+00:00"},
+            "sequence_policy_shadow_v2": {"state": "CONFIRMED", "price": {
+                "distance_to_pivot_pct": 4.0, "last_close": 106.0,
+                "invalidation": 96.0}},
+            "sequence_v2_replay_evaluation": {"entry_activated": True,
+                                               "entry_ts": "2026-08-01T09:45:00+00:00",
+                                               "outcome": "target_hit"},
+        },
+    ]
+
+    item = summarize_timeline(records)["AAA"]
+
+    assert item["entry_activation"] == {
+        "v1": "2026-08-01T10:45:00+00:00",
+        "sequence_v2": "2026-08-01T09:45:00+00:00",
+    }
+    assert item["time_to_entry_hours"] == {"v1": 1.0, "sequence_v2": 4.25}
+    assert item["observed_time_in_state_hours"] == {"FORMING": 4.25}
+    assert item["late_chase_observations"] == {
+        "late_watch": 1, "do_not_chase": 1, "observations": 2,
+        "late_watch_rate": 0.5, "do_not_chase_rate": 0.5,
+    }
+    assert item["pivot_distance_pct"]["v1"] == {
+        "first": -1.0, "last": 3.0, "min": -1.0, "max": 3.0,
+        "observations": 2,
+    }
+    assert item["invalidation_distance_risk"]["v1"]["last"] == {
+        "distance": 9.0, "risk": 9.0, "distance_pct": 8.571428571428571,
+    }
+    assert item["v1_sequence_v2_divergence"] == {
+        "state": 2, "pivot": 2, "outcome": 0, "comparable": 2,
+    }
+
+
+def test_summarize_timeline_keeps_missing_new_metrics_explicitly_null():
+    item = summarize_timeline([{"symbol": "EMPTY", "as_of": "2026-08-01T00:00:00+00:00"}])["EMPTY"]
+
+    assert item["entry_activation"] == {"v1": None, "sequence_v2": None}
+    assert item["time_to_entry_hours"] == {"v1": None, "sequence_v2": None}
+    assert item["pivot_distance_pct"]["v1"]["last"] is None
+    assert item["invalidation_distance_risk"]["v1"]["last"] is None
+    assert item["late_chase_observations"]["late_watch_rate"] == 0.0
+    assert item["late_chase_observations"]["do_not_chase_rate"] == 0.0
+
+
 def test_summarize_shadow_fails_closed_for_expected_count_and_missing_shadow():
     records = [record("AAA", "READY", "PREPARE", "ACTIONABLE_REVIEW")]
 
