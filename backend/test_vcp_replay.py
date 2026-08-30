@@ -1,16 +1,88 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import run_vcp_replay_1m
 from run_vcp_replay_1m import (
     attach_replay_evaluation,
     attach_sequence_v2_evaluation,
+    append_bounded_diagnostic,
     build_replay_result,
     evaluate_trade,
     make_replay_id,
     pending_replay_points,
+    point_in_time_rows,
+    select_replay_snapshots,
     sequence_v2_trade_plan,
     trade_plan,
+    validate_replay_results,
 )
+
+
+def test_select_replay_snapshots_uses_latest_bangkok_dates_not_query_tail():
+    timestamps = [
+        datetime(2026, 8, 17, 16, 30, tzinfo=timezone.utc),  # Aug 17 BKK
+        datetime(2026, 8, 17, 17, 0, tzinfo=timezone.utc),   # Aug 18 BKK
+        datetime(2026, 8, 18, 16, 30, tzinfo=timezone.utc),  # Aug 18 BKK
+        datetime(2026, 8, 19, 16, 30, tzinfo=timezone.utc),  # Aug 19 BKK
+    ]
+
+    selected = select_replay_snapshots(
+        timestamps,
+        end=datetime(2026, 8, 19, 17, tzinfo=timezone.utc),
+        trading_days=2,
+        window_start=datetime(2026, 8, 17, tzinfo=timezone.utc),
+    )
+
+    assert selected["selected_dates"] == [datetime(2026, 8, 18).date(), datetime(2026, 8, 19).date()]
+    assert selected["snapshots"] == timestamps[2:]
+    assert selected["window_start"] == timestamps[2]
+    assert selected["window_end"] == timestamps[3]
+
+
+def test_select_replay_snapshots_fails_when_dates_or_snapshot_bound_is_exceeded():
+    timestamps = [datetime(2026, 8, day, 10, tzinfo=timezone.utc) for day in (17, 18)]
+
+    try:
+        select_replay_snapshots(
+            timestamps, end=datetime(2026, 8, 19, tzinfo=timezone.utc),
+            trading_days=3,
+        )
+    except ValueError as exc:
+        assert "requested 3 trading dates" in str(exc)
+    else:
+        raise AssertionError("under-represented trading-day request must fail")
+
+    try:
+        select_replay_snapshots(
+            timestamps, end=datetime(2026, 8, 19, tzinfo=timezone.utc),
+            cadence="60m", max_snapshots=1,
+        )
+    except ValueError as exc:
+        assert "max_snapshots=1" in str(exc)
+    else:
+        raise AssertionError("snapshot bound must fail clearly")
+
+
+def test_point_in_time_rows_excludes_future_bars():
+    as_of = datetime(2026, 8, 27, 6, tzinfo=timezone.utc)
+    rows = [{"ts": as_of - timedelta(hours=1)}, {"ts": as_of},
+            {"ts": as_of + timedelta(hours=1)}]
+
+    assert point_in_time_rows(rows, as_of) == rows[:2]
+
+
+def test_diagnostics_are_bounded_and_coverage_contract_is_strict():
+    diagnostics = []
+    for value in range(3):
+        append_bounded_diagnostic(diagnostics, value, 2)
+    assert diagnostics == [0, 1]
+
+    validate_replay_results([{"decision_shadow_v2": {}}], 1, "replay-1")
+    try:
+        validate_replay_results([{}], 1, "replay-1")
+    except RuntimeError as exc:
+        assert "missing decision_shadow_v2" in str(exc)
+    else:
+        raise AssertionError("missing decision shadow must fail")
 
 
 def test_low_cheat_trade_plan_uses_close_and_three_r_target():

@@ -23,6 +23,9 @@ from vcp_finder_db import _classify_types, load_daily_metrics, load_daily_trend_
 
 TYPE_POLICY_VERSION = "signalix/vcp-types-v2-early-entry"
 TARGET_R_MULTIPLE = 3.0
+LOCAL_TZ = ZoneInfo("Asia/Bangkok")
+DEFAULT_MAX_SNAPSHOTS = 2_000
+DEFAULT_MAX_DIAGNOSTIC_ITEMS = 500
 
 DDL = """
 CREATE TABLE IF NOT EXISTS vcp_finder_60m_replay_runs (
@@ -59,6 +62,86 @@ def pending_replay_points(prefix, cadence, snapshots, existing_ids):
         if replay_id not in existing_ids:
             pending.append((index, as_of, replay_id))
     return pending
+
+
+def _utc_timestamp(value):
+    """Normalize a queried timestamp without changing its instant."""
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def select_replay_snapshots(timestamps, *, end, cadence="daily",
+                            trading_days=None, window_start=None,
+                            max_snapshots=DEFAULT_MAX_SNAPSHOTS):
+    """Select deterministic snapshots using Asia/Bangkok trading dates."""
+    if cadence not in {"daily", "60m"}:
+        raise ValueError(f"unsupported replay cadence: {cadence}")
+    if max_snapshots < 1:
+        raise ValueError("max_snapshots must be positive")
+    if trading_days is not None and trading_days < 1:
+        raise ValueError("trading_days must be positive")
+    end_utc = _utc_timestamp(end)
+    start_utc = _utc_timestamp(window_start) if window_start is not None else None
+    values = sorted({
+        _utc_timestamp(value) for value in timestamps
+        if _utc_timestamp(value) <= end_utc
+        and (start_utc is None or _utc_timestamp(value) >= start_utc)
+    })
+    by_date = defaultdict(list)
+    for value in values:
+        by_date[value.astimezone(LOCAL_TZ).date()].append(value)
+    available_dates = sorted(by_date)
+    if trading_days is not None:
+        if len(available_dates) < trading_days:
+            raise ValueError(
+                f"requested {trading_days} trading dates, but queried data "
+                f"represents only {len(available_dates)} completed dates"
+            )
+        selected_dates = available_dates[-trading_days:]
+    else:
+        selected_dates = available_dates
+    if cadence == "daily":
+        snapshots = [max(by_date[day]) for day in selected_dates]
+    else:
+        snapshots = [value for day in selected_dates for value in by_date[day]]
+    snapshots = sorted(set(snapshots))
+    if len(snapshots) > max_snapshots:
+        raise ValueError(
+            f"selected {len(snapshots)} {cadence} snapshots, exceeding "
+            f"max_snapshots={max_snapshots}"
+        )
+    if not snapshots:
+        raise ValueError("queried data represents no replay snapshots")
+    return {
+        "snapshots": snapshots,
+        "selected_dates": selected_dates,
+        "window_start": snapshots[0],
+        "window_end": snapshots[-1],
+    }
+
+
+def point_in_time_rows(rows, as_of):
+    """Return only bars available at the snapshot instant (no look-ahead)."""
+    as_of_utc = _utc_timestamp(as_of)
+    return [row for row in rows if _utc_timestamp(row["ts"]) <= as_of_utc]
+
+
+def append_bounded_diagnostic(items, item, limit):
+    """Keep diagnostics bounded while callers retain exact aggregate counts."""
+    if len(items) < limit:
+        items.append(item)
+
+
+def validate_replay_results(results, eligible_count, replay_id):
+    """Enforce complete active-ORD coverage before any snapshot insert."""
+    if len(results) != eligible_count:
+        raise RuntimeError(
+            f"replay {replay_id} evaluated {len(results)} of "
+            f"{eligible_count} active ORD symbols"
+        )
+    if any("decision_shadow_v2" not in result for result in results):
+        raise RuntimeError(f"replay {replay_id} missing decision_shadow_v2")
 
 
 def pg_args():
@@ -216,13 +299,17 @@ def main():
     ap.add_argument("--end", default=None, help="UTC ISO timestamp; defaults to now")
     ap.add_argument("--cadence", choices=("daily", "60m"), default="daily")
     ap.add_argument("--trading-days", type=int, default=None)
+    ap.add_argument("--max-snapshots", type=int, default=DEFAULT_MAX_SNAPSHOTS)
+    ap.add_argument("--max-diagnostic-items", type=int, default=DEFAULT_MAX_DIAGNOSTIC_ITEMS)
     ap.add_argument("--rr", type=float, default=TARGET_R_MULTIPLE)
     ap.add_argument("--id-prefix", default="vcp-replay-1m")
     args = ap.parse_args()
     end = datetime.fromisoformat(args.end) if args.end else datetime.now(timezone.utc)
     if end.tzinfo is None:
         end = end.replace(tzinfo=timezone.utc)
-    start = end - timedelta(days=args.days)
+    query_start = end - timedelta(days=args.days)
+    if args.max_diagnostic_items < 1:
+        ap.error("--max-diagnostic-items must be positive")
     pg = psycopg2.connect(**pg_args())
     try:
         cur = pg.cursor()
@@ -236,28 +323,18 @@ def main():
                WHERE symbol=ANY(%s) AND interval='60m'
                  AND ts <= %s AND ts >= %s
                ORDER BY symbol, ts""",
-            (symbols, end, start - timedelta(days=45)),
+            (symbols, end, query_start - timedelta(days=45)),
         )
         grouped = defaultdict(list)
         for row in cur.fetchall():
             grouped[row[0]].append({"ts": row[1], "open": row[2], "high": row[3], "low": row[4], "close": row[5], "volume": row[6]})
-        cur.execute("SELECT DISTINCT (ts AT TIME ZONE 'Asia/Bangkok')::date FROM intraday_price_data WHERE interval='60m' AND ts >= %s AND ts <= %s ORDER BY 1", (start, end))
-        dates = [r[0] for r in cur.fetchall()]
-        if args.trading_days:
-            selected_dates = set(dates[-max(1, args.trading_days):])
-            selected_ts = [r["ts"] for rows in grouped.values() for r in rows if r["ts"].astimezone(ZoneInfo("Asia/Bangkok")).date() in selected_dates]
-            if selected_ts:
-                start = min(selected_ts)
-        snapshots = []
-        if args.cadence == "60m":
-            snapshots = sorted({r["ts"] for rows in grouped.values() for r in rows if start <= r["ts"] <= end})
-        else:
-            for day in dates:
-                day_end = datetime.combine(day, datetime.max.time(), tzinfo=timezone.utc)
-                ts_values = [r["ts"] for rows in grouped.values() for r in rows if r["ts"] <= day_end]
-                if ts_values:
-                    snapshots.append(max(ts_values))
-            snapshots = sorted(set(snapshots))
+        selection = select_replay_snapshots(
+            [r["ts"] for rows in grouped.values() for r in rows],
+            end=end, cadence=args.cadence, trading_days=args.trading_days,
+            window_start=query_start, max_snapshots=args.max_snapshots,
+        )
+        snapshots = selection["snapshots"]
+        start, replay_end = selection["window_start"], selection["window_end"]
         cur.execute(
             "SELECT replay_id FROM vcp_finder_60m_replay_runs WHERE replay_id LIKE %s",
             (args.id_prefix + "-%",),
@@ -267,13 +344,15 @@ def main():
             args.id_prefix, args.cadence, snapshots, existing_ids,
         )
         summary = {
-            "window_start": start.isoformat(), "window_end": end.isoformat(),
+            "window_start": start.isoformat(), "window_end": replay_end.isoformat(),
             "snapshots": len(snapshots), "snapshots_existing": len(snapshots) - len(pending_points),
             "snapshots_pending": len(pending_points), "runs": [], "coverage": {},
         }
         previous = {}
-        first_events = {}
-        first_sequence_v2_events = {}
+        first_events = []
+        first_event_keys = set()
+        first_sequence_v2_events = []
+        first_sequence_event_symbols = set()
         outcome_counts = defaultdict(int)
         sequence_v2_outcome_counts = defaultdict(int)
         for idx, as_of, replay_id in pending_points:
@@ -281,7 +360,7 @@ def main():
             daily_contexts = load_daily_trend_context(pg, symbols, as_of=as_of)
             daily_metrics = load_daily_metrics(pg, symbols, as_of=as_of)
             for symbol in symbols:
-                rows = [r for r in grouped.get(symbol, []) if r["ts"] <= as_of][-400:]
+                rows = point_in_time_rows(grouped.get(symbol, []), as_of)[-400:]
                 result = build_replay_result(
                     symbol, rows, as_of=as_of, replay_id=replay_id,
                     daily_context=daily_contexts.get(symbol),
@@ -293,42 +372,50 @@ def main():
                 result["provenance"]["replay_window_start"] = start.isoformat()
                 result["provenance"]["replay_as_of"] = as_of.isoformat()
                 plan = result["replay_trade_plan"]
-                if plan and (symbol, plan["base_type"]) not in first_events:
-                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
+                if plan and (symbol, plan["base_type"]) not in first_event_keys:
+                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= replay_end]
                     evaluation = attach_replay_evaluation(result, plan, future)
                     event = {"symbol": symbol, "detected_at": as_of.isoformat(), **plan, **(evaluation or {})}
-                    first_events[(symbol, plan["base_type"])] = event
+                    first_event_keys.add((symbol, plan["base_type"]))
+                    append_bounded_diagnostic(first_events, event, args.max_diagnostic_items)
                     outcome_counts[(plan["base_type"], event.get("outcome"))] += 1
                 sequence_plan = result["sequence_v2_trade_plan"]
-                if sequence_plan and symbol not in first_sequence_v2_events:
-                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= end]
+                if sequence_plan and symbol not in first_sequence_event_symbols:
+                    future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= replay_end]
                     evaluation = attach_sequence_v2_evaluation(result, future)
                     event = {
                         "symbol": symbol, "detected_at": as_of.isoformat(),
                         **sequence_plan, **(evaluation or {}),
                     }
-                    first_sequence_v2_events[symbol] = event
+                    first_sequence_event_symbols.add(symbol)
+                    append_bounded_diagnostic(first_sequence_v2_events, event, args.max_diagnostic_items)
                     sequence_v2_outcome_counts[event.get("outcome")] += 1
                 results.append(result)
-            cur.execute("INSERT INTO vcp_finder_60m_replay_runs (replay_id,window_start,window_end,as_of,policy_version,eligible_count,evaluated_count) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (replay_id) DO NOTHING", (replay_id, start, end, as_of, POLICY_VERSION, len(symbols), len(results)))
+            validate_replay_results(results, len(symbols), replay_id)
+            cur.execute("INSERT INTO vcp_finder_60m_replay_runs (replay_id,window_start,window_end,as_of,policy_version,eligible_count,evaluated_count) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (replay_id) DO NOTHING", (replay_id, start, replay_end, as_of, POLICY_VERSION, len(symbols), len(results)))
             psycopg2.extras.execute_values(cur, "INSERT INTO vcp_finder_60m_replay_results (replay_id,symbol,state,actionable,result) VALUES %s ON CONFLICT (replay_id,symbol) DO NOTHING", [(replay_id, r["symbol"], r["state"], bool(r["actionable"]), json.dumps(r, default=str)) for r in results])
             pg.commit()
             states = defaultdict(int)
             transitions = []
+            transition_count = 0
             current = {}
             for r in results:
                 states[r["state"]] += 1
                 current[r["symbol"]] = r["state"]
                 if r["symbol"] in previous and previous[r["symbol"]] != r["state"]:
-                    transitions.append({"symbol": r["symbol"], "from": previous[r["symbol"]], "to": r["state"]})
-            summary["runs"].append({"replay_id": replay_id, "as_of": as_of.isoformat(), "states": dict(states), "transitions": transitions})
+                    transition_count += 1
+                    append_bounded_diagnostic(transitions, {"symbol": r["symbol"], "from": previous[r["symbol"]], "to": r["state"]}, args.max_diagnostic_items)
+            append_bounded_diagnostic(summary["runs"], {"replay_id": replay_id, "as_of": as_of.isoformat(), "states": dict(states), "transitions": transitions, "transition_count": transition_count}, args.max_diagnostic_items)
             previous = current
-        summary["coverage"] = {"eligible": len(symbols), "symbols_with_rows": sum(bool(grouped.get(s)) for s in symbols), "symbols_with_80_at_end": sum(len([r for r in grouped.get(s, []) if r["ts"] <= end]) >= 80 for s in symbols)}
+        summary["runs_omitted"] = max(0, len(pending_points) - len(summary["runs"]))
+        summary["coverage"] = {"eligible": len(symbols), "symbols_with_rows": sum(bool(grouped.get(s)) for s in symbols), "symbols_with_80_at_end": sum(len([r for r in grouped.get(s, []) if r["ts"] <= replay_end]) >= 80 for s in symbols)}
         summary["type_policy_version"] = TYPE_POLICY_VERSION
         summary["target_rr"] = args.rr
-        summary["first_events"] = list(first_events.values())
+        summary["first_events"] = first_events
+        summary["first_events_omitted"] = max(0, len(first_event_keys) - len(first_events))
         summary["outcomes"] = {f"{kind}:{outcome}": count for (kind, outcome), count in outcome_counts.items()}
-        summary["sequence_v2_first_events"] = list(first_sequence_v2_events.values())
+        summary["sequence_v2_first_events"] = first_sequence_v2_events
+        summary["sequence_v2_first_events_omitted"] = max(0, len(first_sequence_event_symbols) - len(first_sequence_v2_events))
         summary["sequence_v2_outcomes"] = dict(sequence_v2_outcome_counts)
         print(json.dumps(summary, default=str))
     finally:
