@@ -7,6 +7,8 @@ from run_vcp_replay_1m import (
     append_bounded_diagnostic,
     build_replay_result,
     evaluate_trade,
+    insert_replay_run,
+    load_replay_rows,
     make_replay_id,
     pending_replay_points,
     point_in_time_rows,
@@ -15,6 +17,171 @@ from run_vcp_replay_1m import (
     trade_plan,
     validate_replay_results,
 )
+
+
+def test_replay_run_insert_persists_complete_marginable_manifest():
+    class Cursor:
+        def __init__(self):
+            self.query = None
+            self.params = None
+
+        def execute(self, query, params):
+            self.query = query
+            self.params = params
+
+    cursor = Cursor()
+    manifest = {
+        "universe_filter": "marginable_long",
+        "base_active_ord_count": 931,
+        "eligible_count": 237,
+        "excluded_count": 694,
+        "schema_version": "signalix.marginable.v1",
+        "source_document": "SET marginable list",
+        "effective_date": "2026-08-01",
+    }
+    insert_replay_run(
+        cursor, replay_id="replay-1",
+        window_start="2026-08-03T05:30:00+00:00",
+        window_end="2026-08-03T09:45:00+00:00",
+        as_of="2026-08-03T05:30:00+00:00", eligible_count=237,
+        evaluated_count=237, universe_manifest=manifest,
+        cadence="daily", snapshots_per_day=2,
+    )
+
+    expected_fields = (
+        "universe_filter", "base_active_ord_count", "excluded_count",
+        "margin_schema_version", "margin_source_document",
+        "margin_effective_date", "cadence", "snapshots_per_day",
+    )
+    for field in expected_fields:
+        assert field in cursor.query
+    assert "eligible_count" in cursor.query
+    assert "ON CONFLICT (replay_id) DO NOTHING" in cursor.query
+    assert "DROP TABLE" not in cursor.query.upper()
+    assert cursor.params == (
+        "replay-1", "2026-08-03T05:30:00+00:00",
+        "2026-08-03T09:45:00+00:00", "2026-08-03T05:30:00+00:00",
+        "signalix/vcp-finder-60m-v2-latest-sequence", 237, 237,
+        "marginable_long", 931, 694,
+        "signalix.marginable.v1", "SET marginable list", "2026-08-01",
+        "daily", 2,
+    )
+
+
+def test_replay_ddl_is_additive_and_existing_schema_compatible():
+    added_columns = (
+        "universe_filter", "base_active_ord_count", "excluded_count",
+        "margin_schema_version", "margin_source_document",
+        "margin_effective_date", "cadence", "snapshots_per_day",
+    )
+    ddl = run_vcp_replay_1m.DDL.upper()
+    for column in added_columns:
+        assert f"ADD COLUMN IF NOT EXISTS {column.upper()}" in ddl
+    assert "DROP TABLE" not in ddl
+    assert "CREATE TABLE IF NOT EXISTS VCP_FINDER_60M_REPLAY_RUNS" in ddl
+    assert "CREATE TABLE IF NOT EXISTS VCP_FINDER_60M_REPLAY_RESULTS" in ddl
+    assert "CREATE OR REPLACE" not in ddl
+
+
+def test_same_config_has_no_pending_points_but_universe_or_frequency_does():
+    snapshots = [
+        datetime(2026, 8, 3, hour, tzinfo=timezone.utc)
+        for hour in (5, 9)
+    ]
+    existing = {
+        make_replay_id("shadow", "daily", as_of, index,
+                       universe="marginable_long", snapshots_per_day=2)
+        for index, as_of in enumerate(snapshots, 1)
+    }
+
+    assert pending_replay_points(
+        "shadow", "daily", snapshots, existing,
+        universe="marginable_long", snapshots_per_day=2,
+    ) == []
+    assert len(pending_replay_points(
+        "shadow", "daily", snapshots, existing,
+        universe="active_ord", snapshots_per_day=2,
+    )) == 2
+    assert len(pending_replay_points(
+        "shadow", "daily", snapshots, existing,
+        universe="marginable_long", snapshots_per_day=1,
+    )) == 2
+
+
+def test_select_replay_snapshots_two_points_per_bangkok_day():
+    selected = select_replay_snapshots(
+        timestamps=[
+            "2026-08-03T05:00:00+00:00",
+            "2026-08-03T05:30:00+00:00",
+            "2026-08-03T09:00:00+00:00",
+            "2026-08-03T09:45:00+00:00",
+        ],
+        end="2026-08-03T10:00:00+00:00",
+        cadence="daily",
+        snapshots_per_day=2,
+    )
+
+    assert [x.isoformat() for x in selected["snapshots"]] == [
+        "2026-08-03T05:30:00+00:00",
+        "2026-08-03T09:45:00+00:00",
+    ]
+
+
+def test_resolve_replay_universe_uses_marginable_manifest(monkeypatch):
+    monkeypatch.setattr(run_vcp_replay_1m, "active_ord_symbols", lambda pg: ["BBB", "AAA"])
+    monkeypatch.setattr(
+        run_vcp_replay_1m,
+        "eligible_symbols",
+        lambda symbols: (["AAA"], {"universe_filter": "marginable_long", "eligible_count": 1}),
+    )
+
+    symbols, manifest = run_vcp_replay_1m.resolve_replay_universe(object(), "marginable_long")
+
+    assert symbols == ["AAA"]
+    assert manifest["eligible_count"] == 1
+    validate_replay_results([{"decision_shadow_v2": {}}], len(symbols), "replay-1")
+
+
+def test_marginable_universe_symbols_are_exact_sql_any_parameter(monkeypatch):
+    selected = [f"S{index:03d}" for index in range(237)]
+    monkeypatch.setattr(run_vcp_replay_1m, "active_ord_symbols", lambda pg: selected + ["EXCLUDED"])
+    monkeypatch.setattr(
+        run_vcp_replay_1m, "eligible_symbols",
+        lambda symbols: (selected, {
+            "universe_filter": "marginable_long",
+            "base_active_ord_count": 238,
+            "eligible_count": 237,
+            "excluded_count": 1,
+        }),
+    )
+
+    symbols, manifest = run_vcp_replay_1m.resolve_replay_universe(object(), "marginable_long")
+
+    class Cursor:
+        def __init__(self):
+            self.params = None
+
+        def execute(self, _query, params):
+            self.params = params
+
+        def fetchall(self):
+            return []
+
+    cursor = Cursor()
+    load_replay_rows(
+        cursor, symbols, end=datetime(2026, 8, 3, tzinfo=timezone.utc),
+        query_start=datetime(2026, 8, 1, tzinfo=timezone.utc),
+    )
+
+    assert cursor.params[0] == selected
+    assert manifest["eligible_count"] == 237
+    validate_replay_results([{"decision_shadow_v2": {}}] * 237, 237, "replay-237")
+    try:
+        validate_replay_results([{"decision_shadow_v2": {}}] * 237, 931, "replay-931")
+    except RuntimeError as exc:
+        assert "evaluated 237 of 931" in str(exc)
+    else:
+        raise AssertionError("validator must use the selected eligible count")
 
 
 def test_select_replay_snapshots_uses_latest_bangkok_dates_not_query_tail():
@@ -60,6 +227,54 @@ def test_select_replay_snapshots_fails_when_dates_or_snapshot_bound_is_exceeded(
         assert "max_snapshots=1" in str(exc)
     else:
         raise AssertionError("snapshot bound must fail clearly")
+
+
+def test_two_point_cutoffs_use_latest_at_or_before_boundary():
+    selected = select_replay_snapshots(
+        ["2026-08-03T05:30:00+00:00", "2026-08-03T09:44:00+00:00"],
+        end="2026-08-03T10:00:00+00:00", snapshots_per_day=2,
+    )
+    assert selected["snapshots"] == [
+        datetime(2026, 8, 3, 5, 30, tzinfo=timezone.utc),
+        datetime(2026, 8, 3, 9, 44, tzinfo=timezone.utc),
+    ]
+
+
+def test_two_point_cutoffs_fail_closed_when_a_cutoff_is_missing():
+    try:
+        select_replay_snapshots(
+            ["2026-08-03T09:00:00+00:00"],
+            end="2026-08-03T10:00:00+00:00", snapshots_per_day=2,
+        )
+    except ValueError as exc:
+        assert "no snapshot at or before 12:30 BKK" in str(exc)
+    else:
+        raise AssertionError("missing cutoff evidence must fail closed")
+
+
+def test_two_point_selection_preserves_multiple_bangkok_dates():
+    selected = select_replay_snapshots(
+        [
+            "2026-08-02T05:30:00+00:00", "2026-08-02T09:45:00+00:00",
+            "2026-08-03T05:30:00+00:00", "2026-08-03T09:45:00+00:00",
+        ],
+        end="2026-08-03T10:00:00+00:00", snapshots_per_day=2,
+    )
+    assert selected["selected_dates"] == [
+        datetime(2026, 8, 2).date(), datetime(2026, 8, 3).date(),
+    ]
+    assert len(selected["snapshots"]) == 4
+
+
+def test_60m_mode_remains_every_stored_snapshot_with_default_one_per_day():
+    timestamps = [
+        datetime(2026, 8, 3, hour, tzinfo=timezone.utc) for hour in (5, 6, 9)
+    ]
+    selected = select_replay_snapshots(
+        timestamps, end=datetime(2026, 8, 3, 10, tzinfo=timezone.utc),
+        cadence="60m",
+    )
+    assert selected["snapshots"] == timestamps
 
 
 def test_point_in_time_rows_excludes_future_bars():
@@ -215,6 +430,25 @@ def test_replay_id_prefix_is_explicit_and_isolated():
     replay_id = make_replay_id("vcp-shadow-v2", "60m", as_of, 3)
 
     assert replay_id == "vcp-shadow-v2-60m-20260827T060000Z-003"
+
+
+def test_non_default_replay_configurations_have_unique_ids_and_are_idempotent():
+    as_of = datetime(2026, 8, 27, 6, tzinfo=timezone.utc)
+    active_default = make_replay_id("shadow", "daily", as_of, 1)
+    marginable = make_replay_id(
+        "shadow", "daily", as_of, 1, universe="marginable_long",
+    )
+    twice_daily = make_replay_id(
+        "shadow", "daily", as_of, 1, snapshots_per_day=2,
+    )
+    assert active_default == "shadow-daily-20260827T060000Z-001"
+    assert len({active_default, marginable, twice_daily}) == 3
+    assert pending_replay_points(
+        "shadow", "daily", [as_of], {marginable}, universe="marginable_long",
+    ) == []
+    assert pending_replay_points(
+        "shadow", "daily", [as_of], {active_default}, snapshots_per_day=2,
+    )[0][2] == twice_daily
 
 
 def test_pending_replay_points_skip_already_persisted_ids():

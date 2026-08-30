@@ -16,7 +16,7 @@ import psycopg2
 import psycopg2.extras
 
 from instruments import active_ord_symbols
-from marginable import lookup as marginable_lookup
+from marginable import eligible_symbols, lookup as marginable_lookup, metadata as marginable_metadata
 from vcp_decision_policy import project_vcp_decision_shadow
 from vcp_finder import POLICY_VERSION, find_vcp_60m
 from vcp_finder_db import _classify_types, load_daily_metrics, load_daily_trend_context
@@ -48,17 +48,36 @@ CREATE TABLE IF NOT EXISTS vcp_finder_60m_replay_results (
 );
 CREATE INDEX IF NOT EXISTS vcp_replay_results_symbol_idx
   ON vcp_finder_60m_replay_results(symbol, replay_id);
+ALTER TABLE vcp_finder_60m_replay_runs
+  ADD COLUMN IF NOT EXISTS universe_filter TEXT,
+  ADD COLUMN IF NOT EXISTS base_active_ord_count INTEGER,
+  ADD COLUMN IF NOT EXISTS excluded_count INTEGER,
+  ADD COLUMN IF NOT EXISTS margin_schema_version TEXT,
+  ADD COLUMN IF NOT EXISTS margin_source_document TEXT,
+  ADD COLUMN IF NOT EXISTS margin_effective_date DATE,
+  ADD COLUMN IF NOT EXISTS cadence TEXT,
+  ADD COLUMN IF NOT EXISTS snapshots_per_day INTEGER;
 """
 
 
-def make_replay_id(prefix, cadence, as_of, index):
-    return f"{prefix}-{cadence}-{as_of.strftime('%Y%m%dT%H%M%SZ')}-{index:03d}"
+def make_replay_id(prefix, cadence, as_of, index, *, universe="active_ord",
+                   snapshots_per_day=1):
+    """Build an idempotency key, retaining the original default id format."""
+    timestamp = as_of.strftime('%Y%m%dT%H%M%SZ')
+    if universe == "active_ord" and snapshots_per_day == 1:
+        return f"{prefix}-{cadence}-{timestamp}-{index:03d}"
+    return (f"{prefix}-{universe}-spd{snapshots_per_day}-{cadence}-"
+            f"{timestamp}-{index:03d}")
 
 
-def pending_replay_points(prefix, cadence, snapshots, existing_ids):
+def pending_replay_points(prefix, cadence, snapshots, existing_ids, *,
+                          universe="active_ord", snapshots_per_day=1):
     pending = []
     for index, as_of in enumerate(snapshots, 1):
-        replay_id = make_replay_id(prefix, cadence, as_of, index)
+        replay_id = make_replay_id(
+            prefix, cadence, as_of, index, universe=universe,
+            snapshots_per_day=snapshots_per_day,
+        )
         if replay_id not in existing_ids:
             pending.append((index, as_of, replay_id))
     return pending
@@ -66,17 +85,84 @@ def pending_replay_points(prefix, cadence, snapshots, existing_ids):
 
 def _utc_timestamp(value):
     """Normalize a queried timestamp without changing its instant."""
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
+def resolve_replay_universe(pg, universe):
+    """Resolve the selected symbols and auditable manifest for a replay."""
+    active_symbols = sorted(set(active_ord_symbols(pg)))
+    if universe == "marginable_long":
+        return eligible_symbols(active_symbols)
+    margin_meta = marginable_metadata()
+    return active_symbols, {
+        "universe_filter": "active_ord",
+        "base_active_ord_count": len(active_symbols),
+        "eligible_count": len(active_symbols),
+        "excluded_count": 0,
+        "excluded_reason": None,
+        "schema_version": "signalix.marginable.v1",
+        "source_document": margin_meta.get("source_document"),
+        "effective_date": margin_meta.get("effective_date"),
+    }
+
+
+def load_replay_rows(cur, symbols, *, end, query_start):
+    """Load only the selected universe's stored 60m rows."""
+    cur.execute(
+        """SELECT symbol, ts, open, high, low, close, volume
+           FROM intraday_price_data
+           WHERE symbol=ANY(%s) AND interval='60m'
+             AND ts <= %s AND ts >= %s
+           ORDER BY symbol, ts""",
+        (symbols, end, query_start - timedelta(days=45)),
+    )
+    grouped = defaultdict(list)
+    for row in cur.fetchall():
+        grouped[row[0]].append({
+            "ts": row[1], "open": row[2], "high": row[3], "low": row[4],
+            "close": row[5], "volume": row[6],
+        })
+    return grouped
+
+
+def insert_replay_run(cur, *, replay_id, window_start, window_end, as_of,
+                      eligible_count, evaluated_count, universe_manifest,
+                      cadence, snapshots_per_day):
+    """Persist one immutable replay-run manifest without rewriting old rows."""
+    cur.execute(
+        """INSERT INTO vcp_finder_60m_replay_runs
+        (replay_id,window_start,window_end,as_of,policy_version,
+         eligible_count,evaluated_count,universe_filter,
+         base_active_ord_count,excluded_count,margin_schema_version,
+         margin_source_document,margin_effective_date,cadence,
+         snapshots_per_day)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        ON CONFLICT (replay_id) DO NOTHING""",
+        (replay_id, window_start, window_end, as_of, POLICY_VERSION,
+         eligible_count, evaluated_count, universe_manifest["universe_filter"],
+         universe_manifest.get("base_active_ord_count"),
+         universe_manifest.get("excluded_count"),
+         universe_manifest.get("schema_version"),
+         universe_manifest.get("source_document"),
+         universe_manifest.get("effective_date"), cadence, snapshots_per_day),
+    )
+
+
 def select_replay_snapshots(timestamps, *, end, cadence="daily",
                             trading_days=None, window_start=None,
-                            max_snapshots=DEFAULT_MAX_SNAPSHOTS):
+                            max_snapshots=DEFAULT_MAX_SNAPSHOTS,
+                            snapshots_per_day=1):
     """Select deterministic snapshots using Asia/Bangkok trading dates."""
     if cadence not in {"daily", "60m"}:
         raise ValueError(f"unsupported replay cadence: {cadence}")
+    if snapshots_per_day not in {1, 2}:
+        raise ValueError("snapshots_per_day must be 1 or 2")
+    if cadence == "60m" and snapshots_per_day != 1:
+        raise ValueError("snapshots_per_day=2 is only supported for daily cadence")
     if max_snapshots < 1:
         raise ValueError("max_snapshots must be positive")
     if trading_days is not None and trading_days < 1:
@@ -102,7 +188,23 @@ def select_replay_snapshots(timestamps, *, end, cadence="daily",
     else:
         selected_dates = available_dates
     if cadence == "daily":
-        snapshots = [max(by_date[day]) for day in selected_dates]
+        if snapshots_per_day == 1:
+            snapshots = [max(by_date[day]) for day in selected_dates]
+        else:
+            snapshots = []
+            for day in selected_dates:
+                cutoff_points = []
+                for hour, minute in ((12, 30), (16, 45)):
+                    cutoff = datetime.combine(day, datetime.min.time(), LOCAL_TZ).replace(
+                        hour=hour, minute=minute).astimezone(timezone.utc)
+                    available = [value for value in by_date[day] if value <= cutoff]
+                    if not available:
+                        raise ValueError(
+                            f"no snapshot at or before {hour:02d}:{minute:02d} BKK "
+                            f"for selected date {day}"
+                        )
+                    cutoff_points.append(max(available))
+                snapshots.extend(cutoff_points)
     else:
         snapshots = [value for day in selected_dates for value in by_date[day]]
     snapshots = sorted(set(snapshots))
@@ -138,7 +240,7 @@ def validate_replay_results(results, eligible_count, replay_id):
     if len(results) != eligible_count:
         raise RuntimeError(
             f"replay {replay_id} evaluated {len(results)} of "
-            f"{eligible_count} active ORD symbols"
+            f"{eligible_count} selected eligible symbols"
         )
     if any("decision_shadow_v2" not in result for result in results):
         raise RuntimeError(f"replay {replay_id} missing decision_shadow_v2")
@@ -298,6 +400,8 @@ def main():
     ap.add_argument("--days", type=int, default=30)
     ap.add_argument("--end", default=None, help="UTC ISO timestamp; defaults to now")
     ap.add_argument("--cadence", choices=("daily", "60m"), default="daily")
+    ap.add_argument("--snapshots-per-day", type=int, choices=(1, 2), default=1)
+    ap.add_argument("--universe", choices=("active_ord", "marginable_long"), default="active_ord")
     ap.add_argument("--trading-days", type=int, default=None)
     ap.add_argument("--max-snapshots", type=int, default=DEFAULT_MAX_SNAPSHOTS)
     ap.add_argument("--max-diagnostic-items", type=int, default=DEFAULT_MAX_DIAGNOSTIC_ITEMS)
@@ -315,23 +419,16 @@ def main():
         cur = pg.cursor()
         cur.execute(DDL)
         pg.commit()
-        symbols = sorted(set(active_ord_symbols(pg)))
+        symbols, universe_manifest = resolve_replay_universe(pg, args.universe)
         marginable_records = {symbol: marginable_lookup(symbol) for symbol in symbols}
-        cur.execute(
-            """SELECT symbol, ts, open, high, low, close, volume
-               FROM intraday_price_data
-               WHERE symbol=ANY(%s) AND interval='60m'
-                 AND ts <= %s AND ts >= %s
-               ORDER BY symbol, ts""",
-            (symbols, end, query_start - timedelta(days=45)),
+        grouped = load_replay_rows(
+            cur, symbols, end=end, query_start=query_start,
         )
-        grouped = defaultdict(list)
-        for row in cur.fetchall():
-            grouped[row[0]].append({"ts": row[1], "open": row[2], "high": row[3], "low": row[4], "close": row[5], "volume": row[6]})
         selection = select_replay_snapshots(
             [r["ts"] for rows in grouped.values() for r in rows],
             end=end, cadence=args.cadence, trading_days=args.trading_days,
             window_start=query_start, max_snapshots=args.max_snapshots,
+            snapshots_per_day=args.snapshots_per_day,
         )
         snapshots = selection["snapshots"]
         start, replay_end = selection["window_start"], selection["window_end"]
@@ -342,11 +439,14 @@ def main():
         existing_ids = {row[0] for row in cur.fetchall()}
         pending_points = pending_replay_points(
             args.id_prefix, args.cadence, snapshots, existing_ids,
+            universe=args.universe, snapshots_per_day=args.snapshots_per_day,
         )
         summary = {
             "window_start": start.isoformat(), "window_end": replay_end.isoformat(),
             "snapshots": len(snapshots), "snapshots_existing": len(snapshots) - len(pending_points),
             "snapshots_pending": len(pending_points), "runs": [], "coverage": {},
+            "universe": {**universe_manifest, "cadence": args.cadence,
+                         "snapshots_per_day": args.snapshots_per_day},
         }
         previous = {}
         first_events = []
@@ -371,6 +471,10 @@ def main():
                 result["provenance"]["replay_id"] = replay_id
                 result["provenance"]["replay_window_start"] = start.isoformat()
                 result["provenance"]["replay_as_of"] = as_of.isoformat()
+                result["provenance"]["replay_manifest"] = {
+                    **universe_manifest, "cadence": args.cadence,
+                    "snapshots_per_day": args.snapshots_per_day,
+                }
                 plan = result["replay_trade_plan"]
                 if plan and (symbol, plan["base_type"]) not in first_event_keys:
                     future = [r for r in grouped.get(symbol, []) if r["ts"] > as_of and r["ts"] <= replay_end]
@@ -392,7 +496,13 @@ def main():
                     sequence_v2_outcome_counts[event.get("outcome")] += 1
                 results.append(result)
             validate_replay_results(results, len(symbols), replay_id)
-            cur.execute("INSERT INTO vcp_finder_60m_replay_runs (replay_id,window_start,window_end,as_of,policy_version,eligible_count,evaluated_count) VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (replay_id) DO NOTHING", (replay_id, start, replay_end, as_of, POLICY_VERSION, len(symbols), len(results)))
+            insert_replay_run(
+                cur, replay_id=replay_id, window_start=start,
+                window_end=replay_end, as_of=as_of,
+                eligible_count=len(symbols), evaluated_count=len(results),
+                universe_manifest=universe_manifest, cadence=args.cadence,
+                snapshots_per_day=args.snapshots_per_day,
+            )
             psycopg2.extras.execute_values(cur, "INSERT INTO vcp_finder_60m_replay_results (replay_id,symbol,state,actionable,result) VALUES %s ON CONFLICT (replay_id,symbol) DO NOTHING", [(replay_id, r["symbol"], r["state"], bool(r["actionable"]), json.dumps(r, default=str)) for r in results])
             pg.commit()
             states = defaultdict(int)
