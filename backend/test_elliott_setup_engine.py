@@ -63,6 +63,18 @@ def wave_rebound_frame():
     return frame(list(range(1, 51)) + list(range(50, 29, -1)) + [30.5, 31, 32, 33, 34])
 
 
+def wave_three_continuation_frame():
+    return frame(list(range(1, 51)) + list(range(50, 29, -1)) + list(range(30, 61)))
+
+
+def wave_four_frame():
+    return frame(list(range(1, 51)) + list(range(50, 34, -1)) + list(range(35, 76)) + list(range(75, 54, -1)))
+
+
+def wave_five_frame():
+    return frame(list(range(1, 51)) + list(range(50, 34, -1)) + list(range(35, 76)) + list(range(75, 54, -1)) + list(range(55, 96)))
+
+
 def wave_evidence(**overrides):
     evidence = {
         "prior_advance": True,
@@ -89,8 +101,9 @@ def test_wave_candidates_cover_observable_phases():
     assert classify_wave_candidate(wave_two_frame(), wave_evidence())["state"] == "WAVE_2_NEAR_COMPLETION"
     assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(breakout_confirmed=True))["state"] == "EARLY_WAVE_3"
     assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(wave_3_continuation=True))["state"] == "EARLY_WAVE_3"
-    assert classify_wave_candidate(wave_two_frame(), wave_evidence(wave_4_correction=True))["state"] == "UNKNOWN"
-    assert classify_wave_candidate(wave_frame(), wave_evidence(wave_5_advance=True))["state"] == "UNKNOWN"
+    assert classify_wave_candidate(wave_three_continuation_frame(), wave_evidence())["state"] == "WAVE_3_CONTINUATION"
+    assert classify_wave_candidate(wave_four_frame(), wave_evidence())["state"] == "WAVE_4_CORRECTION"
+    assert classify_wave_candidate(wave_five_frame(), wave_evidence())["state"] == "WAVE_5_ADVANCE"
 
 
 def test_wave_four_and_five_markers_do_not_force_states_on_generic_rise():
@@ -103,7 +116,7 @@ def test_wave_four_and_five_markers_do_not_force_states_on_generic_rise():
             wave_5_advance=True,
         ),
     )
-    assert result["state"] == "UNKNOWN"
+    assert result["state"] == "WAVE_1_ADVANCE"
     assert result["state"] not in {"WAVE_4_CORRECTION", "WAVE_5_ADVANCE"}
 
 
@@ -117,6 +130,34 @@ def test_arbitrary_markers_cannot_force_wave_state_on_flat_or_falling_data():
         result = classify_wave_candidate(daily, markers)
         assert result["state"] == "UNKNOWN"
         assert result["state"] not in {"INVALIDATED", "EXTENDED"}
+
+
+def test_markers_are_metadata_and_cannot_change_a_measured_daily_state():
+    daily = wave_three_continuation_frame()
+    plain = classify_wave_candidate(daily, wave_evidence())
+    marked = classify_wave_candidate(
+        daily,
+        wave_evidence(
+            phase="WAVE_4_CORRECTION", candidate_state="INVALIDATED",
+            wave_4_correction=True, wave_5_advance=True,
+            wave_3_continuation=False, breakout_confirmed=False,
+            early_wave_3=True,
+        ),
+    )
+    assert plain["state"] == marked["state"] == "WAVE_3_CONTINUATION"
+
+
+def test_markers_cannot_create_wave_four_or_five_from_unsupported_structure():
+    daily = wave_frame()
+    plain = classify_wave_candidate(daily, wave_evidence())
+    marked = classify_wave_candidate(
+        daily,
+        wave_evidence(
+            phase="WAVE_5_ADVANCE", candidate_state="WAVE_4_CORRECTION",
+            wave_4_correction=True, wave_5_advance=True,
+        ),
+    )
+    assert marked["state"] == plain["state"] == "WAVE_1_ADVANCE"
 
 
 def test_wave_missing_evidence_is_unknown_and_json_safe():

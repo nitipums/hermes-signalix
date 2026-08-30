@@ -46,6 +46,39 @@ def _pct(close: pd.Series, lookback: int):
     return (end / start - 1.0) * 100.0
 
 
+def _swing_legs(close: pd.Series) -> list[dict]:
+    """Compress monotonic Daily close runs into observable swing legs."""
+    values = [float(value) for value in close if math.isfinite(float(value))]
+    if len(values) < 2:
+        return []
+    direction = []
+    for left, right in zip(values, values[1:]):
+        sign = 1 if right > left else -1 if right < left else 0
+        if sign and (not direction or direction[-1] != sign):
+            direction.append(sign)
+    if not direction:
+        return []
+    legs = []
+    start = 0
+    current = 0
+    for index in range(1, len(values)):
+        sign = 1 if values[index] > values[index - 1] else -1 if values[index] < values[index - 1] else 0
+        if not sign:
+            continue
+        if not current:
+            current = sign
+            continue
+        if sign != current:
+            end = index - 1
+            legs.append({"direction": current, "start": start, "end": end,
+                         "start_price": values[start], "end_price": values[end]})
+            start = end
+            current = sign
+    legs.append({"direction": current, "start": start, "end": len(values) - 1,
+                 "start_price": values[start], "end_price": values[-1]})
+    return legs
+
+
 def classify_wave_candidate(
     daily_df: pd.DataFrame,
     swing_evidence: dict | None = None,
@@ -97,20 +130,31 @@ def classify_wave_candidate(
         "measurable_breakout": breakout,
     })
 
-    claimed_state = str(evidence.get("candidate_state") or evidence.get("phase") or "").upper()
-    if (
-        evidence.get("wave_4_correction")
-        or evidence.get("wave_5_advance")
-        or claimed_state in {"WAVE_4_CORRECTION", "WAVE_5_ADVANCE"}
-    ):
-        # V1 cannot distinguish these waves from the measured frame.
-        return result
+    legs = _swing_legs(close)
+    directions = [leg["direction"] for leg in legs]
+    result["evidence"]["daily_swing_legs"] = [
+        {"direction": leg["direction"], "start": leg["start"], "end": leg["end"],
+         "start_price": leg["start_price"], "end_price": leg["end_price"]}
+        for leg in legs
+    ]
+    result["evidence"]["measurable_wave_sequence"] = directions
+    measured_continuation = (
+        directions[-3:] == [1, -1, 1]
+        and len(legs) >= 3
+        and legs[-2]["start_price"] > 0
+        and (legs[-2]["start_price"] - legs[-2]["end_price"]) / legs[-2]["start_price"] >= 0.03
+        and legs[-1]["end_price"] > legs[-3]["end_price"]
+    )
+    result["evidence"]["measurable_continuation"] = measured_continuation
 
-    # Caller labels are retained as review context, but cannot select a state.
-    # The observable frame can identify an advance, pullback, or rebound; it
-    # cannot objectively distinguish Wave 4 from Wave 2, or Wave 5 from a
-    # generic advance, so those marker-only claims remain UNKNOWN.
-    if rebound and breakout:
+    # These states are only emitted for a measurable alternating sequence.
+    # The extra completed impulse leg is the v1 proxy separating Wave 4/5
+    # from the first advance/correction/rebound sequence.
+    if directions[-5:] == [1, -1, 1, -1, 1]:
+        state = "WAVE_5_ADVANCE"
+    elif directions[-4:] == [1, -1, 1, -1]:
+        state = "WAVE_4_CORRECTION"
+    elif measured_continuation:
         state = "WAVE_3_CONTINUATION"
     elif rebound:
         state = "EARLY_WAVE_3"
