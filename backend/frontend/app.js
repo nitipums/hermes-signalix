@@ -920,7 +920,7 @@
     var primaryStatus = vcpPrimaryStatus(result);
     var primaryEvidence = vcpPrimaryEvidence(result);
     return '<tr class="vcp-row vcp-card vcp-card--' + escapeHTML(cls) + '" data-symbol="' + escapeHTML(result.symbol || "") + '">' +
-      '<td class="vcp-row__symbol"><span class="vcp-card__primary"><strong>' + escapeHTML(symbol) + '</strong><span class="vcp-card__decision">' + escapeHTML(primaryStatus) + '</span><span class="vcp-card__evidence">' + escapeHTML(primaryEvidence) + '</span><button type="button" class="vcp-row__details" aria-label="View details for ' + escapeHTML(symbol) + '">Details</button></span>' + tagHTML + '</td>' +
+      '<td class="vcp-row__symbol"><div class="vcp-row__symbol-content"><span class="vcp-card__primary"><strong>' + escapeHTML(symbol) + '</strong><span class="vcp-card__decision">' + escapeHTML(primaryStatus) + '</span><span class="vcp-card__evidence">' + escapeHTML(primaryEvidence) + '</span><button type="button" class="vcp-row__details" aria-label="View details for ' + escapeHTML(symbol) + '">Details</button></span>' + tagHTML + '</div></td>' +
       '<td>' + (price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close)) + '</td>' +
       '<td class="vcp-row__change">' + (price.change_pct == null ? "—" : Number(price.change_pct).toFixed(2) + "%") + '</td>' +
       '<td>' + (price.distance_to_pivot_pct == null ? "—" : Number(price.distance_to_pivot_pct).toFixed(2) + "%") + '</td>' +

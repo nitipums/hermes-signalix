@@ -402,7 +402,8 @@ body {
 .vcp-row { cursor:pointer; transition:background .15s ease; }
 .vcp-row:hover { background:rgba(255,255,255,.045); }
 .vcp-row:last-child td { border-bottom:0; }
-.vcp-row__symbol { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }
+.vcp-row__symbol { min-width:0; max-width:0; overflow:hidden; }
+.vcp-row__symbol-content { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }
 .vcp-row__symbol strong { color:var(--text); flex:0 0 auto; }
 .vcp-card__primary { display:flex; flex-direction:column; min-width:0; gap:2px; }
 .vcp-card__decision { color:var(--text); font-size:.72rem; font-weight:700; white-space:nowrap; }
@@ -449,13 +450,13 @@ body {
   .vcp-table th:nth-child(3), .vcp-table td:nth-child(3) { width:20%; }
   .vcp-table th:nth-child(4), .vcp-table td:nth-child(4) { width:22%; }
   .vcp-table .vcp-row__rr { display:none; }
-  .vcp-row__symbol { flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
-  .vcp-row__symbol .vcp-card__tags { width:100%; max-width:100%; margin:0; }
-  .vcp-row__symbol .tag { max-width:100%; padding:2px 4px; font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .vcp-row__symbol-content { flex-direction:column; align-items:flex-start; gap:4px; white-space:normal; }
+  .vcp-row__symbol-content .vcp-card__tags { width:100%; max-width:100%; margin:0; }
+  .vcp-row__symbol-content .tag { max-width:100%; padding:2px 4px; font-size:.6rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .vcp-card__decision { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; white-space:normal; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere; word-break:normal; line-height:1.25; }
   .vcp-card__evidence { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .vcp-row__details { display:inline-flex; min-height:32px; align-items:center; padding:0 7px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--accent); font:inherit; font-size:.65rem; font-weight:600; cursor:pointer; }
 }
 .vcp-table .vcp-card__tags { flex:1 1 auto; gap:3px; margin:0; min-width:0; overflow:hidden; }
 .vcp-table .vcp-card__tags .tag { padding:1px 4px; font-size:.6rem; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vcp-table .vcp-row__symbol { gap:5px; }
+.vcp-table .vcp-row__symbol-content { gap:5px; }

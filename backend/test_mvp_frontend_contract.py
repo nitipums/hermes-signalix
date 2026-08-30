@@ -251,7 +251,7 @@ def test_mobile_interactive_targets_are_touch_safe():
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
     assert ".vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }" in css
     assert ".vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:16%; }" in css
-    assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css
+    assert ".vcp-row__symbol-content { flex-direction:column; align-items:flex-start;" in css
 
 
 def test_watchlist_table_and_filters_are_contained_on_mobile():
@@ -260,10 +260,20 @@ def test_watchlist_table_and_filters_are_contained_on_mobile():
     assert ".vcp-table { display:table; width:100%; max-width:100%;" in css
     assert "min-width:0; max-width:0; padding:10px 12px;" in css
     assert "text-overflow:ellipsis;" in css
-    assert ".vcp-row__symbol { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }" in css
+    assert ".vcp-row__symbol { display:flex;" not in css
+    assert ".vcp-row__symbol-content { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }" in css
     assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
     assert ".watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap;" in css
     assert ".watchlist-default-filters > label { display:inline-flex; align-items:center;" in css
+
+
+def test_symbol_table_cell_keeps_table_layout_and_inner_content_owns_flex():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert ".vcp-row__symbol { display:flex;" not in css
+    assert ".vcp-row__symbol-content { display:flex;" in css
+    assert '<td class="vcp-row__symbol"><div class="vcp-row__symbol-content">' in js
+    assert '</div></td>' in js
 
 
 def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
