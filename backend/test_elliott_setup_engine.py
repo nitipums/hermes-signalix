@@ -89,6 +89,13 @@ def wave_evidence(**overrides):
     return evidence
 
 
+def test_missing_daily_history_is_unknown_and_fail_closed():
+    result = classify_wave_candidate(None, {})
+    assert result["state"] == "UNKNOWN"
+    assert result["confidence"] == "INSUFFICIENT"
+    assert "daily_ohlcv" in result["evidence"]["missing_evidence"]
+
+
 def test_wave_candidate_is_structural_only():
     result = classify_wave_candidate(wave_two_frame(), wave_evidence())
     assert result["state"] in {"WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3"}

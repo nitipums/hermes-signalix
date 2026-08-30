@@ -103,6 +103,8 @@ def classify_wave_candidate(
     }
     if evidence.get("structure_intact") is False:
         return result
+    if not _close_available(daily_df):
+        return result
 
     close = pd.to_numeric(daily_df["Close"], errors="coerce").dropna()
     if len(close) < 21:
