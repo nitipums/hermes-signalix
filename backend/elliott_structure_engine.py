@@ -37,6 +37,15 @@ def _close_available(daily_df: pd.DataFrame | None) -> bool:
     return daily_df is not None and "Close" in daily_df and len(daily_df) > 0
 
 
+def _pct(close: pd.Series, lookback: int):
+    if len(close) <= lookback:
+        return None
+    start, end = float(close.iloc[-lookback - 1]), float(close.iloc[-1])
+    if not math.isfinite(start) or start == 0 or not math.isfinite(end):
+        return None
+    return (end / start - 1.0) * 100.0
+
+
 def classify_wave_candidate(
     daily_df: pd.DataFrame,
     swing_evidence: dict | None = None,
@@ -59,38 +68,49 @@ def classify_wave_candidate(
         "confidence": "INSUFFICIENT" if missing else "PARTIAL",
         "evidence": evidence_out,
     }
-    if missing or evidence.get("structure_intact") is False:
+    if evidence.get("structure_intact") is False:
         return result
 
-    # Explicit observable phase markers are preferred. They are not treated as
-    # an objective Elliott count; they simply preserve confirmed chart review.
-    phase = str(evidence.get("phase", evidence.get("candidate_state", ""))).upper()
-    aliases = {
-        "WAVE_1": "WAVE_1_ADVANCE", "WAVE1": "WAVE_1_ADVANCE",
-        "WAVE_2": "WAVE_2_FORMING", "WAVE2": "WAVE_2_FORMING",
-        "EARLY_WAVE3": "EARLY_WAVE_3", "WAVE3": "WAVE_3_CONTINUATION",
-        "WAVE_4": "WAVE_4_CORRECTION", "WAVE4": "WAVE_4_CORRECTION",
-        "WAVE_5": "WAVE_5_ADVANCE", "WAVE5": "WAVE_5_ADVANCE",
-    }
-    if phase in WAVE_STATES:
-        result["state"] = phase
-        result["confidence"] = "PARTIAL"
+    close = pd.to_numeric(daily_df["Close"], errors="coerce").dropna()
+    if len(close) < 21:
+        result["evidence"]["missing_evidence"].append("measurable_daily_structure")
         return result
-    if phase in aliases:
-        result["state"] = aliases[phase]
-        return result
+    recent_10 = _pct(close, 10)
+    recent_20 = _pct(close, 20)
+    recent_5 = _pct(close, 5)
+    # Measure the advance before the most recent pullback/rebound window.
+    prior_20 = _pct(close.iloc[:-20], 10) if len(close) > 30 else None
+    recent_high = float(close.iloc[-20:-5].max())
+    drawdown = (float(close.iloc[-1]) / recent_high - 1.0) * 100.0
+    advance = recent_10 is not None and recent_10 > 0 and (prior_20 is None or prior_20 > 0)
+    rebound = drawdown <= -3.0 and recent_5 is not None and recent_5 > 0 and (recent_10 or 0) < 0
+    pullback = drawdown <= -3.0 and (recent_10 or 0) < 0 and (prior_20 or 0) > 0
+    breakout = advance and float(close.iloc[-1]) > float(close.iloc[-21:-1].max())
+    result["evidence"].update({
+        "daily_advance_10d_pct": round(recent_10, 2) if recent_10 is not None else None,
+        "daily_advance_20d_pct": round(recent_20, 2) if recent_20 is not None else None,
+        "daily_rebound_5d_pct": round(recent_5, 2) if recent_5 is not None else None,
+        "daily_drawdown_from_10d_high_pct": round(drawdown, 2),
+        "measurable_advance": advance,
+        "measurable_pullback": pullback,
+        "measurable_rebound": rebound,
+        "measurable_breakout": breakout,
+    })
 
-    if evidence.get("wave_5_advance"):
-        state = "WAVE_5_ADVANCE"
-    elif evidence.get("wave_4_correction"):
-        state = "WAVE_4_CORRECTION"
-    elif evidence.get("wave_3_continuation") or evidence.get("continuation_confirmed"):
-        state = "WAVE_3_CONTINUATION"
-    elif evidence.get("breakout_confirmed") or evidence.get("early_wave_3"):
+    # Markers can corroborate an observable shape, but never create one.
+    if rebound and (evidence.get("breakout_confirmed") or evidence.get("early_wave_3")):
         state = "EARLY_WAVE_3"
-    elif evidence.get("pullback_depth_pct") is not None:
+    elif rebound and (evidence.get("wave_3_continuation") or evidence.get("continuation_confirmed")):
+        state = "WAVE_3_CONTINUATION"
+    elif pullback and evidence.get("wave_4_correction"):
+        state = "WAVE_4_CORRECTION"
+    elif pullback:
         state = "WAVE_2_NEAR_COMPLETION" if evidence.get("fib_zone") else "WAVE_2_FORMING"
-    elif evidence.get("prior_advance"):
+    elif advance and evidence.get("wave_5_advance"):
+        state = "WAVE_5_ADVANCE"
+    elif advance and evidence.get("wave_3_continuation") and breakout:
+        state = "WAVE_3_CONTINUATION"
+    elif advance:
         state = "WAVE_1_ADVANCE"
     else:
         return result

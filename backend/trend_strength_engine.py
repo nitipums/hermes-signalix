@@ -47,9 +47,9 @@ def compute_trend_strength(
         "rise_20d_pct": None,
         "rise_60d_pct": None,
         "relative_strength": _number(relative_strength),
-        "near_52w_high": False,
-        "is_52w_high_breakout": False,
-        "is_ath_breakout": False,
+        "near_52w_high": None,
+        "is_52w_high_breakout": None,
+        "is_ath_breakout": None,
     }
     if daily_df is None or len(daily_df) == 0 or "Close" not in daily_df:
         return empty
@@ -63,24 +63,26 @@ def compute_trend_strength(
     latest = _number(close.iloc[-1])
     result = {**empty, "rise_20d_pct": rise_20, "rise_60d_pct": rise_60}
 
-    # Use the prior 252 closes so a new close can be identified as a breakout.
-    prior_52w = close.iloc[-253:-1] if len(close) >= 253 else close.iloc[:-1]
-    high_52w = _number(prior_52w.max()) if not prior_52w.empty else None
-    result["near_52w_high"] = bool(
-        latest is not None and high_52w is not None
-        and latest >= high_52w * (1.0 - NEAR_52W_HIGH_PCT / 100.0)
-    )
-    result["is_52w_high_breakout"] = bool(
-        latest is not None and high_52w is not None and latest > high_52w
-    )
+    # A Daily 52-week reference is 252 prior sessions, not an arbitrary
+    # short sample.  Keep the result unknown until that reference exists.
+    if len(close) >= 253:
+        high_52w = _number(close.iloc[-253:-1].max())
+        result["near_52w_high"] = bool(
+            latest is not None and high_52w is not None
+            and latest >= high_52w * (1.0 - NEAR_52W_HIGH_PCT / 100.0)
+        )
+        result["is_52w_high_breakout"] = bool(
+            latest is not None and high_52w is not None and latest > high_52w
+        )
 
     ath_reference = _number(prior_ath)
-    if ath_reference is None:
+    if ath_reference is None and len(close) >= 2:
         prior_all = close.iloc[:-1]
-        ath_reference = _number(prior_all.max()) if not prior_all.empty else None
-    result["is_ath_breakout"] = bool(
-        latest is not None and ath_reference is not None and latest > ath_reference
-    )
+        # A short observed sample is not an all-time reference either.
+        if len(close) >= 253:
+            ath_reference = _number(prior_all.max())
+    if ath_reference is not None:
+        result["is_ath_breakout"] = bool(latest is not None and latest > ath_reference)
 
     if len(close) < _MIN_TREND_ROWS or rise_20 is None:
         return result
