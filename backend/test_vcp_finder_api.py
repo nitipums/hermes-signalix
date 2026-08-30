@@ -476,7 +476,7 @@ def test_forming_event_watch_is_retained_as_watch_only_without_promotion(symbol)
     assert out["action_review"] == []
 
 
-def test_event_watch_lane_is_capped_and_ordered_by_existing_rank():
+def test_event_watch_lane_is_uncapped_and_ordered_by_existing_rank():
     candidates = []
     for i in range(12):
         row = _vcp_result(
@@ -491,10 +491,12 @@ def test_event_watch_lane_is_capped_and_ordered_by_existing_rank():
 
     out = project_daily_vcp_watchlist(candidates)
 
-    assert len(out["event_watch"]) == 10
-    assert [row["symbol"] for row in out["event_watch"]] == [f"E{i:02d}" for i in range(10)]
-    assert out["caps"]["EVENT_WATCH"] == 10
+    assert len(out["event_watch"]) == 12
+    assert [row["symbol"] for row in out["event_watch"]] == [f"E{i:02d}" for i in range(12)]
+    assert out["caps"]["EVENT_WATCH"] is None
     assert out["coverage"]["candidate_counts"]["EVENT_WATCH"] == 12
+    assert out["coverage"]["accepted"] == 12
+    assert out["coverage"]["cap_dropped"] == 0
 
 
 def test_action_review_requires_close_trigger_coherent():

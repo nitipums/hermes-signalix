@@ -728,7 +728,7 @@ DAILY_VCP_CAP_ACTION_REVIEW = 10
 DAILY_VCP_CAP_NEAR_TRIGGER = 10
 DAILY_VCP_CAP_BREAKOUT_WATCH = 5
 DAILY_VCP_CAP_STRUCTURE_WATCH = 10
-DAILY_VCP_CAP_EVENT_WATCH = 10
+DAILY_VCP_CAP_EVENT_WATCH = None
 
 
 def daily_watchlist_query_states():
@@ -964,7 +964,8 @@ def project_daily_vcp_watchlist(results):
         watch-only and never actionable.
 
     Hard caps: ACTION_REVIEW <= 10, NEAR_TRIGGER <= 10, BREAKOUT_WATCH <= 5,
-    STRUCTURE_WATCH <= 10, EVENT_WATCH <= 10.
+    STRUCTURE_WATCH <= 10. EVENT_WATCH is intentionally uncapped so the
+    full explicit event-evidence lane remains visible as WATCH_ONLY.
     Cross-lane duplicate symbols are removed, keeping the highest-priority lane.
     """
     raw_lanes = {
@@ -986,7 +987,8 @@ def project_daily_vcp_watchlist(results):
     capped_counts = {}
     for lane, items in raw_lanes.items():
         items.sort(key=_dv_sort_key)
-        raw_lanes[lane] = items[:caps[lane]]
+        cap = caps[lane]
+        raw_lanes[lane] = items if cap is None else items[:cap]
         capped_counts[lane] = candidate_counts[lane] - len(raw_lanes[lane])
     seen = set()
     lanes = {}
