@@ -91,6 +91,18 @@ def test_daily_vcp_surfaces_rejection_telemetry():
     assert "rejected:" in js
 
 
+def test_vcp_refreshes_abort_previous_requests_and_ignore_stale_results():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "let dailyVcpRequestSeq = 0;" in js
+    assert "let vcpRequestSeq = 0;" in js
+    assert "dailyVcpAbort.abort()" in js
+    assert "vcpAbort.abort()" in js
+    assert 'fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true", {signal: ac.signal})' in js
+    assert "if (requestSeq !== dailyVcpRequestSeq) return;" in js
+    assert "if (requestSeq !== vcpRequestSeq) return;" in js
+    assert 'err.name === "AbortError"' in js
+
+
 def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'NOT_VERIFIED: "NOT VERIFIED"' in js

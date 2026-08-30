@@ -21,20 +21,12 @@ def main():
     health = json.loads(body)
     assert status == 200 and health.get("status") == "ok", health
 
-    status, body = get(BASE + "/dashboard/snapshot")
-    snap = json.loads(body)
-    assert status == 200 and isinstance(snap.get("items"), list) and snap["items"], "snapshot empty"
-    for key in ("data_fetched_at", "data_freshness_source", "data_freshness_status", "market_session", "last_valid_session"):
-        assert key in snap, key
-    session = snap["market_session"]
-    for key in ("status", "is_open", "last_valid_session", "timezone", "source"):
-        assert key in session, key
-    assert snap["last_valid_session"] == session["last_valid_session"]
-    assert session["timezone"] == "Asia/Bangkok"
-    assert snap["data_fetched_at"] is None or "T" in snap["data_fetched_at"], snap["data_fetched_at"]
-    item = snap["items"][0]
-    for key in ("symbol", "close", "athHigh", "athLow", "high52", "low52", "ma10Value", "ma20Value", "ma50Value", "ma200Value"):
-        assert key in item, key
+    try:
+        get(BASE + "/dashboard/snapshot")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 410, exc.code
+    else:
+        raise AssertionError("legacy dashboard snapshot unexpectedly served")
 
     for tf in ("60m", "1D", "1W", "1M"):
         status, body = get(BASE + f"/chart/SIS?timeframe={tf}&limit=30")
@@ -62,7 +54,7 @@ def main():
     assert status == 200
     for marker in ("Daily VCP Watchlist", "All VCP · 60m", "id=\"daily-vcp-cards\"", "app.js"):
         assert marker in html, marker
-    print({"health": health, "items": len(snap["items"]), "dashboard_bytes": len(body), "contracts": "ok"})
+    print({"health": health, "contracts": "ok"})
 
 
 if __name__ == "__main__":

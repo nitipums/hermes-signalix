@@ -1,5 +1,6 @@
 import copy
 import json
+import threading
 
 import mvp_routes
 from mvp_api import filter_price_band, project_explorer_response
@@ -460,3 +461,62 @@ def test_watchlist_reports_machine_readable_rejection_coverage():
         "liquidity_below_minimum": 1,
         "structural_quality_gate": 1,
     }
+
+
+def test_daily_watchlist_cache_coalesces_and_preserves_freshness_metadata(monkeypatch):
+    mvp_routes.clear_vcp_watchlist_cache()
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+    payload = {"run_id": "run-fresh", "as_of": "2026-08-30T09:00:00+07:00", "results": [{"symbol": "A"}]}
+
+    def loader(pg, **params):
+        calls.append(params)
+        started.set()
+        release.wait(timeout=2)
+        return payload
+
+    params = {"market": "TH", "daily_watchlist": True, "state": None,
+              "symbol": None, "limit": None, "actionable": False,
+              "focused": False, "review": False}
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: type("Conn", (), {"close": lambda self: None})())
+    results = []
+    workers = [threading.Thread(target=lambda: results.append(
+        mvp_routes._load_daily_watchlist_cached(loader, params))) for _ in range(2)]
+    workers[0].start()
+    assert started.wait(timeout=2)
+    workers[1].start()
+    release.set()
+    for worker in workers:
+        worker.join(timeout=2)
+
+    assert len(calls) == 1
+    assert len(results) == 2
+    assert results[0]["run_id"] == results[1]["run_id"] == "run-fresh"
+    assert results[0]["as_of"] == "2026-08-30T09:00:00+07:00"
+    assert results[0]["results"] == []
+    assert len(mvp_routes._vcp_watchlist_cache) == 1
+
+
+def test_daily_watchlist_cache_expires_and_has_a_hard_entry_bound(monkeypatch):
+    mvp_routes.clear_vcp_watchlist_cache()
+    calls = []
+    monkeypatch.setattr(mvp_routes, "_VCP_WATCHLIST_CACHE_TTL_SECONDS", 0)
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: type("Conn", (), {"close": lambda self: None})())
+
+    def loader(pg, **params):
+        calls.append(params)
+        return {"run_id": str(len(calls)), "results": []}
+
+    base = {"market": "TH", "daily_watchlist": True, "state": None,
+            "symbol": None, "limit": None, "actionable": False,
+            "focused": False, "review": False}
+    mvp_routes._load_daily_watchlist_cached(loader, base)
+    mvp_routes._load_daily_watchlist_cached(loader, base)
+    assert len(calls) == 2
+
+    monkeypatch.setattr(mvp_routes, "_VCP_WATCHLIST_CACHE_TTL_SECONDS", 60)
+    for index in range(6):
+        params = {**base, "state": "STATE_" + str(index)}
+        mvp_routes._load_daily_watchlist_cached(loader, params)
+    assert len(mvp_routes._vcp_watchlist_cache) <= mvp_routes._VCP_WATCHLIST_CACHE_MAX_ENTRIES == 4

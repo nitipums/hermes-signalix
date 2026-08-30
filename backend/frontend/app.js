@@ -149,6 +149,10 @@
   let chartRequestSeq = 0;
   let chartAbort = null;
   var chartCache = {};
+  let dailyVcpRequestSeq = 0;
+  let dailyVcpAbort = null;
+  let vcpRequestSeq = 0;
+  let vcpAbort = null;
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -950,10 +954,14 @@
   }
 
   function loadDailyVcp() {
+    var requestSeq = ++dailyVcpRequestSeq;
+    if (dailyVcpAbort) dailyVcpAbort.abort();
+    var ac = dailyVcpAbort = new AbortController();
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true")
+    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true", {signal: ac.signal})
       .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data){
+        if (requestSeq !== dailyVcpRequestSeq) return;
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
@@ -981,10 +989,13 @@
         dom.dailyVcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " reviewable / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (insufficientCount ? " · " + insufficientCount + " hidden: insufficient/unknown data" : "") + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
       })
-      .catch(function(err){ hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
+      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
   }
 
   function loadVcp() {
+    var requestSeq = ++vcpRequestSeq;
+    if (vcpAbort) vcpAbort.abort();
+    var ac = vcpAbort = new AbortController();
     show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
     var selected = dom.vcpState.value || "ALL";
     var endpoint = "/api/vcp-finder?interval=60m&market=TH";
@@ -992,9 +1003,10 @@
     else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
     else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
     else endpoint += "&limit=5000";
-    fetch(endpoint)
+    fetch(endpoint, {signal: ac.signal})
       .then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
       .then(function(data) {
+        if (requestSeq !== vcpRequestSeq) return;
         hide(dom.vcpLoading); show(dom.vcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
@@ -1011,7 +1023,7 @@
         dom.vcpMeta.textContent = "Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
         renderVcpResults(results);
       })
-      .catch(function(err) { hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
+      .catch(function(err) { if (err.name === "AbortError" || requestSeq !== vcpRequestSeq) return; hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
   }
 
   [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {

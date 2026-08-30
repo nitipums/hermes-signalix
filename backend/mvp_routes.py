@@ -8,12 +8,74 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
+import time
 from urllib.parse import parse_qs, urlsplit
 
 from mvp_snapshot import load_mvp_artifact
 
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _MVP_SNAPSHOT_PATH = os.getenv("MVP_SNAPSHOT_PATH", os.path.join(_BACKEND_DIR, "mvp_snapshot.json"))
+
+# Short-lived process-local reuse for the default MVP request. This avoids
+# duplicate latest-run joins during refresh bursts without becoming storage.
+_VCP_WATCHLIST_CACHE_TTL_SECONDS = 2.0
+_VCP_WATCHLIST_CACHE_MAX_ENTRIES = 4
+_vcp_watchlist_cache = {}
+_vcp_watchlist_inflight = {}
+_vcp_watchlist_cache_lock = threading.Lock()
+
+
+def clear_vcp_watchlist_cache():
+    """Clear the bounded presentation cache (used by deterministic tests)."""
+    with _vcp_watchlist_cache_lock:
+        _vcp_watchlist_cache.clear()
+
+
+def _load_daily_watchlist_cached(loader, params):
+    """Load one daily projection, coalescing concurrent identical requests."""
+    # Loader identity also prevents a replaced implementation from reusing an
+    # old response during tests or a development reload.
+    key = (id(loader), tuple(sorted(params.items())))
+    while True:
+        now = time.monotonic()
+        with _vcp_watchlist_cache_lock:
+            cached = _vcp_watchlist_cache.get(key)
+            if cached and cached[0] > now:
+                return cached[1]
+            if cached:
+                _vcp_watchlist_cache.pop(key, None)
+            waiter = _vcp_watchlist_inflight.get(key)
+            if waiter is None:
+                waiter = threading.Event()
+                _vcp_watchlist_inflight[key] = waiter
+                owner = True
+            else:
+                owner = False
+        if owner:
+            break
+        waiter.wait()
+
+    try:
+        pg = _vcp_pg()
+        try:
+            payload = loader(pg, **params)
+        finally:
+            pg.close()
+        if payload is not None:
+            # Preserve universe/freshness metadata, but never cache the large
+            # full-universe result list for the compact watchlist contract.
+            payload = {**payload, "results": []}
+            with _vcp_watchlist_cache_lock:
+                if len(_vcp_watchlist_cache) >= _VCP_WATCHLIST_CACHE_MAX_ENTRIES:
+                    oldest_key = min(_vcp_watchlist_cache, key=lambda k: _vcp_watchlist_cache[k][0])
+                    _vcp_watchlist_cache.pop(oldest_key, None)
+                _vcp_watchlist_cache[key] = (time.monotonic() + _VCP_WATCHLIST_CACHE_TTL_SECONDS, payload)
+        return payload
+    finally:
+        with _vcp_watchlist_cache_lock:
+            _vcp_watchlist_inflight.pop(key, None)
+            waiter.set()
 
 
 def _vcp_pg():
@@ -71,17 +133,23 @@ def handle_mvp_api(path, handler) -> bool:
         daily_watchlist = (qs.get("daily_watchlist", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
         try:
             from vcp_finder_db import load_latest_vcp_run
-            pg = _vcp_pg()
-            try:
-                symbol = (qs.get("symbol", [""])[0] or "").upper() or None
-                state = (qs.get("state", [""])[0] or "").upper() or None
-                limit = int(qs["limit"][0]) if qs.get("limit") else None
-                actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-                focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-                review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-                payload = load_latest_vcp_run(pg, market=market, daily_watchlist=daily_watchlist, state=state, symbol=symbol, limit=limit, actionable=actionable, focused=focused, review=review)
-            finally:
-                pg.close()
+            symbol = (qs.get("symbol", [""])[0] or "").upper() or None
+            state = (qs.get("state", [""])[0] or "").upper() or None
+            limit = int(qs["limit"][0]) if qs.get("limit") else None
+            actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            params = {"market": market, "daily_watchlist": daily_watchlist, "state": state,
+                      "symbol": symbol, "limit": limit, "actionable": actionable,
+                      "focused": focused, "review": review}
+            if daily_watchlist:
+                payload = _load_daily_watchlist_cached(load_latest_vcp_run, params)
+            else:
+                pg = _vcp_pg()
+                try:
+                    payload = load_latest_vcp_run(pg, **params)
+                finally:
+                    pg.close()
             if payload is None:
                 json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
                 return True

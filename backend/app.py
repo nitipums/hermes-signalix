@@ -984,73 +984,8 @@ def dashboard_shortlist_compact(page: int = 1, page_size: int = 20,
 
 @app.get("/dashboard/snapshot")
 def dashboard_snapshot():
-    """Progressive refresh: return the complete persisted scan card contract.
-
-    The browser swaps these cards in without rebuilding the static asset.  The
-    DB work is set-based (same path as build_dashboard), and no Daily state or
-    scan membership is changed here.
-    """
-    try:
-        import build_dashboard
-        from mvp_snapshot import load_mvp_artifact
-        from reconciled_projection import apply_projection, snapshot_payload
-        # Canonical MVP source.  Do not depend on the retired scan_results.json
-        # envelope: it may be absent after a clean MVP build.
-        mvp_path = os.path.join(os.path.dirname(__file__), "mvp_snapshot.json")
-        mvp = load_mvp_artifact(mvp_path)
-        last_valid_session = (mvp.get("freshness") or {}).get("as_of")
-        freshness = dict(mvp.get("freshness") or {})
-        if not freshness.get("data_fetched_at"):
-            freshness["data_fetched_at"] = mvp.get("scan_time")
-        freshness.setdefault("source", "unknown")
-        freshness.setdefault("status", "unknown")
-        cache_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
-        try:
-            with open(cache_path) as handle:
-                payload = json.load(handle)
-            # The dashboard builder writes the snapshot after the scan envelope
-            # and may legitimately produce a newer timestamp.  A timestamp
-            # mismatch is metadata, not cache corruption; treating it as a
-            # miss caused every request to run the expensive DB fallback.
-            if not isinstance(payload.get("items"), list):
-                raise ValueError("snapshot cache has no items")
-            # Preserve build/dashboard metadata from the file before snapshot_payload
-            # overwrites the file-derived keys (it resets scan_time, market, refresh,
-            # projection_version, etc. but does not carry dashboard_meta/build_timestamp).
-            saved_build_ts = payload.get("build_timestamp")
-            saved_dashboard_meta = payload.get("dashboard_meta")
-            payload["items"] = apply_projection(payload.get("items", []))
-            payload.update(snapshot_payload(payload["items"], payload.get("scan_time") or scan.get("scan_time")))
-            if saved_build_ts is not None:
-                payload["build_timestamp"] = saved_build_ts
-            if saved_dashboard_meta is not None:
-                payload["dashboard_meta"] = saved_dashboard_meta
-            # Ensure market_regime is included in dashboard_meta for the template
-            if "market_regime" in payload and "dashboard_meta" in payload:
-                payload["dashboard_meta"]["market_regime"] = payload["market_regime"]
-        except (OSError, ValueError, json.JSONDecodeError):
-            # Use the same canonical MVP items if the optional enriched cache is
-            # absent.  Never reconstruct from the retired scan_results.json.
-            payload = {"scan_time": mvp.get("scan_time"), "market": mvp.get("market", "TH"),
-                       "refresh": "progressive_cards", "items": mvp["items"]}
-            payload["items"] = apply_projection(payload["items"])
-            payload.update(snapshot_payload(payload["items"], payload["scan_time"]))
-        return {**payload,
-                "build_timestamp": payload.get("build_timestamp"),
-                "data_fetched_at": freshness["data_fetched_at"],
-                "data_freshness_source": freshness["source"],
-                "data_freshness_status": freshness["status"],
-                "data_intraday_status": freshness.get("intraday_status"),
-                "data_global_status": freshness.get("global_status"),
-                "market_session": freshness.get("market_session"),
-                "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
-                "data_freshness_age_hours": freshness.get("age_hours"),
-                # P0: expose append-only intraday emerging-event reconciliation
-                # state. Daily is the official state; these are lower-confidence
-                # intraday observations awaiting/confirming EOD reconciliation.
-                "intradayEvents": _active_intraday_events(payload.get("items", []))}
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"dashboard snapshot unavailable: {exc}")
+    """Retired legacy contract; the MVP uses /api/vcp-finder instead."""
+    raise HTTPException(status_code=410, detail="legacy dashboard snapshot retired; use /api/vcp-finder")
 
 
 @app.get("/watchlists/us-ai-buildout")
