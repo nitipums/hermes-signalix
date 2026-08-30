@@ -26,6 +26,7 @@ from provenance_contract import (
     compute_freshness,
 )
 from marginable import (
+    eligible_symbols,
     enrich_item,
     filter_items,
     metadata as marginable_metadata,
@@ -429,7 +430,10 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     import screening
     from instruments import profile_taxonomy
 
-    symbols = screening._active_scan_symbols(pg, min_history=0, instrument_types=("ORD",), market=market)
+    active_symbols = screening._active_scan_symbols(
+        pg, min_history=0, instrument_types=("ORD",), market=market
+    )
+    symbols, universe_manifest = eligible_symbols(active_symbols)
     profiles = profile_taxonomy(pg, symbols=symbols)
     market_df = screening.load_market(pg, lookback=400, market=market)
     rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
@@ -476,12 +480,17 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             symbol, as_of, data_status, trend, wave, setup, context,
             {"vcp": {"present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"}},
             {"policy_version": "setup-candidates-v1", "daily_source": "price_data",
-             "intraday_source": "intraday_price_data", "as_of": as_of},
+             "intraday_source": "intraday_price_data", "as_of": as_of,
+             "universe_filter": universe_manifest["universe_filter"],
+             "marginable_schema_version": universe_manifest["schema_version"],
+             "marginable_source_document": universe_manifest["source_document"],
+             "marginable_effective_date": universe_manifest["effective_date"]},
         ))
     overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
     return candidates, {"scan_time": latest_daily, "freshness": {"status": overall_freshness},
-                        "source": "price_data+intraday_price_data", "universe": "TH-ORD"}
+                        "source": "price_data+intraday_price_data", "universe": "TH-ORD",
+                        **universe_manifest}
 
 
 def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,

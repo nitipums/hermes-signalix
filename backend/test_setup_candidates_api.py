@@ -74,6 +74,11 @@ def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypat
                          index=pd.date_range("2026-07-01", periods=25))
     calls = []
     monkeypatch.setattr(screening, "_active_scan_symbols", lambda *a, **k: ["AAA"])
+    monkeypatch.setattr(mvp_api, "eligible_symbols", lambda active: (["AAA"], {
+        "universe_filter": "marginable_long", "schema_version": "signalix.marginable.v1",
+        "source_document": "test", "effective_date": "2026-08-25",
+        "base_active_ord_count": 1, "eligible_count": 1, "excluded_count": 0,
+    }))
     monkeypatch.setattr(instruments, "profile_taxonomy", lambda *a, **k: {
         "AAA": {"sector": "Technology", "industry": "Components"}})
     monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
