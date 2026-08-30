@@ -3,6 +3,7 @@ import json
 import pandas as pd
 
 from elliott_structure_engine import classify_wave_candidate
+from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
 
 
@@ -164,4 +165,62 @@ def test_wave_missing_evidence_is_unknown_and_json_safe():
     result = classify_wave_candidate(frame([10] * 10), {"prior_advance": True})
     assert result["state"] == "UNKNOWN"
     assert result["evidence"]["missing_evidence"]
+    json.dumps(result)
+
+
+def daily_wave_two_evidence():
+    return {"timeframe": "daily", "state": "EARLY_WAVE_3", "evidence": {"structure_intact": True}}
+
+
+def rising_60m_frame():
+    close = [100 + i for i in range(40)]
+    return pd.DataFrame(
+        {"Open": close, "High": [v + 1 for v in close], "Low": [v - 1 for v in close], "Close": close},
+        index=pd.date_range("2026-08-30", periods=len(close), freq="h"),
+    )
+
+
+def test_early_wave_three_setup_has_trigger_stop_targets_and_rr():
+    result = build_trade_setup(daily_wave_two_evidence(), rising_60m_frame())
+    assert result["timeframe"] == "60m"
+    assert result["state"] == "EARLY_WAVE_3"
+    assert result["trigger"] is not None
+    assert result["invalidation"] is not None
+    assert result["targets"]
+    assert result["rr"]["to_target_1"] >= 0
+
+
+def test_wave_two_waiting_setup_is_forming_and_wave_state_stays_structural():
+    wave = {"timeframe": "daily", "state": "WAVE_2_NEAR_COMPLETION"}
+    result = build_trade_setup(wave, rising_60m_frame())
+    assert result["status"] == "FORMING"
+    assert result["state"] == "WAVE_2_NEAR_COMPLETION"
+    assert result["state"] not in {"EXTENDED", "INVALIDATED"}
+
+
+def test_wave_three_continuation_is_triggered():
+    wave = {"timeframe": "daily", "state": "WAVE_3_CONTINUATION"}
+    result = build_trade_setup(wave, rising_60m_frame())
+    assert result["status"] == "TRIGGERED"
+
+
+def test_extended_is_setup_status_not_wave_state():
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-1], ["High", "Close"]] = [160, 159]
+    result = build_trade_setup(daily_wave_two_evidence(), frame_)
+    assert result["status"] == "EXTENDED"
+    assert result["state"] != "EXTENDED"
+
+
+def test_invalidation_breach_is_setup_status_not_wave_state():
+    frame_ = rising_60m_frame()
+    frame_.loc[frame_.index[-1], ["Low", "Close"]] = [90, 90]
+    result = build_trade_setup(daily_wave_two_evidence(), frame_)
+    assert result["status"] == "INVALIDATED"
+    assert result["state"] != "INVALIDATED"
+
+
+def test_missing_60m_data_is_blocked_and_json_safe():
+    result = build_trade_setup(daily_wave_two_evidence(), None)
+    assert result["status"] == "DATA_BLOCKED"
     json.dumps(result)
