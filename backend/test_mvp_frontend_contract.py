@@ -19,6 +19,13 @@ def test_v2_serving_contract_has_explicit_marginable_long_requests_and_metadata(
     assert 'id="daily-vcp-retry"' in html
 
 
+def test_request_cache_script_loads_before_app_script():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    cache_script = html.index('<script src="request_cache.js"></script>')
+    app_script = html.index('<script src="app.js"></script>')
+    assert cache_script < app_script
+
+
 def test_v2_primary_label_and_drawer_keep_raw_lifecycle_evidence():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -135,9 +142,8 @@ def test_vcp_refreshes_abort_previous_requests_and_ignore_stale_results():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "let dailyVcpRequestSeq = 0;" in js
     assert "let vcpRequestSeq = 0;" in js
-    assert "dailyVcpAbort.abort()" in js
-    assert "vcpAbort.abort()" in js
-    assert 'fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long", {signal: ac.signal})' in js
+    assert "SignalixRequestCache()" in js
+    assert "requestFactory(entry.controller.signal)" in (ROOT / "request_cache.js").read_text(encoding="utf-8")
     assert 'var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";' in js
     assert "if (requestSeq !== dailyVcpRequestSeq) return;" in js
     assert "if (requestSeq !== vcpRequestSeq) return;" in js
@@ -244,15 +250,15 @@ def test_mobile_interactive_targets_are_touch_safe():
 
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
     assert ".vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }" in css
-    assert ".vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:18%; }" in css
+    assert ".vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:16%; }" in css
     assert ".vcp-row__symbol { flex-direction:column; align-items:flex-start;" in css
 
 
 def test_watchlist_table_and_filters_are_contained_on_mobile():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
-    assert ".vcp-table-wrap { max-width:100%; overflow:hidden;" in css
-    assert ".vcp-table { width:100%; max-width:100%;" in css
-    assert "min-width:0; padding:10px 12px;" in css
+    assert ".vcp-table-wrap { width:100%; max-width:100%; min-width:0; overflow:hidden;" in css
+    assert ".vcp-table { display:table; width:100%; max-width:100%;" in css
+    assert "min-width:0; max-width:0; padding:10px 12px;" in css
     assert "text-overflow:ellipsis;" in css
     assert ".vcp-row__symbol { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }" in css
     assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
@@ -263,13 +269,45 @@ def test_watchlist_table_and_filters_are_contained_on_mobile():
 def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert '.vcp-card__decision { white-space:normal; overflow:visible;' in css
+    assert '.vcp-card__decision { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;' in css
     assert '.vcp-table .vcp-row__rr { display:none; }' in css
-    assert '.vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }' in css
+    assert '.vcp-table { table-layout:fixed; }' in css
+    assert '.vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:16%; }' in css
     assert 'class="vcp-row__details" aria-label="View details for ' in js
     assert 'class="vcp-row__rr">' in js
     assert '<th class="vcp-row__rr">R/R</th>' in js
     assert '<div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>' in (ROOT / "index.html").read_text(encoding="utf-8")
+
+
+def test_vcp_mobile_390_contract_uses_fixed_five_column_layout_without_page_overflow():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    assert "body {" in css and "overflow-x: hidden;" in css
+    assert ".vcp-table-wrap { width:100%; max-width:100%; min-width:0; overflow:hidden;" in css
+    assert ".vcp-table { display:table; width:100%; max-width:100%;" in css
+    assert ".vcp-table th, .vcp-table td { min-width:0; max-width:0;" in css
+    assert ".vcp-table { table-layout:fixed; }" in css
+    assert ".vcp-table th:nth-child(4), .vcp-table td:nth-child(4) { width:22%; }" in css
+    assert 'class="vcp-row__rr">' in js and '<th class="vcp-row__rr">R/R</th>' in js
+    assert "<th>%</th>" in js
+    assert 'aria-label="View details for ' in js
+    assert 'meta name="viewport"' in html
+
+
+def test_vcp_payloads_are_cached_and_presentation_filters_do_not_duplicate_fetches():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    cache = (ROOT / "request_cache.js").read_text(encoding="utf-8")
+    assert "SignalixRequestCache" in cache
+    assert "if (!force && Object.prototype.hasOwnProperty.call(cache, key))" in cache
+    assert "if (inFlight[key]) inFlight[key].controller.abort();" in cache
+    assert "if (force) delete cache[key];" in cache
+    assert "if (inFlight[key] === entry) cache[key] = data;" in cache
+    assert "if (inFlight[key] === entry) delete inFlight[key];" in cache
+    assert "renderDailyVcpData(data);" in js
+    assert "renderVcpData(data);" in js
+    assert "loadDailyVcp(true);" in js
+    assert 'loadVcp(true);' in js
 
 
 def test_vcp_tables_use_canonical_rr_and_compact_tags():

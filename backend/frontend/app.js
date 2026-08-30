@@ -153,9 +153,9 @@
   let chartAbort = null;
   var chartCache = {};
   let dailyVcpRequestSeq = 0;
-  let dailyVcpAbort = null;
   let vcpRequestSeq = 0;
-  let vcpAbort = null;
+  var dailyVcpRequests = SignalixRequestCache();
+  var vcpRequests = SignalixRequestCache();
 
   /* ── helpers ── */
   function hideAll(cls) { $$(cls).forEach(function(el) { el.classList.add("state--hidden"); }); }
@@ -962,7 +962,7 @@
     var groups = {};
     results.forEach(function(result) { var key = vcpDisplayGroup(result); (groups[key] || (groups[key] = [])).push(result); });
     target.innerHTML = order.filter(function(key){ return groups[key] && groups[key].length; }).map(function(key) {
-      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
+      return '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(key) + ' <span class="section-subhead">' + groups[key].length + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>%</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[key].map(vcpCard).join("") + '</tbody></table></div></section>';
     }).join("") || vcpEmptyState(target);
   }
 
@@ -997,20 +997,32 @@
     ["REVIEW_NOW · ACTIONABLE_REVIEW", "STRUCTURE_WATCH · WATCH_ONLY", "PREPARE · WATCH_ONLY", "EVENT_WATCH · WATCH_ONLY", "RESEARCH · NO_ACTION", "DO_NOT_CHASE · NO_ACTION", "DATA_BLOCKED · NO_ACTION", "FORMING · WAIT", "READY · WAIT", "CONFIRMED · REVIEW", "EXTENDED · WAIT", "INVALIDATED · AVOID", "UNKNOWN"].forEach(function(status) {
       if (!groups[status]) return;
       var subhead = groupHasCaps[status] ? String(groups[status].length) + " / " + String(groupCaps[status]) : String(groups[status].length);
-      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>% Change</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
+      html += '<section class="vcp-lane"><h2 class="section-head">' + escapeHTML(status) + ' <span class="section-subhead">' + escapeHTML(subhead) + '</span></h2><div class="vcp-table-wrap"><table class="vcp-table"><thead><tr><th>Symbol</th><th>Price</th><th>%</th><th>Distance</th><th class="vcp-row__rr">R/R</th></tr></thead><tbody>' + groups[status].map(vcpCard).join("") + '</tbody></table></div></section>';
     });
     target.innerHTML = html || vcpEmptyState(target);
   }
 
-  function loadDailyVcp() {
+  function loadDailyVcp(force) {
+    var endpoint = "/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long";
+    var request = dailyVcpRequests.load(endpoint, function(signal) {
+      return fetch(endpoint, {signal: signal}).then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }, !!force);
+    if (request.cached) {
+      ++dailyVcpRequestSeq;
+      request.promise.then(renderDailyVcpData);
+      return;
+    }
+    if (request.pending) return;
     var requestSeq = ++dailyVcpRequestSeq;
-    if (dailyVcpAbort) dailyVcpAbort.abort();
-    var ac = dailyVcpAbort = new AbortController();
     show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
-    fetch("/api/vcp-finder?interval=60m&market=TH&daily_watchlist=true&universe=marginable_long", {signal: ac.signal})
-      .then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
-      .then(function(data){
+    request.promise.then(function(data){
         if (requestSeq !== dailyVcpRequestSeq) return;
+        renderDailyVcpData(data);
+      })
+      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
+  }
+
+  function renderDailyVcpData(data) {
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
@@ -1037,25 +1049,34 @@
         var rejectionSummary = Object.keys(rejectionCounts).sort(function(a, b) { return rejectionCounts[b] - rejectionCounts[a]; }).slice(0, 3).map(function(key) { return key + " " + rejectionCounts[key]; }).join(", ");
         dom.dailyVcpMeta.textContent = marginableUniverseMeta(data) + " · Run " + (data.run_id || "NOT_VERIFIED") + " · " + total + " reviewable / " + ((data.universe || {}).evaluated || 0) + " evaluated" + (insufficientCount ? " · " + insufficientCount + " hidden: insufficient/unknown data" : "") + (rejectionSummary ? " · rejected: " + rejectionSummary : "") + (data.coverage && data.coverage.feed_unavailable ? " · " + data.coverage.feed_unavailable + " feed unavailable" : "");
         renderDailyVcpWatchlist(filtered, dom.dailyVcpCards);
-      })
-      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message; });
   }
 
-  function loadVcp() {
-    var requestSeq = ++vcpRequestSeq;
-    if (vcpAbort) vcpAbort.abort();
-    var ac = vcpAbort = new AbortController();
-    show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
+  function loadVcp(force) {
     var selected = dom.vcpState.value || "ALL";
     var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";
     if (selected === "actionable") endpoint += "&focused=true";
     else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
     else if (selected !== "ALL") endpoint += "&state=" + encodeURIComponent(selected);
     else endpoint += "&limit=5000";
-    fetch(endpoint, {signal: ac.signal})
-      .then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
-      .then(function(data) {
+    var request = vcpRequests.load(endpoint, function(signal) {
+      return fetch(endpoint, {signal: signal}).then(function(res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+    }, !!force);
+    if (request.cached) {
+      ++vcpRequestSeq;
+      request.promise.then(renderVcpData);
+      return;
+    }
+    if (request.pending) return;
+    var requestSeq = ++vcpRequestSeq;
+    show(dom.vcpLoading); hide(dom.vcpError); hide(dom.vcpContent);
+    request.promise.then(function(data) {
         if (requestSeq !== vcpRequestSeq) return;
+        renderVcpData(data);
+      })
+      .catch(function(err) { if (err.name === "AbortError" || requestSeq !== vcpRequestSeq) return; hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
+  }
+
+  function renderVcpData(data) {
         hide(dom.vcpLoading); show(dom.vcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
         setFreshness("fresh", data.as_of, data.fetch_completed_at || data.as_of);
@@ -1071,8 +1092,6 @@
         else if (selected !== "ALL") results = results.filter(function(r){ return r.state === selected; });
         dom.vcpMeta.textContent = marginableUniverseMeta(data) + " · Run " + (data.run_id || "NOT_VERIFIED") + " · " + (results.length) + " shown / " + ((data.universe || {}).evaluated || 0) + " evaluated";
         renderVcpResults(results);
-      })
-      .catch(function(err) { if (err.name === "AbortError" || requestSeq !== vcpRequestSeq) return; hide(dom.vcpLoading); show(dom.vcpError); dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message; });
   }
 
   [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {
@@ -1104,8 +1123,8 @@
   [dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality].forEach(function(input) {
     if (input) input.addEventListener("change", loadVcp);
   });
-  dom.vcpRetry.addEventListener("click", loadVcp);
-  if (dom.dailyVcpRetry) dom.dailyVcpRetry.addEventListener("click", loadDailyVcp);
+  dom.vcpRetry.addEventListener("click", function() { loadVcp(true); });
+  if (dom.dailyVcpRetry) dom.dailyVcpRetry.addEventListener("click", function() { loadDailyVcp(true); });
 
   function marginRateQuery() {
     return marginRates.length ? "&margin_rates=" + encodeURIComponent(marginRates.join(",")) : "";
@@ -1336,7 +1355,7 @@
   setFreshness("loading");
   loadDailyVcp();
   setInterval(function() {
-    if (currentTab === "daily-vcp") loadDailyVcp();
-    else if (currentTab === "vcp" && dom.vcpState.value !== "ALL") loadVcp();
+    if (currentTab === "daily-vcp") loadDailyVcp(true);
+    else if (currentTab === "vcp" && dom.vcpState.value !== "ALL") loadVcp(true);
   }, 60000);
 })();
