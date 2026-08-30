@@ -757,6 +757,30 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
     return results, near_miss
 
 
+def load_evaluated_ord_rows(pg=None, *, market="TH", symbols=None,
+                            as_of_date=None, annotate_ath=False):
+    """Return every evaluated Thai ORD row, including fail-closed rows.
+
+    This bounded adapter reuses the existing full-universe scanner with a
+    permissive condition threshold.  It intentionally applies no VCP filter;
+    callers may project rows into the setup-candidate contract afterwards.
+    """
+    rows, _near_miss = scan_universe(
+        min_conditions=-1,
+        pg=pg,
+        market=market,
+        symbols=symbols,
+        as_of_date=as_of_date,
+        annotate_ath=annotate_ath,
+    )
+    return rows
+
+
+# Keep the adapter discoverable under the universe terminology used by the
+# setup-candidate pipeline.
+evaluate_ord_universe = load_evaluated_ord_rows
+
+
 if __name__ == "__main__":
     import json
 
