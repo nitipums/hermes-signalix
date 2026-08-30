@@ -14,8 +14,60 @@ from vcp_finder_db import (
     load_52_week_context,
     load_latest_vcp_run,
     persist_vcp_run,
+    resolve_serving_universe,
     validate_vcp_run_provenance,
 )
+
+
+def test_serving_universe_defaults_to_marginable_long_and_reports_manifest(monkeypatch):
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["AAA", "BBB", "CCC"])
+    monkeypatch.setattr(
+        "vcp_finder_db.eligible_symbols",
+        lambda symbols, mode: (["AAA", "CCC"], {
+            "universe_filter": mode, "base_active_ord_count": 3,
+            "eligible_count": 2, "excluded_count": 1,
+            "schema_version": "signalix.marginable.v1",
+            "source_document": "margin.pdf", "effective_date": "2026-08-25",
+        }),
+    )
+    symbols, manifest = resolve_serving_universe(object())
+    assert symbols == ["AAA", "CCC"]
+    assert manifest["universe_filter"] == "marginable_long"
+    assert manifest["eligible_count"] == 2
+    assert manifest["excluded_count"] == 1
+
+
+def test_serving_universe_supports_explicit_active_ord_and_fails_closed(monkeypatch):
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["BBB", "AAA"])
+    symbols, manifest = resolve_serving_universe(object(), universe="active_ord")
+    assert symbols == ["AAA", "BBB"]
+    assert manifest["universe_filter"] == "active_ord"
+    assert manifest["eligible_count"] == 2
+    with pytest.raises(ValueError, match="unknown universe"):
+        resolve_serving_universe(object(), universe="everything")
+
+
+def test_v2_shadow_projection_preserves_raw_v1_evidence():
+    result = {
+        "symbol": "AAA", "state": "READY", "policy_version": "finder-v1",
+        "evidence": {"prior_trend_pass": True, "price_contraction_pass": True,
+                     "base_pass": True, "leg_volume_pass": True},
+        "price": {"last_close": 10, "pivot_high": 10, "invalidation": 9,
+                   "distance_to_pivot_pct": 0},
+        "breakout": {"close_confirmed": True, "volume_confirmed": True},
+        "data": {"freshness": "fresh", "feed_status": "ok",
+                 "daily_metrics": {"avg_trade_value_20": 20_000_000}},
+        "marginable": {"is_marginable": True},
+    }
+    from vcp_finder_db import _attach_decision_shadow_v2
+    out = _attach_decision_shadow_v2(result)
+    assert out["source_policy_version"] == "finder-v1"
+    assert out["policy_version"] == "finder-v1"
+    assert out["decision_policy_version"] == "signalix/vcp-decision-shadow-v2"
+    assert out["evidence"] == result["evidence"]
+    assert out["decision_shadow_v2"]["policy_version"] == "signalix/vcp-decision-shadow-v2"
+    assert out["decision_lane"] == out["decision_shadow_v2"]["decision_lane"]
+    assert out["actionability"] == out["decision_shadow_v2"]["actionability"]
 
 
 @pytest.mark.parametrize(
@@ -292,6 +344,8 @@ def test_daily_watchlist_loads_full_run_but_enriches_only_lane_states(monkeypatc
             return {"feed_unavailable": 0, "no_data": 0}
 
         def fetchall(self):
+            if "SELECT symbol FROM vcp_finder_60m_results" in self.sql[-1]:
+                return [{"symbol": "READY1"}, {"symbol": "FORMING1"}]
             if "SELECT result FROM vcp_finder_60m_results" in self.sql[-1]:
                 return [{"result": ready}, {"result": rejected}]
             return []
@@ -314,11 +368,15 @@ def test_daily_watchlist_loads_full_run_but_enriches_only_lane_states(monkeypatc
 
     monkeypatch.setattr("vcp_finder_db.load_52_week_context", fake_52_week_context)
     monkeypatch.setattr("marginable.lookup", lambda symbol: None)
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["READY1", "FORMING1"])
 
-    out = load_latest_vcp_run(Conn(), market="TH", daily_watchlist=True)
+    out = load_latest_vcp_run(Conn(), market="TH", daily_watchlist=True, universe="active_ord")
 
     assert enriched_symbols == ["READY1"]
-    assert out["universe"] == {"eligible": 2, "evaluated": 2, "returned": 2}
+    assert out["universe"] == {
+        "eligible": 2, "evaluated": 2, "returned": 2,
+        "missing_from_run": 0, "missing_symbols": [],
+    }
     assert out["daily_watchlist"]["coverage"]["input"] == 2
     assert out["daily_watchlist"]["coverage"]["rejection_counts"] == {
         "state_not_watchlist_eligible": 1,
@@ -341,6 +399,7 @@ def test_latest_vcp_run_attaches_as_of_index_membership_to_vcp_rows(monkeypatch)
         def fetchall(self):
             sql = self.sql[-1]
             if "daily_scan_observations" in sql or "company_profiles" in sql or "DISTINCT ON" in sql: return []
+            if "SELECT symbol FROM vcp_finder_60m_results" in sql: return [{"symbol": "KCE"}]
             if "vcp_finder_60m_results" in sql: return [{"result": row}]
             if "index_memberships" in sql: return [{"symbol": "KCE", "index_name": "SET50"}, {"symbol": "KCE", "index_name": "SET100"}]
             return []
@@ -350,9 +409,22 @@ def test_latest_vcp_run_attaches_as_of_index_membership_to_vcp_rows(monkeypatch)
         def cursor(self, **kwargs): return self.cur
 
     monkeypatch.setattr("vcp_finder_db.load_52_week_context", lambda *args, **kwargs: {})
-    monkeypatch.setattr("marginable.lookup", lambda symbol: None)
+    monkeypatch.setattr("marginable.lookup", lambda symbol: {
+        "instrument_type": "ORD", "margin_rate_pct": 50, "marker": "**",
+        "can_buy": True, "can_add_collateral": True, "can_short": False,
+    })
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["KCE"])
     out = load_latest_vcp_run(Conn())
     assert out["results"][0]["index_membership"] == ["SET50", "SET100"]
+    margin = out["results"][0]["marginable"]
+    assert margin == {
+        "is_marginable": True, "instrument_type": "ORD", "margin_rate_pct": 50,
+        "marker": "**", "can_buy": True, "can_add_collateral": True,
+        "can_short": False, "schema_version": "signalix.marginable.v1",
+        "source_document": "Marginable_Securities_List_25082026_1787658633_copy.pdf",
+        "effective_date": "2026-08-25",
+        "source": "Krungsri Securities Credit Balance Marginable Securities List",
+    }
 
 
 def test_latest_vcp_run_enriches_missing_rr_from_canonical_daily_payload(monkeypatch):
@@ -371,6 +443,7 @@ def test_latest_vcp_run_enriches_missing_rr_from_canonical_daily_payload(monkeyp
         def fetchall(self):
             sql = self.sql[-1]
             if "x.result" in sql: return []
+            if "SELECT symbol FROM vcp_finder_60m_results" in sql: return [{"symbol": "KCE"}]
             if "vcp_finder_60m_results" in sql: return [{"result": row}]
             if "daily_scan_observations" in sql:
                 return [{"symbol": "KCE", "raw_payload": {
@@ -385,6 +458,7 @@ def test_latest_vcp_run_enriches_missing_rr_from_canonical_daily_payload(monkeyp
 
     monkeypatch.setattr("vcp_finder_db.load_52_week_context", lambda *args, **kwargs: {})
     monkeypatch.setattr("marginable.lookup", lambda symbol: None)
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["KCE"])
     out = load_latest_vcp_run(Conn())
     assert out["results"][0]["rr"] == 3.0
 
@@ -405,6 +479,7 @@ def test_latest_vcp_run_keeps_missing_rr_neutral_without_canonical_value(monkeyp
         def fetchall(self):
             sql = self.sql[-1]
             if "x.result" in sql: return []
+            if "SELECT symbol FROM vcp_finder_60m_results" in sql: return [{"symbol": "HANA"}]
             if "vcp_finder_60m_results" in sql: return [{"result": row}]
             return []
         def close(self): pass
@@ -414,8 +489,63 @@ def test_latest_vcp_run_keeps_missing_rr_neutral_without_canonical_value(monkeyp
 
     monkeypatch.setattr("vcp_finder_db.load_52_week_context", lambda *args, **kwargs: {})
     monkeypatch.setattr("marginable.lookup", lambda symbol: None)
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: ["HANA"])
     out = load_latest_vcp_run(Conn())
     assert out["results"][0].get("rr") is None
+
+
+@pytest.mark.parametrize("run_row_count", [237, 236])
+def test_latest_vcp_run_reports_observed_rows_and_missing_selected_coverage(monkeypatch, run_row_count):
+    as_of = datetime(2026, 8, 29, 9, 0, tzinfo=timezone.utc)
+    selected = [f"S{index:03d}" for index in range(237)]
+    present = selected[:run_row_count]
+
+    class Cursor:
+        def __init__(self):
+            self.sql = ""
+
+        def execute(self, sql, params):
+            self.sql = sql
+
+        def fetchone(self):
+            if "SELECT run_id" in self.sql:
+                return {
+                    "run_id": "run-coverage", "market": "TH", "interval": "60m",
+                    "policy_version": "finder-v1", "as_of": as_of,
+                    "eligible_count": 237, "evaluated_count": run_row_count,
+                    "ingestion_run_id": "i1", "ingestion_status": "full_success",
+                    "fetch_completed_at": as_of,
+                }
+            return {"feed_unavailable": 0, "no_data": 0}
+
+        def fetchall(self):
+            if "SELECT symbol FROM vcp_finder_60m_results" in self.sql:
+                return [{"symbol": symbol} for symbol in present]
+            if "SELECT result FROM vcp_finder_60m_results" in self.sql:
+                return [{"result": {"symbol": symbol, "state": "FORMING", "data": {}}}
+                        for symbol in present]
+            return []
+
+        def close(self):
+            pass
+
+    class Conn:
+        def __init__(self):
+            self.cur = Cursor()
+
+        def cursor(self, **kwargs):
+            return self.cur
+
+    monkeypatch.setattr("vcp_finder_db.active_ord_symbols", lambda _: selected)
+    monkeypatch.setattr("vcp_finder_db.load_52_week_context", lambda *args, **kwargs: {})
+    monkeypatch.setattr("marginable.lookup", lambda symbol: None)
+
+    out = load_latest_vcp_run(Conn(), universe="active_ord")
+    assert out["universe"]["eligible"] == 237
+    assert out["universe"]["evaluated"] == run_row_count
+    assert out["universe"]["returned"] == run_row_count
+    assert out["universe"]["missing_from_run"] == 237 - run_row_count
+    assert out["universe"]["missing_symbols"] == selected[run_row_count:]
 
 
 def test_52_week_context_is_point_in_time_and_uses_price_data():

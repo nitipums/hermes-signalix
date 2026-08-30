@@ -58,6 +58,7 @@ def metadata() -> dict:
     data = load_marginable_data()
     securities = data["securities"]
     return {
+        "schema_version": data.get("schema_version"),
         "source": data.get("source"),
         "source_document": data.get("source_document"),
         "effective_date": data.get("effective_date"),

@@ -122,7 +122,7 @@ def test_vcp_route_evaluates_then_filters(monkeypatch):
     class Conn:
         def close(self): pass
     monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
-    def latest(pg, market, state, symbol, limit, actionable, focused, review, daily_watchlist=False):
+    def latest(pg, market, state, symbol, limit, actionable, focused, review, daily_watchlist=False, universe="marginable_long"):
         filtered = [r for r in payload["results"] if (not state or r["state"] == state) and (not actionable or r["state"] in {"READY", "NEAR_TRIGGER", "CONFIRMED"})]
         return {**payload, "results": filtered, "daily_watchlist": None}
     monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", latest)
@@ -130,6 +130,32 @@ def test_vcp_route_evaluates_then_filters(monkeypatch):
     assert mvp_routes.handle_mvp_api("/api/vcp-finder?state=READY", h) is True
     assert h.status == 200
     assert [x["symbol"] for x in json.loads(h.body)["results"]] == ["AAA"]
+
+
+def test_vcp_route_passes_default_and_explicit_universe(monkeypatch):
+    calls = []
+    class Conn:
+        def close(self): pass
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
+    def latest(pg, **kwargs):
+        calls.append(kwargs)
+        return {"results": [], "universe": {}, "daily_watchlist": None}
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", latest)
+    h = Handler()
+    mvp_routes.handle_mvp_api("/api/vcp-finder", h)
+    mvp_routes.handle_mvp_api("/api/vcp-finder?universe=active_ord", Handler())
+    assert calls[0]["universe"] == "marginable_long"
+    assert calls[1]["universe"] == "active_ord"
+
+
+def test_vcp_route_rejects_unknown_universe_fail_closed(monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("loader must not run")
+    monkeypatch.setattr("vcp_finder_db.load_latest_vcp_run", fail)
+    h = Handler()
+    mvp_routes.handle_mvp_api("/api/vcp-finder?universe=all", h)
+    assert h.status == 400
+    assert json.loads(h.body) == {"error": "invalid_request"}
 
 
 def test_daily_watchlist_route_passes_flag(monkeypatch):
@@ -198,6 +224,7 @@ def test_daily_watchlist_response_does_not_serialize_full_vcp_results(monkeypatc
 
 
 def test_explorer_and_watchlist_share_the_same_unified_decision(monkeypatch):
+    mvp_routes.clear_vcp_watchlist_cache()
     result = _vcp_result("AAA", "READY")
     result["decision"] = project_unified_vcp_decision(result, {"trend_pass": True})
     insufficient = _vcp_result("MISSING", "NOT_VERIFIED")

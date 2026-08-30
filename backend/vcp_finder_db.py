@@ -6,8 +6,10 @@ from datetime import datetime, timezone
 import psycopg2.extras
 
 from instruments import active_ord_symbols
+from marginable import eligible_symbols, metadata as marginable_metadata
 from mvp_api import _resolve_rr
 from unified_vcp_decision import project_unified_vcp_decision
+from vcp_decision_policy import POLICY_VERSION as DECISION_SHADOW_POLICY_VERSION, project_vcp_decision_shadow
 from vcp_finder import POLICY_VERSION, VCP60Config, find_vcp_60m, new_run_id
 
 
@@ -50,6 +52,31 @@ LOW_CHEAT_MAX_RISK_PCT = 8.0
 LOW_CHEAT_MAX_RISK_ATR = 2.5
 LOW_CHEAT_STATES = frozenset({"READY", "NEAR_TRIGGER"})
 VCP_INGESTION_STATUSES = frozenset({"full_success", "partial_success"})
+SERVING_UNIVERSES = frozenset({"marginable_long", "active_ord"})
+
+
+def resolve_serving_universe(pg, *, universe="marginable_long"):
+    """Resolve the explicit live serving universe and auditable manifest."""
+    if universe not in SERVING_UNIVERSES:
+        raise ValueError(f"unknown universe: {universe}")
+    active = sorted(set(active_ord_symbols(pg)))
+    if universe == "marginable_long":
+        selected, manifest = eligible_symbols(active, universe)
+        margin = marginable_metadata()
+        manifest["source"] = margin.get("source")
+        return selected, manifest
+    margin = marginable_metadata()
+    return active, {
+        "universe_filter": "active_ord",
+        "base_active_ord_count": len(active),
+        "eligible_count": len(active),
+        "excluded_count": 0,
+        "excluded_reason": None,
+        "schema_version": margin["schema_version"] if "schema_version" in margin else "signalix.marginable.v1",
+        "source": margin.get("source"),
+        "source_document": margin.get("source_document"),
+        "effective_date": margin.get("effective_date"),
+    }
 
 
 def validate_vcp_run_provenance(*, ingestion_run_id, ingestion_status,
@@ -478,7 +505,21 @@ def _presentation_symbols_for_run(results, *, daily_watchlist):
     ]
 
 
-def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, symbol=None, limit=None, actionable=False, focused=False, review=False):
+def _attach_decision_shadow_v2(result):
+    """Add the pure v2 serving projection while retaining the v1 evidence."""
+    out = dict(result)
+    if "policy_version" in out:
+        out["source_policy_version"] = out["policy_version"]
+    shadow = project_vcp_decision_shadow(out)
+    out["decision_shadow_v2"] = shadow
+    out["decision_policy_version"] = DECISION_SHADOW_POLICY_VERSION
+    out["decision_lane"] = shadow["decision_lane"]
+    out["lane"] = shadow["decision_lane"]
+    out["actionability"] = shadow["actionability"]
+    return out
+
+
+def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, symbol=None, limit=None, actionable=False, focused=False, review=False, universe="marginable_long"):
     cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cur.execute(
         """SELECT run_id, market, interval, policy_version, as_of,
@@ -496,13 +537,23 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
     if not run:
         cur.close()
         return None
+    selected_symbols, universe_manifest = resolve_serving_universe(pg, universe=universe)
     if daily_watchlist:
         # The watchlist projection must see the full run and apply its own
         # fail-closed caps. Ignore caller state/limit/symbol filters.
         state = symbol = limit = None
         actionable = focused = review = False
-    clauses = ["run_id=%s"]
-    params = [run["run_id"]]
+    # Count coverage against the unfiltered live result set. The run manifest
+    # describes the producer's input, not the rows actually available to this
+    # serving request; never substitute it for observed serving coverage.
+    cur.execute(
+        "SELECT symbol FROM vcp_finder_60m_results WHERE run_id=%s AND symbol=ANY(%s)",
+        (run["run_id"], selected_symbols),
+    )
+    run_symbols = {row["symbol"] for row in cur.fetchall()}
+    missing_from_run = sorted(set(selected_symbols) - run_symbols)
+    clauses = ["run_id=%s", "symbol=ANY(%s)"]
+    params = [run["run_id"], selected_symbols]
     # Daily projection must inspect the full completed run so it can report
     # machine-readable rejection coverage. _dv_lane remains fail-closed.
     if state:
@@ -582,19 +633,44 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         for result in results:
             if result.get("rr") is None and result.get("symbol") in canonical_rr:
                 result["rr"] = canonical_rr[result["symbol"]]
-    cur.execute("SELECT COUNT(*) FILTER (WHERE result->'data'->>'feed_status' = 'unavailable') AS feed_unavailable, COUNT(*) FILTER (WHERE COALESCE((result->'data'->>'bar_count')::int, 0) = 0) AS no_data FROM vcp_finder_60m_results WHERE run_id=%s", (run["run_id"],))
+    cur.execute("SELECT COUNT(*) FILTER (WHERE result->'data'->>'feed_status' = 'unavailable') AS feed_unavailable, COUNT(*) FILTER (WHERE COALESCE((result->'data'->>'bar_count')::int, 0) = 0) AS no_data FROM vcp_finder_60m_results WHERE run_id=%s AND symbol=ANY(%s)", (run["run_id"], selected_symbols))
     coverage_row = cur.fetchone()
     cur.close()
     from marginable import lookup
-    for result in results:
+    for index, result in enumerate(results):
+        result = dict(result)
         record = lookup(result.get("symbol"))
-        result["marginable"] = {
-            "is_marginable": bool(record),
-            "margin_rate_pct": record.get("margin_rate_pct") if record else None,
-            "source": "Krungsri Credit Balance" if record else None,
-        }
-        result["margin_rate_pct"] = record.get("margin_rate_pct") if record else None
+        if record:
+            margin_meta = marginable_metadata()
+            result["marginable"] = {
+                "is_marginable": True,
+                "instrument_type": record.get("instrument_type"),
+                "margin_rate_pct": record.get("margin_rate_pct"),
+                "marker": record.get("marker"),
+                "can_buy": record.get("can_buy"),
+                "can_add_collateral": record.get("can_add_collateral"),
+                "can_short": record.get("can_short"),
+                "schema_version": margin_meta.get("schema_version"),
+                "source_document": margin_meta.get("source_document"),
+                "effective_date": margin_meta.get("effective_date"),
+                "source": margin_meta.get("source"),
+            }
+            # Preserve established v1 aliases for consumers that still read
+            # them; their values remain sourced from the margin record.
+            result["margin_rate_pct"] = record.get("margin_rate_pct")
+            result["margin_marker"] = record.get("marker")
+            result["margin_can_buy"] = record.get("can_buy")
+            result["margin_can_add_collateral"] = record.get("can_add_collateral")
+            result["margin_can_short"] = record.get("can_short")
+        else:
+            # Do not attach document/date/source metadata to a symbol for
+            # which no margin record exists.
+            result["marginable"] = {"is_marginable": False}
+            result["margin_rate_pct"] = None
         _attach_unified_decision(result)
+        # The shadow must see the final margin permissions. Re-project after
+        # enrichment; the helper remains pure and raw v1 fields are retained.
+        results[index] = _attach_decision_shadow_v2(result)
     results.sort(key=_result_sort_key)
     daily_projection = project_daily_vcp_watchlist(results) if daily_watchlist else None
     return {
@@ -603,12 +679,30 @@ def load_latest_vcp_run(pg, *, market="TH", daily_watchlist=False, state=None, s
         "interval": run["interval"],
         "market": run["market"],
         "run_id": run["run_id"],
+        # v1 is the producer/raw morphology policy. v2 is an explicit serving
+        # projection and must not replace the source contract field.
         "policy_version": run["policy_version"],
+        "source_policy_version": run["policy_version"],
         "as_of": run["as_of"].isoformat() if hasattr(run["as_of"], "isoformat") else str(run["as_of"]),
         "ingestion_run_id": run["ingestion_run_id"],
         "ingestion_status": run["ingestion_status"],
         "fetch_completed_at": run["fetch_completed_at"].isoformat() if hasattr(run["fetch_completed_at"], "isoformat") else (str(run["fetch_completed_at"]) if run["fetch_completed_at"] else None),
-        "universe": {"eligible": run["eligible_count"], "evaluated": run["evaluated_count"], "returned": run["evaluated_count"] if daily_watchlist else len(results)},
+        "universe_filter": universe_manifest["universe_filter"],
+        "base_active_ord_count": universe_manifest["base_active_ord_count"],
+        "eligible_count": universe_manifest["eligible_count"],
+        "excluded_count": universe_manifest["excluded_count"],
+        "margin_schema_version": universe_manifest.get("schema_version"),
+        "margin_source": universe_manifest.get("source"),
+        "margin_source_document": universe_manifest.get("source_document"),
+        "margin_effective_date": universe_manifest.get("effective_date"),
+        "decision_policy_version": DECISION_SHADOW_POLICY_VERSION,
+        "universe": {
+            "eligible": universe_manifest["eligible_count"],
+            "evaluated": len(results),
+            "returned": len(results),
+            "missing_from_run": len(missing_from_run),
+            "missing_symbols": missing_from_run,
+        },
         "coverage": {"feed_unavailable": coverage_row["feed_unavailable"] or 0, "no_data": coverage_row["no_data"] or 0},
         # The Daily VCP Watchlist only needs capped lanes. Keep full-universe
         # counts in metadata, but never ship the 931-row audit payload here.

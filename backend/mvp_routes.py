@@ -133,6 +133,9 @@ def handle_mvp_api(path, handler) -> bool:
         daily_watchlist = (qs.get("daily_watchlist", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
         try:
             from vcp_finder_db import load_latest_vcp_run
+            universe = (qs.get("universe", ["marginable_long"])[0] or "marginable_long").strip().lower()
+            if universe not in {"marginable_long", "active_ord"}:
+                raise ValueError("unknown universe")
             symbol = (qs.get("symbol", [""])[0] or "").upper() or None
             state = (qs.get("state", [""])[0] or "").upper() or None
             limit = int(qs["limit"][0]) if qs.get("limit") else None
@@ -141,7 +144,7 @@ def handle_mvp_api(path, handler) -> bool:
             review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
             params = {"market": market, "daily_watchlist": daily_watchlist, "state": state,
                       "symbol": symbol, "limit": limit, "actionable": actionable,
-                      "focused": focused, "review": review}
+                      "focused": focused, "review": review, "universe": universe}
             if daily_watchlist:
                 payload = _load_daily_watchlist_cached(load_latest_vcp_run, params)
             else:
