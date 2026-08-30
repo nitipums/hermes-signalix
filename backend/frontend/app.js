@@ -1044,7 +1044,8 @@
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     setFreshness((data.freshness || {}).status || "unknown", data.as_of, (data.freshness || {}).data_fetched_at);
-    dom.dailyVcpMeta.textContent = "Thai ORD · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
+    dom.dailyVcpMeta.textContent = universeLabel + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
     dom.dailyVcpCards.innerHTML = items.map(setupCandidateCard).join("") ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
   }
