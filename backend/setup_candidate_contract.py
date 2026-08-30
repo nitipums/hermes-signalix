@@ -144,7 +144,7 @@ def _status_token(value: Any) -> str:
 def _decision(data_status: dict, wave: dict, setup: dict) -> str:
     if _has_blocked_data(data_status, wave, setup):
         return "DATA_BLOCKED"
-    setup_status = str(setup.get("status", "")).upper()
+    setup_status = _status_token(setup.get("status"))
     evidence = wave.get("evidence") or {}
     failed_statuses = {
         "INVALIDATED", "AVOID", "FAILED", "BROKEN", "DO_NOT_CHASE",

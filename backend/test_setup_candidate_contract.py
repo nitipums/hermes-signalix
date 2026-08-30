@@ -109,6 +109,13 @@ def test_explicit_failed_structure_and_risk_statuses_avoid():
     assert build_setup_candidate(**inputs)["decision"] == "AVOID"
 
 
+def test_failed_setup_status_token_variants_avoid():
+    for status in ("DO-NOT-CHASE", "FAILED STRUCTURE"):
+        inputs = sample_inputs()
+        inputs["setup"] = {"status": status}
+        assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+
+
 def test_blocked_data_precedes_failed_statuses():
     inputs = sample_inputs()
     inputs["data_status"] = {"sufficient": False, "freshness": "stale"}
