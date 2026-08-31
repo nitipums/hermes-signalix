@@ -178,12 +178,19 @@ def _comparison_value(value: Any) -> Any:
             parsed = None
         if parsed is not None:
             value = parsed
-    if isinstance(value, Decimal):
-        return float(value)
-    if isinstance(value, (dt.datetime, dt.date, dt.time)):
-        if isinstance(value, dt.datetime) and value.tzinfo is None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, Decimal)):
+        # PostgreSQL JSONB drivers may return a JSON number as Decimal while
+        # the input record contains an int or float.  Decimal(str(...)) keeps
+        # numeric comparison exact without making strings numeric.
+        return Decimal(str(value))
+    if isinstance(value, dt.datetime):
+        if value.tzinfo is None:
             value = value.replace(tzinfo=dt.timezone.utc)
-        value = value.isoformat().replace("+00:00", "Z")
+        return value.astimezone(dt.timezone.utc)
+    if isinstance(value, (dt.date, dt.time)):
+        return value.isoformat()
     if isinstance(value, dict):
         return {str(k): _comparison_value(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
@@ -248,7 +255,7 @@ def persist_completed_60m_candidate(
 def _same(row: dict | None, record: dict, ignored: set[str] = frozenset()) -> bool:
     if row is None:
         return False
-    return all(_canonical(_comparison_value(row.get(key))) == _canonical(_comparison_value(value))
+    return all(_comparison_value(row.get(key)) == _comparison_value(value)
                for key, value in record.items() if key not in ignored)
 
 

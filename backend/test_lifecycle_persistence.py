@@ -8,7 +8,7 @@ from lifecycle_persistence import (
     IdempotencyConflict, ImmutableConflict, REVIEW_EVENTS, build_candidate_record,
     build_snapshot_identity, build_snapshot_record, canonicalize_plan,
     build_setup_identity, build_review_event_id, init_lifecycle_schema, persist_evaluation, persist_review,
-    persist_completed_60m_candidate, revalidate_setup,
+    persist_completed_60m_candidate, revalidate_setup, _comparison_value, _same,
 )
 
 
@@ -178,6 +178,20 @@ class LifecyclePersistenceTests(unittest.TestCase):
             {**snapshot, "observation_as_of": dt.datetime(2026, 8, 31, 1, tzinfo=dt.timezone.utc), "setup_plan": {"trigger": 1.23}, "machine_payload": {"ok": True}},
         ]
         persist_evaluation(cur, candidate, snapshot)
+
+    def test_comparison_normalizes_timestamp_instants_and_json_numbers(self):
+        self.assertEqual(
+            _comparison_value("2026-08-31T10:00:00+07:00"),
+            _comparison_value(dt.datetime(2026, 8, 31, 3, tzinfo=dt.timezone.utc)),
+        )
+        self.assertEqual(
+            _comparison_value({"trade_stop": 10}),
+            _comparison_value({"trade_stop": 10.0}),
+        )
+        self.assertFalse(
+            _same({"setup_plan": {"trade_stop": 12.5}},
+                  {"setup_plan": {"trade_stop": 12.51}})
+        )
 
     def test_completed_60m_adapter_persists_canonical_candidate_atomically(self):
         from mvp_api import persist_setup_candidate_lifecycle
