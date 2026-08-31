@@ -13,7 +13,7 @@ import pandas as pd
 import risk_stop_target
 
 
-ANCHOR_POLICY = "relaxed-1bar-20260831"
+ANCHOR_POLICY = "relaxed-1bar-scaled-20260831"
 
 
 def _number(value: Any) -> float | None:
@@ -137,10 +137,12 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     )):
         return {}
     # A structural pullback and advance need price significance as well as
-    # direction. This rejects one/two-bar noise and a merely drifting close.
-    if pullback_end_close > pullback_start_close * 0.97:
+    # direction. One-bar legs use a scaled threshold; longer legs retain 3%.
+    pullback_pct = 0.01 if pullback_end - pullback_start == 1 else 0.03
+    advance_pct = 0.01 if leg_end - leg_start == 1 else 0.03
+    if pullback_end_close > pullback_start_close * (1 - pullback_pct):
         return {}
-    if advance_end_close < advance_start_close * 1.03:
+    if advance_end_close < advance_start_close * (1 + advance_pct):
         return {}
     leg = prior.iloc[leg_start:leg_end + 1]
     pivot = prior.iloc[pullback_end]

@@ -33,10 +33,35 @@ def anchor_frame(closes):
 def test_one_bar_up_leg_and_pullback_produce_versioned_anchors():
     anchors = _intraday_anchors(anchor_frame([110, 100, 104, 103]))
 
+    assert ANCHOR_POLICY == "relaxed-1bar-scaled-20260831"
     assert anchors["anchor_policy"] == ANCHOR_POLICY
     assert anchors["trigger"] == 105
     assert anchors["invalidation"] == 99
     assert anchors["pullback_low"] == 102
+
+
+def test_one_bar_pullback_between_one_and_three_pct_passes():
+    assert _intraday_anchors(anchor_frame([100, 98, 102, 101]))
+
+
+def test_one_bar_pullback_noise_below_one_pct_fails_closed():
+    assert _intraday_anchors(anchor_frame([100, 99.8, 104, 103])) == {}
+
+
+def test_one_bar_advance_between_one_and_three_pct_passes():
+    assert _intraday_anchors(anchor_frame([104, 100, 102, 101]))
+
+
+def test_one_bar_advance_noise_below_one_pct_fails_closed():
+    assert _intraday_anchors(anchor_frame([104, 100, 100.2, 100.1])) == {}
+
+
+def test_two_bar_pullback_still_requires_three_pct():
+    assert _intraday_anchors(anchor_frame([100, 99, 98, 100, 102, 101])) == {}
+
+
+def test_two_bar_advance_still_requires_three_pct():
+    assert _intraday_anchors(anchor_frame([104, 102, 100, 101, 102, 101])) == {}
 
 
 def test_no_up_step_returns_no_anchors():
