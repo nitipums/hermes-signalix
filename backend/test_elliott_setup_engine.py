@@ -235,7 +235,7 @@ def rising_60m_frame():
     return result
 
 
-def test_weak_one_or_two_bar_rise_is_data_blocked():
+def test_one_bar_rise_without_significant_pullback_is_data_blocked():
     frame_ = rising_60m_frame().iloc[:-5].copy()
     frame_.index = pd.date_range("2026-08-30", periods=len(frame_), freq="h")
     frame_.attrs["timeframe"] = "60m"

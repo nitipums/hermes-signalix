@@ -3,7 +3,7 @@ import json
 import pandas as pd
 
 from test_elliott_setup_engine import daily_wave_two_evidence, rising_60m_frame
-from trade_setup_engine import build_trade_setup
+from trade_setup_engine import ANCHOR_POLICY, _intraday_anchors, build_trade_setup
 
 
 class GoodFib:
@@ -13,6 +13,39 @@ class GoodFib:
         return {"fib_1272": swing_high + 2 * (swing_high - swing_low),
                 "fib_1618": swing_high + 3 * (swing_high - swing_low),
                 "status": "OK"}
+
+
+def anchor_frame(closes):
+    frame = pd.DataFrame(
+        {
+            "Open": closes,
+            "High": [value + 1 for value in closes],
+            "Low": [value - 1 for value in closes],
+            "Close": closes,
+            "Volume": [100] * len(closes),
+        },
+        index=pd.date_range("2026-08-31", periods=len(closes), freq="h"),
+    )
+    frame.attrs["timeframe"] = "60m"
+    return frame
+
+
+def test_one_bar_up_leg_and_pullback_produce_versioned_anchors():
+    anchors = _intraday_anchors(anchor_frame([110, 100, 104, 103]))
+
+    assert anchors["anchor_policy"] == ANCHOR_POLICY
+    assert anchors["trigger"] == 105
+    assert anchors["invalidation"] == 99
+    assert anchors["pullback_low"] == 102
+
+
+def test_no_up_step_returns_no_anchors():
+    assert _intraday_anchors(anchor_frame([110, 105, 100, 99])) == {}
+
+
+def test_flat_or_insufficient_intraday_data_fails_closed():
+    assert _intraday_anchors(anchor_frame([100, 100, 100])) == {}
+    assert _intraday_anchors(anchor_frame([100, 96])) == {}
 
 
 def test_wick_test_is_not_a_completed_trigger():

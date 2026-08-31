@@ -13,6 +13,9 @@ import pandas as pd
 import risk_stop_target
 
 
+ANCHOR_POLICY = "relaxed-1bar-20260831"
+
+
 def _number(value: Any) -> float | None:
     if isinstance(value, bool):
         return None
@@ -90,7 +93,7 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
             return {}
     # A bounded recent window prevents an old 90-bar extreme from becoming the
     # current setup anchor. The latest candle is the observation under test.
-    # Relaxed 2026-08-31: accept recent 5-bar window and allow 2-3 bar legs.
+    # Relaxed 2026-08-31: inspect the prior 30 bars and allow 1-bar legs.
     prior = df.iloc[:-1].tail(30)
     closes = [float(value) for value in prior["Close"]]
     if len(closes) < 2:
@@ -114,8 +117,8 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
             start = index - 1
         direction = step
     legs.append((direction, start, len(closes) - 1))
-    # Relaxed 2026-08-31: allow 2-bar legs (was 3) to accept minimal 60m structure
-    up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] - leg[1] >= 2]
+    # Relaxed 2026-08-31: allow 1-bar legs to accept minimal 60m structure.
+    up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] - leg[1] >= 1]
     if not up_legs:
         return {}
     _, leg_start, leg_end = up_legs[-1]
@@ -123,7 +126,7 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     if not preceding:
         return {}
     _, pullback_start, pullback_end = preceding[-1]
-    if pullback_end - pullback_start < 2:
+    if pullback_end - pullback_start < 1:
         return {}
     pullback_start_close = _number(closes[pullback_start])
     pullback_end_close = _number(closes[pullback_end])
@@ -155,8 +158,9 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
         return {}
     timestamp = df.index[-1]
     freshness = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
-    is_minimal = (leg_end - leg_start == 2) or (pullback_end - pullback_start == 2)
+    is_minimal = (leg_end - leg_start == 1) or (pullback_end - pullback_start == 1)
     return {
+        "anchor_policy": ANCHOR_POLICY,
         "trigger": swing_high,
         "invalidation": swing_low,
         "swing_low": swing_low,
@@ -265,7 +269,7 @@ def build_trade_setup(
             setup["status"] = "TESTED_TRIGGER"
         elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}:
             setup["status"] = "PRE_TRIGGER"
-    # Relaxed 2026-08-31: minimal 60m structure (2-bar legs, 5-bar window) can still
+    # Relaxed 2026-08-31: minimal 60m structure (1-bar legs, prior 30-bar window) can still
     # return a valid pre-trigger plan. Map minimal FORMING anchors to PRE_TRIGGER
     # so the UI can show trigger/invalidation even with sparse intraday history.
     if anchors.get("is_minimal") and setup["status"] == "FORMING":
