@@ -1,6 +1,8 @@
 """Owner-only HTTP adapter for the append-only lifecycle persistence seam."""
 from __future__ import annotations
 
+import os
+
 import psycopg2
 import psycopg2.extras
 
@@ -16,10 +18,22 @@ def _row(value):
     return dict(value) if value is not None else None
 
 
-def _owner(identity: str | None) -> str:
-    # The deployment gateway authenticates this header; the application only
-    # accepts a non-empty trusted identity and never trusts body reviewer data.
+def _owner(identity: str | None, token: str | None) -> str:
+    """Return the owner identity only after the existing token binding passes.
+
+    Lifecycle routes have no independent gateway-verification middleware in
+    this application.  Reuse the portfolio owner seam: the token proves the
+    caller has the configured owner credential and the identity must equal the
+    server-bound owner identity.  Missing configuration therefore fails closed.
+    """
+    from portfolio import require_owner_identity
+
     if not isinstance(identity, str) or not identity.strip() or len(identity) > 256:
+        raise HTTPException(status_code=401, detail="missing or invalid owner identity")
+    if not require_owner_identity(
+        token if isinstance(token, str) else "", os.getenv("PORTFOLIO_OWNER_TOKEN", ""),
+        identity.strip(), os.getenv("TELEGRAM_CHAT_ID", ""),
+    ):
         raise HTTPException(status_code=401, detail="missing or invalid owner identity")
     return identity.strip()
 
@@ -28,8 +42,12 @@ def create_lifecycle_router(get_pg):
     router = APIRouter(prefix="/api/lifecycle", tags=["lifecycle"])
 
     @router.get("/candidates/{candidate_id}")
-    def lifecycle_candidate(candidate_id: str, x_authenticated_user: str | None = Header(default=None)):
-        _owner(x_authenticated_user)
+    def lifecycle_candidate(
+        candidate_id: str,
+        x_authenticated_user: str | None = Header(default=None),
+        x_portfolio_token: str | None = Header(default=None),
+    ):
+        _owner(x_authenticated_user, x_portfolio_token)
         pg = get_pg()
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         try:
@@ -45,8 +63,12 @@ def create_lifecycle_router(get_pg):
             cur.close()
 
     @router.get("/snapshots/{snapshot_id}")
-    def lifecycle_snapshot(snapshot_id: str, x_authenticated_user: str | None = Header(default=None)):
-        _owner(x_authenticated_user)
+    def lifecycle_snapshot(
+        snapshot_id: str,
+        x_authenticated_user: str | None = Header(default=None),
+        x_portfolio_token: str | None = Header(default=None),
+    ):
+        _owner(x_authenticated_user, x_portfolio_token)
         pg = get_pg()
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         try:
@@ -67,8 +89,9 @@ def create_lifecycle_router(get_pg):
         request: Request,
         x_authenticated_user: str | None = Header(default=None),
         x_idempotency_key: str | None = Header(default=None),
+        x_portfolio_token: str | None = Header(default=None),
     ):
-        reviewer = _owner(x_authenticated_user)
+        reviewer = _owner(x_authenticated_user, x_portfolio_token)
         if not isinstance(x_idempotency_key, str) or not x_idempotency_key.strip():
             raise HTTPException(status_code=422, detail="idempotency key is required")
         try:

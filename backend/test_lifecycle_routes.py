@@ -94,47 +94,67 @@ def raises_status(call, status):
     assert exc.value.status_code == status
 
 
-def test_get_auth_envelope_references_and_read_only_queries():
+def test_get_auth_envelope_references_and_read_only_queries(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_OWNER_TOKEN", "owner-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "arm")
     pg = PG(); ep = endpoints(pg)
     raises_status(lambda: ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](CID), 401)
     raises_status(lambda: ep[("GET", "/api/lifecycle/snapshots/{snapshot_id}")](SNAP), 401)
-    result = ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](CID, x_authenticated_user="arm")
+    raises_status(lambda: ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](
+        CID, x_authenticated_user="forged", x_portfolio_token="owner-token"), 401)
+    raises_status(lambda: ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](
+        CID, x_authenticated_user="arm", x_portfolio_token="wrong"), 401)
+    result = ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](
+        CID, x_authenticated_user="arm", x_portfolio_token="owner-token")
     assert set(result) == {"candidate", "snapshots", "reviews", "provenance"}
     assert result["provenance"]["read_only"] is True
     assert not any(any(token in sql.upper() for token in ("INSERT", "UPDATE", "DELETE")) for sql, _ in pg.cur.sql)
-    raises_status(lambda: ep[("GET", "/api/lifecycle/candidates/{candidate_id}")]("missing", x_authenticated_user="arm"), 404)
-    raises_status(lambda: ep[("GET", "/api/lifecycle/snapshots/{snapshot_id}")]("missing", x_authenticated_user="arm"), 404)
+    raises_status(lambda: ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](
+        "missing", x_authenticated_user="arm", x_portfolio_token="owner-token"), 404)
+    raises_status(lambda: ep[("GET", "/api/lifecycle/snapshots/{snapshot_id}")](
+        "missing", x_authenticated_user="arm", x_portfolio_token="owner-token"), 404)
 
 
-def test_post_auth_payload_reference_validation_and_all_events():
+def test_post_auth_payload_reference_validation_and_all_events(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_OWNER_TOKEN", "owner-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "arm")
     pg = PG(); ep = endpoints(pg)
     post = ep[("POST", "/api/lifecycle/reviews")]
     raises_status(lambda: asyncio.run(post(Request({}), x_idempotency_key="k")), 401)
-    raises_status(lambda: asyncio.run(post(Request({}), x_authenticated_user="arm")), 422)
+    raises_status(lambda: asyncio.run(post(Request({}), x_authenticated_user="arm")), 401)
+    raises_status(lambda: asyncio.run(post(Request({}), x_authenticated_user="forged",
+                                             x_portfolio_token="owner-token")), 401)
     raises_status(lambda: asyncio.run(post(Request({"candidate_id": CID, "setup_id": SID,
                                                       "snapshot_id": SNAP, "event": "NOTE",
                                                       "reviewer": "evil"}),
-                                             x_authenticated_user="arm", x_idempotency_key="k")), 422)
+                                             x_authenticated_user="arm", x_portfolio_token="owner-token",
+                                             x_idempotency_key="k")), 422)
     raises_status(lambda: asyncio.run(post(Request({"candidate_id": "missing", "setup_id": SID,
                                                       "snapshot_id": SNAP, "event": "NOTE"}),
-                                             x_authenticated_user="arm", x_idempotency_key="missing")), 404)
+                                             x_authenticated_user="arm", x_portfolio_token="owner-token",
+                                             x_idempotency_key="missing")), 404)
     for index, event in enumerate(("AGREE", "WATCH", "DISAGREE_WAVE", "REJECT_SETUP",
                                    "MISSED_CANDIDATE", "NOTE")):
         result = asyncio.run(post(Request({"candidate_id": CID, "setup_id": SID,
                                             "snapshot_id": SNAP, "event": event}),
-                                  x_authenticated_user="arm", x_idempotency_key=f"k-{index}"))
+                                  x_authenticated_user="arm", x_portfolio_token="owner-token",
+                                  x_idempotency_key=f"k-{index}"))
         assert result["event"] == event
+        assert result["reviewer"] == "arm"
     assert pg.commits == 6
 
 
-def test_post_retry_conflict_and_invalid_event():
+def test_post_retry_conflict_and_invalid_event(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_OWNER_TOKEN", "owner-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "arm")
     pg = PG(); ep = endpoints(pg)
     post = ep[("POST", "/api/lifecycle/reviews")]
     payload = {"candidate_id": CID, "setup_id": SID, "snapshot_id": SNAP, "event": "NOTE", "note": "one"}
-    first = asyncio.run(post(Request(payload), x_authenticated_user="arm", x_idempotency_key="retry"))
-    again = asyncio.run(post(Request(payload), x_authenticated_user="arm", x_idempotency_key="retry"))
+    auth = {"x_authenticated_user": "arm", "x_portfolio_token": "owner-token"}
+    first = asyncio.run(post(Request(payload), **auth, x_idempotency_key="retry"))
+    again = asyncio.run(post(Request(payload), **auth, x_idempotency_key="retry"))
     assert again["event_id"] == first["event_id"]
     raises_status(lambda: asyncio.run(post(Request({**payload, "note": "two"}),
-                                             x_authenticated_user="arm", x_idempotency_key="retry")), 409)
+                                             **auth, x_idempotency_key="retry")), 409)
     raises_status(lambda: asyncio.run(post(Request({**payload, "event": "NOPE"}),
-                                             x_authenticated_user="arm", x_idempotency_key="bad-event")), 422)
+                                             **auth, x_idempotency_key="bad-event")), 422)
