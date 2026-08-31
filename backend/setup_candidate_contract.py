@@ -15,6 +15,14 @@ from typing import Any
 
 POLICY_VERSION = "setup-candidates-v1"
 DECISIONS = {"REVIEW", "WAIT", "AVOID", "DATA_BLOCKED"}
+DECISION_LANES = {
+    "REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED",
+}
+_LANE_ORDER = {
+    "REVIEW_NOW": 0, "SETUP_FORMING": 1, "DAILY_CANDIDATE": 2,
+    "WAIT": 3, "AVOID": 4, "DATA_BLOCKED": 5,
+}
+_CONFIDENCE_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
 
 def _json_value(value: Any):
@@ -133,7 +141,8 @@ def _has_blocked_data(data_status: dict, wave: dict, setup: dict) -> bool:
         return True
     if setup.get("timeframe", "60m") not in {None, "60m"}:
         return True
-    return (wave.get("state") == "UNKNOWN" or
+    wave_state = wave.get("primary_state", wave.get("state"))
+    return (wave_state == "UNKNOWN" or
             str(wave.get("confidence", "")).upper() == "INSUFFICIENT")
 
 
@@ -141,27 +150,74 @@ def _status_token(value: Any) -> str:
     return str(value or "").upper().replace("-", "_").replace(" ", "_")
 
 
-def _decision(data_status: dict, wave: dict, setup: dict) -> str:
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _wave_confidence(wave: dict) -> str:
+    """Normalize legacy classifier tokens at the projection boundary."""
+    confidence = _status_token(wave.get("confidence"))
+    return {"INSUFFICIENT": "LOW", "PARTIAL": "MEDIUM"}.get(confidence, confidence)
+
+
+def _has_plan(setup: dict) -> bool:
+    targets = setup.get("targets")
+    if not isinstance(targets, (list, tuple)):
+        targets = [targets] if targets is not None else []
+    return (_number(setup.get("trigger")) is not None
+            and _number(setup.get("invalidation")) is not None
+            and any(_number(target) is not None for target in targets))
+
+
+def project_decision_lane(data_status: dict, wave: dict, setup: dict,
+                          trend: dict | None = None) -> str:
+    """Project one canonical item into the fail-closed user decision lanes."""
+    data_status, wave, setup = data_status or {}, wave or {}, setup or {}
     if _has_blocked_data(data_status, wave, setup):
         return "DATA_BLOCKED"
+
     setup_status = _status_token(setup.get("status"))
+    wave_state = _status_token(wave.get("primary_state") or wave.get("state"))
     evidence = wave.get("evidence") or {}
     failed_statuses = {
         "INVALIDATED", "AVOID", "FAILED", "BROKEN", "DO_NOT_CHASE",
         "FAILED_STRUCTURE", "STRUCTURE_FAILED", "BROKEN_STRUCTURE",
-        "FAILED_RISK", "RISK_FAILED", "UNACCEPTABLE_RISK",
+        "FAILED_RISK", "RISK_FAILED", "UNACCEPTABLE_RISK", "EXPIRED", "EXTENDED",
     }
     risk_status = _status_token(setup.get("risk_status"))
-    if (setup_status in failed_statuses or
-            setup.get("risk_acceptable") is False or
-            risk_status in {"UNACCEPTABLE", "INVALID", "FAILED", "BROKEN",
-                             "DO_NOT_CHASE", "FAILED_RISK", "RISK_FAILED",
-                             "UNACCEPTABLE_RISK"} or
-            evidence.get("structure_intact") is False):
+    if (setup_status in failed_statuses
+            or setup.get("risk_acceptable") is False
+            or risk_status in {"UNACCEPTABLE", "INVALID", "FAILED", "BROKEN",
+                               "DO_NOT_CHASE", "FAILED_RISK", "RISK_FAILED",
+                               "UNACCEPTABLE_RISK"}
+            or wave.get("structure_intact") is False
+            or evidence.get("structure_intact") is False):
         return "AVOID"
-    if setup_status in {"READY", "PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"}:
-        return "REVIEW"
+
+    confidence = _wave_confidence(wave)
+    has_plan = _has_plan(setup)
+    rr = _number((setup.get("rr") or {}).get("to_target_1"))
+    review_status = setup_status in {"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"}
+    if (review_status and confidence in {"MEDIUM", "HIGH"} and has_plan
+            and rr is not None and rr >= 2):
+        return "REVIEW_NOW"
+    if has_plan and (confidence == "LOW" or setup_status == "FORMING"
+                     or (rr is not None and rr < 2)):
+        return "SETUP_FORMING"
+    if wave_state not in {"", "UNKNOWN", "INSUFFICIENT"}:
+        return "DAILY_CANDIDATE"
     return "WAIT"
+
+
+def _decision(data_status: dict, wave: dict, setup: dict) -> str:
+    # Compatibility entry point; callers get the new canonical projection.
+    return project_decision_lane(data_status, wave, setup)
 
 
 def build_setup_candidate(
@@ -184,7 +240,7 @@ def build_setup_candidate(
         setup_out["timeframe"] = "60m"
     if wave_out.get("primary_state") is None and wave_out.get("state") is not None:
         wave_out["primary_state"] = wave_out["state"]
-    lane = _decision(data_status or {}, wave_out, setup_out)
+    lane = project_decision_lane(data_status or {}, wave_out, setup_out, trend or {})
     item = {
         "symbol": str(symbol),
         "as_of": as_of,
@@ -198,6 +254,32 @@ def build_setup_candidate(
         "provenance": provenance or {},
     }
     return _json_value(item)
+
+
+def project_lane_order(item: dict) -> tuple:
+    """Return the deterministic lexicographic presentation key for a candidate."""
+    lane = _status_token(item.get("decision_lane"))
+    wave = item.get("wave") or {}
+    confidence = _wave_confidence(wave)
+    trend = item.get("trend") or {}
+    trend_state = str(trend.get("state", "")).lower()
+    setup = item.get("setup") or {}
+    close = _number(setup.get("close"))
+    if close is None:
+        close = _number(item.get("close"))
+    if close is None:
+        close = _number((item.get("trend") or {}).get("close"))
+    trigger = _number(setup.get("trigger"))
+    proximity = abs(close - trigger) / trigger if close is not None and trigger not in (None, 0) else 9e9
+    rr = _number((setup.get("rr") or {}).get("to_target_1")) or 0
+    return (_LANE_ORDER.get(lane, 9), _CONFIDENCE_ORDER.get(confidence, 3),
+            {"uptrend": 0, "emerging_uptrend": 1}.get(trend_state, 2),
+            proximity, -rr)
+
+
+def sort_setup_candidates(items: list[dict]) -> list[dict]:
+    """Sort candidates by the explainable lane ordering without mutating input."""
+    return sorted(items or [], key=project_lane_order)
 
 
 def project_setup_candidate_list(

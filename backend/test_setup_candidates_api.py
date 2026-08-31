@@ -18,13 +18,14 @@ class Handler:
     def write(self, body): self.body += body
 
 
-def candidate(symbol="ABC", *, decision_lane="REVIEW", sector="Technology"):
+def candidate(symbol="ABC", *, decision_lane="REVIEW_NOW", sector="Technology"):
     return {
         "symbol": symbol, "as_of": "2026-08-30", "data_status": {"sufficient": True, "freshness": "fresh"},
         "trend": {"state": "uptrend", "relative_strength": 91},
         "wave": {"timeframe": "daily", "state": "EARLY_WAVE_3",
                   "primary_state": "EARLY_WAVE_3", "evidence": {}},
-        "setup": {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "READY", "rr": {"to_target_1": 3}},
+        "setup": {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "PRE_TRIGGER",
+                  "trigger": 12, "invalidation": 10, "targets": [16], "rr": {"to_target_1": 3}},
         "context": {"sector": sector}, "bonus_evidence": {"vcp": {"present": False}},
         "decision_lane": decision_lane, "provenance": {
             "policy_version": "setup-candidates-v1", "source": "test",
@@ -64,7 +65,7 @@ def test_route_serves_canonical_snapshot_without_legacy_db_fallback(monkeypatch)
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
     assert handler.status == 200
-    assert json.loads(handler.body)["items"][0]["decision_lane"] == "REVIEW"
+    assert json.loads(handler.body)["items"][0]["decision_lane"] == "REVIEW_NOW"
 
 
 def test_setup_candidates_blocks_insufficient_data_and_keeps_non_vcp_row():
@@ -310,7 +311,7 @@ def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     rows, _ = mvp_api.build_setup_candidates_from_data(object())
     item = rows[0]
     assert item["data_status"]["daily_final_session_available"] is True
-    assert item["decision_lane"] == "WAIT"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
     assert item["provenance"]["freshness"] == "fresh"
     assert item["provenance"]["source"] == "price_data+intraday_price_data"
     assert item["provenance"]["as_of"].startswith("2026-08-28")

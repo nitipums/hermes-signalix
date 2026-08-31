@@ -30,7 +30,7 @@ def test_candidate_contract_keeps_layers_separate():
                 "context", "bonus_evidence", "decision_lane", "provenance")) == set(item)
     assert item["wave"]["timeframe"] == "daily"
     assert item["setup"]["timeframe"] == "60m"
-    assert item["decision_lane"] == "REVIEW"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
     assert "decision" not in item
     json.dumps(item)
 
@@ -79,7 +79,7 @@ def test_missing_peer_context_is_explicit_and_non_gating():
     assert item["context"]["peer_data_status"] == "UNKNOWN"
     assert item["context"]["peer_trend_breadth"] is None
     assert item["context"]["peer_symbols"] == []
-    assert item["decision_lane"] == "REVIEW"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
 
 
 def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
@@ -89,7 +89,7 @@ def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
 
     waiting = sample_inputs()
     waiting["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "FORMING"}
-    assert build_setup_candidate(**waiting)["decision_lane"] == "WAIT"
+    assert build_setup_candidate(**waiting)["decision_lane"] == "DAILY_CANDIDATE"
 
     avoided = sample_inputs()
     avoided["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "INVALIDATED"}
@@ -97,7 +97,7 @@ def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
 
     non_vcp = sample_inputs()
     non_vcp["bonus_evidence"] = {"vcp": {"present": False}}
-    assert build_setup_candidate(**non_vcp)["decision_lane"] == "REVIEW"
+    assert build_setup_candidate(**non_vcp)["decision_lane"] == "DAILY_CANDIDATE"
 
 
 def test_explicit_failed_structure_and_risk_statuses_avoid():

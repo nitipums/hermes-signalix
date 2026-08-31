@@ -687,7 +687,8 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         "evaluated_count": len(candidates),
         "returned_count": len(page_items),
         "counts": {decision: sum(x.get("decision_lane") == decision for x in candidates)
-                   for decision in ("REVIEW", "WAIT", "AVOID", "DATA_BLOCKED")},
+                   for decision in ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE",
+                                    "WAIT", "AVOID", "DATA_BLOCKED")},
         "freshness": (snapshot_meta or {}).get("freshness") or _resolve_freshness(items),
         "universe_filter": (snapshot_meta or {}).get("universe_filter") or "marginable_long",
         "base_active_ord_count": (snapshot_meta or {}).get("base_active_ord_count"),
