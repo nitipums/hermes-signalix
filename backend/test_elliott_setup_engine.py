@@ -64,6 +64,23 @@ def wave_rebound_frame():
     return frame(list(range(1, 51)) + list(range(50, 29, -1)) + [30.5, 31, 32, 33, 34])
 
 
+def wave_close_breakout_frame():
+    """Wave 1 advance, Wave 2 pullback, then a Daily Close above the Wave 1 high.
+
+    Only one close above the Wave 1 high so the state is Early Wave 3, not an
+    already-sustained Wave 3 continuation (spec §2.2 progression semantics).
+    """
+    return frame(list(range(1, 51)) + list(range(50, 39, -1)) + [50, 51])
+
+
+def wave_wick_only_frame():
+    """Wave 1 advance, Wave 2 pullback, then a High wick that fails to close above."""
+    closes = list(range(1, 51)) + list(range(50, 39, -1)) + [48, 48.5, 49, 49.5]
+    df = frame(closes)
+    df.loc[df.index[-1], "High"] = 55.0
+    return df
+
+
 def wave_three_continuation_frame():
     return frame(list(range(1, 51)) + list(range(50, 29, -1)) + list(range(30, 61)))
 
@@ -112,11 +129,32 @@ def test_wave_candidates_cover_observable_phases():
     assert classify_wave_candidate(wave_frame(), wave_evidence(pullback_depth_pct=None, fib_zone=None))["state"] == "WAVE_1_ADVANCE"
     assert classify_wave_candidate(wave_two_frame(), wave_evidence(fib_zone=None))["state"] == "WAVE_2_FORMING"
     assert classify_wave_candidate(wave_two_frame(), wave_evidence())["state"] == "WAVE_2_NEAR_COMPLETION"
-    assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(breakout_confirmed=True))["state"] == "EARLY_WAVE_3"
-    assert classify_wave_candidate(wave_rebound_frame(), wave_evidence(wave_3_continuation=True))["state"] == "EARLY_WAVE_3"
+    assert classify_wave_candidate(wave_close_breakout_frame(), wave_evidence())["state"] == "EARLY_WAVE_3"
     assert classify_wave_candidate(wave_three_continuation_frame(), wave_evidence())["state"] == "WAVE_3_CONTINUATION"
     assert classify_wave_candidate(wave_four_frame(), wave_evidence())["state"] == "WAVE_4_CORRECTION"
     assert classify_wave_candidate(wave_five_frame(), wave_evidence())["state"] == "WAVE_5_ADVANCE"
+
+
+def test_early_wave_three_requires_daily_close_above_wave1_high():
+    """Spec §2.7 owner gate: wick alone = TESTED_HIGH, never a promotion."""
+    wick = classify_wave_candidate(wave_wick_only_frame(), wave_evidence())
+    assert wick["evidence"]["tested_high_only"] is True
+    assert wick["state"] != "EARLY_WAVE_3"
+    assert wick["state"] != "WAVE_3_CONTINUATION"
+    close = classify_wave_candidate(wave_close_breakout_frame(), wave_evidence())
+    assert close["evidence"]["close_above_wave1_high"] is True
+    assert close["state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}
+
+
+def test_wick_and_volume_markers_cannot_promote_without_close():
+    """Volume/breakout markers are supporting evidence, never a standalone gate."""
+    for markers in (
+        wave_evidence(breakout_confirmed=True),
+        wave_evidence(early_wave_3=True),
+        wave_evidence(wave_3_continuation=True),
+    ):
+        result = classify_wave_candidate(wave_wick_only_frame(), markers)
+        assert result["state"] not in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}
 
 
 def test_wave_four_and_five_markers_do_not_force_states_on_generic_rise():
