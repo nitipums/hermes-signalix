@@ -42,6 +42,9 @@ def _empty_setup(state: str, status: str, freshness=None, reason=None) -> dict:
         "trigger": None,
         "entry_zone": {"low": None, "high": None},
         "invalidation": None,
+        "trade_stop": None,
+        "thesis_invalidation": None,
+        "risk_stop_separate": False,
         "targets": [],
         "rr": {"to_target_1": None, "to_target_2": None},
         "provenance": {
@@ -80,7 +83,8 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     as_of = df.attrs.get("as_of")
     if as_of is not None:
         try:
-            if pd.Timestamp(as_of) != df.index[-1]:
+            as_of_timestamp = pd.Timestamp(as_of)
+            if pd.isna(as_of_timestamp) or as_of_timestamp < df.index[-1]:
                 return {}
         except (TypeError, ValueError):
             return {}
@@ -161,6 +165,7 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
         "close": close,
         "freshness": freshness,
         "is_minimal": is_minimal,
+        "as_of": as_of,
     }
 
 
@@ -193,20 +198,31 @@ def build_trade_setup(
         return _empty_setup(state, "DATA_BLOCKED", reason=reason)
 
     setup = _empty_setup(state, "FORMING", anchors["freshness"])
+    thesis_invalidation = _number(daily_wave.get("thesis_invalidation"))
+    if thesis_invalidation is None:
+        thesis_invalidation = _number((daily_wave.get("evidence") or {}).get("wave1_low"))
     trigger = anchors["trigger"]
     invalidation = anchors["invalidation"]
     current = anchors["close"]
+    risk = trigger - invalidation
     setup["trigger"] = round(trigger, 4)
-    setup["entry_zone"] = {"low": round(trigger * 0.99, 4), "high": round(trigger, 4)}
+    setup["entry_zone"] = {
+        "low": round(trigger - 0.25 * risk, 4),
+        "high": round(trigger + 0.5 * risk, 4),
+    }
     setup["invalidation"] = round(invalidation, 4)
+    setup["trade_stop"] = round(invalidation, 4)
+    setup["thesis_invalidation"] = thesis_invalidation
+    setup["risk_stop_separate"] = thesis_invalidation is not None
 
     fib = risk_helper.compute_fib_targets(
         anchors["swing_low"], anchors["swing_high"], anchors["pullback_low"]
     )
     targets = [fib.get("fib_1272"), fib.get("fib_1618")]
-    targets = [target for target in targets if _number(target) is not None and target > trigger]
-    risk = trigger - invalidation
-    if not targets or not _number(risk) or risk <= 0:
+    targets = [round(_number(target), 4) for target in targets
+               if _number(target) is not None and _number(target) > trigger]
+    if (fib.get("status") not in {None, "OK"} or not targets or
+            not _number(risk) or risk <= 0):
         setup["status"] = "DATA_BLOCKED"
         setup["reason"] = "invalid Fib or risk anchors"
         return _json_value(setup)
@@ -218,25 +234,42 @@ def build_trade_setup(
     setup["risk"] = round(trigger - invalidation, 4)
     setup["reward"] = round(targets[0] - trigger, 4)
     setup["rr_bands"] = {
-        "minimum_interesting": 3,
-        "preferred": [4, 5],
-        "exceptional": [8, 10],
+        "minimum_review": 2,
+        "lower_priority": [2, 4],
+        "preferred": [4, 8],
+        "exceptional": 8,
     }
 
     observation_low = _number(intraday_df["Low"].iloc[-1])
     if observation_low is None or observation_low <= invalidation:
         setup["status"] = "INVALIDATED"
-    elif current > trigger * 1.03:
+    elif current > setup["entry_zone"]["high"]:
         setup["status"] = "EXTENDED"
-    elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"} and current >= trigger:
-        setup["status"] = "TRIGGERED"
-    elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}:
-        setup["status"] = "READY"
-    else:
-        setup["status"] = "FORMING"
+        setup["reason"] = "do_not_chase"
+    elif setup["rr"]["to_target_1"] is None or setup["rr"]["to_target_1"] < 2:
+        setup["status"] = "EXTENDED"
+        setup["reason"] = "do_not_chase_below_2_to_1"
+    elif anchors.get("as_of") is not None:
+        age_days = (pd.Timestamp(anchors["as_of"]).date() - intraday_df.index[-1].date()).days
+        if age_days > 3:
+            setup["status"] = "EXPIRED"
+            setup["reason"] = "stale 60m setup"
+    if setup["status"] == "FORMING":
+        latest_high = _number(intraday_df["High"].iloc[-1])
+        if latest_high is None:
+            setup["status"] = "DATA_BLOCKED"
+            setup["reason"] = "invalid latest 60m observation"
+        elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"} and current >= trigger:
+            setup["status"] = "TRIGGERED"
+        elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"} and latest_high > trigger:
+            setup["status"] = "TESTED_TRIGGER"
+        elif state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}:
+            setup["status"] = "PRE_TRIGGER"
     # Relaxed 2026-08-31: minimal 60m structure (2-bar legs, 5-bar window) can still
-    # return a valid pre-trigger plan. Map FORMING/READY with minimal anchors to PRE_TRIGGER
+    # return a valid pre-trigger plan. Map minimal FORMING anchors to PRE_TRIGGER
     # so the UI can show trigger/invalidation even with sparse intraday history.
-    if anchors.get("is_minimal") and setup["status"] in {"FORMING", "READY"}:
+    if anchors.get("is_minimal") and setup["status"] == "FORMING":
         setup["status"] = "PRE_TRIGGER"
+    if observation_low is not None and observation_low <= invalidation:
+        setup["status"] = "INVALIDATED"
     return _json_value(setup)

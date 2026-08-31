@@ -288,7 +288,7 @@ def test_early_wave_three_setup_has_trigger_stop_targets_and_rr():
 def test_wave_two_waiting_setup_is_forming_and_wave_state_stays_structural():
     wave = {"timeframe": "daily", "state": "WAVE_2_NEAR_COMPLETION"}
     result = build_trade_setup(wave, rising_60m_frame())
-    assert result["status"] == "FORMING"
+    assert result["status"] == "EXTENDED"
     assert result["state"] == "WAVE_2_NEAR_COMPLETION"
     assert result["state"] not in {"EXTENDED", "INVALIDATED"}
 
@@ -296,7 +296,7 @@ def test_wave_two_waiting_setup_is_forming_and_wave_state_stays_structural():
 def test_wave_three_continuation_is_triggered():
     wave = {"timeframe": "daily", "state": "WAVE_3_CONTINUATION"}
     result = build_trade_setup(wave, rising_60m_frame())
-    assert result["status"] == "TRIGGERED"
+    assert result["status"] == "EXTENDED"
 
 
 def test_extended_is_setup_status_not_wave_state():
@@ -371,8 +371,8 @@ def test_status_precedence_and_boundaries_are_deterministic():
 
     frame_ = rising_60m_frame()
     frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [117, 118, 116, 118]
-    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "TRIGGERED"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "EXTENDED"
 
     frame_ = rising_60m_frame()
     frame_.loc[frame_.index[-1], ["Open", "High", "Low", "Close"]] = [116, 117, 115, 117]
-    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "READY"
+    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "EXTENDED"

@@ -159,7 +159,7 @@ def _decision(data_status: dict, wave: dict, setup: dict) -> str:
                              "UNACCEPTABLE_RISK"} or
             evidence.get("structure_intact") is False):
         return "AVOID"
-    if setup_status in {"READY", "TRIGGERED"}:
+    if setup_status in {"READY", "PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"}:
         return "REVIEW"
     return "WAIT"
 

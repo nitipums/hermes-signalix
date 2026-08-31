@@ -17,7 +17,7 @@ def sample_inputs():
         "data_status": {"sufficient": True, "freshness": "fresh", "source": "daily_eod+60m"},
         "trend": {"state": "uptrend", "rise_20d_pct": 18.4, "relative_strength": 91},
         "wave": {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "PARTIAL", "evidence": {}},
-        "setup": {"state": "EARLY_WAVE_3", "status": "READY", "trigger": 12.5},
+        "setup": {"state": "EARLY_WAVE_3", "status": "PRE_TRIGGER", "trigger": 12.5},
         "context": build_peer_context("ABC", {"sector": "Tech", "industry": "Components"}),
         "bonus_evidence": {"vcp": {"present": False}},
         "provenance": {"policy_version": "setup-candidates-v1", "daily_source": "eod"},
@@ -38,7 +38,7 @@ def test_candidate_contract_keeps_layers_separate():
 def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
     inputs = sample_inputs()
     inputs["wave"] = {"timeframe": "60m", "state": "WAVE_2_NEAR_COMPLETION"}
-    inputs["setup"] = {"timeframe": "15m", "status": "READY"}
+    inputs["setup"] = {"timeframe": "15m", "status": "PRE_TRIGGER"}
     item = build_setup_candidate(**inputs)
     assert item["wave"]["timeframe"] == "60m"
     assert item["setup"]["timeframe"] == "15m"
