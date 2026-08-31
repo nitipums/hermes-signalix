@@ -299,6 +299,32 @@ def test_loader_preserves_explicit_intraday_timeframe_and_accepts_60m(monkeypatc
     assert freshness == "fresh"
 
 
+def test_intraday_loader_stamps_requested_timeframe_and_last_timestamp():
+    import pandas as pd
+    import screening
+
+    timestamps = pd.to_datetime(["2026-08-31 11:00", "2026-08-31 10:00"])
+
+    class Cursor:
+        def execute(self, *_args): pass
+        def fetchall(self):
+            return [
+                (timestamps[0], 10.0, 10.5, 9.9, 10.3, 1000),
+                (timestamps[1], 9.8, 10.2, 9.7, 10.0, 900),
+            ]
+        def close(self): pass
+
+    class PG:
+        def cursor(self): return Cursor()
+
+    frame = screening.load_symbol_intraday(
+        "AAA", pg=PG(), interval="60m", lookback=400,
+    )
+
+    assert frame.attrs["timeframe"] == "60m"
+    assert frame.attrs["as_of"] == frame.index[-1]
+
+
 def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     import datetime as dt
     import mvp_api

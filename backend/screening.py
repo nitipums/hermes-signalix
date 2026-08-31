@@ -197,6 +197,8 @@ def load_symbol_intraday(symbol, pg=None, interval="60m", lookback=400, market="
     df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.set_index("Date").sort_index()
+    df.attrs["timeframe"] = interval
+    df.attrs["as_of"] = df.index[-1]
     return df
 
 
