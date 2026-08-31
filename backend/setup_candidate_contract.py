@@ -126,6 +126,36 @@ def build_peer_context(symbol: str, peer_data: dict | None = None) -> dict:
     return _json_value(result)
 
 
+def attach_bonus_vcp(item: dict, vcp_evidence: dict | None) -> dict:
+    """Attach optional VCP evidence; its absence never blocks a candidate.
+
+    Only an explicitly present, verified VCP observation is positive.  All
+    other inputs remain an explicit non-computed observation so missing VCP
+    data cannot be mistaken for a failed or positive screening result.
+    """
+    evidence = vcp_evidence if isinstance(vcp_evidence, dict) else {}
+    present = evidence.get("present")
+    quality = evidence.get("quality")
+    if present is True and quality != "NOT_VERIFIED":
+        vcp = {
+            "present": True,
+            "quality": quality,
+            "source": evidence.get("source"),
+        }
+    else:
+        vcp = {
+            "present": None if present is not False else False,
+            "quality": quality,
+            "source": "not_computed",
+        }
+    bonus_evidence = item.get("bonus_evidence")
+    if not isinstance(bonus_evidence, dict):
+        bonus_evidence = {}
+        item["bonus_evidence"] = bonus_evidence
+    bonus_evidence["vcp"] = _json_value(vcp)
+    return item
+
+
 def _has_blocked_data(data_status: dict, wave: dict, setup: dict) -> bool:
     status = str(data_status.get("status", "")).upper()
     freshness = str(data_status.get("freshness", "")).lower()

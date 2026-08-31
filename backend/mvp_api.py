@@ -37,7 +37,8 @@ from marginable import (
 import instruments
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
-from setup_candidate_contract import build_peer_context, build_setup_candidate, project_setup_candidate_list
+from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
+                                      build_setup_candidate, project_setup_candidate_list)
 from elliott_structure_engine import classify_wave_candidate
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
@@ -593,10 +594,14 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         if not intraday_current:
             setup = {**setup, "status": "DATA_BLOCKED"}
         profile = profiles.get(symbol) or {}
-        context = build_peer_context(symbol, {
+        peer_data = {
             "sector": profile.get("sector"), "industry": profile.get("industry"),
             "peer_data_status": "UNKNOWN",
-        })
+        }
+        peer_symbols = profile.get("peer_symbols") or profile.get("peers")
+        if peer_symbols is not None:
+            peer_data["peer_symbols"] = peer_symbols
+        context = build_peer_context(symbol, peer_data)
         daily_ok = daily_df is not None and len(daily_df) > 0
         intraday_ok = intraday_current
         daily_freshness = "unknown"
@@ -621,9 +626,16 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             "intraday_60m_as_of": intraday_as_of,
         }
         freshness_statuses.append(candidate_freshness)
+        bonus_evidence = {}
+        attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
+            "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
+        })
+        # Keep the compatibility provenance on the legacy audit placeholder;
+        # attach_bonus_vcp has already enforced its non-positive shape.
+        bonus_evidence["vcp"]["source"] = "legacy_audit_only"
         candidates.append(build_setup_candidate(
             symbol, as_of, data_status, trend, wave, setup, context,
-            {"vcp": {"present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"}},
+            bonus_evidence,
             {"policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
              "daily_source": "price_data", "intraday_source": "intraday_price_data",
              "as_of": as_of, "intraday_as_of": intraday_as_of,
