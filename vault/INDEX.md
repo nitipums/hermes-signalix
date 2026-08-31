@@ -42,6 +42,7 @@
 | `VCP-Finder-MVP.md` | Current VCP-first MVP surface, table, grouping, filter, and provenance contract | ✅ active | primary MVP contract |
 | `2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Owner-approved v2 serving, marginable-long scope, replay and UI closeout evidence | ✅ current | threshold tuning deferred |
 | `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
+| `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
 | `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
 | `Scan-Evaluation-Logic-Map-2026-08-29.md` | Current scan/evaluation architecture and remaining replay gate | ✅ current | Chosen 60m VCP spine; replay promotion remains blocked |

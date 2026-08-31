@@ -2,6 +2,14 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
+## 2026-08-31 — Prototype/chart-review phase confirmed
+Decision: Treat the Matt Pocock grill plan as the current working process. Signalix is in the prototype phase with chart review still in progress; do not promote the prototype or proceed as if the production implementation is accepted. The next gate is bounded replay/chart comparison plus Standards-vs-Spec review and owner approval.
+Reason: Preserve the useful design decisions while keeping prototype learning, chart interpretation, implementation, and production acceptance as separate gates.
+
+## 2026-08-31 — Elliott grill and AiPASS consultation record
+Decision: Preserve the owner-approved Elliott/Trend/Trade-Setup grill decisions, prototype/replay evidence, open gates, and AiPASS routing caveat in `docs/current/2026-08-31-elliott-grill-decision-record.md`. Treat the record as a curated decision/evidence index; it does not promote the prototype, override runtime evidence, or attribute mismatched AiPASS output to Claude Opus 5.
+Reason: Keep the latest product reasoning and external challenger input durable and reviewable without confusing advisory output with owner decisions or deterministic production truth.
+
 ## 2026-08-30 — Marginable-long v2 serving scope
 Decision: Serve `signalix/vcp-decision-shadow-v2` as the decision-facing projection on the owner dashboard, using `marginable_long` as the current operational universe: active Thai ORD intersected with the owner-supplied marginable dataset and `can_buy=true` (currently 237 symbols). Keep the 931-symbol active-ORD path only as an explicit audit/rollback mode; it is not the default dashboard scope. Do not expand replay to three months, promote Low-Cheat, enable alerts, or enable auto-trading.
 Reason: Arm wants the new decision version used now on the real trading surface, limited to instruments that can be bought through the current margin workflow. Replay evidence is sufficient for this bounded operational scope; broader-universe generalization and sequence A/B promotion are deferred.

@@ -2,7 +2,7 @@
 
 > **STATUS: OWNER-APPROVED DESIGN — SPEC REVIEW PENDING**
 > **Date:** 2026-08-30
-> **Scope:** Thai ORD stock setup discovery and preparation
+> **Scope:** `marginable_long` stock setup discovery and preparation — active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true` (currently 237 symbols)
 > **Product role:** Signalix finds and prepares candidate trade setups; Arm reviews the chart and makes the final trade decision.
 
 ## 1. Problem and rationale
@@ -13,10 +13,10 @@ The new primary thesis is:
 
 ```text
 Strong big-picture trend
-→ prior Wave 1 advance
-→ Wave 2 pullback/correction
-→ early Wave 3 confirmation or continuation
-→ trigger + invalidation + Fib target + R:R
+→ observable Daily Wave 1–5 structural interpretation
+→ prepare Wave 1, Wave 2→3, continuation, and Wave 4→5 opportunities
+→ 60m minor structure and pre-trigger plan
+→ trigger + trade stop + thesis invalidation + Fib targets + R:R
 → Arm review and decision
 ```
 
@@ -24,15 +24,28 @@ The redesign is a clean replacement of the decision spine, not a deletion of use
 
 ## 2. Locked design decisions
 
+### 2.0 Owner decisions confirmed during design grilling
+
+- `marginable_long` is the real product universe. Active ORD outside it remains explicit audit/rollback coverage and is not part of setup-candidate serving.
+- The product separates `DAILY_CANDIDATE` → `SETUP_FORMING` → `REVIEW_NOW`. A valid Daily candidate whose 60m setup is unfinished is not `DATA_BLOCKED`.
+- Elliott v1 covers observable Wave 1 through Wave 5 structural states, while retaining `UNKNOWN` and explicit uncertainty.
+- Wave 1 is a preparation state as well as a structural observation; the system does not wait for Wave 2 before preparing a valid lower-timeframe setup.
+- `REVIEW_NOW` is intentionally pre-break: it prepares a complete plan before the trigger. `PRE_TRIGGER` and `TRIGGERED` remain distinct setup states.
+- Minimum R:R for `REVIEW_NOW` is 2:1. R:R never overrides structure, freshness, trigger, invalidation, or target-quality gates.
+- `WAVE_1_ADVANCE` may reach `REVIEW_NOW` when a fresh 60m base or pullback provides a complete pre-trigger plan with R:R at least 2:1 and price is not extended.
+- Both `UPTREND` and `EMERGING_UPTREND` may enter `DAILY_CANDIDATE`; established uptrends rank higher while an emerging trend exposes its missing confirmation evidence.
+
 ### 2.1 Timeframe boundary
 
 - **Daily** is authoritative for big-picture trend and Elliott structural candidates.
 - **60m** is used for early Wave 3 confirmation, lower-timeframe structure, trigger, and entry timing.
 - Daily and 60m evidence remain explicitly separated. A 60m series must not be labelled as Daily evidence.
+- Daily exposes one `primary_state` for the medium-to-large Elliott structure. Higher-timeframe context may support it but does not create a competing primary state.
+- 60m exposes only `minor_structure` for setup preparation and entry confirmation; it cannot overwrite the Daily primary state.
 
 ### 2.2 Elliott state contract
 
-`wave.state` represents structural position only:
+`wave.primary_state` represents the authoritative structural position; `wave.alternative_state` uses the same enum for the next plausible interpretation:
 
 ```text
 WAVE_1_ADVANCE
@@ -47,10 +60,20 @@ UNKNOWN
 
 The system emits a machine-generated candidate/evidence interpretation, not an unquestionable Elliott count.
 
-`INVALIDATED` and `EXTENDED` are not Elliott states. They belong to the trade-setup/risk layer:
+Every non-`UNKNOWN` interpretation exposes:
 
-- `invalidation` records the price/condition that breaks the thesis.
-- setup status may be `FORMING`, `READY`, `TRIGGERED`, `EXTENDED`, `INVALIDATED`, or `DATA_BLOCKED`.
+```text
+primary_state
+confidence: LOW | MEDIUM | HIGH
+alternative_state
+supporting_evidence[]
+contradicting_evidence[]
+missing_evidence[]
+```
+
+Only `MEDIUM` or `HIGH` confidence may reach `REVIEW_NOW`. `LOW` confidence remains `DAILY_CANDIDATE` or `SETUP_FORMING`.
+
+`INVALIDATED` and `EXTENDED` are not Elliott states. They belong to the trade-setup/risk layer. Setup status is `FORMING`, `PRE_TRIGGER`, `TESTED_TRIGGER`, `TRIGGERED`, `EXTENDED`, `STOPPED`, `INVALIDATED`, `EXPIRED`, or `DATA_BLOCKED`; `trade_stop` and `thesis_invalidation` remain separate. `STOPPED` closes one Setup Attempt while its Candidate Thesis may remain valid; `INVALIDATED` means the larger thesis or required setup structure failed.
 
 ### 2.3 Trend and strength are first-class inputs
 
@@ -65,6 +88,8 @@ The primary scan must surface:
 - distance from the breakout/high reference.
 
 52W High/ATH is strong evidence and ranking input, but not an unconditional hard filter. A stock in a valid Wave 2 pullback may not yet be at a new high.
+
+The prior 52W/ATH reference is derived from historical `High`, not historical `Close`. A current session that trades through the reference but does not close above it is `TESTED_HIGH`; `BREAKOUT` requires the current `Close` to finish above the prior reference.
 
 ### 2.4 Sector and peer context
 
@@ -94,16 +119,36 @@ The deterministic risk engine supplies trigger/entry, invalidation/stop, targets
 Initial display bands:
 
 ```text
-minimum interesting: 1:3
-preferred:           1:4–1:5
-exceptional:         1:8–1:10
+minimum review:      1:2
+lower priority:      1:2–<1:4
+preferred:           1:4–<1:8
+exceptional:         1:8+
 ```
 
 R:R alone does not make a setup valid. A setup also needs a coherent trigger, a technically meaningful invalidation, sufficient data, and a target derived from an explicit method.
 
+Risk and thesis invalidation remain separate:
+
+- `trade_stop` is the 60m structural level used for trade risk and R:R.
+- `thesis_invalidation` is the Daily structural level or condition that breaks the larger trend/Elliott interpretation.
+- A stopped setup is immutable. If the Daily thesis remains valid, a later opportunity creates a new setup instance rather than rewriting the stopped one.
+
+Targets are ordered by technical proximity:
+
+- `target_1` is the nearest technically valid target and alone determines whether minimum R:R is at least 2:1.
+- `target_2` is a Daily structural/Fib projection.
+- `target_3` is an extended Wave projection when supported.
+
+A distant target cannot compensate for `target_1` failing the minimum R:R gate.
+
 ### 2.7 Elliott v1 detection policy
 
-Elliott v1 uses a conservative observable proxy. It derives candidates only from measurable prior advance, retracement/Fib zone, correction duration, confirmed swing structure, structure integrity, and 60m breakout/confirmation evidence. It must not claim that a wave count is objectively confirmed. Broad discovery or owner-specific Elliott thresholds require a later, separately approved policy change.
+Elliott v1 uses a conservative observable proxy. It derives candidates only from measurable prior advance, retracement/Fib zone, correction duration, confirmed swing structure, structure integrity, and 60m breakout/confirmation evidence. It must not claim that a wave count is objectively confirmed.
+
+Owner-tuned 2026-08-31:
+- Wave 1: `measurable_advance` from confirmed swing engine (no fixed % threshold; C) — engine must not require `prior_advance + confirmed_swing_anchors + structure_intact` simultaneously to reach MEDIUM.
+- Wave 2 `NEAR_COMPLETION`: retracement 30-60% of Wave 1 (Fib 0.382-0.618), duration 5-25 days, low holds above Wave 1 swing low; <30% = `WAVE_2_FORMING`, >60% or break of Wave 1 low = `WAVE_4_CORRECTION`/`UNKNOWN`.
+- Early Wave 3 / Continuation: Daily `Close` above Wave 1 high (High wick alone = `TESTED_HIGH`), with breakout volume >20-day average as supporting evidence. Broad discovery or owner-specific Elliott thresholds beyond this require a later, separately approved policy change.
 
 ### 2.8 User decision boundary
 
@@ -112,13 +157,74 @@ Signalix prepares a candidate and displays evidence. It does not issue an automa
 User-facing decision values:
 
 ```text
-REVIEW
+REVIEW_NOW
+SETUP_FORMING
+DAILY_CANDIDATE
 WAIT
 AVOID
 DATA_BLOCKED
 ```
 
-`REVIEW` means worth chart review, not permission or a personalized recommendation.
+`REVIEW_NOW` means worth chart review, not permission or a personalized recommendation.
+
+### 2.9 Session-aware freshness
+
+Freshness follows the exchange session calendar rather than raw wall-clock age:
+
+- Daily evidence is current when it contains official EOD truth for the latest completed trading day.
+- During an open session, 60m evidence must contain the latest completed interval required by the fetch cadence.
+- After market close, the final-session observation is required.
+- Through weekends and exchange holidays, the final observation from the latest completed trading day remains current.
+- Missing data that should exist for the completed session is `DATA_BLOCKED`; an exchange closure alone is not stale data.
+
+### 2.10 Trigger, entry zone, and extension
+
+- `trigger` is a 60m structural pivot or resistance level.
+- `TESTED_TRIGGER` means price traded above the trigger before a completed 60m candle closed above it.
+- `TRIGGERED` requires a completed 60m candle to close above the trigger.
+- Volume is supporting evidence and never a standalone hard gate.
+- Define `1R = trigger - trade_stop` for a long setup.
+- The valid post-trigger entry zone ends at `trigger + 0.5R`, while R:R to `target_1` remains at least 2:1.
+- Price beyond `trigger + 0.5R`, or R:R to `target_1` below 2:1, produces `EXTENDED` / `DO_NOT_CHASE`.
+
+### 2.11 Decision-first projection and market context
+
+The primary presentation order is:
+
+```text
+REVIEW_NOW · PRE_TRIGGER
+REVIEW_NOW · TRIGGERED
+SETUP_FORMING
+DAILY_CANDIDATE
+DATA_BLOCKED / AVOID
+```
+
+Within a lane, use explainable lexicographic ordering rather than one opaque score: Elliott confidence → established/emerging trend → trigger proximity → target-1 R:R → trend strength/RS/52W-ATH → sector/peer context → VCP bonus.
+
+Market regime changes warnings, ordering, and confirmation strictness. It never removes a valid `DAILY_CANDIDATE` or blanket-blocks `REVIEW_NOW`; individual leaders can remain reviewable in a defensive regime. Only invalid market data, a market halt, or another explicit inability to evaluate produces `DATA_BLOCKED`.
+
+### 2.12 Candidate, setup, and owner-review lifecycle
+
+Separate the long-lived Daily thesis from each entry attempt:
+
+```text
+candidate_id = one Daily trend/Elliott thesis
+setup_id     = one immutable entry attempt under that thesis
+```
+
+- A Candidate Thesis has no fixed-day expiry. It remains while its trend/structure is valid and receives a ranking decay when structural progress stalls.
+- Every pre-trigger setup is revalidated on each completed 60m interval.
+- A setup expires when its trigger/stop/target structure changes materially, the thesis is invalidated, required data becomes non-current, or R:R to `target_1` falls below 2:1.
+- Changed levels close the old setup and create a new `setup_id`; stopped, expired, and invalidated attempts remain immutable.
+- All machine snapshots and lifecycle events are append-only.
+
+Arm review is a separate append-only event attached to the exact machine snapshot:
+
+```text
+AGREE | WATCH | DISAGREE_WAVE | REJECT_SETUP | MISSED_CANDIDATE | NOTE
+```
+
+The event records review time, machine snapshot identity, Arm's selected interpretation when applicable, and reason/note. Owner feedback may inform a later policy version but never rewrites the historical machine result.
 
 ## 3. Canonical serving architecture
 
@@ -140,7 +246,7 @@ elliott_structure_engine.py
   → Daily Wave 1–5 candidate/evidence
 
 trade_setup_engine.py
-  → 60m confirmation, trigger, entry, invalidation, target, R:R, setup status
+  → 60m minor structure, trigger, entry zone, trade stop, targets, R:R, setup status
 
 setup_candidate_contract.py
   → stable API serialization, provenance, freshness, and decision projection
@@ -151,13 +257,13 @@ Existing risk/Fib utilities and validated data loaders may be adapted behind the
 ### 3.2 Data flow
 
 ```text
-Thai ORD universe
+marginable_long universe (237)
   → verified Daily data
   → trend/strength + 52W/ATH + sector/peer context
-  → Daily Elliott candidate evidence
+  → Daily Wave 1–5 primary/alternative Elliott evidence
   → verified 60m data
-  → early-Wave-3 / continuation setup evidence
-  → trigger + invalidation + Fib targets + R:R
+  → minor structure and pre-trigger setup evidence
+  → trigger + trade stop + thesis invalidation + Fib targets + R:R
   → VCP bonus enrichment
   → one setup-candidate contract
   → /api/setup-candidates
@@ -180,7 +286,7 @@ Each item contains these top-level groups:
   "setup": {},
   "context": {},
   "bonus_evidence": {},
-  "decision": "REVIEW",
+  "decision_lane": "REVIEW_NOW",
   "provenance": {}
 }
 ```
@@ -190,9 +296,10 @@ Each item contains these top-level groups:
 - `trend` is primarily Daily evidence.
 - `wave.timeframe` is `daily` for the big-picture candidate.
 - `setup.timeframe` is `60m` when lower-timeframe data are available.
-- `wave.state` uses only the structural Wave states listed above.
-- `setup.state` may identify `EARLY_WAVE_3` or continuation setup; this is a setup interpretation, not a second Elliott authority.
-- `setup.invalidation` is separate from `wave.state`.
+- `wave.primary_state` and `wave.alternative_state` use only the structural Wave states listed above.
+- `wave.primary_state` is the Daily authority; `wave.alternative_state` is explicitly non-authoritative.
+- `setup.minor_structure` is lower-degree 60m evidence and cannot replace `wave.primary_state`.
+- `setup.trade_stop` and `setup.thesis_invalidation` are separate from `wave.primary_state`.
 - `bonus_evidence.vcp` is optional supporting evidence.
 - `provenance` identifies policy version, source, as-of time/date, and freshness.
 - Every numeric output crossing the API boundary must be JSON-safe plain numbers or null.
@@ -219,24 +326,25 @@ Illustrative item:
   },
   "wave": {
     "timeframe": "daily",
-    "state": "WAVE_2_NEAR_COMPLETION",
-    "confidence": "PARTIAL",
-    "evidence": {
-      "prior_advance": true,
-      "pullback_depth_pct": 18.2,
-      "pullback_duration_days": 27,
-      "fib_zone": "0.5-0.618",
-      "structure_intact": true
-    }
+    "primary_state": "WAVE_2_NEAR_COMPLETION",
+    "alternative_state": "WAVE_4_CORRECTION",
+    "confidence": "MEDIUM",
+    "supporting_evidence": ["prior_advance", "fib_retracement", "structure_intact"],
+    "contradicting_evidence": [],
+    "missing_evidence": []
   },
   "setup": {
     "timeframe": "60m",
-    "state": "EARLY_WAVE_3",
-    "status": "READY",
+    "minor_structure": "PULLBACK_BASE",
+    "status": "PRE_TRIGGER",
     "trigger": 12.5,
-    "entry_zone": {"low": 12.4, "high": 12.6},
-    "invalidation": 11.6,
-    "targets": [15.2, 17.8],
+    "entry_zone": {"low": 12.5, "high": 12.95},
+    "trade_stop": 11.6,
+    "thesis_invalidation": 10.8,
+    "targets": [
+      {"name": "target_1", "price": 15.2, "method": "nearest_structure"},
+      {"name": "target_2", "price": 17.8, "method": "daily_fib_projection"}
+    ],
     "rr": {"to_target_1": 3.0, "to_target_2": 5.9}
   },
   "context": {
@@ -250,7 +358,7 @@ Illustrative item:
     "vcp": {"present": true, "quality": "PARTIAL"},
     "breakout_volume": "PENDING"
   },
-  "decision": "REVIEW",
+  "decision_lane": "REVIEW_NOW",
   "provenance": {
     "policy_version": "setup-candidates-v1",
     "daily_source": "...",
@@ -284,6 +392,14 @@ The illustrative values are contract examples only, not live market output.
 The migration must not silently delete historical data or alter old observations. Compatibility fields may remain for audit, but the new API and dashboard must expose one primary contract.
 
 ## 6. Testing and acceptance design
+
+Acceptance proceeds through three evidence layers before production implementation is accepted:
+
+1. **Deterministic fixtures:** Wave 1–5, ambiguous/invalid evidence, stale/session-closed/holiday cases, tested breakout, pre-trigger, triggered, and extended behavior.
+2. **Historical replay:** all 237 `marginable_long` symbols across multiple market regimes with strict no-lookahead and explicit inclusion/exclusion reasons.
+3. **Owner chart review:** representative Wave 1–5, `REVIEW_NOW`, `SETUP_FORMING`, false-positive, missed-candidate, and `DATA_BLOCKED` cases labelled with Arm review events.
+
+Algorithmic swing, confidence, and threshold questions that cannot be settled from documents alone must pass a read-only throwaway prototype/replay before production code is rewritten.
 
 ### Pure-function tests
 
@@ -325,6 +441,10 @@ Source tests alone are not UI acceptance.
 - No fundamental/news scoring in the first implementation unless separately approved.
 - No expansion beyond the current Thai ORD scope without a new design decision.
 - No deletion of VCP data or historical observations.
+
+### First-release boundary
+
+The first release includes the decision-first dashboard, candidate evidence/detail, Daily plus 60m chart context, owner review events, saved/watch candidates, and historical machine snapshots. Notifications/alerts, automatic policy tuning, broker/order execution, and public multi-user SaaS remain out of scope.
 
 ## 8. Approval gate
 

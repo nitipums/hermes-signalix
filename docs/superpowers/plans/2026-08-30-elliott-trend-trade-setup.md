@@ -1,5 +1,9 @@
 # Elliott/Trend/Trade-Setup Decision Spine Implementation Plan
 
+> **STATUS: CURRENT — PROTOTYPE / CHART REVIEW IN PROGRESS** · Updated 2026-08-31
+> **Current gate:** Do not promote or implement further until bounded replay and Arm chart review are complete.
+> **Plan method:** Matt Pocock flow — grill/domain decisions → prototype one hard question → replay + chart review → Standards-vs-Spec review → owner approval → bounded implementation → runtime/UI gate.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the VCP-first serving decision with a deterministic Trend + Elliott-candidate + Trade-Setup contract served by `/api/setup-candidates` and rendered by `/mvp`.
@@ -26,6 +30,16 @@
 - Preserve existing raw data and historical observations; do not delete or rewrite legacy observations.
 - Work only in the Signalix checkout; never touch the pre-existing untracked `Trade Reference ` directory.
 - No Docker restart, database migration/write, deploy, push, or live-order action is part of the implementation tasks without separate explicit scope.
+
+## Current phase — prototype and chart review
+
+The owner confirmed the Matt Pocock plan as the working process. Signalix is currently between prototype learning and chart review:
+
+- Continue in the throwaway `prototype/elliott-state-replay` worktree.
+- Review representative charts, especially Wave 3 and long-horizon dual-degree behavior.
+- Validate Day + Week-large comparison before locking the 6M+ policy.
+- Do not promote, deploy, create implementation tickets, enable alerts, or touch broker/production DB from this phase.
+- Exit only after bounded replay evidence, Arm chart review, and Standards-vs-Spec review agree.
 
 ---
 

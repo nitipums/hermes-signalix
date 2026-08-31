@@ -45,6 +45,7 @@ Use one of these banners at the top of project notes:
 11. `INDEX.md`
 12. `Documentation-Governance.md`
 13. `Memory-Cleanup-Candidates.md`
+14. `../docs/current/2026-08-31-elliott-grill-decision-record.md`
 
 ## Historical set
 
