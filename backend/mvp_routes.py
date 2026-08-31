@@ -225,10 +225,8 @@ def handle_mvp_api(path, handler) -> bool:
                 # A snapshot is usable here only when its producer serialized
                 # the complete canonical contract. Legacy MVP cards must use
                 # the real OHLCV source below, never a shape-changing adapter.
-                required = {"symbol", "as_of", "data_status", "trend", "wave", "setup",
-                            "context", "bonus_evidence", "decision", "provenance"}
-                if not all(required.issubset(item) for item in items):
-                    raise ValueError("legacy snapshot is not a canonical setup-candidate artifact")
+                for item in items:
+                    mvp_api._setup_candidate_from_snapshot(item, payload)
             except (FileNotFoundError, ValueError, json.JSONDecodeError, KeyError):
                 pg = _vcp_pg()
                 payload = _load_setup_candidates_cached(

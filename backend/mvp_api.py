@@ -16,6 +16,7 @@ from __future__ import annotations
 import math
 from datetime import datetime, timezone, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from daily_shortlist import project_shortlist, project_shortlist_lanes
 from decision_dimensions import project_decision_dimensions
@@ -33,10 +34,33 @@ from marginable import (
     normalize_filter,
     normalize_rates,
 )
+import instruments
+from eod_healthcheck import expected_market_date
+from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import build_peer_context, build_setup_candidate, project_setup_candidate_list
 from elliott_structure_engine import classify_wave_candidate
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
+
+
+def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=None):
+    """Resolve the bounded serving universe from the authoritative master."""
+    if universe_filter not in {"marginable_long", "active_ord"}:
+        raise ValueError(f"unknown universe filter: {universe_filter}")
+    active = list(active_symbols if active_symbols is not None
+                  else instruments.active_ord_symbols(pg))
+    if universe_filter == "active_ord":
+        symbols = sorted({str(symbol).strip().upper() for symbol in active if str(symbol).strip()})
+        return symbols, {
+            "universe_filter": "active_ord", "audit_only": True,
+            "base_active_ord_count": len(symbols), "eligible_count": len(symbols),
+            "excluded_count": 0, "excluded_reason": None,
+        }
+    symbols, manifest = eligible_symbols(active)
+    manifest = dict(manifest)
+    manifest["universe_filter"] = "marginable_long"
+    manifest["audit_only"] = False
+    return symbols, manifest
 
 
 def _number(value, default=None):
@@ -401,9 +425,31 @@ def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
 def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
     """Accept only an already canonical artifact; never relabel legacy cards."""
     required = ("symbol", "as_of", "data_status", "trend", "wave", "setup",
-                "context", "bonus_evidence", "decision", "provenance")
+                "context", "bonus_evidence", "decision_lane", "provenance")
     if not all(key in item for key in required):
         raise ValueError("snapshot is not a canonical setup-candidate artifact")
+    legacy_aliases = {
+        "decision", "group", "action", "status", "primary_state", "primaryState",
+    }
+    present = sorted(legacy_aliases.intersection(item))
+    if present:
+        raise ValueError(
+            "canonical snapshot contains legacy decision aliases: " + ", ".join(present)
+        )
+    if set(item) != set(required):
+        raise ValueError("snapshot is not an exact canonical envelope")
+    provenance = item.get("provenance") or {}
+    provenance_required = {"policy_version", "source", "as_of", "freshness"}
+    if not provenance_required.issubset(provenance):
+        raise ValueError("canonical snapshot provenance is incomplete")
+    data_status = item.get("data_status") or {}
+    freshness = str(data_status.get("freshness", "")).lower()
+    if (data_status.get("sufficient") is False
+            or freshness in {"stale", "unknown", "invalid", "unavailable"}
+            or data_status.get("daily_final_session_available") is False
+            or data_status.get("intraday_60m_freshness") in {"stale", "unknown"}):
+        if item.get("decision_lane") != "DATA_BLOCKED":
+            raise ValueError("canonical snapshot violates fail-closed data contract")
     return item
 
 
@@ -425,27 +471,107 @@ def _wave_inputs(daily_df):
     }
 
 
+def _load_daily_for_symbol(screening, symbol, pg, market):
+    return screening.load_symbol(symbol, pg=pg, lookback=400, market=market)
+
+
+def _load_intraday_for_symbol(screening, symbol, pg, market):
+    frame = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
+    if frame is not None:
+        frame.attrs["timeframe"] = "60m"
+    return frame
+
+
+def _daily_final_session_available(daily_df, expected_session):
+    if daily_df is None or len(daily_df) == 0:
+        return False
+    try:
+        return daily_df.index[-1].date() == expected_session
+    except (AttributeError, IndexError):
+        return False
+
+
+def _expected_intraday_session_date(now=None):
+    """Return the SET session that should have current 60m observations."""
+    current = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Bangkok"))
+    session = current.date()
+    before_first_completed_bar = (current.hour, current.minute) < (10, 15)
+    if (session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES
+            or before_first_completed_bar):
+        session -= timedelta(days=1)
+        while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+            session -= timedelta(days=1)
+    return session
+
+
+def _expected_intraday_interval_start(now=None):
+    """Return the latest 60m bar start that should be complete by ``now``."""
+    current = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Bangkok"))
+    session = _expected_intraday_session_date(current)
+    current_time = (current.hour, current.minute)
+    if current.date() != session or current_time < (11, 0):
+        if current.date() == session:
+            session -= timedelta(days=1)
+            while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+                session -= timedelta(days=1)
+        return datetime.combine(session, datetime.min.time(), tzinfo=ZoneInfo("Asia/Bangkok")).replace(hour=16)
+    if current_time < (12, 0):
+        hour = 10
+    elif current_time < (12, 30):
+        hour = 11
+    elif current_time < (15, 0):
+        hour = 12
+    elif current_time < (16, 0):
+        hour = 14
+    elif current_time < (16, 30):
+        hour = 15
+    else:
+        hour = 16
+    return datetime.combine(session, datetime.min.time(), tzinfo=ZoneInfo("Asia/Bangkok")).replace(hour=hour)
+
+
+def _intraday_60m_status(intraday_df, expected_interval_start):
+    valid_interval = (intraday_df is not None and len(intraday_df) >= 3
+                      and intraday_df.attrs.get("timeframe") == "60m")
+    if not valid_interval:
+        return False, False, "unknown", None
+    try:
+        timestamp = intraday_df.index[-1]
+        as_of = timestamp.isoformat()
+        if getattr(timestamp, "tzinfo", None) is None:
+            timestamp = timestamp.replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+        else:
+            timestamp = timestamp.astimezone(ZoneInfo("Asia/Bangkok"))
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return True, False, "unknown", None
+    if expected_interval_start.tzinfo is None:
+        expected_interval_start = expected_interval_start.replace(
+            tzinfo=ZoneInfo("Asia/Bangkok")
+        )
+    else:
+        expected_interval_start = expected_interval_start.astimezone(
+            ZoneInfo("Asia/Bangkok")
+        )
+    current = timestamp >= expected_interval_start
+    return True, current, "fresh" if current else "stale", as_of
+
+
 def build_setup_candidates_from_data(pg, *, market="TH"):
     """Build the canonical source from the authoritative read-only data path."""
     import screening
-    from instruments import profile_taxonomy
-
-    active_symbols = screening._active_scan_symbols(
-        pg, min_history=0, instrument_types=("ORD",), market=market
-    )
-    symbols, universe_manifest = eligible_symbols(active_symbols)
-    profiles = profile_taxonomy(pg, symbols=symbols)
+    symbols, universe_manifest = resolve_universe(pg, "marginable_long")
+    profiles = instruments.profile_taxonomy(pg, symbols=symbols)
     market_df = screening.load_market(pg, lookback=400, market=market)
     rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
     candidates = []
     latest_daily = None
-    today = datetime.now(timezone(timedelta(hours=7))).date()
+    expected_daily_session = expected_market_date()
+    expected_intraday_interval = _expected_intraday_interval_start()
     freshness_statuses = []
     for symbol in symbols:
-        daily_df = screening.load_symbol(symbol, pg=pg, lookback=400, market=market)
-        intraday_df = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
+        daily_df = _load_daily_for_symbol(screening, symbol, pg, market)
+        intraday_df = _load_intraday_for_symbol(screening, symbol, pg, market)
         if intraday_df is not None:
-            intraday_df.attrs["timeframe"] = "60m"
             intraday_df.attrs["as_of"] = intraday_df.index[-1]
         as_of = daily_df.index[-1].isoformat() if daily_df is not None and len(daily_df) else None
         if as_of and (latest_daily is None or as_of > latest_daily):
@@ -455,36 +581,57 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
             prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
         trend = compute_trend_strength(daily_df, relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath)
+        daily_current = _daily_final_session_available(daily_df, expected_daily_session)
+        intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
+            _intraday_60m_status(intraday_df, expected_intraday_interval)
+        )
         wave = classify_wave_candidate(daily_df, _wave_inputs(daily_df))
         setup = build_trade_setup(wave, intraday_df)
+        if not daily_current:
+            wave = {**wave, "state": "UNKNOWN", "primary_state": "UNKNOWN", "confidence": "INSUFFICIENT",
+                    "missing_evidence": ["final_session_daily"]}
+        if not intraday_current:
+            setup = {**setup, "status": "DATA_BLOCKED"}
         profile = profiles.get(symbol) or {}
         context = build_peer_context(symbol, {
             "sector": profile.get("sector"), "industry": profile.get("industry"),
             "peer_data_status": "UNKNOWN",
         })
         daily_ok = daily_df is not None and len(daily_df) > 0
-        intraday_ok = intraday_df is not None and len(intraday_df) >= 3
-        freshness = "unknown"
+        intraday_ok = intraday_current
+        daily_freshness = "unknown"
         if daily_ok:
             daily_date = daily_df.index[-1].date()
-            age_days = (today - daily_date).days
-            freshness = "fresh" if 0 <= age_days <= 10 else "stale"
+            daily_freshness = "fresh" if daily_date == expected_daily_session else "stale"
+        if daily_current and intraday_current:
+            candidate_freshness = "fresh"
+        elif "stale" in {daily_freshness, intraday_freshness}:
+            candidate_freshness = "stale"
+        else:
+            candidate_freshness = "unknown"
         data_status = {
-            "sufficient": bool(daily_ok and intraday_ok),
-            "freshness": freshness,
+            "sufficient": bool(daily_current and intraday_current),
+            "freshness": candidate_freshness,
             "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
-            "daily_available": daily_ok, "intraday_60m_available": intraday_ok,
+            "daily_available": daily_ok,
+            "daily_final_session_available": daily_current,
+            "daily_freshness": daily_freshness,
+            "intraday_60m_available": intraday_available,
+            "intraday_60m_freshness": intraday_freshness,
+            "intraday_60m_as_of": intraday_as_of,
         }
-        freshness_statuses.append(freshness)
+        freshness_statuses.append(candidate_freshness)
         candidates.append(build_setup_candidate(
             symbol, as_of, data_status, trend, wave, setup, context,
             {"vcp": {"present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"}},
-            {"policy_version": "setup-candidates-v1", "daily_source": "price_data",
-             "intraday_source": "intraday_price_data", "as_of": as_of,
+            {"policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
+             "daily_source": "price_data", "intraday_source": "intraday_price_data",
+             "as_of": as_of, "intraday_as_of": intraday_as_of,
+             "freshness": candidate_freshness,
              "universe_filter": universe_manifest["universe_filter"],
-             "marginable_schema_version": universe_manifest["schema_version"],
-             "marginable_source_document": universe_manifest["source_document"],
-             "marginable_effective_date": universe_manifest["effective_date"]},
+             "marginable_schema_version": universe_manifest.get("schema_version"),
+             "marginable_source_document": universe_manifest.get("source_document"),
+             "marginable_effective_date": universe_manifest.get("effective_date")},
         ))
     overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
@@ -513,7 +660,7 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
     if lifecycle:
         token = lifecycle.upper()
         filtered = [x for x in filtered if str((x.get("setup") or {}).get("status", "")).upper() == token
-                    or str(x.get("decision", "")).upper() == token]
+                    or str(x.get("decision_lane", "")).upper() == token]
     if state:
         token = state.upper()
         filtered = [x for x in filtered if str((x.get("wave") or {}).get("state", "")).upper() == token
@@ -539,7 +686,7 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         "total_pages": math.ceil(total / page_size) if total else 0,
         "evaluated_count": len(candidates),
         "returned_count": len(page_items),
-        "counts": {decision: sum(x.get("decision") == decision for x in candidates)
+        "counts": {decision: sum(x.get("decision_lane") == decision for x in candidates)
                    for decision in ("REVIEW", "WAIT", "AVOID", "DATA_BLOCKED")},
         "freshness": (snapshot_meta or {}).get("freshness") or _resolve_freshness(items),
         "universe_filter": (snapshot_meta or {}).get("universe_filter") or "marginable_long",

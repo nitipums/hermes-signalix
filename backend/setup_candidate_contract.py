@@ -182,6 +182,9 @@ def build_setup_candidate(
     setup_out = dict(setup or {})
     if setup_out.get("timeframe") is None:
         setup_out["timeframe"] = "60m"
+    if wave_out.get("primary_state") is None and wave_out.get("state") is not None:
+        wave_out["primary_state"] = wave_out["state"]
+    lane = _decision(data_status or {}, wave_out, setup_out)
     item = {
         "symbol": str(symbol),
         "as_of": as_of,
@@ -191,7 +194,7 @@ def build_setup_candidate(
         "setup": setup_out,
         "context": context or {},
         "bonus_evidence": bonus_evidence or {},
-        "decision": _decision(data_status or {}, wave_out, setup_out),
+        "decision_lane": lane,
         "provenance": provenance or {},
     }
     return _json_value(item)

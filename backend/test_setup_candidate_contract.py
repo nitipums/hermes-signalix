@@ -27,10 +27,11 @@ def sample_inputs():
 def test_candidate_contract_keeps_layers_separate():
     item = build_setup_candidate(**sample_inputs())
     assert set(("symbol", "as_of", "data_status", "trend", "wave", "setup",
-                "context", "bonus_evidence", "decision", "provenance")) == set(item)
+                "context", "bonus_evidence", "decision_lane", "provenance")) == set(item)
     assert item["wave"]["timeframe"] == "daily"
     assert item["setup"]["timeframe"] == "60m"
-    assert item["decision"] == "REVIEW"
+    assert item["decision_lane"] == "REVIEW"
+    assert "decision" not in item
     json.dumps(item)
 
 
@@ -41,7 +42,7 @@ def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
     item = build_setup_candidate(**inputs)
     assert item["wave"]["timeframe"] == "60m"
     assert item["setup"]["timeframe"] == "15m"
-    assert item["decision"] == "DATA_BLOCKED"
+    assert item["decision_lane"] == "DATA_BLOCKED"
 
 
 def test_missing_timeframes_are_defaulted_by_contract_construction():
@@ -78,49 +79,49 @@ def test_missing_peer_context_is_explicit_and_non_gating():
     assert item["context"]["peer_data_status"] == "UNKNOWN"
     assert item["context"]["peer_trend_breadth"] is None
     assert item["context"]["peer_symbols"] == []
-    assert item["decision"] == "REVIEW"
+    assert item["decision_lane"] == "REVIEW"
 
 
 def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
     blocked = sample_inputs()
     blocked["data_status"] = {"sufficient": False, "freshness": "unknown"}
-    assert build_setup_candidate(**blocked)["decision"] == "DATA_BLOCKED"
+    assert build_setup_candidate(**blocked)["decision_lane"] == "DATA_BLOCKED"
 
     waiting = sample_inputs()
     waiting["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "FORMING"}
-    assert build_setup_candidate(**waiting)["decision"] == "WAIT"
+    assert build_setup_candidate(**waiting)["decision_lane"] == "WAIT"
 
     avoided = sample_inputs()
     avoided["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "INVALIDATED"}
-    assert build_setup_candidate(**avoided)["decision"] == "AVOID"
+    assert build_setup_candidate(**avoided)["decision_lane"] == "AVOID"
 
     non_vcp = sample_inputs()
     non_vcp["bonus_evidence"] = {"vcp": {"present": False}}
-    assert build_setup_candidate(**non_vcp)["decision"] == "REVIEW"
+    assert build_setup_candidate(**non_vcp)["decision_lane"] == "REVIEW"
 
 
 def test_explicit_failed_structure_and_risk_statuses_avoid():
     for status in ("FAILED", "BROKEN", "DO_NOT_CHASE", "FAILED_STRUCTURE"):
         inputs = sample_inputs()
         inputs["setup"] = {"status": status}
-        assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+        assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
     inputs = sample_inputs()
     inputs["setup"] = {"status": "FORMING", "risk_status": "RISK_FAILED"}
-    assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+    assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
 
 
 def test_failed_setup_status_token_variants_avoid():
     for status in ("DO-NOT-CHASE", "FAILED STRUCTURE"):
         inputs = sample_inputs()
         inputs["setup"] = {"status": status}
-        assert build_setup_candidate(**inputs)["decision"] == "AVOID"
+        assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
 
 
 def test_blocked_data_precedes_failed_statuses():
     inputs = sample_inputs()
     inputs["data_status"] = {"sufficient": False, "freshness": "stale"}
     inputs["setup"] = {"status": "DO_NOT_CHASE"}
-    assert build_setup_candidate(**inputs)["decision"] == "DATA_BLOCKED"
+    assert build_setup_candidate(**inputs)["decision_lane"] == "DATA_BLOCKED"
 
 
 def test_recursive_json_conversion_returns_plain_primitives_or_null():
@@ -137,7 +138,7 @@ def test_recursive_json_conversion_returns_plain_primitives_or_null():
 
 def test_list_projection_preserves_unknown_and_non_vcp_rows():
     first = build_setup_candidate(**sample_inputs())
-    second = dict(first, symbol="XYZ", decision="DATA_BLOCKED")
+    second = dict(first, symbol="XYZ", decision_lane="DATA_BLOCKED")
     projected = project_setup_candidate_list([first, second])
     assert projected["count"] == 2
     assert [row["symbol"] for row in projected["items"]] == ["ABC", "XYZ"]
@@ -162,3 +163,35 @@ def test_screening_adapter_does_not_apply_vcp_filter(monkeypatch):
     assert captured["min_conditions"] == -1
     assert captured["market"] == "TH"
     assert captured["annotate_ath"] is False
+
+
+def test_universe_manifest_uses_authoritative_active_ord_and_explicit_audit_mode():
+    import mvp_api
+    from marginable import load_marginable_data
+
+    eligible = sorted(
+        symbol for symbol, record in load_marginable_data()["by_symbol"].items()
+        if record.get("instrument_type") == "ORD" and record.get("can_buy") is True
+    )
+    assert len(eligible) == 237
+    excluded = [f"NOT_MARGINABLE_{i:03d}" for i in range(694)]
+    active = eligible + excluded
+
+    symbols, manifest = mvp_api.resolve_universe(
+        object(), "marginable_long", active_symbols=active
+    )
+    assert symbols == eligible
+    assert manifest["base_active_ord_count"] == 931
+    assert manifest["eligible_count"] == 237
+    assert manifest["excluded_count"] == 694
+    assert not set(excluded).intersection(symbols)
+
+    audit_symbols, audit_manifest = mvp_api.resolve_universe(
+        object(), "active_ord", active_symbols=active
+    )
+    assert audit_symbols == sorted(active)
+    assert audit_manifest["audit_only"] is True
+    assert audit_manifest["eligible_count"] == 931
+    import pytest
+    with pytest.raises(ValueError, match="unknown universe"):
+        mvp_api.resolve_universe(object(), "all", active_symbols=active)
