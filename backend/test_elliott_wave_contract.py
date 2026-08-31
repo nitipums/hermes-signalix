@@ -13,6 +13,7 @@ import pytest
 
 from elliott_structure_engine import (
     WAVE_STATES,
+    _swing_legs_ohlc,
     build_wave_contract,
     classify_wave_candidate,
 )
@@ -96,6 +97,39 @@ def test_unknown_contract_still_exposes_arrays_and_low_confidence():
     assert "daily_ohlcv" in contract["missing_evidence"]
     assert contract["supporting_evidence"] == []
     json.dumps(contract)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda frame: frame.drop(columns=["High"]),
+        lambda frame: frame.drop(columns=["Low"]),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3)),
+        lambda frame: frame.assign(Low=lambda value: value["Low"].mask(value.index == 3)),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3, 0)),
+        lambda frame: frame.assign(Low=lambda value: value["Low"].mask(value.index == 3, -1)),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3, value["Low"] - 1)),
+        lambda frame: frame.assign(Open=lambda value: value["Open"].mask(value.index == 3, value["High"] + 1)),
+    ],
+)
+def test_invalid_or_incomplete_daily_ohlc_fails_closed(mutate):
+    daily = rising_frame(list(range(1, 26)))
+    daily = mutate(daily)
+
+    assert _swing_legs_ohlc(daily) == []
+    contract = build_wave_contract(daily)
+    assert contract["primary_state"] == "UNKNOWN"
+    assert contract["confidence"] == "LOW"
+    assert "daily_ohlcv" in contract["missing_evidence"]
+    assert contract["evidence"].get("ohlc_swing_legs") is None
+
+
+def test_valid_flat_daily_candle_is_not_rejected_as_malformed_ohlc():
+    daily = rising_frame([10] * 25)
+    assert _swing_legs_ohlc(daily) == []
+    contract = build_wave_contract(daily)
+    assert contract["primary_state"] == "UNKNOWN"
+    assert "daily_ohlcv" not in contract["missing_evidence"]
 
 
 def test_confidence_tokens_map_into_contract_scale():

@@ -73,6 +73,31 @@ def _close_available(daily_df: pd.DataFrame | None) -> bool:
     return daily_df is not None and "Close" in daily_df and len(daily_df) > 0
 
 
+def _valid_ohlc(daily_df: pd.DataFrame | None) -> bool:
+    """Return whether the complete Daily OHLC input is usable for pivots."""
+    def positive_finite(value) -> bool:
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return False
+        return math.isfinite(numeric) and numeric > 0
+
+    required = ("Open", "High", "Low", "Close")
+    if daily_df is None or len(daily_df) == 0 or not all(column in daily_df for column in required):
+        return False
+    if any(len(daily_df[column]) != len(daily_df) or not daily_df[column].index.equals(daily_df.index)
+           for column in required):
+        return False
+    values = daily_df[list(required)].apply(pd.to_numeric, errors="coerce")
+    if not values.apply(lambda column: column.map(positive_finite)).all().all():
+        return False
+    return bool(
+        ((values["High"] >= values[["Open", "Close"]].max(axis=1)) &
+         (values["Low"] <= values[["Open", "Close"]].min(axis=1)) &
+         (values["High"] >= values["Low"])).all()
+    )
+
+
 def _pct(close: pd.Series, lookback: int):
     if len(close) <= lookback:
         return None
@@ -122,21 +147,16 @@ def _swing_legs_ohlc(daily_df: pd.DataFrame, pct: float = 0.05, min_bars: int = 
     but pivot prices are replaced with actual OHLC extremes:
       - up leg: start = min(Low) in segment, end = max(High) in segment
       - down leg: start = max(High) in segment, end = min(Low) in segment
-    Falls back to close legs if High/Low missing. Filter 5%/5bars on extreme prices.
+    Invalid or incomplete OHLC returns no legs. Filter 5%/5bars on extreme prices.
     """
     try:
-        if daily_df is None or "Close" not in daily_df:
+        if not _valid_ohlc(daily_df):
             return []
-        close = pd.to_numeric(daily_df["Close"], errors="coerce").dropna()
+        close = pd.to_numeric(daily_df["Close"], errors="coerce")
         if len(close) < 2:
             return []
-        # if Low/High missing, fallback
-        if "High" not in daily_df or "Low" not in daily_df:
-            return _swing_legs(close)
         high = pd.to_numeric(daily_df["High"], errors="coerce")
         low = pd.to_numeric(daily_df["Low"], errors="coerce")
-        # align to close length; daily_df is date-asc with same length
-        # use positional index
         values = [float(v) for v in close if math.isfinite(float(v))]
         if len(values) < 2:
             return []
@@ -163,17 +183,17 @@ def _swing_legs_ohlc(daily_df: pd.DataFrame, pct: float = 0.05, min_bars: int = 
             try:
                 if direction == 1:
                     # up: Low at start bar, High at end bar
-                    sp = float(low.iloc[s]) if s < len(low) and __import__('math').isfinite(float(low.iloc[s])) else float(values[s])
-                    ep = float(high.iloc[e]) if e < len(high) and __import__('math').isfinite(float(high.iloc[e])) else float(values[e])
+                    sp = float(low.iloc[s])
+                    ep = float(high.iloc[e])
                     start_price = sp
                     end_price = ep
                 else:
-                    sp = float(high.iloc[s]) if s < len(high) and __import__('math').isfinite(float(high.iloc[s])) else float(values[s])
-                    ep = float(low.iloc[e]) if e < len(low) and __import__('math').isfinite(float(low.iloc[e])) else float(values[e])
+                    sp = float(high.iloc[s])
+                    ep = float(low.iloc[e])
                     start_price = sp
                     end_price = ep
             except Exception:
-                start_price = float(values[s]); end_price = float(values[e])
+                return []
             legs.append({"direction": direction, "start": s, "end": e,
                          "start_price": start_price, "end_price": end_price})
         # filter by pct/bars on extremes
@@ -203,16 +223,12 @@ def _swing_legs_ohlc(daily_df: pd.DataFrame, pct: float = 0.05, min_bars: int = 
                         merged[-1]["start_price"] = float(high.iloc[s])
                         merged[-1]["end_price"] = float(low.iloc[e])
                 except Exception:
-                    pass
+                    return []
             else:
                 merged.append(dict(leg))
         return merged
     except Exception:
-        try:
-            close = pd.to_numeric(daily_df["Close"], errors="coerce").dropna()
-            return _swing_legs(close)
-        except Exception:
-            return []
+        return []
 
 
 def _best_wave1_anchor(daily_df: pd.DataFrame, ohlc_legs: list[dict], pct: float = 0.05, min_bars: int = 5) -> dict | None:
@@ -564,7 +580,9 @@ def classify_wave_candidate(
         result["evidence"]["small_waves"] = []
         result["evidence"]["dual_degree"] = {"large": {"pct": LARGE_SWING_PCT, "bars": LARGE_SWING_BARS, "label": "1,2,3"}, "small": {"pct": SMALL_SWING_PCT, "bars": SMALL_SWING_BARS, "label": "(1),(2),(3)"}}
         return result
-    if not _close_available(daily_df):
+    if not _close_available(daily_df) or not _valid_ohlc(daily_df):
+        if _close_available(daily_df) and "daily_ohlcv" not in missing:
+            missing.append("daily_ohlcv")
         result["evidence"]["variant"] = VARIANT
         result["evidence"]["small_wave_legs"] = []
         result["evidence"]["small_wave_labels"] = []
@@ -573,7 +591,7 @@ def classify_wave_candidate(
         result["evidence"]["dual_degree"] = {"large": {"pct": LARGE_SWING_PCT, "bars": LARGE_SWING_BARS, "label": "1,2,3"}, "small": {"pct": SMALL_SWING_PCT, "bars": SMALL_SWING_BARS, "label": "(1),(2),(3)"}}
         return result
 
-    close = pd.to_numeric(daily_df["Close"], errors="coerce").dropna()
+    close = pd.to_numeric(daily_df["Close"], errors="coerce")
     if len(close) < 21:
         result["evidence"]["missing_evidence"].append("measurable_daily_structure")
         result["evidence"]["variant"] = VARIANT
@@ -600,20 +618,12 @@ def classify_wave_candidate(
     breakout_close = advance and float(close.iloc[-1]) > float(close.iloc[-21:-1].max())
 
     # --- Large degree: OHLC extremes (Low for bottoms, High for tops) ---
-    # Use OHLC swing legs when High/Low available; fallback to Close otherwise.
+    # Use OHLC swing legs only when the complete Daily OHLC input is valid.
     legs_close = _swing_legs(close)
     directions_close = [leg["direction"] for leg in legs_close]
-    has_ohlc = "High" in daily_df and "Low" in daily_df
-    if has_ohlc:
-        ohlc_legs_raw = _swing_legs_ohlc(daily_df, pct=SWING_PCT, min_bars=SWING_BARS)
-        if ohlc_legs_raw:
-            legs = ohlc_legs_raw
-        else:
-            legs = legs_close
-            ohlc_legs_raw = []
-    else:
-        legs = legs_close
-        ohlc_legs_raw = []
+    has_ohlc = _valid_ohlc(daily_df)
+    ohlc_legs_raw = _swing_legs_ohlc(daily_df, pct=SWING_PCT, min_bars=SWING_BARS) if has_ohlc else []
+    legs = ohlc_legs_raw
     directions = [leg["direction"] for leg in legs]
     result["evidence"]["daily_swing_legs"] = [
         {"direction": leg["direction"], "start": leg["start"], "end": leg["end"],
