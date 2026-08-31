@@ -60,8 +60,14 @@ rather than relabelling an old Daily value as 60m.
 ## MVP owner-only surface — current
 `mvp_server.py` serves `/mvp` from the bind-mounted release tree. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
-`mvp_api.py` keeps Daily `READY`/`PRE_READY` publication separate from
-`RISING MOVERS` (`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) context lanes.
+`mvp_api.py` serves the canonical `/api/setup-candidates` envelope with six
+fail-closed decision lanes (`REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`,
+`WAIT`, `AVOID`, `DATA_BLOCKED`). Daily `primary_state`/confidence and 60m
+setup status/trigger/invalidation/R:R remain separate. T1–T7 source contracts
+are complete on the prototype branch; lifecycle persistence/API wiring and
+public served acceptance remain explicitly held for later integration/T8.
+Legacy Daily `READY`/`PRE_READY`, `RISING MOVERS`, and `CAUTION` surfaces remain
+compatibility/audit context only and are not the new primary decision labels.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
 `mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:

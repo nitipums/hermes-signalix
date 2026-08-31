@@ -38,7 +38,8 @@ import instruments
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
-                                      build_setup_candidate, project_setup_candidate_list)
+                                      build_setup_candidate, project_setup_candidate_list,
+                                      sort_setup_candidates)
 from elliott_structure_engine import classify_wave_candidate
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
@@ -667,7 +668,9 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
                                       sector: str | None = None, search: str | None = None,
                                       page: int = 1, page_size: int = 50) -> dict:
     """Serve the complete canonical candidate list with presentation filters only."""
-    candidates = [_setup_candidate_from_snapshot(item, snapshot_meta) for item in items]
+    candidates = sort_setup_candidates(
+        [_setup_candidate_from_snapshot(item, snapshot_meta) for item in items]
+    )
     filtered = candidates
     if lifecycle:
         token = lifecycle.upper()

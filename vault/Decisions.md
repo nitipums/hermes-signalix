@@ -2,9 +2,53 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
-## 2026-08-31 — Prototype/chart-review phase confirmed
-Decision: Treat the Matt Pocock grill plan as the current working process. Signalix is in the prototype phase with chart review still in progress; do not promote the prototype or proceed as if the production implementation is accepted. The next gate is bounded replay/chart comparison plus Standards-vs-Spec review and owner approval.
-Reason: Preserve the useful design decisions while keeping prototype learning, chart interpretation, implementation, and production acceptance as separate gates.
+## 2026-08-31 — T1–T9 spine promoted to release (LITE-VERIFIED)
+
+Decision: Promote the complete T1–T8 spine plus T7/T9 lifecycle work from `prototype/elliott-state-replay` to `release/signalix-mvp-stable` after Lite source/DB/runtime gates. Served spine acceptance on the public URL (desktop/390px/error journeys) is the next gate before calling the spine production-ready; evaluator-caller wiring for lifecycle persistence stays a separate owner decision.
+
+Evidence: release commits `8573b9d`..`2f6e790` (T1–T8), `9589fca` (T7), `00dd37c`/`04d6639`/`ddf1a87`/`7b3ed49` (T9), full backend suite green on release after promotion; lifecycle production e2e on :8000 passed (GET/POST/401/409/idempotency, append-only trigger verified); migration `007` applied to the canonical database with owner approval.
+
+## 2026-08-31 — T8 full-universe ranking source (LITE-VERIFIED; served gate held)
+
+Decision: Apply deterministic lexicographic ordering to the complete canonical candidate set before presentation filters/pagination. Preserve all evaluated rows and six lane counts; no legacy positive labels or silent exclusions. Source implementation is complete, but the currently running container is not the prototype artifact: `/api/setup-candidates` returned 404 and served `/app.js` lacked the new grouping function. No restart/deploy was performed; served/public acceptance remains NOT VERIFIED and production promotion is held.
+
+Evidence: Codex gpt-5.6-luna implementation + Lite diff/test gate; full backend suite 622 passed / 2 skipped. Source commit pending with docs sync.
+
+## 2026-08-31 — T7 append-only lifecycle contract (LITE-VERIFIED)
+
+Decision: Candidate thesis identity and setup-attempt identity are separate stable hashes. Machine snapshots and Arm review events are append-only; changed trigger/stop/target structure creates a new setup_id, while stopped/expired/invalidated history remains immutable. Revalidation expires an attempt for structure change, thesis invalidation, non-current data, or target-1 R:R below 2:1. Implemented as pure JSON-safe `backend/lifecycle_contract.py`; database persistence/API wiring is intentionally deferred.
+
+Evidence: commit `c61cf7b`; lifecycle tests pass; full backend suite 619 passed / 2 skipped at closeout. Next T8 is full-universe ranking and served acceptance.
+
+## 2026-08-31 — T6 sector/peer + VCP bonus enrichment (LITE-VERIFIED)
+
+Decision: Sector/peer context remains evidence/ranking only; missing profile data is explicit UNKNOWN. VCP attaches only on explicitly verified positive evidence and never gates a valid candidate.
+
+Evidence: commit `de65be3`; full backend suite 614 passed / 2 skipped.
+
+## 2026-08-31 — T5 MVP decision-first source rendering (LITE-VERIFIED)
+
+Decision: `/mvp` reads canonical `decision_lane`, groups six lanes in primary order, exposes Daily wave primary_state/confidence and 60m setup evidence, and routes unknown lane values to DATA_BLOCKED. Public served/browser acceptance is deferred to T8.
+
+Evidence: commit `0787fca`; full backend suite 611 passed / 2 skipped.
+
+## 2026-08-31 — T4 canonical decision lanes (LITE-VERIFIED)
+
+Decision: `/api/setup-candidates` projects REVIEW_NOW, SETUP_FORMING, DAILY_CANDIDATE, WAIT, AVOID, DATA_BLOCKED with fail-closed confidence, completeness, freshness, and R:R gates.
+
+Evidence: commit `57cd291`; full backend suite 609 passed / 2 skipped.
+
+## 2026-08-31 — T3 60m trade-setup production boundary (LITE-VERIFIED)
+
+Decision: 60m setup status distinguishes PRE_TRIGGER, TESTED_TRIGGER, TRIGGERED, EXTENDED, INVALIDATED, EXPIRED, and DATA_BLOCKED. Entry zone is risk-bounded; target-1 R:R ≥2:1 is the minimum review gate; trade_stop remains separate from Daily thesis_invalidation.
+
+Evidence: commit `347aed5`; full backend suite 600 passed / 2 skipped.
+
+## 2026-08-31 — T2 Elliott production boundary + close-gate (LITE-VERIFIED)
+
+Decision: `EARLY_WAVE_3`/`WAVE_3_CONTINUATION` require a Daily Close above the Wave 1 high; a wick alone is `TESTED_HIGH` and never promotes. Volume/markers are supporting evidence only. Invalid or incomplete Daily OHLC fails closed (no Close-derived substitute evidence).
+
+Evidence: commit `d31a2d2` + OHLC fail-closed remediation; frozen fixtures CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION HIGH.
 
 ## 2026-08-31 — Elliott grill and AiPASS consultation record
 Decision: Preserve the owner-approved Elliott/Trend/Trade-Setup grill decisions, prototype/replay evidence, open gates, and AiPASS routing caveat in `docs/current/2026-08-31-elliott-grill-decision-record.md`. Treat the record as a curated decision/evidence index; it does not promote the prototype, override runtime evidence, or attribute mismatched AiPASS output to Claude Opus 5.

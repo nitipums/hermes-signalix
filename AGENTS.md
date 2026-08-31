@@ -44,15 +44,15 @@ EARLY_WAVE_3 | WAVE_3_CONTINUATION | WAVE_4_CORRECTION
 WAVE_5_ADVANCE | UNKNOWN
 ```
 
-`INVALIDATED` and `EXTENDED` belong to the setup/risk layer, not the Elliott state. Setup status may be `FORMING`, `READY`, `TRIGGERED`, `EXTENDED`, `INVALIDATED`, or `DATA_BLOCKED`.
+- `INVALIDATED` and `EXTENDED` belong to the setup/risk layer, not the Elliott state. Setup status is `FORMING`, `PRE_TRIGGER`, `TESTED_TRIGGER`, `TRIGGERED`, `EXTENDED`, `INVALIDATED`, `EXPIRED`, or `DATA_BLOCKED`.
 
-User-facing decisions are:
+User-facing decision lanes are:
 
 ```text
-REVIEW | WAIT | AVOID | DATA_BLOCKED
+REVIEW_NOW | SETUP_FORMING | DAILY_CANDIDATE | WAIT | AVOID | DATA_BLOCKED
 ```
 
-Stale, missing, invalid, incoherent, or insufficient evidence must fail closed into an explicit unknown/blocked state. Never infer a metric, wave label, target, or risk value from a similarly named field.
+T1–T7 implementation layers are complete in the prototype branch; T8 full-universe ranking and served acceptance remains pending. Stale, missing, invalid, incoherent, or insufficient evidence must fail closed into an explicit unknown/blocked state. Never infer a metric, wave label, target, or risk value from a similarly named field.
 
 ## How to use this file
 

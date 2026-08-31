@@ -35,7 +35,7 @@
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
-| `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
+| `Decisions.md` | การตัดสินใจ product/tech | ✅ active | T1–T9 spine implementation + promotion decisions (latest: spine promoted to release) |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
 | `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | historical feedback retained; no retired-profile writes |
 | `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **Daily VCP Watchlist default + All VCP full view; official historical SET50/SET100 membership sync at stable `e5c7139`; old Daily/Explorer contract superseded** |
