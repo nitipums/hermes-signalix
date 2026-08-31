@@ -43,9 +43,10 @@
 | `2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Owner-approved v2 serving, marginable-long scope, replay and UI closeout evidence | ✅ current | threshold tuning deferred |
 | `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
 | `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
-| `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline | 20 daily snapshots, 18,620 rows, no-lookahead |
-| `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
-| `Scan-Evaluation-Logic-Map-2026-08-29.md` | Current scan/evaluation architecture and remaining replay gate | ✅ current | Chosen 60m VCP spine; replay promotion remains blocked |
+| `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; production promotion and served acceptance pending owner approval |
+| `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline (**historical/audit**) | 20 daily snapshots, 18,620 rows, no-lookahead; VCP is bonus evidence not primary spine |
+| `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate (**historical/audit**) | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
+| `Scan-Evaluation-Logic-Map-2026-08-29.md` | ~~Current scan/evaluation architecture~~ **⛔ HISTORICAL/SUPERSEDED 2026-08-31** — retained for audit; current authority is Elliott/Trend spine | ⛔ historical | superseded by Elliott prototype |
 | `docs/superpowers/plans/2026-08-29-scan-evaluation-closeout.md` | Working checklist to close Scan/Evaluation + replay promotion gate | ✅ current | Single next-session workplan; Lite/Ploy final gate |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |

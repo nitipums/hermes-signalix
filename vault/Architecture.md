@@ -75,7 +75,25 @@ The owner-only MVP is VCP-first:
   └─ All VCP · 60m       full VCP universe / forming / audit view
 ```
 
-The former `/dashboard.html` surface is retired (HTTP 404). `/mvp` is the only public MVP entrypoint; its Daily VCP Watchlist is the fast review surface and All VCP · 60m is the full-universe/audit view. VCP tables show only Symbol, Price, % Change, Distance, and R/R; contraction and breakout-volume evidence drive deterministic sorting rather than consuming table space. Forming is split into `maturing`, `early`, and `needs_work` filters. Price ranges support multi-select; margin rates support Select all/Clear/Apply without reload on each checkbox click.
+The former VCP-first `/dashboard.html` surface is retired (HTTP 404). `/mvp` is the single public MVP entrypoint; it consumes one `/api/setup-candidates` contract. `/api/vcp-finder` is legacy/audit only during migration and is **not** the primary decision authority.
+
+Daily owns big-picture trend, strength, 52W/ATH, and Elliott structural candidates. 60m owns lower-timeframe structure, trigger, and entry timing; it must never overwrite Daily state or be labelled as Daily evidence. VCP, contraction, and breakout-volume are bonus/supporting evidence only.
+
+### Implementation spine state — 2026-08-31 (T1–T9 done; runtime acceptance pending)
+
+- **T1 universe + contract scaffolding: DONE** — commit `8573b9d` (`resolve_universe` 931/237/694, canonical 11-group envelope, session-aware freshness, fail-closed `DATA_BLOCKED`).
+- **T2 Elliott engine production boundary: DONE** — commit `d31a2d2`; Daily close-gate + `build_wave_contract` + frozen CRC/BGRIM/AWC evidence fixtures.
+- **T3 60m trade-setup production boundary: DONE** — commit `347aed5`; explicit `PRE_TRIGGER`/`TESTED_TRIGGER`/`TRIGGERED` distinction, risk-bounded entry zone, target-1 R:R ≥2 gate, expiry and separate Daily thesis invalidation.
+- **T4 canonical decision lanes: DONE** — commit `57cd291`; six fail-closed lanes (`REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`) and deterministic ordering helper.
+- **T5 MVP decision-first rendering: DONE at source** — commit `0787fca`; `/mvp` consumes canonical `/api/setup-candidates`, renders lane groups and honest fallback states. Served browser/public-route evidence is held for T8.
+- **T6 context + bonus enrichment: DONE** — commit `de65be3`; sector/peer context is non-gating and VCP is optional bonus evidence.
+- **T7 lifecycle contract: DONE** — commit `c61cf7b`; pure JSON-safe append-only candidate/setup IDs, snapshots, owner reviews, and revalidation/expiry. T9 now supplies the separate persistence/API integration at source and test-database level.
+- **T8 full-universe ranking source: DONE** — commit `062b3a3`; deterministic full-set ordering before filters/pagination.
+- **T8 contract remediation: DONE** — commit `2f6e790`; production builder now uses canonical `build_wave_contract`, preserves explicit intraday timeframe metadata, recognizes `decision_lane` in reconciled projection, and completes ranking tie-break dimensions.
+- **T8 served acceptance: NOT VERIFIED** — running container serves a different checkout/artifact; public browser at `91.98.72.120:3001/mvp` loads but flat legacy cards render, `groupSetupCandidates` is absent, and same-origin `/api/setup-candidates` is not yet proven. No restart/deploy performed.
+- **T9 lifecycle persistence/API: SOURCE+DB DONE** — commits `fd22674`..`7b49de3`; PostgreSQL 3-table append-only persistence, canonical 2-decimal plan comparison, owner-token/server-bound identity enforcement, read-only lifecycle projections, owner review events, and completed-60m opt-in persistence adapter. Lite verified `backend/test_lifecycle_postgres.py` against ephemeral PostgreSQL 16: 9 passed; the canonical database was untouched.
+- **T9 runtime acceptance: NOT VERIFIED** — the evaluator caller does not yet invoke the opt-in persistence hook automatically, the served `/app` runtime does not yet include T9 commits, and the public desktop/mobile/error journey has not run. Production promotion requires owner approval.
+- **Next:** owner-approved runtime promotion and served public acceptance; T8 separately owns setup-candidate runtime acceptance.
 
 VCP runs after committed full/partial 60m ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Missing optional index/margin metadata is omitted from tags; it is never displayed as `NOT_VERIFIED`.
 
