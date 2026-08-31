@@ -533,10 +533,27 @@ def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mob
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert "empty result, not an API failure" in js
     assert "Unable to load setup candidates:" in js
-    assert 'decision = item.decision || "DATA_BLOCKED"' in js
+    assert 'decision = item.decision_lane || "DATA_BLOCKED"' in js
     assert ".setup-candidate-card { width: 100%; max-width: 100%; }" in css
     assert "overflow-x: hidden" in css
     assert "390px" not in html or 'meta name="viewport"' in html
+
+
+def test_setup_candidates_use_canonical_lane_and_wave_evidence_projection():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "item.decision ||" not in js
+    for marker in ("item.decision_lane", "wave.primary_state || wave.state", "wave.confidence", "setup.entry_zone", "rr.to_target_1"):
+        assert marker in js
+
+
+def test_setup_candidates_group_in_canonical_lane_order_and_block_unknown_lanes():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    lane_order = '["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"]'
+    assert lane_order in js
+    assert "function groupSetupCandidates(items)" in js
+    assert 'var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED"' in js
+    assert "groups.REVIEW_NOW" in js and '"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"' in js
+    assert "laneItems.map(setupCandidateCard).join(\"\")" in js
 
 
 def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():

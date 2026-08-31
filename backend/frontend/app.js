@@ -1015,18 +1015,20 @@
     var trend = item.trend || {}, wave = item.wave || {}, setup = item.setup || {};
     var context = item.context || {}, bonus = item.bonus_evidence || {};
     var rr = setup.rr || {}, targets = setup.targets || [];
-    var decision = item.decision || "DATA_BLOCKED";
+    var decision = item.decision_lane || "DATA_BLOCKED";
     var evidence = "Trend " + (trend.state || "UNKNOWN") + " · " +
       (trend.rise_20d_pct == null ? "20D –" : "20D " + Number(trend.rise_20d_pct).toFixed(1) + "%") +
       " · 60D " + (trend.rise_60d_pct == null ? "–" : Number(trend.rise_60d_pct).toFixed(1) + "%") +
       " · RS " + (trend.relative_strength == null ? "–" : trend.relative_strength) +
       " · 52W " + (trend.is_52w_high_breakout ? "BREAKOUT" : trend.near_52w_high ? "NEAR HIGH" : "–") +
       " · ATH " + (trend.is_ath_breakout == null ? "UNKNOWN" : trend.is_ath_breakout ? "BREAKOUT" : "NO BREAKOUT");
-    var waveEvidence = (wave.state || "UNKNOWN") + " · " +
+    var waveEvidence = (wave.primary_state || wave.state || "UNKNOWN") + " · confidence " +
+      (wave.confidence || "UNKNOWN") + " · " +
       ((wave.evidence || {}).structure_intact == null ? "structure unknown" :
        (wave.evidence || {}).structure_intact ? "structure intact" : "structure broken");
     var setupEvidence = (setup.status || "UNKNOWN") + " · trigger " + displayValue(setup.trigger) +
-      " · invalidation " + displayValue(setup.invalidation);
+      " · invalidation " + displayValue(setup.invalidation) +
+      " · entry " + displayValue((setup.entry_zone || {}).low) + "–" + displayValue((setup.entry_zone || {}).high);
     var targetText = targets.length ? targets.map(displayValue).join(" / ") : "–";
     var vcp = bonus.vcp ? (bonus.vcp.present === true ? "VCP bonus" : bonus.vcp.present === false ? "VCP not present" : "VCP bonus unknown") : "VCP bonus unknown";
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
@@ -1038,6 +1040,31 @@
       '<p class="setup-candidate__bonus">' + escapeHTML(vcp) + ' · ' + escapeHTML(item.as_of || "as of unknown") + '</p></article>';
   }
 
+  function groupSetupCandidates(items) {
+    var laneOrder = ["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"];
+    var groups = {};
+    var reviewOrder = ["PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"];
+    laneOrder.forEach(function(lane) { groups[lane] = []; });
+    (items || []).forEach(function(item) {
+      var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED";
+      groups[lane].push(item);
+    });
+    if (groups.REVIEW_NOW.length) {
+      var reviewGroups = {};
+      reviewOrder.forEach(function(status) { reviewGroups[status] = []; });
+      var reviewUnknown = [];
+      groups.REVIEW_NOW.forEach(function(item) {
+        var status = (item.setup || {}).status;
+        if (reviewGroups[status]) reviewGroups[status].push(item);
+        else reviewUnknown.push(item);
+      });
+      groups.REVIEW_NOW = reviewOrder.reduce(function(result, status) {
+        return result.concat(reviewGroups[status]);
+      }, []).concat(reviewUnknown);
+    }
+    return {order: laneOrder, groups: groups};
+  }
+
   function renderSetupCandidates(data) {
     hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
     var items = data.items || [];
@@ -1046,7 +1073,13 @@
     setFreshness((data.freshness || {}).status || "unknown", data.as_of, (data.freshness || {}).data_fetched_at);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
     dom.dailyVcpMeta.textContent = universeLabel + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
-    dom.dailyVcpCards.innerHTML = items.map(setupCandidateCard).join("") ||
+    var grouped = groupSetupCandidates(items);
+    var groupedHTML = grouped.order.reduce(function(html, lane) {
+      var laneItems = grouped.groups[lane];
+      if (!laneItems.length) return html;
+      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + '</span></h2>' + laneItems.map(setupCandidateCard).join("") + '</section>';
+    }, "");
+    dom.dailyVcpCards.innerHTML = groupedHTML ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
   }
 
