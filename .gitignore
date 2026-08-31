@@ -10,6 +10,7 @@ venv/
 eod_healthcheck_log.jsonl
 eod_healthcheck_observations.json
 update_log.txt
+portfolio_monitor_log.txt
 backend/intraday_*_log.jsonl
 backend/intraday_*_log.txt
 backend/intraday_update_log.txt
@@ -27,3 +28,5 @@ backend/artifact_manifest.json
 # Release worktree/plan metadata
 .superpowers/sdd/
 .worktrees/
+# Owner personal reference media (never commit)
+Trade Reference/
