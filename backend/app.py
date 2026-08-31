@@ -53,7 +53,7 @@ app.add_middleware(
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["X-Portfolio-Token"],
+    allow_headers=["X-Portfolio-Token", "X-Authenticated-User", "X-Idempotency-Key"],
 )
 
 # ---------- Connections (lazy) ----------
@@ -235,6 +235,8 @@ def tiers():
 # Deferred Portfolio/owner routes are isolated from the MVP app core.
 from portfolio_routes import create_portfolio_router
 app.include_router(create_portfolio_router(get_pg))
+from lifecycle_routes import create_lifecycle_router
+app.include_router(create_lifecycle_router(get_pg))
 
 
 @app.post("/webhook")

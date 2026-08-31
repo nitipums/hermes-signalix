@@ -493,6 +493,16 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                         **universe_manifest}
 
 
+def persist_setup_candidate_lifecycle(cur, candidate: dict, **kwargs) -> dict:
+    """Explicit completed-60m persistence hook for a producer result.
+
+    The canonical builder above remains read-only.  A completed-60m evaluator
+    may opt into this adapter with its caller-owned cursor/transaction.
+    """
+    from lifecycle_persistence import persist_completed_60m_candidate
+    return persist_completed_60m_candidate(cur, candidate, **kwargs)
+
+
 def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,
                                       lifecycle: str | None = None, state: str | None = None,
                                       sector: str | None = None, search: str | None = None,
