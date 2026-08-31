@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 
@@ -149,31 +150,79 @@ def append_review_event(
 
 
 def _value(record: dict, key: str) -> Any:
-    """Read an explicit setup field, allowing a single explicit ``setup`` group."""
+    """Read an explicit field from a flattened or canonical candidate record."""
     if key in record:
         return record[key]
     setup = record.get("setup")
     if isinstance(setup, dict) and key in setup:
         return setup[key]
+    setup_plan = record.get("setup_plan")
+    if isinstance(setup_plan, dict) and key in setup_plan:
+        return setup_plan[key]
     return None
+
+
+def _canonical_price(value: Any) -> float | None:
+    """Return the persistence contract's two-decimal price representation."""
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
+        return None
+    try:
+        price = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    if not price.is_finite():
+        return None
+    return round(float(price), 2)
+
+
+def _comparison_plan(record: dict) -> dict:
+    """Normalize full envelopes, snapshot plans, and flattened plans alike."""
+    targets = _value(record, "targets")
+    if targets is None:
+        target_1 = _value(record, "target_1")
+        targets = [] if target_1 is None else [target_1]
+    elif not isinstance(targets, (list, tuple)):
+        targets = [targets]
+    normalized_targets = sorted(
+        (_canonical_price(target) for target in targets),
+        key=lambda value: (value is None, value),
+    )
+    target_1 = _value(record, "target_1")
+    if target_1 is None and normalized_targets:
+        target_1 = normalized_targets[0]
+    return {
+        "trigger": _canonical_price(_value(record, "trigger")),
+        "stop": _canonical_price(_stop(record)),
+        "target_1": _canonical_price(target_1),
+        "targets": normalized_targets,
+    }
 
 
 def _rr(record: dict) -> Any:
     rr = record.get("rr")
     if rr is None and isinstance(record.get("setup"), dict):
         rr = record["setup"].get("rr")
+    if rr is None and isinstance(record.get("setup_plan"), dict):
+        rr = record["setup_plan"].get("rr")
     return rr.get("to_target_1") if isinstance(rr, dict) else None
 
 
 def _stop(record: dict) -> Any:
     if "stop" in record:
         return record["stop"]
+    if "trade_stop" in record:
+        return record["trade_stop"]
     if "invalidation" in record:
         return record["invalidation"]
-    if not isinstance(record.get("setup"), dict):
-        return None
-    setup = record["setup"]
-    return setup.get("stop", setup.get("invalidation"))
+    setup = record.get("setup")
+    if isinstance(setup, dict):
+        return setup.get("stop", setup.get("trade_stop", setup.get("invalidation")))
+    setup_plan = record.get("setup_plan")
+    if isinstance(setup_plan, dict):
+        return setup_plan.get("stop", setup_plan.get("trade_stop", setup_plan.get("invalidation")))
+    return None
 
 
 def revalidate_setup(previous: dict, current: dict) -> dict:
@@ -181,9 +230,7 @@ def revalidate_setup(previous: dict, current: dict) -> dict:
     if not isinstance(previous, dict) or not isinstance(current, dict):
         raise ValueError("previous and current must be dicts")
     reasons: list[str] = []
-    previous_levels = (_value(previous, "trigger"), _stop(previous), _value(previous, "targets"))
-    current_levels = (_value(current, "trigger"), _stop(current), _value(current, "targets"))
-    if previous_levels != current_levels:
+    if _comparison_plan(previous) != _comparison_plan(current):
         reasons.append("STRUCTURE_CHANGED")
 
     thesis = current.get("thesis") if isinstance(current.get("thesis"), dict) else {}

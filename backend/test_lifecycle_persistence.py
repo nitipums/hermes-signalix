@@ -63,6 +63,52 @@ class LifecyclePersistenceTests(unittest.TestCase):
             self.assertEqual(result["status"], "EXPIRED")
             self.assertEqual(result["reasons"], [reason])
 
+    def test_revalidation_canonicalizes_levels_and_normalizes_envelopes(self):
+        previous = {
+            "symbol": "ABC", "as_of": "2026-08-31",
+            "data_status": {"sufficient": True, "freshness": "fresh"},
+            "setup": {"timeframe": "60m", "trigger": 10.124,
+                      "invalidation": 9.876, "targets": [15.555, 12.124]},
+        }
+        current = {"trigger": 10.125, "trade_stop": 9.875,
+                   "target_1": 12.124, "targets": [15.554, 12.125],
+                   "data_current": True, "rr": {"to_target_1": 2}}
+        self.assertEqual(revalidate_setup(previous, current),
+                         {"status": "ACTIVE", "reasons": []})
+        for key, value in (("trigger", 10.13), ("trade_stop", 9.99),
+                           ("targets", [12.12, 15.56])):
+            changed = dict(current)
+            changed[key] = value
+            result = revalidate_setup(previous, changed)
+            self.assertEqual(result["status"], "EXPIRED")
+            self.assertEqual(result["reasons"], ["STRUCTURE_CHANGED"])
+
+    def test_revalidation_missing_or_invalid_rr_is_below_minimum(self):
+        base = {"trigger": 10, "trade_stop": 9, "targets": [14],
+                "thesis_valid": True, "data_current": True}
+        for rr in (None, {"to_target_1": "bad"}, {"to_target_1": float("nan")}):
+            current = dict(base)
+            if rr is not None:
+                current["rr"] = rr
+            result = revalidate_setup(base, current)
+            self.assertEqual(result, {"status": "EXPIRED",
+                                      "reasons": ["RR_BELOW_MINIMUM"]})
+
+    def test_revalidation_envelope_prior_normalizes_trade_stop_and_invalidation(self):
+        flat_current = {"trigger": 10.125, "trade_stop": 9.875,
+                        "target_1": 12.124, "targets": [15.554, 12.125],
+                        "data_current": True, "rr": {"to_target_1": 2}}
+        for prior_setup in (
+                {"trigger": 10.124, "trade_stop": 9.876,
+                 "target_1": 12.124, "targets": [15.555, 12.124]},
+                {"trigger": 10.124, "invalidation": 9.876,
+                 "target_1": 12.124, "targets": [15.555, 12.124]},
+                {"trigger": 10.124, "stop": 9.876,
+                 "target_1": 12.124, "targets": [15.555, 12.124]}):
+            previous = {"setup": prior_setup, "rr": {"to_target_1": 2}}
+            self.assertEqual(revalidate_setup(previous, flat_current),
+                             {"status": "ACTIVE", "reasons": []})
+
     def test_records_are_json_safe(self):
         candidate = build_candidate_record("ABC", dt.date(2026, 8, 31), "p1", {"ok": True})
         snapshot = build_snapshot_record(candidate["candidate_id"], "setup", dt.datetime(2026, 8, 31, tzinfo=dt.timezone.utc), "p1", "daily", {"trigger": 1.234}, {}, "ACTIVE")
@@ -166,6 +212,44 @@ class LifecyclePersistenceTests(unittest.TestCase):
                      "wave": {}, "setup": {"timeframe": "60m"}, "provenance": {}}
         with self.assertRaisesRegex(ValueError, "completed fresh 60m"):
             persist_completed_60m_candidate(Cursor(), candidate)
+
+    def test_completed_60m_adapter_fails_closed_for_stale_or_wrong_timeframe(self):
+        base = {"symbol": "ABC", "as_of": "2026-08-31", "wave": {},
+                "setup": {"timeframe": "60m"}, "provenance": {"policy_version": "p1", "source": "s"},
+                "data_status": {"sufficient": True, "intraday_60m_freshness": "fresh"}}
+        for candidate in (
+            {**base, "data_status": {"sufficient": True, "intraday_60m_freshness": "stale"}},
+            {**base, "setup": {"timeframe": "1h"}},
+        ):
+            with self.assertRaisesRegex(ValueError, "completed fresh 60m"):
+                persist_completed_60m_candidate(Cursor(), candidate)
+
+    def test_completed_60m_adapter_repeat_is_idempotent_at_db_boundary(self):
+        from mvp_api import persist_setup_candidate_lifecycle
+        candidate = {
+            "symbol": "ABC", "as_of": "2026-08-31T00:00:00Z",
+            "data_status": {"sufficient": True, "intraday_60m_freshness": "fresh",
+                            "intraday_60m_as_of": "2026-08-31T10:00:00+07:00"},
+            "wave": {"primary_state": "EARLY_WAVE_3"},
+            "setup": {"timeframe": "60m", "trigger": 12.5, "invalidation": 10,
+                      "targets": [17.5], "rr": {"to_target_1": 2}},
+            "provenance": {"policy_version": "p1", "source": "test"},
+        }
+        candidate_record = build_candidate_record("ABC", candidate["as_of"], "p1", candidate)
+        snapshot = build_snapshot_record(candidate_record["candidate_id"],
+                                         build_setup_identity(candidate_record["candidate_id"],
+                                                              {"trigger": 12.5, "trade_stop": 10,
+                                                               "target_1": 17.5, "targets": [17.5]}),
+                                         candidate["data_status"]["intraday_60m_as_of"], "p1", "test",
+                                         {"trigger": 12.5, "trade_stop": 10, "target_1": 17.5,
+                                          "targets": [17.5]}, candidate, "ACTIVE", [])
+        cur = Cursor()
+        cur.rows = [dict(candidate_record), dict(snapshot)]
+        first = persist_setup_candidate_lifecycle(cur, candidate)
+        cur.rows = [dict(candidate_record), dict(snapshot)]
+        second = persist_setup_candidate_lifecycle(cur, candidate)
+        self.assertEqual(first["snapshot"]["snapshot_id"], second["snapshot"]["snapshot_id"])
+        self.assertEqual(sum("ON CONFLICT (snapshot_id) DO NOTHING" in sql for sql, _ in cur.calls), 2)
 
 
 if __name__ == "__main__":
