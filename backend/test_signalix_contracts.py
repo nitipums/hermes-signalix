@@ -30,10 +30,10 @@ def test_reconciled_projection_keeps_canonical_item_primary(monkeypatch):
     item = {
         "symbol": "AAA", "as_of": "2026-08-30", "data_status": {}, "trend": {},
         "wave": {}, "setup": {}, "context": {}, "bonus_evidence": {},
-        "decision": "WAIT", "provenance": {}, "group": "fresh", "action": "BUY",
+        "decision_lane": "WAIT", "provenance": {}, "group": "fresh", "action": "BUY",
     }
     result = reconciled_projection.apply_projection([item])[0]
-    assert result["decision"] == "WAIT"
+    assert result["decision_lane"] == "WAIT"
     assert "group" not in result and "action" not in result
     assert result["audit"]["legacy_projection"]["action"] == "BUY"
 

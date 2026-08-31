@@ -2,6 +2,8 @@ import json
 import threading
 import time
 
+import pytest
+
 import mvp_routes
 from mvp_api import project_setup_candidates_response
 
@@ -149,9 +151,9 @@ def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypat
     monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {"AAA": 91})
     monkeypatch.setattr(screening, "load_symbol", lambda *a, **k: daily)
     monkeypatch.setattr(screening, "load_symbol_intraday", lambda *a, **k: None)
-    original_wave = mvp_api.classify_wave_candidate
+    original_wave = mvp_api.build_wave_contract
     original_setup = mvp_api.build_trade_setup
-    monkeypatch.setattr(mvp_api, "classify_wave_candidate", lambda df, evidence: (calls.append("wave") or original_wave(df, evidence)))
+    monkeypatch.setattr(mvp_api, "build_wave_contract", lambda df, evidence: (calls.append("wave") or original_wave(df, evidence)))
     monkeypatch.setattr(mvp_api, "build_trade_setup", lambda wave, intra: (calls.append("setup") or original_setup(wave, intra)))
 
     rows, meta = mvp_api.build_setup_candidates_from_data(object())
@@ -248,14 +250,16 @@ def test_missing_final_daily_session_is_blocked(monkeypatch):
     assert rows[0]["wave"]["primary_state"] == "UNKNOWN"
 
 
-def test_wrong_intraday_interval_is_blocked(monkeypatch):
+@pytest.mark.parametrize("timeframe", [None, "15m"])
+def test_wrong_or_untagged_intraday_interval_is_blocked(monkeypatch, timeframe):
     import mvp_api
     import pandas as pd
     daily = pd.DataFrame({"Close": [float(i) for i in range(25)]},
                          index=pd.date_range("2026-08-01", periods=25))
     intraday = pd.DataFrame({"Close": [1.0, 1.1, 1.2]},
                             index=pd.date_range("2026-08-31", periods=3, freq="15min"))
-    intraday.attrs["timeframe"] = "15m"
+    if timeframe is not None:
+        intraday.attrs["timeframe"] = timeframe
     monkeypatch.setattr(mvp_api.instruments, "active_ord_symbols", lambda pg: ["AAA"])
     monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
     monkeypatch.setattr(mvp_api, "eligible_symbols", lambda active: (["AAA"], {
@@ -270,6 +274,29 @@ def test_wrong_intraday_interval_is_blocked(monkeypatch):
     rows, _ = mvp_api.build_setup_candidates_from_data(object())
     assert rows[0]["setup"]["status"] == "DATA_BLOCKED"
     assert rows[0]["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_loader_preserves_explicit_intraday_timeframe_and_accepts_60m(monkeypatch):
+    import mvp_api
+    import pandas as pd
+
+    def load(*args, **kwargs):
+        frame = pd.DataFrame({"Close": [1.0, 1.1, 1.2]},
+                             index=pd.date_range("2026-08-31", periods=3, freq="60min"))
+        frame.attrs["timeframe"] = "60m"
+        return frame
+
+    class Screening:
+        load_symbol_intraday = staticmethod(load)
+
+    frame = mvp_api._load_intraday_for_symbol(Screening, "AAA", object(), "TH")
+    assert frame.attrs["timeframe"] == "60m"
+    available, current, freshness, _ = mvp_api._intraday_60m_status(
+        frame, frame.index[-1].to_pydatetime().replace(tzinfo=None)
+    )
+    assert available is True
+    assert current is True
+    assert freshness == "fresh"
 
 
 def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
@@ -303,8 +330,10 @@ def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
     monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
     monkeypatch.setattr(mvp_api, "compute_trend_strength", lambda *a, **k: {"state": "uptrend"})
-    monkeypatch.setattr(mvp_api, "classify_wave_candidate", lambda *a, **k: {
-        "state": "WAVE_1_ADVANCE", "confidence": "MEDIUM", "evidence": {}})
+    monkeypatch.setattr(mvp_api, "build_wave_contract", lambda *a, **k: {
+        "primary_state": "WAVE_1_ADVANCE", "alternative_state": "WAVE_2_FORMING",
+        "confidence": "MEDIUM", "supporting_evidence": [],
+        "contradicting_evidence": [], "missing_evidence": [], "evidence": {}})
     monkeypatch.setattr(mvp_api, "build_trade_setup", lambda *a, **k: {
         "timeframe": "60m", "status": "FORMING"})
 
@@ -348,8 +377,10 @@ def test_stale_60m_session_fails_closed(monkeypatch):
     monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
     monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
     monkeypatch.setattr(mvp_api, "compute_trend_strength", lambda *a, **k: {"state": "uptrend"})
-    monkeypatch.setattr(mvp_api, "classify_wave_candidate", lambda *a, **k: {
-        "state": "WAVE_1_ADVANCE", "confidence": "MEDIUM", "evidence": {}})
+    monkeypatch.setattr(mvp_api, "build_wave_contract", lambda *a, **k: {
+        "primary_state": "WAVE_1_ADVANCE", "alternative_state": "WAVE_2_FORMING",
+        "confidence": "MEDIUM", "supporting_evidence": [],
+        "contradicting_evidence": [], "missing_evidence": [], "evidence": {}})
     monkeypatch.setattr(mvp_api, "build_trade_setup", lambda *a, **k: {
         "timeframe": "60m", "status": "READY"})
 

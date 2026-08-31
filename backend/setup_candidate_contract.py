@@ -287,7 +287,11 @@ def build_setup_candidate(
 
 
 def project_lane_order(item: dict) -> tuple:
-    """Return the deterministic lexicographic presentation key for a candidate."""
+    """Return the deterministic, explainable T8 presentation key.
+
+    Missing observations are explicitly ranked after present observations. No
+    value is derived from a similarly named field or from a financial metric.
+    """
     lane = _status_token(item.get("decision_lane"))
     wave = item.get("wave") or {}
     confidence = _wave_confidence(wave)
@@ -299,12 +303,70 @@ def project_lane_order(item: dict) -> tuple:
         close = _number(item.get("close"))
     if close is None:
         close = _number((item.get("trend") or {}).get("close"))
+    def descending(value, neutral=1):
+        number = _number(value)
+        return (0, -number) if number is not None else (neutral, 0)
+
+    def present_first(value, true_rank=0, false_rank=1):
+        if value is True:
+            return true_rank
+        if value is False:
+            return false_rank
+        return 2
+
+    setup_status = _status_token(setup.get("status"))
+    review_status_order = {"PRE_TRIGGER": 0, "TESTED_TRIGGER": 1, "TRIGGERED": 2}
+    status_rank = (review_status_order.get(setup_status, 3)
+                   if lane == "REVIEW_NOW" else 3)
+
     trigger = _number(setup.get("trigger"))
-    proximity = abs(close - trigger) / trigger if close is not None and trigger not in (None, 0) else 9e9
-    rr = _number((setup.get("rr") or {}).get("to_target_1")) or 0
-    return (_LANE_ORDER.get(lane, 9), _CONFIDENCE_ORDER.get(confidence, 3),
-            {"uptrend": 0, "emerging_uptrend": 1}.get(trend_state, 2),
-            proximity, -rr)
+    proximity = (abs(close - trigger) / trigger
+                 if close is not None and trigger not in (None, 0) else None)
+    proximity_key = (0, proximity) if proximity is not None else (1, 0)
+    rr = _number((setup.get("rr") or {}).get("to_target_1"))
+
+    strength = descending(trend.get("rise_20d_pct"))
+    strength_60 = descending(trend.get("rise_60d_pct"))
+    relative_strength = descending(trend.get("relative_strength"))
+    high_breakout = present_first(trend.get("is_52w_high_breakout"))
+    ath_breakout = present_first(trend.get("is_ath_breakout"))
+    near_high = present_first(trend.get("near_52w_high"))
+
+    context = item.get("context") or {}
+    sector_trend = str(context.get("sector_trend") or "").lower()
+    sector_trend_rank = {"uptrend": 0, "emerging_uptrend": 1}.get(sector_trend, 2)
+    peer_breadth = context.get("peer_trend_breadth")
+    breadth = None
+    if isinstance(peer_breadth, str) and "/" in peer_breadth:
+        try:
+            up, total = peer_breadth.split("/", 1)
+            if float(total) > 0:
+                breadth = float(up) / float(total)
+        except (TypeError, ValueError):
+            breadth = None
+    peer_breakouts = descending(context.get("peer_breakout_count"))
+    sector_leadership = str(context.get("sector_leader_or_laggard") or "").upper()
+    leadership_rank = {"LEADER": 0, "LAGGARD": 2}.get(sector_leadership, 1)
+    peer_context_status = 0 if context.get("peer_data_status") == "AVAILABLE" else 1
+
+    vcp = (item.get("bonus_evidence") or {}).get("vcp") or {}
+    vcp_rank = (0 if vcp.get("present") is True else 1
+                if vcp.get("present") is False else 2)
+    symbol = str(item.get("symbol") or "")
+    return (
+        _LANE_ORDER.get(lane, 9),
+        _CONFIDENCE_ORDER.get(confidence, 3),
+        {"uptrend": 0, "emerging_uptrend": 1}.get(trend_state, 2),
+        status_rank,
+        proximity_key,
+        (0, -rr) if rr is not None else (1, 0),
+        strength, strength_60, relative_strength,
+        high_breakout, ath_breakout, near_high,
+        sector_trend_rank, (0, -breadth) if breadth is not None else (1, 0),
+        peer_breakouts, leadership_rank, peer_context_status,
+        vcp_rank,
+        symbol,
+    )
 
 
 def sort_setup_candidates(items: list[dict]) -> list[dict]:

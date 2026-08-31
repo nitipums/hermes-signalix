@@ -40,7 +40,7 @@ from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
                                       build_setup_candidate, project_setup_candidate_list,
                                       sort_setup_candidates)
-from elliott_structure_engine import classify_wave_candidate
+from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
 
@@ -479,8 +479,6 @@ def _load_daily_for_symbol(screening, symbol, pg, market):
 
 def _load_intraday_for_symbol(screening, symbol, pg, market):
     frame = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
-    if frame is not None:
-        frame.attrs["timeframe"] = "60m"
     return frame
 
 
@@ -587,11 +585,25 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
             _intraday_60m_status(intraday_df, expected_intraday_interval)
         )
-        wave = classify_wave_candidate(daily_df, _wave_inputs(daily_df))
-        setup = build_trade_setup(wave, intraday_df)
+        wave = build_wave_contract(daily_df, _wave_inputs(daily_df))
+        # The trade-setup engine still consumes its historical ``state`` input;
+        # keep that adapter local while the candidate contract remains
+        # canonical and exposes only ``primary_state``.
+        setup = build_trade_setup(
+            {**wave, "state": wave.get("primary_state", "UNKNOWN")}, intraday_df
+        )
         if not daily_current:
-            wave = {**wave, "state": "UNKNOWN", "primary_state": "UNKNOWN", "confidence": "INSUFFICIENT",
-                    "missing_evidence": ["final_session_daily"]}
+            wave = {
+                **wave,
+                "primary_state": "UNKNOWN",
+                "alternative_state": "UNKNOWN",
+                "confidence": "LOW",
+                "supporting_evidence": [],
+                "contradicting_evidence": [],
+                "missing_evidence": sorted(set(
+                    list(wave.get("missing_evidence") or []) + ["final_session_daily"]
+                )),
+            }
         if not intraday_current:
             setup = {**setup, "status": "DATA_BLOCKED"}
         profile = profiles.get(symbol) or {}
