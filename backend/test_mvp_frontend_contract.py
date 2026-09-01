@@ -73,7 +73,7 @@ def test_v2_success_empty_and_transport_error_states_are_distinct():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "zero candidates matched the current presentation filters" in js
     assert 'show(dom.dailyVcpError)' in js
-    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message' in js
+    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message' in js
     assert 'dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message' in js
 
 
@@ -272,13 +272,36 @@ def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
     assert "intraday_fetched_at" in source
-    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus)" in js
+    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus)" in js
     assert 'id="freshness-daily"' in html
     assert 'id="freshness-60m"' in html
     assert "Daily EOD" in js
     assert "intraday_60m_as_of" in js
     assert 'scan_time: vm.fetch_completed_at || vm.as_of' in js
     assert "60m " in js
+
+
+def test_setup_candidate_freshness_reports_mixed_timeframes_without_collapsing_to_unavailable():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    normalizer = _extract_function(js, "normalizeFreshnessStatus")
+    summary = _extract_function(js, "freshnessSummary")
+    assert _run_node([normalizer, summary], 'freshnessSummary("expected_previous_session", "fresh")') == "mixed"
+    assert _run_node([normalizer, summary], 'freshnessSummary("unknown", "fresh")') == "partial"
+    assert '"Freshness mixed by timeframe"' in js
+    assert 'expected previous completed session' in js
+    assert 'prefix + ": fresh · "' in js
+
+
+def test_canonical_setup_refresh_failure_clears_cached_rows_and_retry_is_forced():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "dailyVcpRequests.clear(endpoint);" in js
+    assert "hide(dom.dailyVcpContent); show(dom.dailyVcpError);" in js
+    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message' in js
+    assert 'dom.dailyVcpRetry.addEventListener("click", function() { loadDailyVcp(true); });' in js
+    assert "}, !!force);" in js
+    # A cached response is still guarded by the request generation, so a
+    # stale cached completion cannot repaint rows after a failed refresh.
+    assert "cachedRequestSeq === dailyVcpRequestSeq" in js
 
 
 def test_unavailable_hour_chart_is_explicit_not_blank():

@@ -349,20 +349,44 @@
   }
 
   /* ── freshness ── */
-  function setFreshness(status, asOf, intradayAt, dailyStatus) {
-    dom.freshnessDot.className = "freshness-dot freshness-dot--" + status;
-    var effectiveDailyStatus = dailyStatus || status;
-    var daily = effectiveDailyStatus === "loading" ? "Daily EOD: Loading…"
-      : effectiveDailyStatus === "fresh" || effectiveDailyStatus === "market_closed" ? "Daily EOD: " + timeAgo(asOf)
-      : effectiveDailyStatus === "stale" ? "Daily EOD: stale · " + timeAgo(asOf)
-      : "Daily EOD: unavailable";
-    var intraday = intradayAt ? "60m: fresh · " + timeAgo(intradayAt) : "60m: unavailable";
+  function normalizeFreshnessStatus(status) {
+    status = String(status || "unknown").toLowerCase();
+    return status === "latest_available" || status === "expected_previous_session" ? "expected_previous" : status;
+  }
+
+  function freshnessSummary(dailyStatus, intradayStatus) {
+    var daily = normalizeFreshnessStatus(dailyStatus);
+    var intraday = normalizeFreshnessStatus(intradayStatus);
+    if (daily === "loading" || intraday === "loading") return "loading";
+    if (daily === "unknown" && intraday === "unknown") return "unknown";
+    if (daily === intraday) return daily;
+    return daily === "unknown" || intraday === "unknown" ? "partial" : "mixed";
+  }
+
+  function freshnessTimeLabel(prefix, status, timestamp) {
+    status = normalizeFreshnessStatus(status);
+    if (status === "loading") return prefix + ": Loading…";
+    if (status === "fresh" || status === "market_closed") return prefix + ": fresh · " + timeAgo(timestamp);
+    if (status === "expected_previous") return prefix + ": expected previous completed session · " + timeAgo(timestamp);
+    if (status === "stale") return prefix + ": stale · " + timeAgo(timestamp);
+    return prefix + ": unavailable";
+  }
+
+  function setFreshness(status, asOf, intradayAt, dailyStatus, intradayStatus) {
+    var effectiveDailyStatus = normalizeFreshnessStatus(dailyStatus || status);
+    var effectiveIntradayStatus = normalizeFreshnessStatus(intradayStatus || (intradayAt ? "fresh" : "unknown"));
+    var summary = freshnessSummary(effectiveDailyStatus, effectiveIntradayStatus);
+    dom.freshnessDot.className = "freshness-dot freshness-dot--" + (summary === "mixed" || summary === "partial" ? "stale" : summary);
+    var daily = freshnessTimeLabel("Daily EOD", effectiveDailyStatus, asOf);
+    var intraday = freshnessTimeLabel("60m", effectiveIntradayStatus, intradayAt);
     if (dom.freshnessDaily) dom.freshnessDaily.textContent = daily;
     if (dom.freshness60m) dom.freshness60m.textContent = intraday;
-    dom.freshnessLabel.textContent = status === "loading" ? "Freshness loading…"
-      : status === "fresh" ? "Freshness available"
-      : status === "market_closed" ? "Market closed"
-      : status === "stale" ? "Freshness stale"
+    dom.freshnessLabel.textContent = summary === "loading" ? "Freshness loading…"
+      : summary === "fresh" || summary === "market_closed" ? "Freshness available"
+      : summary === "expected_previous" ? "Freshness current through previous completed session"
+      : summary === "mixed" ? "Freshness mixed by timeframe"
+      : summary === "partial" ? "Freshness partial by timeframe"
+      : summary === "stale" ? "Freshness stale"
       : "Freshness unavailable";
   }
 
@@ -1295,8 +1319,10 @@
       return candidate && (!latest || String(candidate) > String(latest)) ? candidate : latest;
     }, null);
     var dailyStatuses = items.map(function(item) { return (item.data_status || {}).daily_freshness; }).filter(Boolean);
-    var dailyStatus = dailyStatuses.indexOf("stale") >= 0 ? "stale" : dailyStatuses.length && dailyStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null;
-    setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus);
+    var intradayStatuses = items.map(function(item) { return (item.data_status || {}).intraday_60m_freshness; }).filter(Boolean);
+    var dailyStatus = freshness.daily_status || (dailyStatuses.indexOf("stale") >= 0 ? "stale" : dailyStatuses.length && dailyStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
+    var intradayStatus = freshness.intraday_status || (intradayStatuses.indexOf("stale") >= 0 ? "stale" : intradayStatuses.length && intradayStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
+    setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
     var provenanceSource = freshness.source || (items[0] && items[0].provenance && items[0].provenance.source) || "price_data+intraday_price_data";
     dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
@@ -1332,8 +1358,8 @@
       return fetch(endpoint, {signal: signal}).then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
     }, !!force);
     if (request.cached) {
-      ++dailyVcpRequestSeq;
-      request.promise.then(renderSetupCandidates);
+      var cachedRequestSeq = ++dailyVcpRequestSeq;
+      request.promise.then(function(data) { if (cachedRequestSeq === dailyVcpRequestSeq) renderSetupCandidates(data); });
       return;
     }
     if (request.pending) return;
@@ -1343,7 +1369,13 @@
         if (requestSeq !== dailyVcpRequestSeq) return;
         renderSetupCandidates(data);
       })
-      .catch(function(err){ if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return; hide(dom.dailyVcpLoading); hide(dom.dailyVcpContent); show(dom.dailyVcpError); setFreshness("error"); dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message; /* dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message */ });
+      .catch(function(err){
+        if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return;
+        dailyVcpRequests.clear(endpoint);
+        hide(dom.dailyVcpLoading); hide(dom.dailyVcpContent); show(dom.dailyVcpError);
+        setFreshness("error", null, null, "unknown", "unknown");
+        dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message;
+      });
   }
 
   function renderDailyVcpData(data) {
