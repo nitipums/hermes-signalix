@@ -2,21 +2,19 @@
 
 > **STATUS: CURRENT**
 > This note records cleanup already completed and remaining candidates only.
-> Last reviewed: 2026-08-28 (vault 10 handoffs archived; fact_store 178(dup of 175)+96(DUP)+49+98(superseded) removed — now 132 facts; huggingface cache deleted).
+> **Last reviewed:** 2026-09-01 · Level-1 memory consolidated; Level-3 fact_store reduced to 25 compact facts; Wallet detail and obsolete Signalix progress facts removed.
 
 ## Keep / current candidates
 
-- VCP MVP/current surfaces: facts 175, 180.
-- VCP type candidate taxonomy: fact 181.
-- Database scope/cleanup: fact 182.
-- Stable SET50/SET100 sync: fact 183.
-- Current 60m cadence: fact 179.
-- Full ORD / deterministic / provenance architecture: facts 121, 112, 147.
-- Current browser/verification safety: fact 71 and current verification skills.
+- User identity/preferences and memory policy: facts 23, 25, 160, 200, 208, 211.
+- Current Signalix contract/Wave semantics: facts 215, 219, 220, 226.
+- Current release/automation boundary: facts 227, 229; canonical detail is in the current handoff and Execution-Pipeline.
+- Browser/Git safety: facts 71, 228 and current verification skills.
+- Portfolio Copilot bounded-context direction: fact 50; detailed execution remains future work.
 
 ## Superseded/removed cleanup record
 
-- Old 718-symbol taxonomy, old 15m cadence, old checkpoint/provider/margin duplicates, and contradictory quota/liquidity facts were removed from fact_store after current replacements were verified.
+- Old VCP-first serving, old 15m/stage/L2 details, old checkpoint/provider/margin duplicates, Wallet transaction/account details, and contradictory quota/liquidity facts were removed from fact_store after current replacements were verified.
 - Old Daily Shortlist/All Explorer product contract remains in vault as `STATUS: SUPERSEDED`, preserving historical design evidence.
 - Old implementation handoffs and postmortems remain historical unless their header says `STATUS: CURRENT`.
 
@@ -28,7 +26,7 @@
 - The original skills remain available for restore if an umbrella loses a needed procedure.
 
 
-Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, and old provider states should not be promoted to permanent memory.
+Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, old provider states, and profile-specific bookkeeping should not be promoted to Lite permanent memory.
 
 ## Work-management fact — resolved
 Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as the product-scope and acceptance authority. Kanban is the active durable execution/orchestration state for the current gated run; live card status is not mirrored into vault notes. Older audit-only wording is superseded by the 2026-08-28 terminal-reporting decision.

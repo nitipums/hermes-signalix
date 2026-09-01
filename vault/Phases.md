@@ -9,10 +9,10 @@
 - **Phase 4 — Bot delivery** ✅ implemented, currently paused (Telegram; LINE dropped)
 - **User layer (multi-tenant routing)** ✅ (2026-08-12)
 - **Phase 5 — Elliott/Trend/Trade-Setup spine:** ✅ source implemented and promoted 2026-08-31; served API and 390px failure→Retry→recovery browser gate verified.
-- **Phase 6 — Lifecycle persistence:** ✅ source + test-DB integration; evaluator auto-caller and public acceptance remain open.
+- **Phase 6 — Lifecycle persistence:** ✅ source + test-DB integration; evaluator auto-caller remains `PENDING / OWNER DECISION` and is evidence persistence only.
 
 ## Current operating boundary — 2026-09-01
-The active stock-setup product is the promoted Elliott/Trend/Trade-Setup spine: Daily trend/strength/Elliott → 60m setup → Arm review. VCP is bonus/compatibility evidence. Source promotion is complete; served API is partial and public browser acceptance remains open. Alerts, auto-trading, and broker execution remain off.
+The active stock-setup product is the promoted Elliott/Trend/Trade-Setup spine: Daily trend/strength/Elliott → 60m setup → Arm review. VCP is bonus/compatibility evidence. Source promotion, served API, and 390px failure→Retry→recovery browser acceptance are complete; Arm manual Wave-identification review is next. Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain off.
 
 
 ## User layer (DONE 2026-08-12)

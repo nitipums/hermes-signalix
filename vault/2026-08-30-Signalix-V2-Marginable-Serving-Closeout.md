@@ -1,6 +1,7 @@
 # Signalix v2 Marginable-long Serving Closeout — 2026-08-30
 
-> **STATUS: CURRENT EVIDENCE**
+> **STATUS: HISTORICAL / AUDIT EVIDENCE** · Superseded by the Elliott/Trend/Trade-Setup release on 2026-09-01.
+> **Current authority:** `vault/2026-09-01-Current-Session-Handoff.md` and `vault/Execution-Pipeline.md`.
 > **Owner:** Arm
 > **Final gate:** Lite
 > **Scope:** current dashboard serving and 2-month replay closeout

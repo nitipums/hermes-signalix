@@ -10,7 +10,7 @@ watchlist/explorer review. Alert delivery is currently paused.
 > Owner: Nitipum.s (collaborates with Arm). This vault is the canonical
 > knowledge base — keep it in sync after every structural change.
 
-## Status (updated 2026-08-25)
+## Status (updated 2026-09-01)
 
 | Layer | State | Notes |
 |-------|-------|-------|
