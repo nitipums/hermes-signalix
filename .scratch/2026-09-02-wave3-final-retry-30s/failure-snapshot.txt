@@ -1,0 +1,16 @@
+- generic
+  - banner
+    - heading "Signalix" [level=1, ref=e1]
+    - generic
+      - StaticText "Freshness unavailable"
+      - StaticText "Daily EOD: unavailable"
+      - StaticText "60m: unavailable"
+  - tablist "Surface"
+    - tab "Trend · Elliott · Trade Setup" [selected, ref=e2]
+    - tab "VCP Audit · Compatibility / Rollback" [ref=e3]
+  - tabpanel "Trend · Elliott · Trade Setup"
+    - generic
+      - StaticText "⚠️"
+      - paragraph
+        - StaticText "Unable to load setup candidates: Failed to fetch"
+      - button "Retry" [ref=e4]
