@@ -1,0 +1,1058 @@
+- generic
+  - banner
+    - heading "Signalix" [level=1, ref=e1]
+    - generic
+      - StaticText "Freshness available"
+      - StaticText "Daily EOD: fresh · 1d ago"
+      - StaticText "60m: fresh · 22m ago"
+  - tablist "Surface"
+    - tab "Trend · Elliott · Trade Setup" [selected, ref=e2]
+    - tab "VCP Audit · Compatibility / Rollback" [ref=e3]
+  - tabpanel "Trend · Elliott · Trade Setup"
+    - generic
+      - paragraph
+        - StaticText "Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal."
+      - generic "Watchlist default filters"
+        - checkbox "Marginable" [checked=true, ref=e5]
+        - checkbox "Avg trade value > 10M" [checked=true, ref=e6]
+        - checkbox "Price > 0.60 THB" [checked=true, ref=e7]
+        - LabelText
+          - StaticText "Sector"
+          - textbox "Filter setup candidates by sector" [ref=e10]
+        - LabelText
+          - StaticText "Decision state"
+          - combobox "Filter setup candidates by canonical decision state" [expanded=false, ref=e11]: All decision states
+            - MenuListPopup
+              - option "All decision states" [selected, ref=e65]
+              - option "Forming" [ref=e66]
+              - option "Ready" [ref=e67]
+              - option "Confirmed" [ref=e68]
+              - option "Extended" [ref=e69]
+              - option "Invalidated" [ref=e70]
+        - LabelText
+          - StaticText "Decision"
+          - combobox "Filter setup candidates by canonical decision" [expanded=false, ref=e12]: All decisions
+            - MenuListPopup
+              - option "All decisions" [selected, ref=e71]
+              - option "Review" [ref=e72]
+              - option "Wait" [ref=e73]
+              - option "Avoid" [ref=e74]
+        - LabelText
+          - StaticText "Quality"
+          - combobox "Filter setup candidates by canonical quality" [expanded=false, ref=e13]: All quality
+            - MenuListPopup
+              - option "All quality" [selected, ref=e75]
+              - option "Pass" [ref=e76]
+              - option "Partial" [ref=e77]
+              - option "Fail" [ref=e78]
+              - option "Unknown" [ref=e79]
+      - StaticText "Marginable long · Daily EOD 31 Aug 2026 00:00:00 ICT (Bangkok) · 60m 01 Sept 2026 16:00:00 ICT (Bangkok) · source price_data+intraday_price_data · 50 shown / 237 evaluated · setup-candidates-v1"
+      - generic
+        - heading "DAILY_CANDIDATE 50 / 144" [level=2, ref=e14]
+          - StaticText "DAILY_CANDIDATE 50 / 144"
+        - article [ref=e15] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KCE"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 44.0% · 60D 52.2% · RS 96.96969696969697 · 52W BREAKOUT · ATH BREAKOUT · 52W/ATH breakout"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e16] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "RCL"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 25.7% · 60D 39.7% · RS 85.28138528138528 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e17] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BCP"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 24.6% · 60D 62.8% · RS 89.6103896103896 · 52W BREAKOUT · ATH BREAKOUT · 52W/ATH breakout"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Energy"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e18] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "IRPC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 21.8% · 60D 44.9% · RS 98.7012987012987 · 52W BREAKOUT · ATH BREAKOUT · 52W/ATH breakout"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e19] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BBGI"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 19.8% · 60D 39.4% · RS 93.93939393939394 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Basic Materials"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e20] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KSL"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 13.7% · 60D 20.4% · RS 60.17316017316018 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e21] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CENTEL"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 12.3% · 60D 28.1% · RS 84.4155844155844 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Consumer Cyclical"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e22] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BGRIM"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 8.0% · 60D 45.0% · RS 90.9090909090909 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Utilities"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e23] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PLANB"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 7.4% · 60D 56.7% · RS 79.22077922077922 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e24] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CBG"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 6.3% · 60D 32.9% · RS 31.601731601731604 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Consumer Defensive"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e25] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PTT"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 5.8% · 60D 11.6% · RS 63.63636363636363 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e26] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "RBF"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 5.4% · 60D 22.1% · RS 71.42857142857143 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e27] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BKIH"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 5.4% · 60D 11.1% · RS 74.02597402597402 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Financial Services"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e28] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "NER"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 4.9% · 60D 6.3% · RS 37.66233766233766 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e29] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TURBO"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 4.6% · 60D 24.0% · RS – · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e30] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KKP"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 4.5% · 60D 28.2% · RS 94.37229437229438 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e31] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "GUNKUL"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 2.0% · 60D 30.1% · RS 99.56709956709958 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Utilities"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e32] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TFG"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 1.5% · 60D 8.1% · RS 87.87878787878788 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Consumer Defensive"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e33] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SFLEX"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend emerging_uptrend · 20D 4.0% · 60D 11.5% · RS 35.064935064935064 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e34] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TU"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend emerging_uptrend · 20D 3.3% · 60D 12.5% · RS 33.76623376623377 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e35] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TVO"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend emerging_uptrend · 20D 2.8% · 60D 8.7% · RS 44.15584415584416 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e36] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PSP"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend emerging_uptrend · 20D 2.0% · 60D 66.0% · RS 83.11688311688312 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e37] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DRT"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend emerging_uptrend · 20D 0.9% · 60D 7.0% · RS 29.22077922077922 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Industrials"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e38] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D 0.0% · 60D 11.0% · RS 38.095238095238095 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e39] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DIF"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D 0.0% · 60D 2.0% · RS 62.33766233766234 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e40] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PM"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -0.9% · 60D 1.9% · RS 13.852813852813853 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e41] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KCG"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -0.9% · 60D 8.3% · RS 60.60606060606061 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e42] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "ITC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -1.1% · 60D 6.1% · RS 58.44155844155844 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e43] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SCB"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -1.3% · 60D 9.8% · RS 51.94805194805194 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e44] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TOA"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -1.9% · 60D 21.1% · RS 32.03463203463203 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e45] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DMT"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -2.4% · 60D 8.0% · RS 53.67965367965368 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Industrials"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e46] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SCGD"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -4.5% · 60D 7.4% · RS 54.97835497835498 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e47] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CPI"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -5.5% · 60D 0.0% · RS 45.887445887445885 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Consumer Defensive"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e48] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PRM"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -6.9% · 60D 9.3% · RS 82.25108225108225 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e49] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SVOA"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -8.7% · 60D 18.0% · RS 86.58008658008657 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e50] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "STPI"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -8.7% · 60D 9.5% · RS 79.65367965367966 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e51] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DELTA"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend downtrend · 20D -10.4% · 60D -29.9% · RS 87.44588744588745 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e52] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SGC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend UNKNOWN · 20D -10.9% · 60D 15.6% · RS 86.14718614718615 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e53] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "APO"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend downtrend · 20D -15.1% · 60D -11.8% · RS 11.688311688311687 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_3_CONTINUATION · confidence HIGH · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Consumer Defensive"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e54] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BANPU"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 152.2% · 60D 158.9% · RS 97.83549783549783 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_5_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Utilities"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e55] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TEAM"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 22.9% · 60D 16.0% · RS 94.8051948051948 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_5_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e56] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PTTGC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 21.1% · 60D 29.0% · RS 92.20779220779221 · 52W BREAKOUT · ATH BREAKOUT · 52W/ATH breakout"
+          - StaticText "Wave"
+          - StaticText "WAVE_1_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e57] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SPRC"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 18.9% · 60D 79.6% · RS 97.40259740259741 · 52W BREAKOUT · ATH BREAKOUT · 52W/ATH breakout"
+          - StaticText "Wave"
+          - StaticText "WAVE_1_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e58] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "AMATA"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 12.9% · 60D 31.0% · RS 92.64069264069265 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_1_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Real Estate"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e59] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "III"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 11.3% · 60D 22.6% · RS 40.25974025974026 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_5_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · Industrials"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e60] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "UTP"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 9.1% · 60D 11.8% · RS 48.484848484848484 · 52W – · ATH NO BREAKOUT · 52W/ATH –"
+          - StaticText "Wave"
+          - StaticText "WAVE_2_FORMING · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e61] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PYLON"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 7.8% · 60D 13.4% · RS 91.34199134199135 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_5_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e62] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SSP"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 7.5% · 60D 38.0% · RS 67.53246753246754 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_1_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e63] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TIPH"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 6.5% · 60D 18.0% · RS 61.471861471861466 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_5_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+        - article [ref=e64] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PROUD"
+          - StaticText "DAILY_CANDIDATE"
+          - paragraph
+            - StaticText "Trend uptrend · 20D 6.3% · 60D 24.0% · RS 45.02164502164502 · 52W NEAR HIGH · ATH NO BREAKOUT · 52W/ATH near high"
+          - StaticText "Wave"
+          - StaticText "WAVE_1_ADVANCE · confidence MEDIUM · structure unknown"
+          - StaticText "Setup"
+          - StaticText "FORMING · trigger NOT_VERIFIED · invalidation NOT_VERIFIED · entry NOT_VERIFIED–NOT_VERIFIED"
+          - StaticText "Targets"
+          - StaticText "–"
+          - StaticText "R:R"
+          - StaticText "NOT_VERIFIED"
+          - StaticText "Market / sector"
+          - StaticText "UNKNOWN · UNKNOWN"
+          - StaticText "Peers"
+          - StaticText "UNKNOWN"
+          - paragraph
+            - StaticText "VCP bonus unknown · 2026-08-31T00:00:00"
+      - navigation "Setup candidate pages" [ref=e4]
+        - button "Previous setup candidate page" [disabled, ref=e8]
+          - StaticText "← Prev"
+        - StaticText "Page 1 of 5"
+        - button "Next setup candidate page" [ref=e9]
+          - StaticText "Next →"
