@@ -32,6 +32,8 @@ Decision: Promote the complete T1–T8 spine plus T7/T9 lifecycle work from `pro
 
 The public 390px failure→Retry→recovery browser gate passed through an isolated `agent-browser` session against `/mvp`: only `/api/setup-candidates` was intercepted; the failure state showed no stale rows and an actionable Retry; restoring the route and clicking Retry returned HTTP 200 with 50 rows from 237 evaluated. Evidence is retained under `.scratch/2026-09-01-browser-failure-retry-final2/` and summarized in `vault/2026-09-01-Current-Session-Handoff.md`. The evaluator auto-caller decision and broader desktop/drawer acceptance remain separate.
 
+Evaluator auto-caller definition: an optional future wiring in which the completed-60m evaluator invokes the lifecycle persistence hook automatically, appending candidate/setup snapshots and revalidation evidence. It is not broker execution or automatic trading. Status: `PENDING / OWNER DECISION`. Alerts and automatic trading/broker execution remain `PENDING / FUTURE FEATURE` and OFF.
+
 Evidence: release commits `8573b9d`..`2f6e790` (T1–T8), `9589fca` (T7), `00dd37c`/`04d6639`/`ddf1a87`/`7b3ed49` (T9), full backend suite green on release after promotion; lifecycle production e2e on :8000 passed (GET/POST/401/409/idempotency, append-only trigger verified); migration `007` applied to the canonical database with owner approval.
 
 ## 2026-08-31 — T8 full-universe ranking source (LITE-VERIFIED; served gate held)

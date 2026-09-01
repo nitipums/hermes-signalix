@@ -18,6 +18,12 @@ The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `si
 
 `marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
+### Deferred features — 2026-09-01
+
+- Alerts/delivery: `PENDING / FUTURE FEATURE`, OFF.
+- Automatic trading/broker execution: `PENDING / FUTURE FEATURE`, OFF and not authorized.
+- Evaluator auto-caller: `PENDING / OWNER DECISION`; if approved later, it will append lifecycle evaluation evidence only, not submit orders.
+
 The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
 
 `/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. Former release-candidate/feature worktrees and temporary cleanup copies were retired after stable push; no retired path is treated as current source.

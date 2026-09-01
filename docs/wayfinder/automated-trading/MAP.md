@@ -7,7 +7,8 @@
 ## Notes
 
 - Domain: Signalix + InnovestX / Settrade Open API
-- Planning only: map นี้ยังไม่อนุมัติการสร้าง broker execution หรือเปิด alerts/auto-trading
+- **Planning only:** map นี้ยังไม่อนุมัติการสร้าง broker execution หรือเปิด alerts/auto-trading
+- **Status:** `PENDING / FUTURE FEATURE` · alerts, automatic trading, and broker execution remain OFF; this map is decision research only.
 - Skills: wayfinder, grilling, domain-modeling, Signalix acceptance/data-lineage rules
 - Owner: พี่อาร์มตัดสินใจ scope/risk และเป็น final approver ของ production side effects
 - Local tracker: child tickets อยู่ใน `tickets/`; `blocked_by` ใช้แทน dependency เพราะยังไม่มี native issue tracker
@@ -44,3 +45,7 @@
 ## Open tickets
 
 ดู child tickets ใน `tickets/` และเลือกทำทีละใบตาม frontier/dependencies
+
+## Explicit boundary
+
+Evaluator auto-caller is not automatic trading. It is a future owner decision for having the completed-60m evaluator append lifecycle evidence automatically. It must not submit broker orders, enable alerts, or bypass Arm approval.

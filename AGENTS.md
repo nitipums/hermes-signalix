@@ -95,7 +95,7 @@ Before any task, Codex must:
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **931 active ORD**, **237 eligible**, **694 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
 - `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the current transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only actionable lane in that legacy/current transition contract; event evidence alone cannot create confirmation or actionability.
-- Alerts and auto-trading are off. Do not enable them, add broker execution, or expand beyond Thai ORD without explicit owner scope.
+- Alerts and auto-trading are `PENDING / FUTURE FEATURE` and remain OFF. Do not enable alerts, evaluator auto-caller persistence, broker execution, or expand beyond Thai ORD without explicit owner scope.
 
 ## Agent roles
 

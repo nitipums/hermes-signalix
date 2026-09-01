@@ -39,6 +39,11 @@ The product must let a user answer, quickly and honestly:
 - T1–T9 source and release promotion are complete. Live `:3001` serves the new DB-built contract with honest blocked/avoid states; public 390px failure→Retry→recovery journey is `PASS` with direct DOM/screenshot evidence. Broader desktop/drawer regression evidence and evaluator auto-caller remain separate.
 - VCP, contraction, and breakout-volume are bonus/compatibility evidence. `/api/vcp-finder` and old VCP surfaces are audit/rollback only.
 - 931 active ORD remains explicit audit/rollback coverage; `marginable_long` = 237 eligible symbols. Alerts, auto-trading, and broker execution remain off.
+- Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain OFF. The evaluator auto-caller is a separate `PENDING / OWNER DECISION` for automatic lifecycle-evidence persistence only; it is not order execution.
+
+## Current user-validation loop — 2026-09-01
+
+The release is handed to Arm for manual use. Elliott Wave output remains machine-generated candidate/evidence, not unquestionable truth. Review/confirm Wave identification from the rendered chart first; do not tune semantics from assumptions. Any confirmed product issue becomes a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle.
 
 ## Historical baseline — VCP-first MVP (superseded 2026-09-01)
 
