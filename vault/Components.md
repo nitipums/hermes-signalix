@@ -1,6 +1,7 @@
 # Components
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`. Legacy modules are labeled in-place.
+> **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
+> **Reconciled:** 2026-09-01 · Elliott/Trend/Trade-Setup is primary; VCP modules are compatibility/audit.
 
 Every backend module, what it does, and its hard rules.
 
@@ -12,7 +13,7 @@ after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run
 1. `local` — CSV drop dirs (`/root/signalix/uploads`, seed dir). Owner pushes via `upload_server.py`. Most reliable.
 2. `drive` — re-list Google Drive archive folder via `gdown`, pull newer files.
 3. `settrade` — Settrade Open API v2 (`settrade-v2`), preferred automated source.
-4. `yfinance` — fallback; unreliable for Thai stocks (>15% gaps, zero-vol bars dropped).
+4. `yfinance` — fallback only; no 15% price-gap skip is applied, per owner directive.
 
 > Per Nitipum.s rule: native Thai EOD zip is AUTHORITATIVE; Settrade preferred
 > automated; Drive = owner backup; yfinance = last resort only.
@@ -63,11 +64,10 @@ owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
 `mvp_api.py` serves the canonical `/api/setup-candidates` envelope with six
 fail-closed decision lanes (`REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`,
 `WAIT`, `AVOID`, `DATA_BLOCKED`). Daily `primary_state`/confidence and 60m
-setup status/trigger/invalidation/R:R remain separate. T1–T7 source contracts
-are complete on the prototype branch; lifecycle persistence/API wiring and
-public served acceptance remain explicitly held for later integration/T8.
-Legacy Daily `READY`/`PRE_READY`, `RISING MOVERS`, and `CAUTION` surfaces remain
-compatibility/audit context only and are not the new primary decision labels.
+setup status/trigger/invalidation/R:R remain separate. T1–T9 source contracts
+and release promotion are complete; public 390px failure→Retry→recovery browser
+acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage
+labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
 `mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:

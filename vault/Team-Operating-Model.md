@@ -1,6 +1,6 @@
 # Signalix Team Operating Model & Provider Allocation
 
-**Status:** CURRENT · standard team adopted 2026-08-29. Current work source is `vault/Execution-Pipeline.md` (Kanban is audit/archive only).
+**Status:** CURRENT · standard team adopted 2026-08-29. Product/acceptance scope is `vault/Execution-Pipeline.md`; active worker execution state is Kanban board `signalix` (not mirrored into vault notes).
 
 ## Authority and workflow
 

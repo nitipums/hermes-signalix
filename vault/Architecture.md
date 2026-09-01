@@ -1,8 +1,23 @@
 # Architecture
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`. Verify implementation/runtime when dates conflict.
+> **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
+> **Reconciled:** 2026-09-01 · T1–T9 source promoted; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller remains separate.
 
-## Data flow
+## Current primary serving flow — 2026-09-01
+
+```text
+marginable_long (237)
+→ Daily EOD trend/strength + Elliott evidence
+→ verified 60m minor structure / trade setup
+→ deterministic trigger + stop + targets + R:R
+→ VCP/sector/peer bonus evidence
+→ /api/setup-candidates
+→ /mvp → Arm chart review
+```
+
+The older flow below is retained as compatibility/history; it must not be read as the current decision authority.
+
+## Historical / compatibility data flow
 ```
             ┌─────────────────── EOD INGESTION ───────────────────┐
    Thai EOD │  update_data.py  (local zip → drive → Settrade → yf) │
@@ -58,28 +73,31 @@ logs in the non-TTY container).
 - Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
 - `backend/build_dashboard.py` — compatibility snapshot builder; it no longer writes a public dashboard artifact and is not the MVP entrypoint
-- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher
+- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher; `/api/setup-candidates` is primary and VCP routes are audit-only
 - `backend/mvp_snapshot.py` — canonical `signalix.mvp.v1` artifact loader/sanitizer
 - `backend/mvp_api.py` — Daily Shortlist, watch-only mover/caution lanes, Explorer projection
 - `backend/mvp_chart_db.py` — SELECT-only `1D`/`1W`/`60M`/`1M` OHLCV + indicators
 - `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
 - `docker-compose.yml` — 4 services
 
-## Current MVP surface contract — 2026-08-26
+## Current MVP surface contract — 2026-09-01
 
-The owner-only MVP is VCP-first:
+The primary owner-only surface is the Elliott/Trend/Trade-Setup decision spine:
 
 ```text
 /mvp
-  ├─ Daily VCP Shortlist  primary fast view: actionable review only
-  └─ All VCP · 60m       full VCP universe / forming / audit view
+  └─ Trend + Daily Elliott candidate + 60m Trade Setup
+      ├─ REVIEW_NOW
+      ├─ SETUP_FORMING
+      ├─ DAILY_CANDIDATE
+      ├─ WAIT
+      ├─ AVOID
+      └─ DATA_BLOCKED
 ```
 
-The former VCP-first `/dashboard.html` surface is retired (HTTP 404). `/mvp` is the single public MVP entrypoint; it consumes one `/api/setup-candidates` contract. `/api/vcp-finder` is legacy/audit only during migration and is **not** the primary decision authority.
+`/api/setup-candidates` is the canonical API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted; served API is partially verified from the live DB builder; public desktop/390px/error journey remains pending. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
 
-Daily owns big-picture trend, strength, 52W/ATH, and Elliott structural candidates. 60m owns lower-timeframe structure, trigger, and entry timing; it must never overwrite Daily state or be labelled as Daily evidence. VCP, contraction, and breakout-volume are bonus/supporting evidence only.
-
-### Implementation spine state — 2026-08-31 (T1–T9 done; runtime acceptance pending)
+### Implementation spine state — 2026-08-31 (T1–T9 promoted; served acceptance partial)
 
 - **T1 universe + contract scaffolding: DONE** — commit `8573b9d` (`resolve_universe` 931/237/694, canonical 11-group envelope, session-aware freshness, fail-closed `DATA_BLOCKED`).
 - **T2 Elliott engine production boundary: DONE** — commit `d31a2d2`; Daily close-gate + `build_wave_contract` + frozen CRC/BGRIM/AWC evidence fixtures.
@@ -90,7 +108,7 @@ Daily owns big-picture trend, strength, 52W/ATH, and Elliott structural candidat
 - **T7 lifecycle contract: DONE** — commit `c61cf7b`; pure JSON-safe append-only candidate/setup IDs, snapshots, owner reviews, and revalidation/expiry. T9 now supplies the separate persistence/API integration at source and test-database level.
 - **T8 full-universe ranking source: DONE** — Codex + Lite verified; `project_setup_candidates_response` sorts the complete canonical set before filters/pagination using the T4 lexicographic helper; all six lane counts and evaluated coverage are preserved. Full source suite: 622 passed / 2 skipped.
 - **T8 contract remediation: DONE** — commit `2f6e790`; production builder now uses canonical `build_wave_contract`, preserves explicit intraday timeframe metadata, recognizes `decision_lane` in reconciled projection, and completes ranking tie-break dimensions.
-- **T8 served acceptance: PARTIAL PASS (2026-08-31 overnight)** — release spine promoted; backend + dashboard reloaded; served `/api/setup-candidates` via `:3001` returns the full 237 universe from the live DB builder with honest lanes (WAVE states flow: 40 WAVE_3_CONTINUATION, 33 WAVE_4, 31 WAVE_5, 29 WAVE_1; setup EXTENDED 8 / INVALIDATED 7 / DATA_BLOCKED 222; AVOID 10 with do-not-chase reasons). Public desktop/390px browser journey still pending. Snapshot `mvp_snapshot.json` is stale (pre-promotion) and will refresh at the next EOD/intraday build.
+- **T8 served acceptance: PARTIAL PASS (2026-08-31 overnight)** — release spine promoted; backend + dashboard reloaded; served `/api/setup-candidates` via `:3001` returns the full 237 universe from the live DB builder with honest lanes (WAVE states flow: 40 WAVE_3_CONTINUATION, 33 WAVE_4, 31 WAVE_5, 29 WAVE_1; setup EXTENDED 8 / INVALIDATED 7 / DATA_BLOCKED 227; AVOID 10 with do-not-chase reasons). Public desktop/390px browser journey still pending. Snapshot `mvp_snapshot.json` is stale (pre-promotion) and will refresh at the next EOD/intraday build.
 - **60m anchor policy: relaxed-1bar-scaled-20260831** — 1-bar legs with scaled 1% significance (3% for 2+ bars); funnel verified: anchors pass 15/237 (was 1/237). Remaining DATA_BLOCKED are honest fail-closed (no qualifying 60m structure in the prior 30 bars).
 - **T9 lifecycle persistence/API: SOURCE+DB DONE** — commits `fd22674`..`7b49de3`; PostgreSQL 3-table append-only persistence, canonical 2-decimal plan comparison, owner-token/server-bound identity enforcement, read-only lifecycle projections, owner review events, and completed-60m opt-in persistence adapter. Lite verified `backend/test_lifecycle_postgres.py` against ephemeral PostgreSQL 16: 9 passed.
 - **T9 runtime acceptance: NOT VERIFIED for the spine** — lifecycle routes serve owner-token-protected 404/200/409 journeys on :8000; the evaluator caller does not yet invoke the opt-in persistence hook automatically; public desktop/mobile/error journey for the promoted spine has not run.

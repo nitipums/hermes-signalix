@@ -1,6 +1,7 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled with `Architecture.md`, `Components.md`, `Deployment.md`, and `Execution-Pipeline.md` at current dashboard-first release.
+> **STATUS: CURRENT** · Reconciled 2026-09-01.
+> Runtime scope: T1–T9 Elliott/Trend/Trade-Setup release promotion. Served `/mvp` and `/api/setup-candidates` are verified for the public 390px failure→Retry→recovery journey; evaluator auto-caller remains separate.
 
 AI Trading-Agent SaaS for Thai SET retail traders. Trend-Following engine
 (Mark Minervini / VCP) that auto-screens the market and supports dashboard-based
@@ -15,7 +16,7 @@ watchlist/explorer review. Alert delivery is currently paused.
 |-------|-------|-------|
 | Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
-| Dashboard (web) | ✅ Current stable MVP | owner-only `/mvp`, port 3001; Daily VCP Watchlist is the fast primary view; All VCP · 60m is the full current view |
+| Dashboard (web) | 🟡 Partial acceptance | owner-only `/mvp`, port 3001; canonical `/api/setup-candidates`; 390px failure→Retry→recovery PASS, broader acceptance/evaluator decision separate |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ⏸ Paused | Docker `delivery` is gated under Compose profile `alerts`; source/routing retained |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |

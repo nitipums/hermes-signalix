@@ -1,7 +1,8 @@
 # Signalix Documentation Governance
 
-> **Status:** CURRENT — governance layer
-> **Last reviewed:** 2026-08-26
+> **STATUS: CURRENT** · governance layer
+> **Last reviewed:** 2026-09-01
+> **Current reconciliation:** T1–T9 source is promoted to `release/signalix-mvp-stable`; public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 
@@ -15,7 +16,7 @@
 | Current component behavior | `Components.md` | historical implementation notes |
 | Current deployment and operations | `Deployment.md` | stale terminal logs, worker workspaces |
 | Current execution sequence / acceptance | `Execution-Pipeline.md` | archived Kanban cards, old plans |
-| Active work state, owner, dependency, retry, run state | `Execution-Pipeline.md` + focused plans under `/root/signalix/.hermes/plans/` | Kanban board is audit/archive only; do not dispatch from it |
+| Active work state, owner, dependency, retry, run state | Kanban board `signalix` | Do not mirror live card status into vault notes; `Execution-Pipeline.md` owns scope/acceptance, not live worker state |
 | Historical incidents and migration evidence | `Postmortems/` and dated handoffs | current product direction |
 | Durable cross-session invariants | compact MEMORY / `fact_store` | raw sessions, task progress, secrets |
 | Repeatable procedures | one primary Hermes skill per workflow | copied instructions in many notes |
@@ -46,6 +47,8 @@ Use one of these banners at the top of project notes:
 12. `Documentation-Governance.md`
 13. `Memory-Cleanup-Candidates.md`
 14. `../docs/current/2026-08-31-elliott-grill-decision-record.md`
+15. `../docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
+16. `../docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md`
 
 ## Historical set
 

@@ -1,6 +1,8 @@
 # Signalix Execution Pipeline
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`. Markdown plus linked focused plans define product scope/acceptance; the Signalix Kanban board is the active durable execution/orchestration state for the current gated run and must not be mirrored into this note.
+> **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
+> **Reconciled:** 2026-09-01 · T1–T9 promoted; public 390px failure→Retry→recovery gate PASS; evaluator auto-caller remains separate.
+> Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
@@ -30,21 +32,17 @@ The product must let a user answer, quickly and honestly:
 - The overview must be usable before detail/chart data load; unknown compact-card data must never cause all symbols to disappear.
 - Drawer metadata and decision evidence are separate contracts: genuine missing/insufficient VCP evidence remains `NOT_VERIFIED`; optional canonical metadata shows `Loading…` while `/api/symbol/{symbol}` is pending and `Unavailable` when that request fails. Chart unavailability is reported separately.
 
-## Current verified baseline
+## Current verified baseline — 2026-09-01
 
-- Thai daily scan supports the five decision groups: **New Breakout**, **Pullback in Uptrend**, **Wait for Breakout**, **Base Building**, and **Down/Broken**.
-- Full scan persistence is append-only and retains every evaluated symbol, including monitor and avoid states.
-- Breakout lifecycle has immutable trigger/pivot/invalidation evidence and retry lineage.
-- Intraday is a 60-minute stored overlay; it must never overwrite historical Daily classification.
-- Thai and curated US AI Buildout use shared market-scoped scanner logic. US remains a research watchlist with explicitly labelled bootstrap data quality.
-- Owner-only MVP is VCP-first: `Daily VCP Watchlist` is the fast default with actionable review plus `BREAKOUT_WATCH`; `All VCP · 60m` / Explorer defaults to the current `marginable_long` operational universe (active ORD + marginable + `can_buy=true`, currently 237 symbols), with explicit active-ORD audit/rollback mode. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation. Alert delivery is currently paused; dashboard watchlist + explorer are the active product focus.
-- VCP full-universe persistence retains every evaluated symbol. Forming presentation lanes are maturing/early/needs_work; contraction and breakout volume are deterministic sort inputs, not primary table columns.
-- VCP runs after committed full/partial 60m ingestion with ingestion lineage and overlap lock; failed/skipped ingestion does not create a new VCP run. Missing optional index/margin data is omitted rather than rendered as `NOT_VERIFIED`.
-- Canonical MVP artifacts sanitize legacy projection labels so current Stage/Phase/provenance cannot be contradicted by old embedded group/date fields.
-- VCP drawer enrichment preserves VCP decision fields, fetches missing Daily metadata from `/api/symbol/{symbol}`, and distinguishes `Loading…`/`Unavailable` metadata from genuine `NOT_VERIFIED` evidence; covered by frontend contract tests and served click-path verification.
-- The prior default liquidity bug is fixed: an unknown compact-card liquidity value is not treated as illiquid and therefore cannot hide all cards.
-- **2026-08-29 decision contract, updated 2026-08-30:** Serving VCP cards use one compact v2 state/quality/decision projection sourced from the 60m VCP Finder. Daily EOD remains supporting context/lifecycle evidence and cannot promote a 60m result to `CONFIRMED`; stale, unverified, and insufficient evidence share one internal `data_sufficient=false` gate. Legacy Daily labels remain compatibility/audit paths, not the visible VCP primary status. The owner-approved operational dashboard scope is `marginable_long` (237 `can_buy=true` symbols); active ORD 931 remains an explicit audit/rollback mode. Public `/mvp`, v2 VCP API contract, 237 selected coverage, desktop/mobile layout, and VCP drawer parity were rechecked after backend/dashboard recreation; final source is committed on the stable branch.
-- **2026-08-30 structure-first update:** `EVENT_WATCH` is an uncapped `WATCH_ONLY` discovery lane; incomplete volume is evidence, not a candidate blocker. `REVIEW_NOW` remains the only actionable lane. Public mobile table width and request-cache behavior were rechecked after the UI fix; cold watch API remains measured separately from fast cached repeats.
+- The primary product spine is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**.
+- The canonical API is `/api/setup-candidates`; it preserves all 237 `marginable_long` rows and six fail-closed lanes: `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`.
+- T1–T9 source and release promotion are complete. Live `:3001` serves the new DB-built contract with honest blocked/avoid states; public 390px failure→Retry→recovery journey is `PASS` with direct DOM/screenshot evidence. Broader desktop/drawer regression evidence and evaluator auto-caller remain separate.
+- VCP, contraction, and breakout-volume are bonus/compatibility evidence. `/api/vcp-finder` and old VCP surfaces are audit/rollback only.
+- 931 active ORD remains explicit audit/rollback coverage; `marginable_long` = 237 eligible symbols. Alerts, auto-trading, and broker execution remain off.
+
+## Historical baseline — VCP-first MVP (superseded 2026-09-01)
+
+The following older VCP-first baseline is retained as audit history, not current product authority.
 
 ## Current reliability status — 2026-08-21
 
@@ -53,7 +51,11 @@ The intraday E2E path is now explicit and verified: full active ORD 60m fetch �
 This closes the previous “DB updated but dashboard stale” gap. Unexpected source/credential/network/code failures still alert for operator action; the system does not silently modify source code.
 
 
-Only pull one tightly scoped implementation item at a time. Lite is the final evidence gate; worker completion is not final approval. Every active-chain card terminal outcome (`PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED`) requires a delivered report to the owner; a `REVISE`/`FAIL` must produce a bounded remediation card or an explicit human/capability/resource blocker.
+## Current team-review gate — 2026-09-01
+
+Before any implementation change, use `docs/current/2026-09-01-signalix-independent-review.md` as the review packet. Lite, Codex, and Ploy agree on four `REVISE` areas: DATA_BLOCKED semantics/reason codes, cold-path latency and pagination, chart-ready Elliott evidence markers, and staged legacy quarantine. AskMatt must settle the product decisions and card boundaries first; then use Kanban for one bounded card at a time with independent acceptance.
+
+Only pull one tightly scoped implementation item at a time. Lite is the final evidence gate; worker completion is not final approval. Every active-chain card terminal outcome (`PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED`) requires a delivered report to the owner; `REVISE`/`FAIL` requires bounded remediation or an explicit blocker.
 
 ### Now — P0 product/data integrity
 

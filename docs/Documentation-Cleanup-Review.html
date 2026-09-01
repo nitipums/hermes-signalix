@@ -1,46 +1,25 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Signalix · Documentation Cleanup Review</title>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signalix · Documentation Reconciliation · 2026-09-01</title>
 <style>
-:root{color-scheme:dark;--bg:#0b1020;--panel:#131b32;--line:#2a385d;--text:#edf2ff;--muted:#9eacce;--green:#45d483;--amber:#ffca63;--red:#ff7b8f;--blue:#78a9ff}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#0b1020,#111936);color:var(--text);font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:1180px;margin:auto;padding:32px 20px 56px}h1{font-size:clamp(28px,5vw,52px);line-height:1.05;margin:0 0 10px}h2{margin:0 0 14px}h3{margin:0 0 8px;color:var(--blue)}p{color:var(--muted)}.eyebrow{color:var(--green);font-weight:700;letter-spacing:.1em;text-transform:uppercase}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:25px 0}.card,.panel{background:rgba(19,27,50,.88);border:1px solid var(--line);border-radius:16px;padding:18px}.metric{font-size:30px;font-weight:800}.label{color:var(--muted);font-size:13px}.layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}.tree{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:#d8e2ff;white-space:pre-wrap;background:#0a0f1d;padding:16px;border-radius:12px;border:1px solid #202d4d}.pill{display:inline-block;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;margin:2px 4px 2px 0}.current{background:#123b2a;color:var(--green)}.archive{background:#3d3014;color:var(--amber)}.risk{background:#411d2c;color:var(--red)}ul{padding-left:20px;color:var(--muted)}li{margin:6px 0}a{color:#9bc0ff;text-decoration:none}a:hover{text-decoration:underline}.bar{display:flex;height:18px;border-radius:99px;overflow:hidden;background:#202a46;margin:12px 0}.bar i{display:block}.bar .c{background:var(--green);width:2%}.bar .a{background:#596988;flex:1}@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}.card,.panel{padding:14px}}
-</style>
-</head>
-<body><main>
-<div class="eyebrow">Signalix · Documentation Cleanup Review</div>
-<h1>One map. Clear authority.</h1>
-<p>Filesystem organization pass · 31 Aug 2026 · no source/runtime changes</p>
-<div class="grid">
-<div class="card"><div class="metric">3</div><div class="label">current working/decision files</div></div>
-<div class="card"><div class="metric">22</div><div class="label">archived superpowers files</div></div>
-<div class="card"><div class="metric">113</div><div class="label">Markdown files inventoried</div></div>
-<div class="card"><div class="metric">0</div><div class="label">user/runtime files touched</div></div>
-</div>
-<div class="panel"><h2>Current filesystem split</h2><div class="tree">docs/
-├── README.md                              <span class="pill current">CURRENT MAP</span>
-├── Documentation-Cleanup-Review.html      <span class="pill current">OPEN THIS</span>
-├── current/
-│   └── 2026-08-31-elliott-grill-decision-record.md  <span class="pill current">CURRENT RECORD</span>
-├── superpowers/
-│   ├── specs/2026-08-30-elliott-trend-trade-setup-design.md
-│   └── plans/2026-08-30-elliott-trend-trade-setup.md
-└── archive/superpowers/
-    ├── specs/   10 prior specs
-    ├── plans/  12 prior plans
-    └── sdd/     reserved for tracked historical evidence</div></div>
-<div class="layout" style="margin-top:16px">
-<section class="panel"><h2>Authority route</h2>
-<p><span class="pill current">CURRENT</span> New product direction is being developed in the Elliott/Trend/Trade-Setup design.</p>
-<ul><li><b>Product:</b> <a href="../vault/Product-Strategy-Market-to-Action.md">Product Strategy</a></li><li><b>Decisions:</b> <a href="../vault/Decisions.md">Decision Ledger</a></li><li><b>Acceptance:</b> <a href="../vault/Execution-Pipeline.md">Execution Pipeline</a></li><li><b>System:</b> <a href="../vault/Architecture.md">Architecture</a> · <a href="../vault/Deployment.md">Deployment</a></li><li><b>Governance:</b> <a href="../vault/Documentation-Governance.md">Governance</a> · <a href="../vault/INDEX.md">Index</a></li></ul>
-</section>
-<section class="panel"><h2>What is not authority</h2>
-<p><span class="pill archive">ARCHIVE</span> Historical plans/specs remain searchable evidence only.</p>
-<ul><li>Archived superpowers plans/specs</li><li>Ignored <code>.superpowers/sdd/</code> work evidence</li><li>Generated JSON/HTML/log artifacts</li><li>Old VCP-first notes until semantic reconciliation</li></ul>
-</section>
-</div>
-<div class="panel" style="margin-top:16px"><h2>Cleanup gate</h2><div class="bar"><i class="c"></i><i class="a"></i></div><p><b>Structure:</b> PASS — active versus archived implementation documents are separated.</p><p><b>Safety:</b> PASS — owner dirty files, research files, code, runtime, and generated artifacts were untouched.</p><p><b>Semantics:</b> <span class="pill risk">REVIEW_REQUIRED</span> Vault documents still disagree: VCP-first legacy wording versus the new Trend/Elliott/Trade-Setup direction.</p><p><b>Next:</b> Reconcile canonical vault notes, update status banners/index, preserve historical links, then verify the public product/runtime separately.</p></div>
-<p style="margin-top:24px">Open the companion map: <a href="README.md">docs/README.md</a></p>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131b32;--line:#2a385d;--text:#edf2ff;--muted:#9eacce;--green:#45d483;--amber:#ffca63;--red:#ff7b8f;--blue:#78a9ff}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#0b1020,#111936);color:var(--text);font:15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:1180px;margin:auto;padding:32px 20px 56px}h1{font-size:clamp(28px,5vw,52px);line-height:1.05;margin:0 0 10px}h2{margin:0 0 14px}.eyebrow{color:var(--green);font-weight:700;letter-spacing:.1em;text-transform:uppercase}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:25px 0}.card,.panel{background:rgba(19,27,50,.9);border:1px solid var(--line);border-radius:16px;padding:18px}.metric{font-size:30px;font-weight:800}.label{color:var(--muted);font-size:13px}.layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}.tree{font-family:ui-monospace,monospace;color:#d8e2ff;white-space:pre-wrap;background:#0a0f1d;padding:16px;border-radius:12px;border:1px solid #202d4d}.pill{display:inline-block;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:700;margin:2px 4px 2px 0}.current{background:#123b2a;color:var(--green)}.archive{background:#3d3014;color:var(--amber)}.risk{background:#411d2c;color:var(--red)}ul{padding-left:20px;color:var(--muted)}li{margin:6px 0}a{color:#9bc0ff;text-decoration:none}a:hover{text-decoration:underline}@media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}.card,.panel{padding:14px}}
+</style></head><body><main>
+<div class="eyebrow">Signalix · Documentation Reconciliation</div>
+<h1>One spine. Clear authority.</h1>
+<p>Reconciled 01 Sep 2026 · authority docs updated; historical evidence preserved; runtime/browser status kept separate.</p>
+<div class="grid"><div class="card"><div class="metric">24</div><div class="label">tracked documentation files changed</div></div><div class="card"><div class="metric">16</div><div class="label">current authority entries</div></div><div class="card"><div class="metric">1</div><div class="label">separate owner decision remaining</div></div><div class="card"><div class="metric">0</div><div class="label">secrets or runtime files touched</div></div></div>
+<div class="panel"><h2>Current authority spine</h2><div class="tree">Product strategy       → vault/Product-Strategy-Market-to-Action.md
+Atomic decisions       → vault/Decisions.md
+Architecture/components → vault/Architecture.md + Components.md
+Deployment/runtime     → vault/Deployment.md
+Acceptance/evidence    → vault/Execution-Pipeline.md
+Executable contract    → docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md
+Lifecycle contract     → docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md
+Active worker state    → Kanban board signalix (not copied into notes)
+Historical VCP         → vault/VCP-Finder-MVP.md + replay/closeout notes</div></div>
+<div class="layout" style="margin-top:16px"><section class="panel"><h2>Current product state</h2><ul><li><span class="pill current">PROMOTED</span> T1–T9 source on <code>release/signalix-mvp-stable</code>.</li><li><span class="pill current">PRIMARY</span> <code>/api/setup-candidates</code> → <code>/mvp</code>.</li><li><span class="pill current">SCOPE</span> <code>marginable_long</code>: 237 eligible; 931 active ORD audit/rollback.</li><li><span class="pill archive">BONUS</span> VCP/contraction/breakout-volume; old VCP routes are audit-only.</li></ul></section><section class="panel"><h2>Safety boundary</h2><ul><li>Alerts, auto-trading, broker execution: OFF.</li><li>Dirty prototype/feature worktrees: preserved; not release authority.</li><li>Generated snapshots/logs and <code>docs/wayfinder/</code>: untouched.</li><li>No credentials, tokens, or <code>.env</code> content entered into docs.</li></ul></section></div>
+<div class="panel" style="margin-top:16px"><h2>Acceptance gate</h2><p><span class="pill current">PASS</span> Documentation authority and status reconciliation.</p><p><span class="pill current">PASS</span> `/mvp` shell, backend readiness, retired route 404, DB-built API, and public 390px failure→Retry→recovery browser journey.</p><p><span class="pill risk">SEPARATE</span> Broader desktop/drawer regression evidence and evaluator auto-caller wiring remain separate owner-scoped items.</p><p><span class="pill archive">HISTORICAL</span> VCP-first plans, replay records, and scan map remain searchable evidence, clearly marked as superseded/audit.</p></div>
+<p style="margin-top:24px">Companion map: <a href="README.md">docs/README.md</a> · Vault index: <a href="../vault/INDEX.md">vault/INDEX.md</a></p>
 </main></body></html>

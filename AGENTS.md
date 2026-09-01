@@ -52,7 +52,7 @@ User-facing decision lanes are:
 REVIEW_NOW | SETUP_FORMING | DAILY_CANDIDATE | WAIT | AVOID | DATA_BLOCKED
 ```
 
-T1–T7 implementation layers are complete in the prototype branch; T8 full-universe ranking and served acceptance remains pending. Stale, missing, invalid, incoherent, or insufficient evidence must fail closed into an explicit unknown/blocked state. Never infer a metric, wave label, target, or risk value from a similarly named field.
+- **T1–T9 source and release promotion: DONE** — promoted to `release/signalix-mvp-stable`; `/api/setup-candidates` is served from the live DB builder with honest lanes. Public 390px failure→Retry→recovery browser acceptance is `PASS` (2026-09-01); evaluator auto-caller wiring remains a separate owner decision.
 
 ## How to use this file
 

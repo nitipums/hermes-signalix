@@ -1,6 +1,7 @@
 # Signalix Elliott/Trend/Trade-Setup Decision Spine
 
-> **STATUS: OWNER-APPROVED DESIGN — T1–T9 SOURCE IMPLEMENTED + PROMOTED; SERVED SPINE ACCEPTANCE PENDING**
+> **STATUS: OWNER-APPROVED DESIGN — T1–T9 SOURCE IMPLEMENTED + PROMOTED; SERVED ACCEPTANCE PENDING**
+> **Reconciled:** 2026-09-01 · Runtime currently serves the DB-built API partially; public desktop/mobile/error journey remains NOT VERIFIED.
 > **Date:** 2026-08-30 · **Implementation:** 2026-08-31 (T1–T9 source) · **Promotion:** 2026-08-31 (release branch)
 > **Scope:** `marginable_long` stock setup discovery and preparation — active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true` (currently 237 symbols)
 > **Product role:** Signalix finds and prepares candidate trade setups; Arm reviews the chart and makes the final trade decision.
@@ -27,7 +28,7 @@ The redesign is a clean replacement of the decision spine, not a deletion of use
 ### 2.0 Owner decisions confirmed during design grilling
 
 - `marginable_long` is the real product universe. Active ORD outside it remains explicit audit/rollback coverage and is not part of setup-candidate serving.
-- The product separates `DAILY_CANDIDATE` → `SETUP_FORMING` → `REVIEW_NOW`. A valid Daily candidate whose 60m setup is unfinished is not `DATA_BLOCKED`.
+- The product separates `DAILY_CANDIDATE` → `SETUP_FORMING` → `REVIEW_NOW`. A valid Daily candidate whose 60m setup is unfinished is not `DATA_BLOCKED`; it is presented as `NO_SETUP_DETECTED` when required Daily/60m data are available but qualifying anchors do not exist.
 - Elliott v1 covers observable Wave 1 through Wave 5 structural states, while retaining `UNKNOWN` and explicit uncertainty.
 - Wave 1 is a preparation state as well as a structural observation; the system does not wait for Wave 2 before preparing a valid lower-timeframe setup.
 - `REVIEW_NOW` is intentionally pre-break: it prepares a complete plan before the trigger. `PRE_TRIGGER` and `TRIGGERED` remain distinct setup states.
@@ -175,7 +176,9 @@ Freshness follows the exchange session calendar rather than raw wall-clock age:
 - During an open session, 60m evidence must contain the latest completed interval required by the fetch cadence.
 - After market close, the final-session observation is required.
 - Through weekends and exchange holidays, the final observation from the latest completed trading day remains current.
-- Missing data that should exist for the completed session is `DATA_BLOCKED`; an exchange closure alone is not stale data.
+- Missing required data that should exist for the completed session produces an explicit data reason (`NO_DAILY_DATA`, `NO_60M_DATA`, `DAILY_STALE`, `60M_STALE`, or `60M_INVALID`) and `DATA_BLOCKED`; an exchange closure alone is not stale data.
+- Available Daily/60m data without qualifying 60m anchors produces `NO_SETUP_DETECTED` and maps to `SETUP_FORMING` or `DAILY_CANDIDATE`, not generic `DATA_BLOCKED`.
+- Invalid Fib/risk inputs that prevent a safe plan produce `RISK_INVALID`; they must never silently become a valid setup or use a legacy fallback.
 
 ### 2.10 Trigger, entry zone, and extension
 
@@ -302,7 +305,12 @@ Each item contains these top-level groups:
 - `setup.trade_stop` and `setup.thesis_invalidation` are separate from `wave.primary_state`.
 - `bonus_evidence.vcp` is optional supporting evidence.
 - `provenance` identifies policy version, source, as-of time/date, and freshness.
-- Every numeric output crossing the API boundary must be JSON-safe plain numbers or null.
+- `data_status` carries a deterministic `reason_code` for data availability/freshness: `NO_DAILY_DATA`, `NO_60M_DATA`, `DAILY_STALE`, `60M_STALE`, `60M_INVALID`, or `NONE` when required inputs are available.
+- `setup` carries a deterministic `reason_code` for setup readiness/risk: `NO_SETUP_DETECTED`, `RISK_INVALID`, or another explicit setup reason; `NONE` means no blocking setup reason.
+- `NO_SETUP_DETECTED` is user-facing “No setup detected yet” and maps to `SETUP_FORMING`/`DAILY_CANDIDATE` when Daily evidence is valid. `RISK_INVALID` is user-facing “Risk invalid” and remains non-actionable.
+- `DATA_BLOCKED` is reserved for unavailable, stale, invalid, or incoherent required evidence. It must not be used as a generic synonym for “no qualifying setup.”
+- The canonical route has **no fallback** to legacy snapshots, legacy projections, or legacy decision fields. If the canonical builder/artifact is unavailable, return an explicit transport/build error; never relabel legacy output as setup candidates.
+- List requests default to `page_size=50`; response metadata always preserves full `eligible_count`, `evaluated_count`, `total_items`, lane counts, and returned page count. Heavy wave evidence is loaded through detail/chart paths.
 
 Illustrative item:
 
@@ -367,7 +375,28 @@ Illustrative item:
 }
 ```
 
-The illustrative values are contract examples only, not live market output.
+### 4.2 Chart-ready Elliott evidence contract
+
+Every candidate may expose `wave_markers[]` as normalized chart evidence produced by the same Daily wave snapshot:
+
+```json
+{
+  "id": "wave1_low",
+  "kind": "STRUCTURAL_ANCHOR",
+  "timeframe": "1D",
+  "timestamp": "2026-08-01T00:00:00+07:00",
+  "price": 16.5,
+  "label": "Wave 1 low",
+  "wave_role": "WAVE_1",
+  "source": "elliott_structure_engine",
+  "confidence": "MEDIUM",
+  "evidence_refs": ["measurable_advance", "structure_intact"],
+  "snapshot_id": "..."
+}
+```
+
+The first implementation must support markers for Wave 1 low/high, Wave 2 pullback low, Wave 3 close confirmation, tested-high/structure-break, trigger, trade stop, and thesis invalidation. Each marker uses an exact candle timestamp and price; positional indices alone are not a sufficient API contract. The UI provides a toggleable Wave Evidence layer and click-to-explain content showing the rule, evidence, alternative state, missing evidence, policy/variant, and snapshot identity. Daily markers appear only on compatible Daily charts; 60m markers require explicit mapping and otherwise show not-mapped/unavailable.
+
 
 ## 5. Migration and retirement boundary
 
@@ -389,7 +418,14 @@ The illustrative values are contract examples only, not live market output.
 - any route that silently filters out non-VCP candidates;
 - any Daily-labelled metric calculated from 60m fallback data.
 
-The migration must not silently delete historical data or alter old observations. Compatibility fields may remain for audit, but the new API and dashboard must expose one primary contract.
+The migration must not silently delete historical data or alter old observations. Compatibility fields may remain for audit, but the new API and dashboard must expose one primary contract. The canonical route has no fallback to legacy snapshots, legacy projections, or legacy decision fields. If the canonical builder/artifact is unavailable, return an explicit transport/build error; never relabel legacy output as setup candidates.
+
+### 5.1 One-day legacy retirement boundary
+
+- Hide the VCP tab from primary navigation immediately.
+- Keep `/api/vcp-finder` audit-only for one day with explicit deprecation status.
+- During the one-day window, run route/import/timer/consumer reuse audit, including accidental reuse of old functions by canonical paths.
+- After the window, remove or return 410 only for paths with zero canonical consumers and documented rollback/audit retention, after Arm sign-off.
 
 ## 6. Testing and acceptance design
 
@@ -401,6 +437,15 @@ Acceptance proceeds through three evidence layers before production implementati
 
 Algorithmic swing, confidence, and threshold questions that cannot be settled from documents alone must pass a read-only throwaway prototype/replay before production code is rewritten.
 
+### 6.1 Served performance and pagination acceptance
+
+- Release warm canonical API target: ≤1s.
+- Release cold canonical API target: ≤15s; strict cold ≤3s remains a future optimization target.
+- First meaningful UI target: ≤2s.
+- Default list page size: 50; pagination must make all 237 eligible rows reachable while preserving full-universe metadata.
+- List payload target: roughly ≤200–300KB; heavy `wave.evidence` and chart markers load on detail/chart interaction.
+- Measure cold/warm/post-ingestion latency, payload bytes, DB query count, build stage timings, and concurrent single-flight behavior separately.
+
 ### Pure-function tests
 
 - Trend state and strength evidence on rising, flat, falling, and new-high fixtures.
@@ -410,12 +455,17 @@ Algorithmic swing, confidence, and threshold questions that cannot be settled fr
 - Setup status emits extension/invalidation separately.
 - Sector/peer breadth handles missing peers and does not silently become a hard exclusion.
 - Trigger, invalidation, Fib targets, and R:R are deterministic and JSON-safe.
-- Insufficient/stale data produces `UNKNOWN`/`DATA_BLOCKED`, not a positive state.
+- Insufficient/stale data produces explicit reason codes and `UNKNOWN`/`DATA_BLOCKED`; `NO_SETUP_DETECTED` remains non-blocked when required evidence is available.
+- Invalid Fib/risk inputs produce `RISK_INVALID` and never use a legacy fallback.
 
 ### API tests
 
 - `/api/setup-candidates` returns the complete contract and provenance.
 - Daily and 60m evidence are separated by field and timeframe.
+- `data_status.reason_code` distinguishes `NO_DAILY_DATA`, `NO_60M_DATA`, `DAILY_STALE`, `60M_STALE`, `60M_INVALID`, and `NONE`.
+- `setup.reason_code` distinguishes `NO_SETUP_DETECTED` and `RISK_INVALID`; valid Daily/60m data without anchors never becomes generic `DATA_BLOCKED`.
+- Canonical route has no legacy snapshot/projection fallback and returns explicit build/transport error when unavailable.
+- Pagination defaults to 50 and full metadata preserves all 237 evaluated rows and lane counts.
 - No VCP-only hard gate removes a valid non-VCP candidate.
 - Invalid/missing data is explicit.
 - Legacy `/api/vcp-finder` is not used as the default `/mvp` data source.
@@ -425,11 +475,14 @@ Algorithmic swing, confidence, and threshold questions that cannot be settled fr
 After implementation, verify the public route first, then the same user journey at desktop and 390px mobile:
 
 - candidate list loads;
+- default page shows 50 rows with reachable pagination and full-universe metadata;
 - grouping by Wave/setup lifecycle is understandable;
 - card shows trend, rise/high evidence, Wave candidate, trigger, invalidation, targets, R:R, sector/peers, and VCP bonus;
-- unknown/data-blocked state is visible and not misrepresented as a setup;
+- Wave Evidence toggle shows timestamp/value markers and click-to-explain rule/evidence/snapshot;
+- unknown/data-blocked, `NO_SETUP_DETECTED`, and `RISK_INVALID` states are visible and not misrepresented as a setup;
 - an API/data failure state is exercised;
-- `/mvp` and `/api/setup-candidates` agree on the primary contract.
+- `/mvp` and `/api/setup-candidates` agree on the primary contract;
+- VCP tab is absent from primary navigation after migration card A.
 
 Source tests alone are not UI acceptance.
 
@@ -446,6 +499,8 @@ Source tests alone are not UI acceptance.
 
 The first release includes the decision-first dashboard, candidate evidence/detail, Daily plus 60m chart context, owner review events, saved/watch candidates, and historical machine snapshots. Notifications/alerts, automatic policy tuning, broker/order execution, and public multi-user SaaS remain out of scope.
 
-## 8. Approval gate
+## 8. Approval and implementation gate
 
-This spec is ready for owner review. Implementation begins only after Arm approves this written spec. After approval, create a bounded implementation plan with explicit files, tests, runtime probes, deployment boundary, and rollback/retirement handling.
+This spec was owner-approved for refinement on 2026-09-01 after independent Lite/Ploy/Codex review. Q1–Q14 are settled at product-intent level; Lite + Codex own technical field/enum details. Before implementation, publish bounded tickets with real blocking edges and have Lite manage Kanban. Codex implements only the current ticket with explicit `-m gpt-5.6-luna`, TDD, and no deploy/restart/DB write unless separately approved. Lite independently reviews source, tests, runtime, API, browser, mobile, and failure state; Ploy challenges trader/risk semantics where relevant.
+
+The implementation cards must be sequenced after `to-tickets`, not inferred from this spec alone. No code fix, deletion, fallback removal, deployment, or migration is authorized by the spec until the ticket is dispatched through the Lite-managed Kanban flow.

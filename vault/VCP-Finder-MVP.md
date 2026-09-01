@@ -1,7 +1,8 @@
 # Signalix VCP Finder MVP
 
-> **STATUS: CURRENT** · **CANONICAL_FOR:** VCP-first MVP surface and display contract.
-> **Last reviewed:** 2026-08-26
+> **STATUS: SUPERSEDED 2026-09-01** · VCP compatibility/audit contract only.
+> **Replacement authority:** `../docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
+> VCP evidence, replay history, and legacy route are retained; they no longer define the primary product surface.
 
 ## Product surface
 

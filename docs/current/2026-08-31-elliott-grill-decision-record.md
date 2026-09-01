@@ -110,27 +110,28 @@ Treat these as unverified AI advisory, not owner decisions:
 | Concern | Read/update first | Status |
 |---|---|---|
 | Owner grill decisions and evidence index | This record | CURRENT |
-| Prototype/replay/chart-review phase | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` + throwaway worktree | CURRENT — IN PROGRESS |
+| Prototype/replay/chart-review phase | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` + throwaway worktree | HISTORICAL evidence; T1–T9 later promoted; 390px failure/recovery gate passed |
 | Domain terminology | `CONTEXT.md` | CURRENT working glossary |
-| Executable Elliott product contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | CURRENT working design; spec gate still explicit |
-| Implementation plan | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | CURRENT working plan; checklist needs reconciliation |
-| Product thesis/roadmap | `vault/Product-Strategy-Market-to-Action.md` | CURRENT authority, contains legacy sections requiring reconciliation |
-| Atomic decisions | `vault/Decisions.md` | CURRENT ledger; contains older VCP decisions as history/transition context |
-| Acceptance/evidence | `vault/Execution-Pipeline.md` | CURRENT acceptance authority; baseline wording needs sync |
-| Architecture/runtime | `vault/Architecture.md`, `vault/Deployment.md` | CURRENT operational references; new spine serving remains not verified |
+| Executable Elliott product contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | CURRENT; source implemented/promoted; 390px failure/recovery gate passed |
+| Implementation plan | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | CURRENT closeout; checklists historical evidence |
+| Product thesis/roadmap | `vault/Product-Strategy-Market-to-Action.md` | CURRENT authority; current override at section 12 |
+| Atomic decisions | `vault/Decisions.md` | CURRENT ledger; team review added 2026-09-01 |
+| Acceptance/evidence | `vault/Execution-Pipeline.md` | CURRENT authority; team review is next gate |
+| Architecture/runtime | `vault/Architecture.md`, `vault/Deployment.md` | CURRENT; served 390px failure/recovery gate passed; broader/evaluator items separate |
 | Historical work | `docs/archive/superpowers/`, `vault/archive/`, dated postmortems | HISTORICAL / ARCHIVED |
 
 ## 7. Current verdict
 
 | Gate | Verdict | Evidence |
 |---|---|---|
-| Owner product direction | PASS for documented working direction | Grill decisions and updated design content |
-| Prototype logic | PASS as throwaway evidence | Reported walkthrough/axe/mobile checks |
-| Focused engine tests | PASS as code evidence | Reported `30/30` |
+| Owner product direction | PASS | Owner-approved Elliott/Trend/Trade-Setup direction |
+| Prototype logic | PASS | Throwaway evidence only |
+| Focused engine tests | PASS | `30/30` at prototype checkpoint |
 | Long-horizon Wave 3 validation | NOT VERIFIED | Week-large / 1Y comparison remains open |
-| New production runtime | NOT VERIFIED | Served setup path currently returns all 237 as `DATA_BLOCKED` with stale `as_of` |
-| Opus identity/routing | NOT VERIFIED | UI selection and response metadata disagree |
-| Production promotion | BLOCKED | Runtime/data/spec/UI gates are not aligned |
+| Runtime transport | PASS | `/mvp` and `/api/setup-candidates` respond locally; readiness 200 |
+| Served semantics | REVISE | current full aggregation shows 227 DATA_BLOCKED / 10 AVOID and no positive review lanes |
+| Browser/public acceptance | NOT VERIFIED | desktop/mobile/error journey remains open |
+| Production readiness | BLOCKED | four owner concerns require bounded review/fixes first |
 
 ## 8. Resume sequence
 
@@ -140,15 +141,19 @@ Treat these as unverified AI advisory, not owner decisions:
 4. Only after owner/spec gate: create bounded implementation tickets, then verify source → tests → runtime → public UI.
 5. Keep alerts, auto-trading, and broker execution off.
 
-## 9. Session closeout — latest resume state (updated 2026-08-31 eve)
+> **Current closeout:** T1–T9 source and release promotion are complete. The live dashboard shell/API have been reloaded and return the DB-built contract; the public 390px failure→Retry→recovery journey is PASS. This record is the durable evidence index, not runtime authority.
 
-- **Phase:** Implementation tickets published — ready to start ticket 01 (universe + contract scaffolding).
-- **Active worktree:** `/root/signalix/.worktrees/elliott-state-replay`.
-- **Branch:** `prototype/elliott-state-replay` (HEAD 897d440 base; worktree remains intentionally dirty — never reset/stash/commit without owner direction).
-- **Base release checkout:** `/root/signalix` on `release/signalix-mvp-stable`; do not use it for prototype edits.
+> **Closeout reconciliation 2026-09-01:** The isolated public 390px failure→Retry→recovery browser journey is now `PASS`; direct evidence is recorded in `vault/2026-09-01-Current-Session-Handoff.md`. The evaluator auto-caller decision and any broader desktop/drawer regression remain separate.
+
+- **Phase:** T1–T9 implementation and release promotion complete; 390px failure/recovery acceptance passed; broader desktop/drawer evidence remains separate.
+- **Active release checkout:** `/root/signalix` on `release/signalix-mvp-stable`; prototype worktree is historical evidence and remains isolated.
 - **Prototype assets:** `prototypes/elliott-state-replay/index.html`, `replay_lab.py`, `engine_evidence_chart.py`, `crc_dual_wave.py`, and worktree Elliott/variant files.
 
-### Completed this session (Lite-verified)
+### Current implementation closeout
+- **T1–T9:** source implemented and promoted to `release/signalix-mvp-stable`.
+- **Remaining gates:** broader desktop/drawer regression evidence and evaluator auto-caller decision; the explicit 390px API/error-state journey is closed by the isolated harness.
+- **Do not restart implementation from ticket 01:** the later T1/T2 closeout notes below are retained evidence, not an outstanding task list.
+
 - **Retracement gate fixed:** `backend/elliott_structure_engine.py` adds `retrace_ok_for_w3` (retrace ≤60 AND holds) — blocks W3 promotion when retrace >60% or Wave1-low broken. Verified: CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION (correct).
 - **Universe resolver fixed:** `replay_lab.resolve_universe` now queries `symbol_master` (931 active ORD) instead of `price_data` (1,219) — eligible now 237. Verified 237/237.
 - **Focused tests:** `backend/test_elliott_setup_engine.py` 30/30 PASS (Lite rerun).
@@ -163,17 +168,17 @@ Treat these as unverified AI advisory, not owner decisions:
   - `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` — legacy-path wording sync
 - **Implementation tickets published:** `.scratch/elliott-trend-trade-setup/issues/01..08` (Matt Pocock to-tickets; owner approved granularity).
   - Frontier: **01** (None), then 02/03 → 04 → 05/06 → 07 → 08.
-  - Next action when resuming: implement ticket 01 with bounded batch (worker + Lite final gate), then 02/03 engine production boundaries with contract tests.
+  - Historical next action at that checkpoint: implement ticket 01, then 02/03 engine boundaries. This was completed by the later T1–T9 promotion.
 
-### T2 closeout (2026-08-31 late, Lite-verified)
+### Historical T2 closeout evidence (checkpoint before release promotion)
 - **T2 — Elliott engine → production + contract test: DONE.** Commit `d31a2d2` on `prototype/elliott-state-replay` (scoped: engine + tests + fixtures only).
 - **Close-gate enforced (spec §2.7):** `EARLY_WAVE_3`/`WAVE_3_CONTINUATION` now require a Daily Close above Wave 1 high; wick alone = `TESTED_HIGH` never promotes; volume/markers are supporting evidence only. Regression path (marker-promoted EWR3 without close) removed; old test updated to spec.
 - **`build_wave_contract` added (spec §2.2):** primary_state/alternative_state/confidence LOW–MEDIUM–HIGH + supporting/contradicting/missing arrays, dual-degree evidence-only, JSON-safe. Ready for T4 to consume.
 - **Evidence:** full backend suite 594 passed / 2 skipped; frozen 1Y fixtures CRC/BGRIM/AWC (as_of 2026-08-28) lock owner-verified states — CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION HIGH; live read-only replay dry-run reproduced all three.
-- **NOT VERIFIED / deferred:** no deploy/restart (runtime serving untouched — nothing to serve yet); T3+ tickets still open; dirty worktree files untouched (trade_setup_engine.py relax = T3 input).
+- **Historical checkpoint only:** no deploy/restart at that prototype stage; T3+ were open then. This is superseded by the later T1–T9 release promotion recorded above.
 
-### Not started / intentionally deferred
-- Ticket 01 done (commit `8573b9d`), T2 done (commit `d31a2d2`); T3 trade-setup engine production is next, then T4 API integration.
+### Historical implementation notes (retained evidence)
+- Ticket 01/T2 completion and the later T3–T9 implementation are retained as historical evidence; no ticket is currently outstanding from this record.
 - Week-large 7%/2-bars production validation (prototype only, NOT locked; skill notes keep as candidate option for 6M+).
 - Opus stress-test corner-case loop (optional challenger input only).
 - No production promotion, DB writes, deployment, alert activation, broker integration, or auto-trading.

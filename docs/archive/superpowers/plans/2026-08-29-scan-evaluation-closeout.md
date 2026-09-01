@@ -1,7 +1,6 @@
 # Signalix Scan & Evaluation Closeout Workplan
 
-> **STATUS: CURRENT_WITH_REMAINING_GAPS**
-> **Owner:** Arm
+> **STATUS: HISTORICAL / SUPERSEDED 2026-09-01** · Retained audit evidence; the Elliott/Trend/Trade-Setup plan is the current implementation authority.
 > **Orchestrator/final gate:** Lite
 > **Trader/product challenger:** Ploy
 > **Started:** 2026-08-29

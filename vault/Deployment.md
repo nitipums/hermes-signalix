@@ -1,6 +1,7 @@
 # Deployment
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`. Runtime state must be verified from the host/container, not assumed from this note.
+> **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
+> **Reconciled:** 2026-09-01 · Release branch T1–T9 promoted; containers healthy; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller separate.
 
 ## Stable release
 
@@ -11,9 +12,11 @@ MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-## Current runtime scope — 2026-08-28
+## Current runtime scope — 2026-09-01
 
-Dashboard-first operation is current: Daily VCP Watchlist plus All VCP · 60m / Explorer remain in focus. Alert delivery is paused. The Compose `delivery` service uses profile `alerts`, and is not started by default; enable only deliberately with `docker compose --profile alerts up -d delivery` after a future owner decision. Current active services are `signalix_backend`, `signalix_dashboard`, `signalix_postgres`, and `signalix_redis`.
+The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis are healthy at rebaseline; `/mvp` returns 200, `/api/setup-candidates` returns the live DB-built contract, `/health/readiness` is on backend `:8000`, and retired `/dashboard.html` returns 404. The public 390px failure→Retry→recovery journey is verified; broader desktop/drawer regression evidence remains separate. Alerts, auto-trading, and broker execution remain off.
+
+`marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
 The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
 

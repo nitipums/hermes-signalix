@@ -1,6 +1,7 @@
 # VCP Decision Shadow v2 — Multi-Day Every-60m Replay
 
-> **STATUS: CURRENT EVIDENCE** · 2026-08-28
+> **STATUS: HISTORICAL / AUDIT EVIDENCE** · Superseded as primary decision authority on 2026-09-01.
+> Current authority: `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`.
 > **Verdict:** `REVISE` — v2 lane integrity passes; v1 sequence policy and Low-Cheat entry profile are not accepted for a served-policy switch.
 > **Deployment boundary updated 2026-08-30:** Historical replay/shadow fields remain non-serving. The owner-approved `decision_shadow_v2` projection is now applied to live VCP results under `marginable_long`; raw morphology/source policy remains `signalix/vcp-finder-60m-v1`.
 

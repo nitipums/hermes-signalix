@@ -1,6 +1,7 @@
 # Signalix T9 — Lifecycle Persistence + Owner-Review API
 
-> **STATUS: OWNER-APPROVED DESIGN — READY FOR IMPLEMENTATION**
+> **STATUS: OWNER-APPROVED DESIGN — IMPLEMENTED + PROMOTED; RUNTIME ACCEPTANCE PARTIAL**
+> **Reconciled:** 2026-09-01 · Lifecycle source/DB integration is complete; evaluator auto-caller and public browser journey remain open.
 > **Date:** 2026-08-31
 > **Owner confirmation:** Q1–Q22 confirmed by Arm
 > **Scope:** PostgreSQL persistence and owner-only API integration for the already-verified pure lifecycle contract.

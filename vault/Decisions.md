@@ -2,9 +2,35 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
-## 2026-08-31 — T1–T9 spine promoted to release (LITE-VERIFIED)
+## 2026-09-01 — Session boundary before implementation
+
+Arm instructed: record the complete review/spec/ticket state, stop, switch to a fresh session, then implement. The old VCP todo/blocked cards were archived; no new Kanban cards were published or dispatched. Local ticket drafts are under `.scratch/2026-09-01-signalix-review/issues/`. Next session must re-read the handoff and re-check git/worktrees/runtime before publishing cards.
+
+
+Arm refined the review contract: distinguish no Daily data from no 60m data; call valid Daily evidence without qualifying 60m anchors `NO_SETUP_DETECTED`/setup-forming; call invalid Fib/risk `RISK_INVALID`; prohibit legacy fallback; use a 1-day legacy deprecation window; and audit code/import reuse before removal.
+
+Arm refined Q5–Q9 and approved the next operating boundary: technical reason-field/enum design is delegated to Lite + Codex, with independent review; canonical fallback is prohibited; valid Daily plus valid 60m without qualifying anchors is user-visible `NO_SETUP_DETECTED`; legacy deprecation is one day; Lite manages Kanban and dispatches Codex per bounded task, then independently reviews the result. Q14 approves updating the focused spec before ticket creation.
+
+
+
+Arm approved the four review directions: (1) separate true unavailable/stale/invalid data from incomplete 60m setup; (2) target warm API ≤500ms, cold API ≤3s, first meaningful UI ≤2s, with compact list payload and heavy evidence on detail; (3) add chart-linked Daily Elliott markers and “How this wave was identified”; (4) retire legacy in stages: primary migration → audit-only quarantine → deprecation → removal/410 after rollback sign-off.
+
+These decisions authorize contract/design refinement, not implementation or deployment. The review packet is `docs/current/2026-09-01-signalix-independent-review.md`; next step is close the remaining design frontier, then create bounded Kanban cards.
+
+
+Decision: Do not fix, delete legacy, deploy, or dispatch implementation cards from the review alone. First take the consolidated review `docs/current/2026-09-01-signalix-independent-review.md` to askmatt, then create bounded Kanban cards for reason-level DATA_BLOCKED semantics, cold-path performance, chart-ready Elliott markers, and staged legacy quarantine.
+
+Evidence: Lite, Ploy, and Codex independently reviewed the same release. All four owner concerns are `REVISE`; runtime transport is PASS but served semantics and public browser acceptance are not closed. Ploy aggregated all 237 rows: 227 DATA_BLOCKED, 10 AVOID, zero positive review/forming/candidate/wait lanes.
+
+
+The owner-approved current stock-setup authority is the Elliott/Trend/Trade-Setup design and its T1–T9 promoted implementation. `/api/setup-candidates` is primary; VCP Finder notes/routes are compatibility, audit, or replay evidence. Current runtime evidence is partial: the dashboard shell and DB-built API respond, but public desktop/mobile/error browser acceptance and evaluator auto-caller wiring remain open. This entry supersedes older VCP-first wording in this ledger without deleting historical decisions.
+
 
 Decision: Promote the complete T1–T8 spine plus T7/T9 lifecycle work from `prototype/elliott-state-replay` to `release/signalix-mvp-stable` after Lite source/DB/runtime gates. Served spine acceptance on the public URL (desktop/390px/error journeys) is the next gate before calling the spine production-ready; evaluator-caller wiring for lifecycle persistence stays a separate owner decision.
+
+## 2026-09-01 — Current closeout reconciliation
+
+The public 390px failure→Retry→recovery browser gate passed through an isolated `agent-browser` session against `/mvp`: only `/api/setup-candidates` was intercepted; the failure state showed no stale rows and an actionable Retry; restoring the route and clicking Retry returned HTTP 200 with 50 rows from 237 evaluated. Evidence is retained under `.scratch/2026-09-01-browser-failure-retry-final2/` and summarized in `vault/2026-09-01-Current-Session-Handoff.md`. The evaluator auto-caller decision and broader desktop/drawer acceptance remain separate.
 
 Evidence: release commits `8573b9d`..`2f6e790` (T1–T8), `9589fca` (T7), `00dd37c`/`04d6639`/`ddf1a87`/`7b3ed49` (T9), full backend suite green on release after promotion; lifecycle production e2e on :8000 passed (GET/POST/401/409/idempotency, append-only trigger verified); migration `007` applied to the canonical database with owner approval.
 

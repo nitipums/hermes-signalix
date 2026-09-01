@@ -46,6 +46,6 @@ The following were deliberately untouched because they are owner changes, user r
 - `../backend/` and live containers/artifacts
 - ignored `.superpowers/sdd/` working evidence
 
-## Current caveat
+## Current reconciliation — 2026-09-01
 
-The file layout is now separated, but semantic cleanup is intentionally next: the vault still contains conflicting VCP-first versus Trend/Elliott/Trade-Setup wording. Do not resolve that conflict by reading archive files as authority. Reconcile the canonical vault notes in a separate documentation pass.
+The semantic cleanup is complete for the canonical spine: T1–T9 Elliott/Trend/Trade-Setup is promoted, `/api/setup-candidates` is primary, and VCP documents are compatibility/audit history. Public 390px failure→Retry→recovery browser acceptance is PASS; broader desktop/drawer evidence and evaluator auto-caller remain separate. Do not use archived VCP notes or stale checklists as current direction.

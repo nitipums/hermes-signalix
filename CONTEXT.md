@@ -115,3 +115,15 @@ _Avoid_: Candidate thesis, mutable setup
 **Arm Review Event**:
 An append-only owner judgement attached to the exact machine snapshot, such as Agree, Watch, Disagree Wave, Reject Setup, Missed Candidate, or Note. It never overwrites the machine interpretation.
 _Avoid_: Machine correction, historical override
+
+## 2026-09-01 Owner-approved review decisions
+
+- `DATA_BLOCKED` means required evidence is unavailable, stale, invalid, or incoherent; valid Daily evidence with an unfinished 60m setup belongs in `DAILY_CANDIDATE` or `SETUP_FORMING`, not generic blocked.
+- Dashboard release performance targets are warm API ≤1s and cold API ≤15s, with 237/237 coverage and single-flight; strict cold ≤3s, first meaningful UI ≤2s, and compact list payload roughly ≤200–300KB remain future optimization targets; heavy wave evidence loads on detail/drawer.
+- Wave explainability must expose chart-linked Daily markers for Wave 1 low/high, Wave 2 pullback low, Wave 3 close confirmation, tested-high/structure-break, trigger, trade stop, and thesis invalidation, with a linked evidence explanation. Daily and 60m markers remain separate unless explicitly mapped.
+- Legacy retirement uses staged migration: primary UI/API migration → audit-only quarantine → deprecation window → removal/410 after usage and rollback sign-off. Raw VCP/replay evidence remains immutable.
+- Q5–Q8 refinement: distinguish `NO_DAILY_DATA` from `NO_60M_DATA`; valid Daily plus no qualifying 60m anchors is `NO_SETUP_DETECTED`/setup-forming rather than generic `DATA_BLOCKED`; invalid Fib/risk is `RISK_INVALID`; no legacy fallback is allowed; legacy deprecation window is 1 day, followed by code/import reuse audit and owner-approved removal/410.
+- Q9 workflow: Matt grill → owner decision/CONTEXT/ledger → to-spec → to-tickets → Kanban dependency chain → Codex bounded implementation/TDD → Lite diff/test/runtime/UI gate → Ploy trader challenge where relevant → terminal report and controlled unblock. Codex remains implementation/review input, never final authority.
+- Q10–Q11 technical boundary: Arm sets product intent; Lite and Codex choose the concrete field/enum mapping and independently review it. Keep data reason separate from setup reason; valid Daily + valid 60m without anchors is `NO_SETUP_DETECTED`, while actual unavailable/stale/invalid evidence remains explicitly blocked.
+- Q12–Q13 execution boundary: hide the VCP tab immediately, prohibit canonical fallback, use a 1-day audit-only deprecation window, then audit code/import reuse. Lite manages Kanban, dispatches Codex per bounded task, receives artifacts, and performs final review; Codex does not manage Kanban.
+- Q15 technical seam decision: Arm does not need to choose internal module seams. Lite + Codex select the smallest safe seams: candidate contract for reason/lane/payload, chart evidence contract for markers/explanations, and migration boundary for no-fallback/reuse audit/removal.

@@ -1,7 +1,7 @@
 # Signalix Scan & Evaluation Logic Map
 
-> **STATUS: CURRENT_WITH_REMAINING_GAPS**
-> **Date:** 2026-08-29
+> **STATUS: HISTORICAL / SUPERSEDED 2026-09-01**
+> Retained as source-grounded audit evidence. Current architecture and decision authority are in `vault/Architecture.md` and the Elliott/Trend/Trade-Setup design.
 > **Purpose:** อธิบายว่า Signalix ตอนนี้ scan/evaluate อะไร อย่างไร และจุดไหนซ้ำซ้อน
 > **Scope:** source + served-runtime map; current runtime evidence is recorded below
 
