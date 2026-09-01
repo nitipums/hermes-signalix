@@ -71,6 +71,23 @@ This is a usable release handoff, not a claim that machine-generated Elliott lab
 
 Arm will try the current `/mvp` manually. Any uncertainty or incorrect-looking Elliott identification should be collected as chart-review feedback, then handled as a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle. Do not silently tune wave labels from subjective feedback without an explicit owner-approved contract.
 
+## User-validation preflight — 2026-09-01
+
+### Rendered usability journey — PASS
+
+- Public `/mvp` loaded at desktop `1280×900` and mobile `390×844`.
+- Primary setup-candidate surface rendered `50` cards from `237 evaluated`; metadata, freshness, filters, and pagination were visible.
+- VCP tab opened and clearly displayed `Audit / compatibility / rollback only · deprecated`.
+- KCE card opened the real detail drawer; chart/timeframe controls, Wave Evidence, drawer navigation, close control, and body scroll lock worked.
+- Drawer panel scroll was verified (`scrollHeight=1145`, `clientHeight=717`, `overflow-y=auto`); after scrolling, the full Wave Evidence explanation and provenance were visible.
+- TradingView link verified: `https://www.tradingview.com/symbols/KCE/?exchange=SET`.
+- Mobile metrics: `innerWidth=390`, `clientWidth=390`, `scrollWidth=390`, `body.scrollWidth=390`; no horizontal overflow.
+- Console and page-error logs were empty. Evidence: `.scratch/2026-09-01-user-validation/`.
+
+### Semantic Wave confirmation — NOT VERIFIED
+
+The rendered explanation is available for Arm's review, but Lite does not mark the machine-generated Wave interpretation correct on Arm's behalf. Arm must compare the chart/evidence points and confirm or report disagreement. Any disagreement starts a new bounded `grill-with-docs → spec → tickets → implementation` loop.
+
 ## Related authority
 
 - [[Execution-Pipeline]]

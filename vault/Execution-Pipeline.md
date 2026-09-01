@@ -45,6 +45,8 @@ The product must let a user answer, quickly and honestly:
 
 The release is handed to Arm for manual use. Elliott Wave output remains machine-generated candidate/evidence, not unquestionable truth. Review/confirm Wave identification from the rendered chart first; do not tune semantics from assumptions. Any confirmed product issue becomes a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle.
 
+Lite preflight is `PASS` for the rendered usability journey (desktop/mobile load, tab/filter interaction, candidate→drawer, chart, Wave Evidence visibility after drawer scroll, TradingView link, and no overflow). Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
+
 ## Historical baseline — VCP-first MVP (superseded 2026-09-01)
 
 The following older VCP-first baseline is retained as audit history, not current product authority.
