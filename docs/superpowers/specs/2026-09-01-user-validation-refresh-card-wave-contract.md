@@ -85,5 +85,11 @@ The current live TASCO probe showed `daily_available=true` and fresh 60m data wh
 T06 adds the bounded source presentation for the canonical Daily `wave.primary_state` and
 `LOW`/`MEDIUM`/`HIGH` confidence on setup-candidate cards and the drawer. The drawer labels
 this as `Daily structural`; missing canonical wave data remains `Unavailable`/`NOT_VERIFIED`,
-and legacy VCP-only drawer items do not claim Daily wave provenance. Served/public acceptance
+legacy VCP-only drawer items do not claim Daily wave provenance. Served/public acceptance
 and desktop/390px browser evidence remain pending.
+
+T07 adds previous/next navigation over the current filtered, lane-ordered setup-candidate
+collection. The drawer exposes a position indicator, disables controls at collection
+boundaries, and keeps selected item, chart, and metadata enrichment behind the existing
+request-sequence guards. Source tests pass; the served `:3001` artifact is still stale and
+must be reloaded before desktop/390px browser acceptance.

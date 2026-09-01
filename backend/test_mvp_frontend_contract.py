@@ -967,3 +967,34 @@ def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
     assert result["scroll"] <= result["viewport"]
     assert result["card"] <= 390
     assert result["grid"] <= result["card"]
+
+
+def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_boundaries():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    collection = _extract_function(js, "setupDrawerCollection")
+    grouping = _extract_function(js, "groupSetupCandidates")
+    navigation = _extract_function(js, "drawerNavigationState")
+    items = [
+        {"symbol": "ZZZ", "decision_lane": "DAILY_CANDIDATE"},
+        {"symbol": "AAA", "decision_lane": "REVIEW_NOW", "setup": {"status": "TRIGGERED"}},
+        {"symbol": "AAA", "decision_lane": "REVIEW_NOW", "setup": {"status": "PRE_TRIGGER"}},
+        {"symbol": "MID", "decision_lane": "SETUP_FORMING"},
+    ]
+    assert _run_node([grouping, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
+    assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 0)") == {"index": 0, "count": 3, "position": "1 of 3", "previousDisabled": True, "nextDisabled": False}
+    assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 2)") == {"index": 2, "count": 3, "position": "3 of 3", "previousDisabled": False, "nextDisabled": True}
+    assert 'id="drawer-position"' in html
+    assert "drawerItems[nextIndex] || drawerItemForSymbol(symbol)" in js
+    assert "items = items.filter(setupCandidateMatchesToolbar)" in js
+    assert "drawerItems = setupDrawerCollection(items)" in js
+
+
+def test_t07_drawer_navigation_atomically_guards_stale_enrichment_and_chart_responses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "drawerItem = item;" in js
+    assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol" in js
+    assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe" in js
+    assert "drawerItem = drawerItem.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : mergeCanonicalSetupDetail(item, fresh);" in js
+    assert ".drawer-position" in css

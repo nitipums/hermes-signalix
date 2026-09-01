@@ -107,6 +107,7 @@
     drawerClose:   $("#drawer-close"),
     drawerPrev:    $("#drawer-prev"),
     drawerNext:    $("#drawer-next"),
+    drawerPosition: $("#drawer-position"),
     drawerSymbol:  $("#drawer-symbol"),
     drawerName:    $("#drawer-name"),
     drawerPrice:   $("#drawer-price"),
@@ -164,7 +165,9 @@
   let chartTimeframe = "60M";
   let chartSymbol = null;
   let drawerSymbols = [];
+  let drawerItems = [];
   let drawerIndex = -1;
+  let drawerItem = null;
   let drawerTouchStartX = null;
   let chartRequestSeq = 0;
   let chartAbort = null;
@@ -784,11 +787,21 @@
   }
 
   function updateDrawerNav() {
-    var hasItems = drawerSymbols.length > 1 && drawerIndex >= 0;
+    var hasItems = drawerSymbols.length > 0 && drawerIndex >= 0;
     dom.drawerPrev.disabled = !hasItems || drawerIndex <= 0;
     dom.drawerNext.disabled = !hasItems || drawerIndex >= drawerSymbols.length - 1;
     dom.drawerPrev.title = hasItems ? "Previous stock" : "No previous stock";
     dom.drawerNext.title = hasItems ? "Next stock" : "No next stock";
+    if (dom.drawerPosition) {
+      dom.drawerPosition.textContent = hasItems ? (drawerIndex + 1) + " of " + drawerSymbols.length : "– of –";
+      dom.drawerPosition.setAttribute("aria-label", hasItems ? "Stock " + (drawerIndex + 1) + " of " + drawerSymbols.length : "Stock position unavailable");
+    }
+  }
+
+  function drawerNavigationState(symbols, index) {
+    var count = Array.isArray(symbols) ? symbols.length : 0;
+    return {index: index, count: count, position: index >= 0 && index < count ? (index + 1) + " of " + count : "– of –",
+      previousDisabled: index <= 0 || count === 0, nextDisabled: index < 0 || index >= count - 1 || count === 0};
   }
 
   function visibleDrawerSymbols() {
@@ -864,7 +877,7 @@
     if (nextIndex < 0 || nextIndex >= drawerSymbols.length) return;
     var symbol = drawerSymbols[nextIndex];
     drawerIndex = nextIndex;
-    openDrawer(drawerItemForSymbol(symbol), symbol, drawerSymbols, drawerIndex);
+    openDrawer(drawerItems[nextIndex] || drawerItemForSymbol(symbol), symbol, drawerSymbols, drawerIndex);
   }
 
   function openDrawer(item, symbol, navSymbols, navIndex) {
@@ -876,7 +889,12 @@
         risk_stop: setup.trade_stop, rr: (setup.rr || {}).to_target_1});
     }
     chartSymbol = symbol;
-    if (Array.isArray(navSymbols)) drawerSymbols = navSymbols.slice();
+    if (Array.isArray(navSymbols)) {
+      drawerSymbols = navSymbols.slice();
+      if (drawerItems.length !== drawerSymbols.length || !drawerItems[navIndex] || drawerItems[navIndex].symbol !== symbol) {
+        drawerItems = drawerSymbols.map(drawerItemForSymbol);
+      }
+    }
     if (navIndex != null) drawerIndex = navIndex;
     else {
       drawerIndex = drawerSymbols.indexOf(symbol);
@@ -892,11 +910,12 @@
     chartAbort = chartController;
     // Immediate render from local card data (fast path).
     if (item.vcp_result) item._canonicalMetadataPending = true;
-    renderDrawerDetail(item);
+    drawerItem = item;
+    renderDrawerDetail(drawerItem);
 
     var cachedChart = chartCache[chartKey];
     if (cachedChart) {
-      renderDrawerChart(mergeChartDecisionOverlay(cachedChart, item));
+      renderDrawerChart(mergeChartDecisionOverlay(cachedChart, drawerItem));
     } else {
       dom.drawerChartPH.style.display = "block";
       dom.drawerChartPH.textContent = "Chart loading…";
@@ -915,21 +934,22 @@
       .then(function(fresh) {
         if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
         if (fresh && fresh.symbol) {
-          renderDrawerDetail(item.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : mergeCanonicalSetupDetail(item, fresh));
+          drawerItem = drawerItem.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : mergeCanonicalSetupDetail(item, fresh);
+          renderDrawerDetail(drawerItem);
           var currentChart = chartCache[chartKey];
-          if (currentChart && item.vcp_result) {
+          if (currentChart && drawerItem.vcp_result) {
             // Daily metadata can arrive after candles. It can provide an
             // optional target, but never supplies VCP trigger/invalidation.
-            renderDrawerChart(mergeChartDecisionOverlay(currentChart, item));
+            renderDrawerChart(mergeChartDecisionOverlay(currentChart, drawerItem));
           }
         }
       })
       .catch(function() {
         // Metadata failure is distinct from VCP evidence being NOT_VERIFIED.
         if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
-        if (item.vcp_result) {
-          item._canonicalMetadataPending = false;
-          renderDrawerDetail(item);
+        if (drawerItem && drawerItem.vcp_result) {
+          drawerItem._canonicalMetadataPending = false;
+          renderDrawerDetail(drawerItem);
         }
       });
 
@@ -975,6 +995,7 @@
     chartRequestSeq += 1;
     if (chartAbort) chartAbort.abort();
     chartAbort = null;
+    drawerItem = null;
     dom.drawer.classList.add("drawer--hidden");
     document.body.style.overflow = "";
   }
@@ -1298,6 +1319,15 @@
     return {order: laneOrder, groups: groups};
   }
 
+  function setupDrawerCollection(items) {
+    var grouped = groupSetupCandidates(items || []);
+    return grouped.order.reduce(function(result, lane) {
+      return result.concat(grouped.groups[lane]);
+    }, []).filter(function(item, index, all) {
+      return item && item.symbol && all.findIndex(function(candidate) { return candidate.symbol === item.symbol; }) === index;
+    });
+  }
+
   function validateSetupCandidatePayload(data) {
     if (!data || !Array.isArray(data.items) || !data.counts ||
         typeof data.counts !== "object" || Array.isArray(data.counts)) return false;
@@ -1351,6 +1381,8 @@
       return;
     }
     items = items.filter(setupCandidateMatchesToolbar);
+    drawerItems = setupDrawerCollection(items);
+    drawerSymbols = drawerItems.map(function(item) { return item.symbol; });
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     var freshness = data.freshness || {};

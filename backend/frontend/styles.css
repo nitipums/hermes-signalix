@@ -351,6 +351,7 @@ body {
 }
 .drawer-title  { font-size: 16px; font-weight: 700; }
 .drawer-nav { display:flex; align-items:center; gap:4px; margin-left:auto; }
+.drawer-position { min-width:52px; color:var(--text-2); font-size:11px; text-align:center; font-variant-numeric:tabular-nums; }
 .drawer-nav-button { min-height:var(--touch); min-width:var(--touch); border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text-2); font-size:20px; cursor:pointer; }
 .drawer-nav-button:hover:not(:disabled) { color:var(--accent); border-color:var(--accent); }
 .drawer-nav-button:disabled { opacity:.3; cursor:not-allowed; }
@@ -435,6 +436,9 @@ body {
   .setup-candidate__grid { grid-template-columns: 1fr; gap: 6px; }
   .setup-candidate__plan { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
   .setup-candidate-card { width: 100%; max-width: 100%; }
+  .drawer-header { padding:10px; gap:4px; }
+  .drawer-nav { margin-left:2px; }
+  .drawer-position { min-width:46px; }
 }
 
 /* ── reduced motion ── */
