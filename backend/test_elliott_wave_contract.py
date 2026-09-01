@@ -14,6 +14,7 @@ import pytest
 from elliott_structure_engine import (
     WAVE_STATES,
     _swing_legs_ohlc,
+    build_wave_evidence_markers,
     build_wave_contract,
     classify_wave_candidate,
 )
@@ -35,6 +36,15 @@ EXPECTED_STATES = {
     "CRC": "WAVE_1_ADVANCE",       # retrace 85.71% > 60% must NOT promote to W3
     "BGRIM": "WAVE_3_CONTINUATION",  # retrace 29.17%, close above Wave 1 high
     "AWC": "WAVE_1_ADVANCE",       # retrace 91.18% > 60% must NOT promote to W3
+}
+
+EXPECTED_MARKERS = {
+    "CRC": [("WAVE_1_LOW", "109", 16.5), ("WAVE_1_HIGH", "114", 20.0),
+             ("WAVE_2_PULLBACK_LOW", "143", 17.0), ("WAVE_3_CLOSE_CONFIRMATION", "259", 27.75)],
+    "BGRIM": [("WAVE_1_LOW", "126", 13.1), ("WAVE_1_HIGH", "210", 17.9),
+               ("WAVE_2_PULLBACK_LOW", "245", 17.6), ("WAVE_3_CLOSE_CONFIRMATION", "259", 20.7)],
+    "AWC": [("WAVE_1_LOW", "109", 1.92), ("WAVE_1_HIGH", "118", 2.26),
+            ("WAVE_2_PULLBACK_LOW", "175", 2.06), ("WAVE_3_CLOSE_CONFIRMATION", "259", 3.12)],
 }
 
 
@@ -87,6 +97,19 @@ def test_wave_contract_shape_and_confidence(symbol):
         assert isinstance(contract[key], list)
     assert contract["policy"] == "elliott-v1-observable-proxy"
     json.dumps(contract)  # JSON-safe boundary
+
+
+@pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
+def test_chart_markers_are_exact_fixture_rows_and_snapshot_linked(symbol):
+    contract = build_wave_contract(load_frame(symbol))
+    actual = [(row["kind"], row["timestamp"], row["price"])
+              for row in contract["evidence_markers"] if row["kind"] != "THESIS_INVALIDATION"]
+    assert actual == EXPECTED_MARKERS[symbol]
+    assert all(marker["snapshot_id"] == contract["snapshot_id"] for marker in contract["evidence_markers"])
+    assert all(marker["timeframe"] == "daily" for marker in contract["evidence_markers"])
+    required = {"id", "kind", "timeframe", "timestamp", "price", "label", "wave_role",
+                "source", "confidence", "evidence_refs", "snapshot_id", "snapshot_identity"}
+    assert all(required <= marker.keys() for marker in contract["evidence_markers"])
 
 
 def test_unknown_contract_still_exposes_arrays_and_low_confidence():
@@ -168,6 +191,29 @@ def test_wave_contract_confidence_respects_review_lane_boundary():
             assert contract["confidence"] == "LOW"
         else:
             assert contract["confidence"] in {"MEDIUM", "HIGH"}
+
+
+def test_tested_high_marker_uses_source_wick_price_and_timestamp():
+    frame = pd.DataFrame({"date": ["2026-01-01", "2026-01-02"],
+                          "High": [10.0, 12.0], "Low": [9.0, 11.0],
+                          "Close": [9.5, 11.5]})
+    marker = build_wave_evidence_markers(
+        frame, {"wave1_high": 11.0, "tested_high_only": True}
+    )[0]
+    assert marker["kind"] == "TESTED_HIGH"
+    assert marker["price"] == 12.0
+    assert marker["timestamp"] == "2026-01-02"
+
+
+def test_marker_timestamp_normalization_matches_daily_and_intraday_chart_forms():
+    daily = pd.DataFrame({"date": [pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-02")],
+                          "High": [10.0, 12.0], "Low": [9.0, 11.0],
+                          "Close": [9.5, 11.5]})
+    marker = build_wave_evidence_markers(
+        daily, {"wave1_high": 11.0, "tested_high_only": True}
+    )[0]
+    assert marker["timestamp"] == "2026-01-02"
+
 
 
 def test_contradicting_evidence_flags_broken_gates():

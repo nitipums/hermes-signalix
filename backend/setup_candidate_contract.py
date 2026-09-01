@@ -165,6 +165,13 @@ def _has_blocked_data(data_status: dict, wave: dict, setup: dict) -> bool:
         return True
     if freshness in {"stale", "unknown", "invalid", "unavailable"}:
         return True
+    reason_codes = {_status_token(code) for code in (data_status.get("reason_codes") or [])}
+    scalar_reason = _status_token(data_status.get("reason_code"))
+    if scalar_reason:
+        reason_codes.add(scalar_reason)
+    if any(code == "NO_DAILY_DATA" or code == "NO_60M_DATA"
+           or code.startswith(("STALE_", "INVALID_")) for code in reason_codes):
+        return True
     if str(setup.get("status", "")).upper() == "DATA_BLOCKED":
         return True
     if wave.get("timeframe", "daily") not in {None, "daily"}:
@@ -190,19 +197,109 @@ def _number(value: Any) -> float | None:
     return value if math.isfinite(value) else None
 
 
+def _normalize_marker_timestamp(value: Any) -> str | None:
+    """Match chart candle timestamps without changing date-only Daily values."""
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    if len(raw) > 10 and raw[10] == " ":
+        raw = raw[:10] + "T" + raw[11:]
+    return raw
+
+
+def _setup_evidence_markers(setup: dict, wave: dict, provenance: dict) -> list[dict]:
+    """Expose setup levels as source-linked 60m markers when timestamped."""
+    setup, provenance = setup or {}, provenance or {}
+    setup_provenance = setup.get("provenance") if isinstance(setup.get("provenance"), dict) else {}
+    timestamp = setup_provenance.get("as_of") or provenance.get("intraday_as_of")
+    snapshot_id = setup.get("snapshot_id") or provenance.get("snapshot_id")
+    if snapshot_id is None and timestamp is not None:
+        snapshot_id = "60m:" + str(timestamp)
+    result = []
+    for kind, price_key, timestamp_key, label, role, refs in (
+        ("TRIGGER", "trigger", "trigger_timestamp", "60m trigger", "SETUP", ["setup.trigger"]),
+        ("TRADE_STOP", "trade_stop", "trade_stop_timestamp", "Trade stop", "TRADE_RISK", ["setup.trade_stop"]),
+    ):
+        price = _number(setup.get(price_key))
+        marker_timestamp = _normalize_marker_timestamp(setup.get(timestamp_key) or timestamp)
+        if price is None or marker_timestamp is None:
+            continue
+        result.append(_json_value({
+            "id": "setup-" + kind.lower().replace("_", "-"), "kind": kind,
+            "timeframe": "60m", "timestamp": str(marker_timestamp), "price": price,
+            "label": label, "wave_role": role, "source": "intraday_ohlcv",
+            "confidence": "HIGH" if setup.get("status") not in {"DATA_BLOCKED", "FORMING"} else "MEDIUM",
+            "evidence_refs": refs, "snapshot_id": snapshot_id,
+            "snapshot_identity": snapshot_id,
+            "explanation": {"rule": "Deterministic 60m setup level from the trade-setup payload.",
+                            "evidence": refs, "alternative": None,
+                            "missing": [], "policy": "setup-candidates-v1"},
+        }))
+    return result
+
+
 def _wave_confidence(wave: dict) -> str:
     """Normalize legacy classifier tokens at the projection boundary."""
     confidence = _status_token(wave.get("confidence"))
     return {"INSUFFICIENT": "LOW", "PARTIAL": "MEDIUM"}.get(confidence, confidence)
 
 
+def _normalize_wave_evidence(wave: dict) -> dict:
+    """Guarantee the evidence shape for every canonical wave interpretation."""
+    result = dict(wave or {})
+    state = result.get("primary_state", result.get("state", "UNKNOWN"))
+    for field in ("supporting_evidence", "contradicting_evidence", "missing_evidence"):
+        value = result.get(field)
+        if value is None:
+            result[field] = []
+        elif not isinstance(value, list):
+            result[field] = list(value) if isinstance(value, (tuple, set)) else [value]
+    # A producer may provide the legacy state key only; keep the canonical
+    # state explicit so downstream consumers do not infer it from evidence.
+    if result.get("primary_state") is None and result.get("state") is not None:
+        result["primary_state"] = result["state"]
+    if state != "UNKNOWN":
+        return result
+    return result
+
+
 def _has_plan(setup: dict) -> bool:
     targets = setup.get("targets")
-    if not isinstance(targets, (list, tuple)):
-        targets = [targets] if targets is not None else []
+    if not isinstance(targets, (list, tuple)) or not targets:
+        return False
+
+    # Compatibility payloads predate named target objects and contain only
+    # scalar prices, e.g. ``targets: [120]``.  Keep this narrow adapter
+    # separate from the canonical named-target validation below: a mixed list
+    # must never silently downgrade into the legacy interpretation.
+    scalar_targets = all(
+        isinstance(target, numbers.Number) and not isinstance(target, bool)
+        and _number(target) is not None
+        for target in targets
+    )
+    if scalar_targets:
+        return (_number(setup.get("trigger")) is not None
+                and _number(setup.get("invalidation")) is not None)
+
+    target_1 = setup.get("target_1")
+    if target_1 is None:
+        target_1 = next((target.get("price") for target in targets
+                         if isinstance(target, dict) and target.get("name") == "target_1"), None)
+    target_1 = _number(target_1)
+    ordered_targets = all(
+        isinstance(target, dict) and target.get("name") == f"target_{index}"
+        and _number(target.get("price")) is not None
+        for index, target in enumerate(targets, start=1)
+    )
+    first_target = targets[0].get("price") if isinstance(targets[0], dict) else None
     return (_number(setup.get("trigger")) is not None
             and _number(setup.get("invalidation")) is not None
-            and any(_number(target) is not None for target in targets))
+            and target_1 is not None
+            and ordered_targets
+            and _number(first_target) == target_1)
 
 
 def project_decision_lane(data_status: dict, wave: dict, setup: dict,
@@ -262,27 +359,53 @@ def build_setup_candidate(
     provenance: dict,
 ) -> dict:
     """Build one canonical, JSON-safe setup-candidate item."""
-    wave_out = dict(wave or {})
+    wave_out = _normalize_wave_evidence(wave)
     if wave_out.get("timeframe") is None:
         wave_out["timeframe"] = "daily"
     setup_out = dict(setup or {})
+    # Direct engine-to-contract composition can carry this legacy adapter
+    # field.  Normalize it into the data layer so setup.reason_code remains a
+    # setup-only diagnostic.
+    engine_data_reason = setup_out.pop("data_reason_code", None)
+    data_status_out = dict(data_status or {})
+    reason_codes = list(data_status_out.get("reason_codes") or [])
+    if data_status_out.get("reason_code"):
+        reason_codes.insert(0, data_status_out["reason_code"])
+    if engine_data_reason:
+        reason_codes.append(engine_data_reason)
+    reason_codes = list(dict.fromkeys(
+        _status_token(code) for code in reason_codes if code
+    ))
+    if reason_codes:
+        data_status_out["reason_code"] = reason_codes[0]
+        data_status_out["reason_codes"] = reason_codes
     if setup_out.get("timeframe") is None:
         setup_out["timeframe"] = "60m"
     if wave_out.get("primary_state") is None and wave_out.get("state") is not None:
         wave_out["primary_state"] = wave_out["state"]
-    lane = project_decision_lane(data_status or {}, wave_out, setup_out, trend or {})
+    lane = project_decision_lane(data_status_out, wave_out, setup_out, trend or {})
+    provenance_out = provenance or {}
+    daily_markers = (wave_out.get("evidence_markers") or [])
+    setup_markers = _setup_evidence_markers(setup_out, wave_out, provenance_out)
+    # Explicit timeframe buckets prevent a Daily marker from appearing on a 60m chart.
+    chart_evidence = {"daily": {"timeframe": "daily", "markers": daily_markers},
+                      "60m": {"timeframe": "60m", "markers": setup_markers,
+                              "daily_mapping": None}}
     item = {
         "symbol": str(symbol),
         "as_of": as_of,
-        "data_status": data_status or {},
+        "data_status": data_status_out,
         "trend": trend or {},
         "wave": wave_out,
         "setup": setup_out,
         "context": context or {},
         "bonus_evidence": bonus_evidence or {},
         "decision_lane": lane,
-        "provenance": provenance or {},
+        "provenance": provenance_out,
     }
+    # Preserve the exact legacy/caller shape when no chart-linked evidence exists.
+    if daily_markers or setup_markers:
+        item["chart_evidence"] = chart_evidence
     return _json_value(item)
 
 
@@ -391,6 +514,78 @@ def project_setup_candidate_list(
         "policy_version": (provenance or {}).get("policy_version", POLICY_VERSION),
         "universe": universe,
         "provenance": _json_value(provenance or {}),
+    }
+
+
+def _diagnostic_bucket(count_symbols: list[str]) -> dict:
+    symbols = sorted(set(count_symbols))
+    return {"count": len(symbols), "symbols": symbols}
+
+
+def build_setup_candidate_diagnostic(
+    items: list[dict], *, as_of: str | None, universe: str,
+    returned_count: int,
+) -> dict:
+    """Summarize every evaluated row without changing the served item page.
+
+    Buckets describe deterministic evidence gaps, not additional decision
+    labels.  Missing data buckets take precedence over stale/invalid evidence;
+    a row can appear in more than one independent evidence bucket.
+    """
+    daily_unavailable, intraday_unavailable = [], []
+    stale_invalid, no_setup, invalid_risk_fib = [], [], []
+    lane_totals = {lane: 0 for lane in (
+        "REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"
+    )}
+    for item in items or []:
+        symbol = str(item.get("symbol", ""))
+        data = item.get("data_status") or {}
+        setup = item.get("setup") or {}
+        lane = str(item.get("decision_lane", "")).upper()
+        if lane in lane_totals:
+            lane_totals[lane] += 1
+
+        data_reason_codes = {
+            _status_token(code) for code in (data.get("reason_codes") or [])
+        }
+        scalar_reason = _status_token(data.get("reason_code"))
+        if scalar_reason:
+            data_reason_codes.add(scalar_reason)
+        daily_missing = "NO_DAILY_DATA" in data_reason_codes
+        intraday_missing = "NO_60M_DATA" in data_reason_codes
+        if daily_missing:
+            daily_unavailable.append(symbol)
+        if intraday_missing:
+            intraday_unavailable.append(symbol)
+
+        stale_or_invalid = any(code.startswith(("STALE_", "INVALID_"))
+                               for code in data_reason_codes)
+        if stale_or_invalid:
+            stale_invalid.append(symbol)
+
+        setup_reason_code = _status_token(setup.get("reason_code"))
+        risk_status = str(setup.get("risk_status", "")).upper()
+        risk_fib_invalid = (
+            setup_reason_code == "RISK_INVALID"
+            or risk_status in {"INVALID", "FAILED", "BROKEN", "FAILED_RISK", "RISK_FAILED"}
+        )
+        if risk_fib_invalid:
+            invalid_risk_fib.append(symbol)
+
+        if setup_reason_code == "NO_SETUP_DETECTED" and data.get("sufficient") is not False:
+            no_setup.append(symbol)
+
+    return {
+        "as_of": as_of,
+        "universe": universe,
+        "evaluated_count": len(items or []),
+        "returned_count": returned_count,
+        "decision_lane_totals": lane_totals,
+        "daily_unavailable": _diagnostic_bucket(daily_unavailable),
+        "intraday_60m_unavailable": _diagnostic_bucket(intraday_unavailable),
+        "stale_invalid_evidence": _diagnostic_bucket(stale_invalid),
+        "no_setup_detected": _diagnostic_bucket(no_setup),
+        "invalid_risk_fib": _diagnostic_bucket(invalid_risk_fib),
     }
 
 

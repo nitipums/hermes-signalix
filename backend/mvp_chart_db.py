@@ -24,6 +24,10 @@ import datetime as dt
 from typing import Any, Optional
 from threading import Lock
 
+import pandas as pd
+
+from elliott_structure_engine import build_wave_contract
+
 
 _POOL = None
 _POOL_LOCK = Lock()
@@ -105,7 +109,7 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
     candles: list[dict] = []
     for row in rows:
         candles.append({
-            "date": str(row[0]),
+            "date": _chart_timestamp(row[0], timeframe),
             "open": float(row[1]) if row[1] is not None else None,
             "high": float(row[2]) if row[2] is not None else None,
             "low": float(row[3]) if row[3] is not None else None,
@@ -115,6 +119,21 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
     if timeframe in {"1D", "60M"}:
         candles.reverse()
     return candles
+
+
+def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
+    """Serialize Daily dates and 60m datetimes in the same ISO form as markers."""
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    if str(timeframe).upper() != "60M":
+        return raw[:10] if len(raw) >= 10 else raw
+    if len(raw) > 10 and raw[10] == " ":
+        raw = raw[:10] + "T" + raw[11:]
+    return raw
 
 
 
@@ -255,6 +274,8 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
             "provenance": {
@@ -270,6 +291,12 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
         cur.close()
     except Exception as e:
         # Fail-graceful: return NOT_VERIFIED
+        # psycopg2 connections are transactional; return a clean connection
+        # to the pool so a failed query cannot poison the next chart request.
+        try:
+            pg.rollback()
+        except Exception:
+            pass
         return {
             "symbol": symbol.upper(),
             "candles": None,
@@ -278,6 +305,8 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
             "provenance": {
@@ -303,6 +332,9 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                 "ma200": None,
                 "macd": None,
                 "rsi": None,
+                "wave_evidence": {"timeframe": "60m", "markers": [],
+                                  "mapping": {"daily": "not_projected", "60m": "setup_only"},
+                                  "missing": ["daily_markers_not_projected"]},
                 "source": None,
                 "as_of": None,
                 "availability": "unavailable",
@@ -340,6 +372,20 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     note = (", ".join(notes) if notes else
             f"Computed from {chart_source} (SELECT only). All indicators available.")
 
+    wave_evidence = {"timeframe": timeframe.lower(), "markers": [],
+                     "mapping": {"daily": "not_projected", "60m": "setup_only"}}
+    if timeframe == "1D":
+        daily = pd.DataFrame(candles)
+        if not daily.empty:
+            daily = daily.rename(columns={"open": "Open", "high": "High", "low": "Low",
+                                          "close": "Close", "volume": "Volume"})
+            wave = build_wave_contract(daily, {}, snapshot_id="daily:" + str(as_of))
+            wave_evidence = {"timeframe": "daily", "markers": wave.get("evidence_markers", []),
+                             "explanation": wave.get("evidence_explanation"),
+                             "snapshot_id": wave.get("snapshot_id"),
+                             "mapping": {"daily": "authoritative", "60m": "not_projected"}}
+    elif timeframe == "60M":
+        wave_evidence["missing"] = ["daily_markers_not_projected"]
     return {
         "symbol": symbol.upper(),
         "timeframe": timeframe,
@@ -349,6 +395,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
         "ma200": ma200,
         "macd": macd,
         "rsi": rsi,
+        "wave_evidence": wave_evidence,
         "source": chart_source,
         "as_of": as_of,
         "provenance": {

@@ -37,7 +37,8 @@ def _json_value(value: Any):
     return numeric if numeric is not None else str(value)
 
 
-def _empty_setup(state: str, status: str, freshness=None, reason=None) -> dict:
+def _empty_setup(state: str, status: str, freshness=None, reason=None,
+                 reason_code=None, data_reason_code=None) -> dict:
     setup = {
         "timeframe": "60m",
         "state": state,
@@ -58,6 +59,10 @@ def _empty_setup(state: str, status: str, freshness=None, reason=None) -> dict:
     }
     if reason:
         setup["reason"] = reason
+    if reason_code:
+        setup["reason_code"] = reason_code
+    if data_reason_code:
+        setup["data_reason_code"] = data_reason_code
     return setup
 
 
@@ -161,6 +166,17 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     timestamp = df.index[-1]
     freshness = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
     is_minimal = (leg_end - leg_start == 1) or (pullback_end - pullback_start == 1)
+    trigger_pos = leg_start + int(leg["High"].astype(float).values.argmax())
+    trigger_timestamp = prior.index[trigger_pos]
+    if hasattr(trigger_timestamp, "isoformat"):
+        trigger_timestamp = trigger_timestamp.isoformat()
+    else:
+        trigger_timestamp = str(trigger_timestamp)
+    trade_stop_timestamp = prior.index[pullback_end]
+    if hasattr(trade_stop_timestamp, "isoformat"):
+        trade_stop_timestamp = trade_stop_timestamp.isoformat()
+    else:
+        trade_stop_timestamp = str(trade_stop_timestamp)
     return {
         "anchor_policy": ANCHOR_POLICY,
         "trigger": swing_high,
@@ -172,7 +188,27 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
         "freshness": freshness,
         "is_minimal": is_minimal,
         "as_of": as_of,
+        "trigger_timestamp": trigger_timestamp,
+        "trade_stop_timestamp": trade_stop_timestamp,
     }
+
+
+def _valid_60m_series(df: pd.DataFrame | None) -> bool:
+    if not _valid_ohlcv(df) or df.attrs.get("timeframe") != "60m":
+        return False
+    if not isinstance(df.index, pd.DatetimeIndex) or df.index.hasnans:
+        return False
+    if not df.index.is_monotonic_increasing or not df.index.is_unique:
+        return False
+    as_of = df.attrs.get("as_of")
+    if as_of is not None:
+        try:
+            timestamp = pd.Timestamp(as_of)
+            if pd.isna(timestamp) or timestamp < df.index[-1]:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
 
 
 def _ratio(target: float | None, trigger: float | None, invalidation: float | None):
@@ -191,19 +227,35 @@ def build_trade_setup(
 ) -> dict:
     """Prepare, but never authorize, a 60m trade setup."""
     daily_wave = daily_wave or {}
-    state = daily_wave.get("state") or "UNKNOWN"
+    state = daily_wave.get("state") or daily_wave.get("primary_state") or "UNKNOWN"
     if daily_wave.get("timeframe") != "daily":
-        return _empty_setup(state, "DATA_BLOCKED", reason="missing or mismatched Daily timeframe")
+        return _empty_setup(
+            state, "DATA_BLOCKED", reason="missing or mismatched Daily timeframe",
+            data_reason_code="INVALID_DAILY_OHLCV",
+        )
+    if intraday_df is None or len(intraday_df) == 0:
+        return _empty_setup(
+            state, "DATA_BLOCKED", reason="missing 60m OHLCV",
+            data_reason_code="NO_60M_DATA",
+        )
+    if not _valid_60m_series(intraday_df):
+        return _empty_setup(
+            state, "DATA_BLOCKED", reason="invalid 60m OHLCV",
+            data_reason_code="INVALID_60M_OHLCV",
+        )
     anchors = _intraday_anchors(intraday_df) if intraday_df is not None else {}
     if not anchors:
-        reason = (
-            "missing or invalid 60m OHLCV"
-            if not _valid_ohlcv(intraday_df)
-            else "insufficient recent 60m structural anchors"
+        return _empty_setup(
+            state, "FORMING", intraday_df.index[-1].isoformat(),
+            reason="insufficient recent 60m structural anchors",
+            reason_code="NO_SETUP_DETECTED",
         )
-        return _empty_setup(state, "DATA_BLOCKED", reason=reason)
 
     setup = _empty_setup(state, "FORMING", anchors["freshness"])
+    setup["snapshot_id"] = "60m:" + str(anchors["freshness"])
+    setup["snapshot_identity"] = setup["snapshot_id"]
+    setup["trigger_timestamp"] = anchors["trigger_timestamp"]
+    setup["trade_stop_timestamp"] = anchors["trade_stop_timestamp"]
     thesis_invalidation = _number(daily_wave.get("thesis_invalidation"))
     if thesis_invalidation is None:
         thesis_invalidation = _number((daily_wave.get("evidence") or {}).get("wave1_low"))
@@ -224,21 +276,30 @@ def build_trade_setup(
     fib = risk_helper.compute_fib_targets(
         anchors["swing_low"], anchors["swing_high"], anchors["pullback_low"]
     )
-    targets = [fib.get("fib_1272"), fib.get("fib_1618")]
-    targets = [round(_number(target), 4) for target in targets
+    targets = [(method, fib.get(method)) for method in ("fib_1272", "fib_1618")]
+    targets = [(method, round(_number(target), 4)) for method, target in targets
                if _number(target) is not None and _number(target) > trigger]
     if (fib.get("status") not in {None, "OK"} or not targets or
             not _number(risk) or risk <= 0):
-        setup["status"] = "DATA_BLOCKED"
+        setup["status"] = "INVALIDATED"
+        setup["risk_status"] = "INVALID"
+        setup["reason_code"] = "RISK_INVALID"
         setup["reason"] = "invalid Fib or risk anchors"
         return _json_value(setup)
-    setup["targets"] = targets
+    setup["targets"] = [
+        {"name": f"target_{index}", "price": price, "method": method}
+        for index, (method, price) in enumerate(targets[:2], start=1)
+    ]
+    # Numeric aliases preserve the pre-marker setup payload for older callers;
+    # the ordered objects above are the canonical chart/API representation.
+    setup["target_1"] = targets[0][1]
+    setup["target_2"] = targets[1][1] if len(targets) > 1 else None
     setup["rr"] = {
-        "to_target_1": _ratio(targets[0], trigger, invalidation),
-        "to_target_2": _ratio(targets[1], trigger, invalidation) if len(targets) > 1 else None,
+        "to_target_1": _ratio(targets[0][1], trigger, invalidation),
+        "to_target_2": _ratio(targets[1][1], trigger, invalidation) if len(targets) > 1 else None,
     }
     setup["risk"] = round(trigger - invalidation, 4)
-    setup["reward"] = round(targets[0] - trigger, 4)
+    setup["reward"] = round(targets[0][1] - trigger, 4)
     setup["rr_bands"] = {
         "minimum_review": 2,
         "lower_priority": [2, 4],

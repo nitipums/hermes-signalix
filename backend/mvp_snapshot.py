@@ -6,8 +6,9 @@ from typing import Any
 
 CONTRACT_VERSION = "signalix.mvp.v1"
 
-# Legacy projection fields are not canonical MVP decision data.  Keeping them
-# in the artifact lets an old group/date leak beside the current Stage/Phase.
+# Legacy projection fields are not canonical MVP decision data. Keeping them
+# in compatibility artifacts preserves audit evidence without letting an old
+# group/date leak beside the canonical setup-candidate decision.
 LEGACY_PROJECTION_FIELDS = frozenset({
     "evidence_summary",
     "old_group_mapping",
@@ -16,7 +17,7 @@ LEGACY_PROJECTION_FIELDS = frozenset({
 
 CANONICAL_SETUP_FIELDS = frozenset({
     "symbol", "as_of", "data_status", "trend", "wave", "setup",
-    "context", "bonus_evidence", "decision", "provenance",
+    "context", "bonus_evidence", "provenance",
 })
 
 # These fields describe the retired dashboard/VCP taxonomy.  They may remain
@@ -33,7 +34,8 @@ LEGACY_PRIMARY_FIELDS = frozenset({
 
 
 def _is_setup_candidate(item: dict) -> bool:
-    return CANONICAL_SETUP_FIELDS <= set(item)
+    return (CANONICAL_SETUP_FIELDS <= set(item)
+            and bool({"decision", "decision_lane"}.intersection(item)))
 
 
 def _nest_legacy_fields(item: dict) -> dict:

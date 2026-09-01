@@ -235,15 +235,16 @@ def rising_60m_frame():
     return result
 
 
-def test_one_bar_rise_without_significant_pullback_is_data_blocked():
+def test_one_bar_rise_without_significant_pullback_is_forming_without_setup():
     frame_ = rising_60m_frame().iloc[:-5].copy()
     frame_.index = pd.date_range("2026-08-30", periods=len(frame_), freq="h")
     frame_.attrs["timeframe"] = "60m"
     result = build_trade_setup(daily_wave_two_evidence(), frame_)
-    assert result["status"] == "DATA_BLOCKED"
+    assert result["status"] == "FORMING"
+    assert result["reason_code"] == "NO_SETUP_DETECTED"
 
 
-def test_degenerate_leg_and_missing_pivot_confirmation_are_blocked():
+def test_degenerate_leg_and_missing_pivot_confirmation_are_forming_without_setup():
     close = list(range(100, 111)) + list(range(109, 103, -1)) + [104, 105, 106]
     frame_ = pd.DataFrame(
         {"Open": close, "High": [v + 1 for v in close],
@@ -252,7 +253,9 @@ def test_degenerate_leg_and_missing_pivot_confirmation_are_blocked():
         index=pd.date_range("2026-08-30", periods=len(close), freq="h"),
     )
     frame_.attrs["timeframe"] = "60m"
-    assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
+    result = build_trade_setup(daily_wave_two_evidence(), frame_)
+    assert result["status"] == "FORMING"
+    assert result["reason_code"] == "NO_SETUP_DETECTED"
 
 
 def test_invalid_timestamp_metadata_is_blocked():
@@ -265,14 +268,16 @@ def test_invalid_timestamp_metadata_is_blocked():
     assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "DATA_BLOCKED"
 
 
-def test_invalid_non_finite_helper_output_is_blocked():
+def test_invalid_non_finite_helper_output_invalidates_risk():
     class BadFib:
         @staticmethod
         def compute_fib_targets(*args):
             return {"fib_1272": float("nan"), "fib_1618": float("inf")}
 
     result = build_trade_setup(daily_wave_two_evidence(), rising_60m_frame(), risk_helper=BadFib)
-    assert result["status"] == "DATA_BLOCKED"
+    assert result["status"] == "INVALIDATED"
+    assert result["risk_status"] == "INVALID"
+    assert result["reason_code"] == "RISK_INVALID"
 
 
 def test_early_wave_three_setup_has_trigger_stop_targets_and_rr():
@@ -351,7 +356,7 @@ def test_flat_structural_break_is_invalidated_not_data_blocked():
     assert build_trade_setup(daily_wave_two_evidence(), frame_)["status"] == "INVALIDATED"
 
 
-def test_non_positive_reward_or_risk_is_blocked():
+def test_non_positive_reward_or_risk_invalidates_risk():
     frame_ = rising_60m_frame()
 
     class BadFib:
@@ -359,7 +364,10 @@ def test_non_positive_reward_or_risk_is_blocked():
         def compute_fib_targets(*args):
             return {"fib_1272": args[0], "fib_1618": args[0], "status": "OK"}
 
-    assert build_trade_setup(daily_wave_two_evidence(), frame_, risk_helper=BadFib)["status"] == "DATA_BLOCKED"
+    result = build_trade_setup(daily_wave_two_evidence(), frame_, risk_helper=BadFib)
+    assert result["status"] == "INVALIDATED"
+    assert result["risk_status"] == "INVALID"
+    assert result["reason_code"] == "RISK_INVALID"
 
 
 def test_status_precedence_and_boundaries_are_deterministic():

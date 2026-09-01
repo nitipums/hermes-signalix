@@ -1161,7 +1161,168 @@ def _missing_evidence(evidence: dict, state: str) -> list[str]:
     return out
 
 
-def build_wave_contract(daily_df, swing_evidence: dict | None = None) -> dict:
+def _marker_timestamp(frame, index: int | None):
+    """Return the source timestamp without manufacturing one."""
+    if index is None or frame is None or index < 0 or index >= len(frame):
+        return None
+    if "date" in frame:
+        value = frame.iloc[index].get("date")
+        return None if value is None else _normalize_marker_timestamp(value)
+    try:
+        value = frame.index[index]
+        return _normalize_marker_timestamp(value)
+    except (IndexError, TypeError):
+        return None
+
+
+def _normalize_marker_timestamp(value) -> str | None:
+    """Normalize source timestamps for the Daily chart's date-only candles."""
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    return raw[:10] if len(raw) >= 10 else raw
+
+
+def _marker_index(frame, price, column: str, start: int = 0, end: int | None = None):
+    """Find an exact source row for a known pivot price."""
+    if price is None or frame is None or column not in frame:
+        return None
+    stop = len(frame) if end is None else min(len(frame), end + 1)
+    try:
+        values = pd.to_numeric(frame[column], errors="coerce")
+        matches = [i for i in range(max(0, start), stop)
+                   if pd.notna(values.iloc[i]) and float(values.iloc[i]) == float(price)]
+        return matches[-1] if matches else None
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def _first_marker_index(frame, predicate, start: int = 0):
+    """Find the first source row where an observable event occurs."""
+    if frame is None:
+        return None
+    for index in range(max(0, start), len(frame)):
+        try:
+            if predicate(frame.iloc[index]):
+                return index
+        except (TypeError, ValueError, KeyError):
+            continue
+    return None
+
+
+def _evidence_marker(kind: str, timeframe: str, timestamp, price, label: str,
+                     wave_role: str, source: str, confidence: str,
+                     evidence_refs: list[str], snapshot_id: str | None,
+                     explanation: dict) -> dict:
+    return _json_value({
+        "id": "elliott-" + kind.lower().replace("_", "-"),
+        "kind": kind,
+        "timeframe": timeframe,
+        "timestamp": timestamp,
+        "price": price,
+        "label": label,
+        "wave_role": wave_role,
+        "source": source,
+        "confidence": confidence,
+        "evidence_refs": evidence_refs,
+        "snapshot_id": snapshot_id,
+        "snapshot_identity": snapshot_id,
+        "explanation": explanation,
+    })
+
+
+def build_wave_evidence_markers(daily_df, evidence: dict, *, confidence: str = "LOW",
+                                snapshot_id: str | None = None) -> list[dict]:
+    """Project only source-linked Daily Elliott observations onto chart markers."""
+    evidence = evidence or {}
+    legs = evidence.get("ohlc_swing_legs") or []
+    markers = []
+    refs = ["daily_ohlcv", "ohlc_swing_legs"]
+    w1_low, w1_high = evidence.get("wave1_low"), evidence.get("wave1_high")
+    w1_leg = next((leg for leg in legs if leg.get("start_price") == w1_low
+                   and leg.get("end_price") == w1_high), None)
+    pullback_leg = None
+    if w1_leg is not None:
+        low_idx, high_idx = int(w1_leg["start"]), int(w1_leg["end"])
+        markers.extend([
+            _evidence_marker("WAVE_1_LOW", "daily", _marker_timestamp(daily_df, low_idx), w1_low,
+                             "Wave 1 low", "WAVE_1", "daily_ohlcv", confidence, refs, snapshot_id,
+                             {"rule": "Wave 1 advance begins at the observed swing low.", "evidence": refs,
+                              "alternative": evidence.get("alternative_state"), "missing": [],
+                              "policy": "elliott-v1-observable-proxy"}),
+            _evidence_marker("WAVE_1_HIGH", "daily", _marker_timestamp(daily_df, high_idx), w1_high,
+                             "Wave 1 high", "WAVE_1", "daily_ohlcv", confidence, refs, snapshot_id,
+                             {"rule": "Wave 1 advance ends at the observed swing high.", "evidence": refs,
+                              "alternative": evidence.get("alternative_state"), "missing": [],
+                              "policy": "elliott-v1-observable-proxy"}),
+        ])
+        markers.append(_evidence_marker(
+            "THESIS_INVALIDATION", "daily", _marker_timestamp(daily_df, low_idx), w1_low,
+            "Thesis invalidation", "THESIS_INVALIDATION", "daily_ohlcv", confidence,
+            ["wave1_low"], snapshot_id,
+            {"rule": "Daily structure is invalid below the Wave 1 low.", "evidence": ["wave1_low"],
+             "alternative": None, "missing": [], "policy": "elliott-v1-observable-proxy"}))
+        pullback = next((leg for leg in legs if leg.get("direction") == -1
+                         and int(leg.get("start", -1)) > high_idx), None)
+        if pullback is not None:
+            pullback_leg = pullback
+            idx = int(pullback["end"])
+            markers.append(_evidence_marker(
+                "WAVE_2_PULLBACK_LOW", "daily", _marker_timestamp(daily_df, idx),
+                pullback.get("end_price"), "Wave 2 pullback low", "WAVE_2",
+                "daily_ohlcv", confidence, refs, snapshot_id,
+                {"rule": "Pullback low is the next observed Daily down-swing low.", "evidence": refs,
+                 "alternative": None, "missing": [], "policy": "elliott-v1-observable-proxy"}))
+    last_idx = len(daily_df) - 1 if daily_df is not None else None
+    if evidence.get("close_above_wave1_high") is True and last_idx is not None:
+        # Confirmation is an as-of observation: the completed latest Daily
+        # candle is the source row that confirms the currently served thesis.
+        # Structural markers above remain anchored to their historical pivots.
+        event_idx = last_idx
+        close = daily_df.iloc[event_idx].get("Close")
+        markers.append(_evidence_marker(
+            "WAVE_3_CLOSE_CONFIRMATION", "daily", _marker_timestamp(daily_df, event_idx), close,
+            "Wave 3 close confirmation", "WAVE_3", "daily_ohlcv", confidence,
+            ["daily_close_above_wave1_high"], snapshot_id,
+            {"rule": "Daily Close must finish above Wave 1 high; a wick alone is not confirmation.",
+             "evidence": ["daily_close_above_wave1_high"], "alternative": None,
+             "missing": [], "policy": "elliott-v1-observable-proxy"}))
+    if evidence.get("tested_high_only") is True:
+        idx = _first_marker_index(
+            daily_df,
+            lambda row: float(row.get("High")) > float(w1_high),
+            start=(int(pullback_leg["end"]) + 1 if pullback_leg is not None
+                   else high_idx + 1 if w1_leg is not None else 0),
+        )
+        markers.append(_evidence_marker(
+            "TESTED_HIGH", "daily", _marker_timestamp(daily_df, idx),
+            daily_df.iloc[idx].get("High") if idx is not None else None,
+            "Tested high (wick only)", "WAVE_3", "daily_ohlcv", confidence,
+            ["tested_high_only"], snapshot_id,
+            {"rule": "A wick through the reference is tested-high evidence, not a breakout.",
+             "evidence": ["tested_high_only"], "alternative": None, "missing": ["daily_close_above_wave1_high"],
+             "policy": "elliott-v1-observable-proxy"}))
+    if evidence.get("holds_above_wave1_low") is False:
+        idx = _first_marker_index(
+            daily_df,
+            lambda row: float(row.get("Low")) <= float(w1_low),
+            start=(high_idx + 1 if w1_leg is not None else 0),
+        )
+        markers.append(_evidence_marker(
+            "STRUCTURE_BREAK", "daily", _marker_timestamp(daily_df, idx), w1_low,
+            "Daily structure break", "THESIS_INVALIDATION", "daily_ohlcv", confidence,
+            ["wave1_low_broken"], snapshot_id,
+            {"rule": "A Daily low at or below Wave 1 low breaks the thesis structure.",
+             "evidence": ["wave1_low_broken"], "alternative": None, "missing": [],
+             "policy": "elliott-v1-observable-proxy"}))
+    return [marker for marker in markers if marker.get("timestamp") is not None
+            and marker.get("price") is not None]
+
+
+def build_wave_contract(daily_df, swing_evidence: dict | None = None, *, snapshot_id: str | None = None) -> dict:
     """Classify the Daily series and project the canonical wave contract.
 
     Emits ``primary_state``, ``alternative_state``, ``confidence``
@@ -1198,6 +1359,20 @@ def build_wave_contract(daily_df, swing_evidence: dict | None = None) -> dict:
         "missing_evidence": _missing_evidence(evidence, state),
         "evidence": evidence,
         "policy": "elliott-v1-observable-proxy",
+    }
+    as_of = _marker_timestamp(daily_df, len(daily_df) - 1) if daily_df is not None and len(daily_df) else None
+    identity = snapshot_id or ("daily:" + as_of if as_of is not None else None)
+    contract["snapshot_id"] = identity
+    contract["evidence_markers"] = build_wave_evidence_markers(
+        daily_df, evidence, confidence=confidence, snapshot_id=identity
+    )
+    contract["markers"] = contract["evidence_markers"]
+    contract["evidence_explanation"] = {
+        "rule": "Daily Elliott interpretation uses observable OHLCV structure.",
+        "evidence": contract["supporting_evidence"],
+        "alternative": alternative,
+        "missing": contract["missing_evidence"],
+        "policy": contract["policy"],
     }
     if isinstance(dual_degree, dict):
         contract["dual_degree"] = dual_degree

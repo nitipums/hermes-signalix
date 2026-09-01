@@ -7,18 +7,19 @@ API contract shapes for:
   GET /api/explorer         → project_explorer_response(items, page, page_size, search, stage)
   GET /api/symbol/{symbol}  → project_symbol_detail(items, symbol)
 
-Uses existing daily_shortlist module for eligibility/ranking.
-Never queries DB, never rescans, never mutates data.
+Uses existing daily_shortlist module for eligibility/ranking. Canonical setup
+candidate construction performs bounded read-only DB queries; no path mutates
+market data.
 """
 
 from __future__ import annotations
 
 import math
+import time
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from daily_shortlist import project_shortlist, project_shortlist_lanes
 from decision_dimensions import project_decision_dimensions
 from provenance_contract import (
     DECISION_STATE_OFFICIAL_DAILY,
@@ -38,7 +39,8 @@ import instruments
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
-                                      build_setup_candidate, project_setup_candidate_list,
+                                      build_setup_candidate, build_setup_candidate_diagnostic,
+                                      project_setup_candidate_list,
                                       sort_setup_candidates)
 from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
@@ -424,8 +426,8 @@ def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
     return result
 
 
-def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
-    """Accept only an already canonical artifact; never relabel legacy cards."""
+def _validate_canonical_setup_candidate(item: dict) -> dict:
+    """Validate a canonical source item without adapting legacy data."""
     required = ("symbol", "as_of", "data_status", "trend", "wave", "setup",
                 "context", "bonus_evidence", "decision_lane", "provenance")
     if not all(key in item for key in required):
@@ -455,6 +457,15 @@ def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None
     return item
 
 
+def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
+    """Compatibility-only validator for callers that explicitly load snapshots.
+
+    The canonical route does not call this adapter or load a snapshot. It is
+    retained for replay/audit callers and deliberately refuses legacy cards.
+    """
+    return _validate_canonical_setup_candidate(item)
+
+
 def _wave_inputs(daily_df):
     """Derive only observable v1 evidence from the Daily OHLCV series."""
     if daily_df is None or "Close" not in daily_df:
@@ -482,6 +493,67 @@ def _load_intraday_for_symbol(screening, symbol, pg, market):
     return frame
 
 
+def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
+    """Load bounded Daily and 60m frames in two queries, grouped by symbol."""
+    import pandas as pd
+    if not symbols:
+        return {}, {}, 0
+
+    def load(sql, params, timeframe=None):
+        cur = pg.cursor()
+        try:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(str(row[0]), []).append(row[1:])
+        frames = {}
+        for symbol, values in grouped.items():
+            frame = pd.DataFrame(values, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+            frame["Date"] = pd.to_datetime(frame["Date"])
+            frame = frame.set_index("Date").sort_index()
+            if timeframe:
+                frame.attrs["timeframe"] = timeframe
+                frame.attrs["as_of"] = frame.index[-1]
+            frames[symbol] = frame
+        return frames
+
+    ranked_daily = """SELECT symbol, date, open, high, low, close, volume FROM (
+        SELECT symbol, date, open, high, low, close, volume,
+               ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
+        FROM price_data WHERE market=%s AND symbol = ANY(%s)
+    ) rows WHERE rn <= %s ORDER BY symbol, date"""
+    ranked_intraday = """SELECT symbol, ts, open, high, low, close, volume FROM (
+        SELECT symbol, ts, open, high, low, close, volume,
+               ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY ts DESC) AS rn
+        FROM intraday_price_data WHERE interval=%s AND symbol = ANY(%s)
+    ) rows WHERE rn <= %s ORDER BY symbol, ts"""
+    daily = load(ranked_daily, (market.upper(), list(symbols), lookback))
+    intraday = load(ranked_intraday, ("60m", list(symbols), lookback), "60m")
+    return daily, intraday, 2
+
+
+def _relative_strength_ranks(daily_frames, market_df):
+    import pandas as pd
+    lookback = 252
+    if market_df is None or len(market_df) < lookback:
+        # Zero is a real-looking percentile and therefore fabricates evidence.
+        # Omit the rank until both benchmark and symbol history are sufficient.
+        return {}
+    market_return = market_df["Close"].iloc[-1] / market_df["Close"].iloc[-lookback] - 1
+    returns = {}
+    for symbol, frame in daily_frames.items():
+        if frame is not None and len(frame) >= lookback:
+            close = frame["Close"]
+            returns[symbol] = close.iloc[-1] / close.iloc[-lookback] - 1 - market_return
+    if not returns:
+        return {}
+    ranks = pd.Series(returns).rank(pct=True) * 100
+    return {symbol: float(value) for symbol, value in ranks.items()}
+
+
 def _daily_final_session_available(daily_df, expected_session):
     if daily_df is None or len(daily_df) == 0:
         return False
@@ -489,6 +561,25 @@ def _daily_final_session_available(daily_df, expected_session):
         return daily_df.index[-1].date() == expected_session
     except (AttributeError, IndexError):
         return False
+
+
+def _valid_candidate_ohlcv(frame) -> bool:
+    """Validate required OHLCV without rejecting valid positive flat candles."""
+    import pandas as pd
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    if (frame is None or len(frame) == 0
+            or not isinstance(frame.index, pd.DatetimeIndex)
+            or frame.index.hasnans
+            or not frame.index.is_unique
+            or not frame.index.is_monotonic_increasing
+            or not set(required).issubset(frame.columns)):
+        return False
+    values = frame[required].apply(pd.to_numeric, errors="coerce")
+    if values.isna().any().any() or not (values > 0).all().all():
+        return False
+    return bool(((values["High"] >= values[["Open", "Close"]].max(axis=1))
+                 & (values["Low"] <= values[["Open", "Close"]].min(axis=1))
+                 & (values["High"] >= values["Low"])).all())
 
 
 def _expected_intraday_session_date(now=None):
@@ -559,33 +650,64 @@ def _intraday_60m_status(intraday_df, expected_interval_start):
 def build_setup_candidates_from_data(pg, *, market="TH"):
     """Build the canonical source from the authoritative read-only data path."""
     import screening
+    build_started = time.monotonic()
+    stage_started = build_started
     symbols, universe_manifest = resolve_universe(pg, "marginable_long")
     profiles = instruments.profile_taxonomy(pg, symbols=symbols)
     market_df = screening.load_market(pg, lookback=400, market=market)
-    rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
+    source_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    stage_started = time.monotonic()
+    try:
+        daily_frames, intraday_frames, ohlcv_query_count = _bulk_candidate_frames(
+            pg, symbols, market=market
+        )
+        rs_ranks = _relative_strength_ranks(daily_frames, market_df)
+    except (AttributeError, TypeError):
+        # Small pure tests may provide a sentinel instead of a DB connection.
+        daily_frames = intraday_frames = None
+        ohlcv_query_count = len(symbols) * 2
+        rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
+        # The legacy adapter historically filled unavailable ranks with 0.0.
+        # Canonical setup candidates must expose unknown RS as null instead.
+        rs_ranks = {
+            symbol: value for symbol, value in (rs_ranks or {}).items()
+            if _number(value) is not None and _number(value) > 0
+        }
+    load_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    stage_started = time.monotonic()
     candidates = []
     latest_daily = None
     expected_daily_session = expected_market_date()
     expected_intraday_interval = _expected_intraday_interval_start()
     freshness_statuses = []
     for symbol in symbols:
-        daily_df = _load_daily_for_symbol(screening, symbol, pg, market)
-        intraday_df = _load_intraday_for_symbol(screening, symbol, pg, market)
+        daily_df = (daily_frames.get(symbol) if daily_frames is not None
+                    else _load_daily_for_symbol(screening, symbol, pg, market))
+        intraday_df = (intraday_frames.get(symbol) if intraday_frames is not None
+                       else _load_intraday_for_symbol(screening, symbol, pg, market))
         if intraday_df is not None:
             intraday_df.attrs["as_of"] = intraday_df.index[-1]
-        as_of = daily_df.index[-1].isoformat() if daily_df is not None and len(daily_df) else None
+        daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
+        as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
         if as_of and (latest_daily is None or as_of > latest_daily):
             latest_daily = as_of
         prior_ath = None
         if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
             prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
             prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
-        trend = compute_trend_strength(daily_df, relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath)
-        daily_current = _daily_final_session_available(daily_df, expected_daily_session)
+        trend = compute_trend_strength(
+            daily_df if daily_evidence_valid else None,
+            relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath
+        )
+        daily_current = (daily_evidence_valid
+                         and _daily_final_session_available(daily_df, expected_daily_session))
         intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
             _intraday_60m_status(intraday_df, expected_intraday_interval)
         )
-        wave = build_wave_contract(daily_df, _wave_inputs(daily_df))
+        wave = build_wave_contract(
+            daily_df if daily_evidence_valid else None,
+            _wave_inputs(daily_df) if daily_evidence_valid else {}
+        )
         # The trade-setup engine still consumes its historical ``state`` input;
         # keep that adapter local while the candidate contract remains
         # canonical and exposes only ``primary_state``.
@@ -618,7 +740,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         daily_ok = daily_df is not None and len(daily_df) > 0
         intraday_ok = intraday_current
         daily_freshness = "unknown"
-        if daily_ok:
+        if daily_ok and daily_evidence_valid:
             daily_date = daily_df.index[-1].date()
             daily_freshness = "fresh" if daily_date == expected_daily_session else "stale"
         if daily_current and intraday_current:
@@ -638,6 +760,28 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             "intraday_60m_freshness": intraday_freshness,
             "intraday_60m_as_of": intraday_as_of,
         }
+        engine_data_reason = setup.pop("data_reason_code", None)
+        data_reason_codes = []
+        if not daily_ok:
+            data_reason_codes.append("NO_DAILY_DATA")
+        elif not daily_evidence_valid:
+            data_reason_codes.append("INVALID_DAILY_OHLCV")
+        elif daily_freshness == "stale":
+            data_reason_codes.append("STALE_DAILY_DATA")
+        if engine_data_reason:
+            data_reason_codes.append(engine_data_reason)
+        elif not intraday_available:
+            data_reason_codes.append("NO_60M_DATA")
+        elif intraday_freshness == "stale":
+            data_reason_codes.append("STALE_60M_DATA")
+        if data_reason_codes:
+            data_status["reason_code"] = data_reason_codes[0]
+            data_status["reason_codes"] = list(dict.fromkeys(data_reason_codes))
+        if str(data_status.get("reason_code", "")).startswith("INVALID_"):
+            data_status["sufficient"] = False
+            data_status["freshness"] = "invalid"
+            setup["status"] = "DATA_BLOCKED"
+            candidate_freshness = "invalid"
         freshness_statuses.append(candidate_freshness)
         bonus_evidence = {}
         attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
@@ -660,8 +804,16 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         ))
     overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
+    evaluate_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    total_ms = round((time.monotonic() - build_started) * 1000, 3)
     return candidates, {"scan_time": latest_daily, "freshness": {"status": overall_freshness},
                         "source": "price_data+intraday_price_data", "universe": "TH-ORD",
+                        "build_observability": {
+                            "duration_ms": total_ms,
+                            "stages_ms": {"source_context": source_ms, "ohlcv_load": load_ms,
+                                          "candidate_evaluation": evaluate_ms},
+                            "ohlcv_query_count": ohlcv_query_count,
+                        },
                         **universe_manifest}
 
 
@@ -680,9 +832,7 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
                                       sector: str | None = None, search: str | None = None,
                                       page: int = 1, page_size: int = 50) -> dict:
     """Serve the complete canonical candidate list with presentation filters only."""
-    candidates = sort_setup_candidates(
-        [_setup_candidate_from_snapshot(item, snapshot_meta) for item in items]
-    )
+    candidates = sort_setup_candidates([_validate_canonical_setup_candidate(item) for item in items])
     filtered = candidates
     if lifecycle:
         token = lifecycle.upper()
@@ -702,8 +852,14 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
     page = max(1, int(page)); page_size = max(1, min(int(page_size), 100))
     total = len(filtered); start = (page - 1) * page_size
     page_items = filtered[start:start + page_size]
+    compact_items = []
+    for item in page_items:
+        compact = dict(item)
+        compact["wave"] = {key: value for key, value in (item.get("wave") or {}).items()
+                           if key != "evidence"}
+        compact_items.append(compact)
     projected = project_setup_candidate_list(
-        page_items,
+        compact_items,
         as_of=(snapshot_meta or {}).get("scan_time"),
         provenance={"policy_version": "setup-candidates-v1"},
         universe=(snapshot_meta or {}).get("universe_filter") or "marginable_long",
@@ -725,7 +881,15 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         "marginable_schema_version": (snapshot_meta or {}).get("schema_version"),
         "marginable_source_document": (snapshot_meta or {}).get("source_document"),
         "marginable_effective_date": (snapshot_meta or {}).get("effective_date"),
+        "build_observability": (snapshot_meta or {}).get("build_observability"),
+        "cache_status": (snapshot_meta or {}).get("cache_status"),
     })
+    projected["diagnostic"] = build_setup_candidate_diagnostic(
+        candidates,
+        as_of=projected.get("as_of"),
+        universe=projected["universe"],
+        returned_count=len(page_items),
+    )
     return projected
 
 
@@ -738,6 +902,10 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
     then maps to frontend contract shape. The default surface is the
     owner-selected Krungsri Credit Balance marginable list.
     """
+    # Keep the retired shortlist classifier out of the canonical setup import
+    # path.  This compatibility route is the only consumer that needs it.
+    from daily_shortlist import project_shortlist
+
     marginable_filter = normalize_filter(marginable_filter)
     margin_rates = normalize_rates(margin_rates)
     items = filter_price_band(filter_items(items, marginable_filter, margin_rates), price_band)

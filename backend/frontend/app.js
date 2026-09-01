@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════
    Signalix MVP Reset — Vanilla JS
    Owner-only. No auth. No tiers. No watchlist.
-   Surfaces: Daily Shortlist + All Stocks Explorer
+   Primary surface: Trend · Elliott · Trade Setup; VCP is audit/compatibility only
    States: loading / empty / stale / error / retry
    ═══════════════════════════════════════════════════════════ */
 
@@ -30,6 +30,9 @@
     dailyVcpContent: $("#daily-vcp-content"),
     dailyVcpCards:   $("#daily-vcp-cards"),
     dailyVcpMeta:    $("#daily-vcp-meta"),
+    dailySetupPrev:  $("#daily-setup-prev"),
+    dailySetupNext:  $("#daily-setup-next"),
+    dailySetupPageInfo: $("#daily-setup-page-info"),
     dailyFilterMarginable: $("#daily-filter-marginable"),
     dailyFilterTradeValue: $("#daily-filter-trade-value"),
     dailyFilterPrice: $("#daily-filter-price"),
@@ -111,6 +114,8 @@
     drawerChart:    $("#drawer-chart"),
     drawerCanvas:  $("#drawer-canvas"),
     drawerChartPH: $("#drawer-chart-placeholder"),
+    chartWaveEvidence: $("#chart-wave-evidence"),
+    chartWaveExplanation: $("#chart-wave-explanation"),
     indMa20:       $("#ind-ma20"),
     indMa50:       $("#ind-ma50"),
     indMa200:      $("#ind-ma200"),
@@ -144,7 +149,7 @@
   let shortlistData = null;
   let vcpResultsBySymbol = {};
   let vcpRunMeta = {};
-  const chartLayers = { candles: true, volume: true, ma: true, rsi: true };
+  const chartLayers = { candles: true, volume: true, ma: true, rsi: true, waveEvidence: true };
   let chartTimeframe = "60M";
   let chartSymbol = null;
   let drawerSymbols = [];
@@ -154,6 +159,8 @@
   let chartAbort = null;
   var chartCache = {};
   let dailyVcpRequestSeq = 0;
+  let dailySetupPage = 1;
+  let dailySetupTotalPages = 1;
   let vcpRequestSeq = 0;
   var dailyVcpRequests = SignalixRequestCache();
   var vcpRequests = SignalixRequestCache();
@@ -420,12 +427,77 @@
     };
   }
 
+  function canonicalChartOverlay(item) {
+    var setup = item && item.setup;
+    if (!setup || typeof setup !== "object" || Array.isArray(setup)) return {};
+    // target_1 is the canonical risk gate and chart decision target. Never
+    // substitute target_2 when target_1 is absent or malformed.
+    return {
+      trigger: setup.trigger,
+      // The chart stop is the executable trade-risk level. Thesis
+      // invalidation is separate evidence and must not replace it.
+      stop: setup.trade_stop,
+      target: setup.target_1 != null && setup.target_1 !== "" && Number.isFinite(Number(setup.target_1))
+        ? Number(setup.target_1) : null
+    };
+  }
+
+  function chartTimestampKey(value) {
+    if (value == null) return "";
+    var raw = String(value).trim();
+    return raw.length > 10 && raw.charAt(10) === " " ? raw.slice(0, 10) + "T" + raw.slice(11) : raw;
+  }
+
   function mergeChartDecisionOverlay(chart, item) {
-    var overlay = vcpChartOverlay(item);
+    var overlay = item && item.decision_lane ? canonicalChartOverlay(item) : vcpChartOverlay(item);
     ["trigger", "stop", "target"].forEach(function(field) {
       if (overlay[field] != null) chart[field] = overlay[field];
     });
+    var timeframe = chart.timeframe || chartTimeframe;
+    var evidence = item && item.chart_evidence;
+    if (evidence) {
+      var bucket = timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null;
+      if (bucket) chart.wave_evidence = bucket;
+    }
     return chart;
+  }
+
+  function waveEvidenceText(value) {
+    if (value == null || value === "") return "Unavailable";
+    if (Array.isArray(value)) {
+      var values = value.map(waveEvidenceText).filter(function(entry) { return entry !== "Unavailable"; });
+      return values.length ? values.join(" · ") : "Unavailable";
+    }
+    if (typeof value === "object") {
+      try { return JSON.stringify(value); } catch (e) { return "Unavailable"; }
+    }
+    return String(value);
+  }
+
+  function showWaveExplanation(marker) {
+    var panel = dom.chartWaveExplanation;
+    if (!panel) return;
+    if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
+      panel.hidden = true; panel.textContent = ""; return;
+    }
+    var details = marker.explanation && typeof marker.explanation === "object" && !Array.isArray(marker.explanation)
+      ? marker.explanation : {};
+    function text(value) { return waveEvidenceText(value); }
+    panel.hidden = false;
+    var refs = Array.isArray(marker.evidence_refs) ? marker.evidence_refs.map(text).filter(function(ref) {
+      return ref !== "Unavailable";
+    }) : [];
+    var snapshot = marker.snapshot_identity || marker.snapshot_id;
+    panel.innerHTML = "<strong>" + escapeHTML(waveEvidenceText(marker.label || marker.kind || "Wave evidence")) + "</strong>" +
+      "<div>Timeframe: " + escapeHTML(text(marker.timeframe)) + " · Source: " + escapeHTML(text(marker.source)) + "</div>" +
+      "<div>Confidence: " + escapeHTML(text(marker.confidence)) + " · Snapshot: " + escapeHTML(text(snapshot)) + "</div>" +
+      "<div>Rule: " + escapeHTML(text(details.rule)) + "</div>" +
+      "<div>Evidence: " + escapeHTML(text(details.evidence)) + "</div>" +
+      "<div>Alternative: " + escapeHTML(text(details.alternative)) + "</div>" +
+      "<div>Missing: " + escapeHTML(text(details.missing)) + "</div>" +
+      "<div>Policy: " + escapeHTML(text(details.policy)) + "</div>" +
+      "<div>Evidence refs: " + escapeHTML(refs.length ? refs.join(" · ") : "Unavailable") + "</div>" +
+      "<div>Snapshot: " + escapeHTML(text(snapshot)) + "</div>";
   }
 
   function renderDrawerDetail(item) {
@@ -586,6 +658,23 @@
     decisionLine(chart.trigger, "#f4c95d", "Required close");
     decisionLine(chart.stop, "#ef7777", "Stop");
     decisionLine(chart.target, "#6ee7b7", "Target");
+    window.__signalixWaveMarkerHits = [];
+    if (chartLayers.waveEvidence && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
+      var markerColors = {WAVE_1_LOW: "#a78bfa", WAVE_1_HIGH: "#a78bfa", WAVE_2_PULLBACK_LOW: "#60a5fa",
+        WAVE_3_CLOSE_CONFIRMATION: "#26a69a", TESTED_HIGH: "#ffa726", STRUCTURE_BREAK: "#ef5350",
+        THESIS_INVALIDATION: "#ef5350", TRIGGER: "#f4c95d", TRADE_STOP: "#ef7777"};
+      chart.wave_evidence.markers.forEach(function(marker) {
+        if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;
+        var sourceIndex = chart.candles.findIndex(function(c) { return chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp); });
+        if (sourceIndex < start || sourceIndex >= start + candles.length || sourceIndex < 0) return;
+        var price = Number(marker.price); if (!Number.isFinite(price)) return;
+        var localIndex = sourceIndex - start, x = xFor(localIndex), y = yPrice(price);
+        ctx.fillStyle = markerColors[marker.kind] || "#c9a84c";
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillText(waveEvidenceText(marker.label || marker.kind), Math.max(left, x - 24), Math.max(top + 10, y - 8));
+        window.__signalixWaveMarkerHits.push({x: x, y: y, marker: marker});
+      });
+    }
   }
 
   function setChartTimeframeButtons(value) {
@@ -652,6 +741,22 @@
     return item;
   }
 
+  function mergeCanonicalSetupDetail(item, detail) {
+    // The symbol endpoint supplies optional drawer metadata only. Keep the
+    // list response as the authority for setup/evidence, especially chart
+    // markers which are intentionally absent from compact cards.
+    var merged = Object.assign({}, item, detail || {});
+    ["trend", "wave", "setup", "context", "bonus_evidence", "decision_lane", "chart_evidence", "provenance"].forEach(function(field) {
+      if (item[field] !== undefined) merged[field] = item[field];
+    });
+    merged._canonicalMetadataPending = false;
+    return merged;
+  }
+
+  function shouldUseSnapshotChartFallback(item) {
+    return !(item && item.decision_lane);
+  }
+
   function navigateDrawer(delta) {
     var nextIndex = drawerIndex + delta;
     if (nextIndex < 0 || nextIndex >= drawerSymbols.length) return;
@@ -666,7 +771,7 @@
       item = Object.assign({}, item, {name: item.name || symbol, stage: trend.state,
         action: item.decision, sector: context.sector, industry: context.industry,
         trigger: setup.trigger, invalidation: setup.invalidation,
-        risk_stop: setup.invalidation, rr: (setup.rr || {}).to_target_1});
+        risk_stop: setup.trade_stop, rr: (setup.rr || {}).to_target_1});
     }
     chartSymbol = symbol;
     if (Array.isArray(navSymbols)) drawerSymbols = navSymbols.slice();
@@ -708,7 +813,7 @@
       .then(function(fresh) {
         if (requestSeq !== chartRequestSeq || chartSymbol !== symbol) return;
         if (fresh && fresh.symbol) {
-          renderDrawerDetail(item.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : fresh);
+          renderDrawerDetail(item.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : mergeCanonicalSetupDetail(item, fresh));
           var currentChart = chartCache[chartKey];
           if (currentChart && item.vcp_result) {
             // Daily metadata can arrive after candles. It can provide an
@@ -735,6 +840,7 @@
         })
         .catch(function(err) {
           if (err && err.name === "AbortError") throw err;
+          if (!shouldUseSnapshotChartFallback(item)) throw err;
           return fetch("/api/chart/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(requestedTimeframe), {signal: chartController.signal}).then(function(res) {
             if (!res.ok) throw new Error("snapshot chart HTTP " + res.status);
             return res.json();
@@ -835,21 +941,37 @@
   });
 
   /* ── close drawer ── */
-  dom.drawerClose.addEventListener("click", closeDrawer);
-  dom.drawerOverlay.addEventListener("click", closeDrawer);
-  dom.drawerPrev.addEventListener("click", function() { navigateDrawer(-1); });
-  dom.drawerNext.addEventListener("click", function() { navigateDrawer(1); });
-  dom.drawer.addEventListener("touchstart", function(e) {
+  if (dom.drawerClose) dom.drawerClose.addEventListener("click", closeDrawer);
+  if (dom.drawerOverlay) dom.drawerOverlay.addEventListener("click", closeDrawer);
+  if (dom.drawerPrev) dom.drawerPrev.addEventListener("click", function() { navigateDrawer(-1); });
+  if (dom.drawerNext) dom.drawerNext.addEventListener("click", function() { navigateDrawer(1); });
+  if (dom.drawer) dom.drawer.addEventListener("touchstart", function(e) {
     if (e.touches && e.touches.length === 1) drawerTouchStartX = e.touches[0].clientX;
   }, {passive: true});
-  dom.drawer.addEventListener("touchend", function(e) {
+  if (dom.drawer) dom.drawer.addEventListener("touchend", function(e) {
     if (drawerTouchStartX == null || !e.changedTouches || !e.changedTouches.length) return;
     var delta = e.changedTouches[0].clientX - drawerTouchStartX;
     drawerTouchStartX = null;
     if (Math.abs(delta) < 50) return;
     navigateDrawer(delta > 0 ? -1 : 1);
   }, {passive: true});
+  if (dom.chartWaveEvidence) dom.chartWaveEvidence.addEventListener("change", function() {
+    chartLayers.waveEvidence = dom.chartWaveEvidence.checked;
+    if (window.__signalixLastChart) drawChart(window.__signalixLastChart);
+    if (!chartLayers.waveEvidence) showWaveExplanation(null);
+  });
+  if (dom.drawerCanvas) dom.drawerCanvas.addEventListener("click", function(e) {
+    if (!chartLayers.waveEvidence || !window.__signalixWaveMarkerHits) return;
+    var rect = dom.drawerCanvas.getBoundingClientRect();
+    var scaleX = dom.drawerCanvas.width / rect.width, scaleY = dom.drawerCanvas.height / rect.height;
+    var x = (e.clientX - rect.left) * scaleX, y = (e.clientY - rect.top) * scaleY;
+    var hit = window.__signalixWaveMarkerHits.find(function(candidate) {
+      return Math.hypot(candidate.x - x, candidate.y - y) <= 12;
+    });
+    showWaveExplanation(hit && hit.marker);
+  });
   document.addEventListener("keydown", function(e) {
+    if (!dom.drawer) return;
     if (e.key === "ArrowLeft" && !dom.drawer.classList.contains("drawer--hidden")) navigateDrawer(-1);
     if (e.key === "ArrowRight" && !dom.drawer.classList.contains("drawer--hidden")) navigateDrawer(1);
     if (e.key === "Escape" && !dom.drawer.classList.contains("drawer--hidden")) closeDrawer();
@@ -1014,7 +1136,7 @@
   function setupCandidateCard(item) {
     var trend = item.trend || {}, wave = item.wave || {}, setup = item.setup || {};
     var context = item.context || {}, bonus = item.bonus_evidence || {};
-    var rr = setup.rr || {}, targets = setup.targets || [];
+    var rr = setup.rr || {}, targets = Array.isArray(setup.targets) ? setup.targets : [];
     var decision = item.decision_lane || "DATA_BLOCKED";
     var evidence = "Trend " + (trend.state || "UNKNOWN") + " · " +
       (trend.rise_20d_pct == null ? "20D –" : "20D " + Number(trend.rise_20d_pct).toFixed(1) + "%") +
@@ -1029,7 +1151,13 @@
     var setupEvidence = (setup.status || "UNKNOWN") + " · trigger " + displayValue(setup.trigger) +
       " · invalidation " + displayValue(setup.invalidation) +
       " · entry " + displayValue((setup.entry_zone || {}).low) + "–" + displayValue((setup.entry_zone || {}).high);
-    var targetText = targets.length ? targets.map(displayValue).join(" / ") : "–";
+    var targetText = targets.length ? targets.map(function(target) {
+      if (!target || typeof target !== "object" || Array.isArray(target)) return displayValue(target);
+      var name = displayValue(target.name);
+      var price = displayValue(target.price);
+      var method = displayValue(target.method);
+      return name + " " + price + " (" + method + ")";
+    }).join(" / ") : "–";
     var vcp = bonus.vcp ? (bonus.vcp.present === true ? "VCP bonus" : bonus.vcp.present === false ? "VCP not present" : "VCP bonus unknown") : "VCP bonus unknown";
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b>' + escapeHTML(decision) + '</b></div>' +
@@ -1065,28 +1193,89 @@
     return {order: laneOrder, groups: groups};
   }
 
+  function validateSetupCandidatePayload(data) {
+    if (!data || !Array.isArray(data.items) || !data.counts ||
+        typeof data.counts !== "object" || Array.isArray(data.counts)) return false;
+    var items = data.items;
+    var laneTotals = data.counts;
+    var laneItemCounts = {};
+    var laneOrder = ["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"];
+    var laneTotalCount = 0;
+    for (var lane in laneTotals) {
+      if (!Object.prototype.hasOwnProperty.call(laneTotals, lane)) continue;
+      var count = laneTotals[lane];
+      if (!Number.isInteger(count) || count < 0) return false;
+      laneTotalCount += count;
+    }
+    items.forEach(function(item) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return;
+      var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED";
+      laneItemCounts[lane] = (laneItemCounts[lane] || 0) + 1;
+    });
+    if (items.some(function(item) { return !item || typeof item !== "object" || Array.isArray(item); })) return false;
+    for (var itemLane in laneItemCounts) {
+      if (!Object.prototype.hasOwnProperty.call(laneTotals, itemLane) || laneItemCounts[itemLane] > laneTotals[itemLane]) return false;
+    }
+    return laneTotalCount === Number(data.evaluated_count);
+  }
+
   function renderSetupCandidates(data) {
+    data = data || {};
     hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
-    var items = data.items || [];
+    var items = data && Array.isArray(data.items) ? data.items : [];
+    var returnedCount = Number(data.returned_count);
+    var evaluatedCount = Number(data.evaluated_count);
+    var totalItems = Number(data.total_items);
+    var page = Number(data.page);
+    var pageSize = Number(data.page_size);
+    var totalPages = Number(data.total_pages || 0);
+    var laneTotals = data && data.counts || {};
+    var laneTotalCount = Object.keys(laneTotals).reduce(function(total, lane) { return total + Number(laneTotals[lane] || 0); }, 0);
+    var paginationValid = Number.isInteger(returnedCount) && returnedCount === items.length &&
+      Number.isInteger(evaluatedCount) && evaluatedCount >= returnedCount &&
+      Number.isInteger(totalItems) && totalItems >= returnedCount && totalItems <= evaluatedCount &&
+      Number.isInteger(page) && page >= 1 && Number.isInteger(pageSize) && pageSize >= 1 &&
+      Number.isInteger(totalPages) && totalPages === (totalItems ? Math.ceil(totalItems / pageSize) : 0) &&
+      page <= Math.max(1, totalPages) && laneTotalCount === evaluatedCount &&
+      validateSetupCandidatePayload(data);
+    if (!paginationValid) {
+      dom.dailyVcpMeta.textContent = "Canonical setup-candidate response inconsistent · DATA_BLOCKED";
+      dom.dailySetupPageInfo && (dom.dailySetupPageInfo.textContent = "Page unavailable");
+      dom.dailyVcpCards.innerHTML = '<div class="state"><div class="state-icon">⚠️</div><p class="state-text">Setup candidate data is inconsistent.</p><p class="state-hint">Refresh before reviewing evidence.</p></div>';
+      return;
+    }
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     setFreshness((data.freshness || {}).status || "unknown", data.as_of, (data.freshness || {}).data_fetched_at);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
     dom.dailyVcpMeta.textContent = universeLabel + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    dailySetupPage = data.page || 1;
+    dailySetupTotalPages = totalPages;
+    dom.dailySetupPageInfo.textContent = dailySetupTotalPages ? "Page " + dailySetupPage + " of " + dailySetupTotalPages : "Page 0 of 0";
+    dom.dailySetupPrev.disabled = dailySetupPage <= 1;
+    dom.dailySetupNext.disabled = !dailySetupTotalPages || dailySetupPage >= dailySetupTotalPages;
     var grouped = groupSetupCandidates(items);
     var groupedHTML = grouped.order.reduce(function(html, lane) {
       var laneItems = grouped.groups[lane];
       if (!laneItems.length) return html;
-      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + '</span></h2>' + laneItems.map(setupCandidateCard).join("") + '</section>';
+      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + laneItems.map(setupCandidateCard).join("") + '</section>';
     }, "");
     dom.dailyVcpCards.innerHTML = groupedHTML ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
   }
 
-  function loadDailyVcp(force) {
-    // Legacy audit compatibility markers: primary requests use setup-candidates.
-    // universe=marginable_long; renderDailyVcpData(data); Watchlist error remains an audit vocabulary.
-    var endpoint = "/api/setup-candidates?page=1&page_size=100";
+  function loadDailyVcp(force, page) {
+    // Legacy DOM/function names remain for compatibility; primary requests use
+    // the canonical setup-candidates contract.
+    // Filter event handlers pass the DOM event as the first argument. Treat
+    // those calls as a new presentation query so they always start at page 1;
+    // timer refreshes and explicit pagination retain their current page.
+    if (force && typeof force === "object") {
+      force = false;
+      page = 1;
+    }
+    if (page != null) dailySetupPage = Math.max(1, Number(page) || 1);
+    var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";
     if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) endpoint += "&sector=" + encodeURIComponent(dom.dailySetupSector.value.trim());
     var request = dailyVcpRequests.load(endpoint, function(signal) {
       return fetch(endpoint, {signal: signal}).then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
@@ -1137,6 +1326,7 @@
 
   function loadVcp(force) {
     var selected = dom.vcpState.value || "ALL";
+    // VCP is an explicitly secondary audit/compatibility/rollback surface.
     var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";
     if (selected === "actionable") endpoint += "&focused=true";
     else if (selected.indexOf("FORMING_") === 0) endpoint += "&state=FORMING";
@@ -1179,20 +1369,24 @@
   }
 
   [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {
-    if (input) input.addEventListener("change", loadDailyVcp);
+    if (input) input.addEventListener("change", function() { loadDailyVcp(false, 1); });
   });
   if (dom.dailyVcpType) dom.dailyVcpType.addEventListener("change", loadDailyVcp);
-  if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", loadDailyVcp);
+  if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", function() {
+    loadDailyVcp(false, 1);
+  });
   [dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
-    if (input) input.addEventListener("change", loadDailyVcp);
+    if (input) input.addEventListener("change", function() { loadDailyVcp(false, 1); });
   });
   /* ── tab switching ── */
   function switchTab(tab) {
     currentTab = tab;
     dom.tabDailyVcp.classList.toggle("nav-tab--active", tab === "daily-vcp");
     dom.tabDailyVcp.setAttribute("aria-selected", tab === "daily-vcp");
-    dom.tabVcp.classList.toggle("nav-tab--active", tab === "vcp");
-    dom.tabVcp.setAttribute("aria-selected", tab === "vcp");
+    if (dom.tabVcp) {
+      dom.tabVcp.classList.toggle("nav-tab--active", tab === "vcp");
+      dom.tabVcp.setAttribute("aria-selected", tab === "vcp");
+    }
     dom.panelDailyVcp.classList.toggle("panel--active", tab === "daily-vcp");
     dom.panelDailyVcp.classList.toggle("panel--hidden", tab !== "daily-vcp");
     dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
@@ -1202,7 +1396,7 @@
   }
 
   dom.tabDailyVcp.addEventListener("click", function() { switchTab("daily-vcp"); });
-  dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
+  if (dom.tabVcp) dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
   dom.vcpState.addEventListener("change", loadVcp);
   dom.vcpType.addEventListener("change", loadVcp);
   [dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality].forEach(function(input) {
@@ -1435,6 +1629,12 @@
   dom.slRetry.addEventListener("click", loadShortlist);
   dom.slStaleRetry.addEventListener("click", loadShortlist);
   dom.exRetry.addEventListener("click", function() { loadExplorer(explorerPage); });
+  dom.dailySetupPrev.addEventListener("click", function() {
+    if (dailySetupPage > 1) loadDailyVcp(false, dailySetupPage - 1);
+  });
+  dom.dailySetupNext.addEventListener("click", function() {
+    if (dailySetupPage < dailySetupTotalPages) loadDailyVcp(false, dailySetupPage + 1);
+  });
 
   /* ── init ── */
   setFreshness("loading");

@@ -24,11 +24,11 @@
         Trend · Elliott · Trade Setup
       </button>
       <button id="tab-vcp" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-vcp">
-        All VCP · 60m (legacy/audit)
+        VCP Audit · Compatibility / Rollback
       </button>
     </nav>
 
-    <!-- ── Daily VCP Watchlist panel ── -->
+    <!-- ── Canonical setup-candidate panel ── -->
     <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
       <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading setup candidates…</p></section>
       <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
@@ -42,7 +42,7 @@
           <!-- Retained only for legacy DOM compatibility; the primary contract never filters by VCP type. -->
           <select id="daily-vcp-type" hidden aria-hidden="true"><option value="all">All types</option><option value="low_cheat_vcp">Low-Cheat</option><option value="standard_vcp">VCP</option></select>
           <label>Decision state
-            <select id="daily-vcp-decision-state" aria-label="Filter Daily VCP by canonical decision state">
+            <select id="daily-vcp-decision-state" aria-label="Filter setup candidates by canonical decision state">
               <option value="ALL" selected>All decision states</option>
               <option value="FORMING">Forming</option>
               <option value="READY">Ready</option>
@@ -52,7 +52,7 @@
             </select>
           </label>
           <label>Decision
-            <select id="daily-vcp-decision" aria-label="Filter Daily VCP by canonical decision">
+            <select id="daily-vcp-decision" aria-label="Filter setup candidates by canonical decision">
               <option value="ALL" selected>All decisions</option>
               <option value="REVIEW">Review</option>
               <option value="WAIT">Wait</option>
@@ -60,7 +60,7 @@
             </select>
           </label>
           <label>Quality
-            <select id="daily-vcp-quality" aria-label="Filter Daily VCP by canonical quality">
+            <select id="daily-vcp-quality" aria-label="Filter setup candidates by canonical quality">
               <option value="ALL" selected>All quality</option>
               <option value="PASS">Pass</option>
               <option value="PARTIAL">Partial</option>
@@ -71,10 +71,15 @@
         </div>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
+        <nav id="daily-setup-pagination" class="pagination" aria-label="Setup candidate pages">
+          <button id="daily-setup-prev" class="btn btn--page" disabled aria-label="Previous setup candidate page">← Prev</button>
+          <span id="daily-setup-page-info" class="page-info" aria-live="polite">Page 1 of –</span>
+          <button id="daily-setup-next" class="btn btn--page" disabled aria-label="Next setup candidate page">Next →</button>
+        </nav>
       </section>
     </main>
 
-    <!-- ── All VCP panel ── -->
+    <!-- ── VCP audit / compatibility / rollback panel (not canonical) ── -->
     <main id="panel-vcp" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-vcp">
       <section id="vcp-loading" class="state state--hidden" aria-live="polite">
         <div class="state-icon">⌛</div><p class="state-text">Loading 60m VCP finder…</p>
@@ -84,7 +89,7 @@
         <button id="vcp-retry" class="btn btn--retry">Retry</button>
       </section>
       <section id="vcp-content">
-        <p class="explorer-note">Marginable-long operational universe · legacy/audit intraday 60m VCP finder · no Daily fallback · not an automatic buy signal.</p>
+        <p class="explorer-note"><strong>Audit / compatibility / rollback only · deprecated.</strong> Marginable-long operational universe · legacy intraday 60m VCP finder · no Daily fallback · not the canonical decision spine and not an automatic buy signal. One-day audit boundary; preserve raw VCP/replay evidence.</p>
         <div class="explorer-controls" aria-label="VCP Finder filters">
           <label class="explorer-control">View
             <select id="vcp-state" aria-label="Legacy VCP state filter (audit)">
@@ -352,6 +357,8 @@
             <button type="button" class="chart-timeframe" data-timeframe="1D">Day</button>
             <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
           </div>
+          <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
+          <section id="chart-wave-explanation" class="chart-wave-explanation" hidden aria-live="polite"></section>
 
           <dl class="drawer-fields">
             <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>

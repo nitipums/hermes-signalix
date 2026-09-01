@@ -1,14 +1,48 @@
 """Focused source contract tests for the owner-only MVP frontend."""
 from pathlib import Path
+import json
+import subprocess
 
 
 ROOT = Path(__file__).parent / "frontend"
 
 
+def _extract_function(source, name):
+    start = source.index("function " + name)
+    brace = source.index("{", start)
+    depth = 0
+    quote = None
+    escaped = False
+    for index in range(brace, len(source)):
+        char = source[index]
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in "'\"`":
+            quote = char
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+    raise AssertionError("unclosed JavaScript function: " + name)
+
+
+def _run_node(functions, expression):
+    script = "\n".join(functions) + "\nconsole.log(JSON.stringify(" + expression + "));"
+    result = subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
+    return json.loads(result.stdout)
+
+
 def test_v2_serving_contract_has_explicit_marginable_long_requests_and_metadata():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert js.count("universe=marginable_long") >= 2
+    assert js.count("universe=marginable_long") >= 1
     for marker in (
         "decision_shadow_v2", "decision_lane", "actionability",
         "eligible_count", "universe_filter", "margin_source_document",
@@ -41,6 +75,16 @@ def test_v2_success_empty_and_transport_error_states_are_distinct():
     assert 'show(dom.dailyVcpError)' in js
     assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load Watchlist: " + err.message' in js
     assert 'dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message' in js
+
+
+def test_canonical_chart_overlay_uses_trade_stop_not_thesis_invalidation():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    result = _run_node(
+        [overlay],
+        'canonicalChartOverlay({setup: {trigger: 12, invalidation: 8, trade_stop: 10, target_1: 20}})',
+    )
+    assert result == {"trigger": 12, "stop": 10, "target": 20}
 
 
 def test_stage_colors_and_rising_lane_are_declared():
@@ -240,6 +284,74 @@ def test_unavailable_hour_chart_is_explicit_not_blank():
     assert "chartRequestSeq" in js
 
 
+def test_wave_evidence_layer_is_toggleable_and_explains_payload_without_frontend_rules():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="chart-wave-evidence"' in html
+    assert "chartLayers.waveEvidence" in js
+    assert "window.__signalixWaveMarkerHits" in js
+    assert "showWaveExplanation" in js
+    for field in ("details.rule", "details.evidence", "details.alternative", "details.missing", "details.policy",
+                  "marker.timeframe", "marker.source", "marker.confidence", "marker.evidence_refs",
+                  "marker.snapshot_identity"):
+        assert field in js
+    assert 'timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null' in js
+
+
+def test_wave_marker_window_alignment_uses_source_candle_index():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "var candles = chart.candles.slice(-120);" in js
+    assert "var start = chart.candles.length - candles.length;" in js
+    assert "sourceIndex < start || sourceIndex >= start + candles.length" in js
+    assert "sourceIndex - start" in js
+    assert 'if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;' in js
+    assert "chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp)" in js
+
+
+def test_canonical_chart_overlay_selects_target_1_without_target_2_fallback():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    result = _run_node(
+        [overlay],
+        "canonicalChartOverlay({setup:{trigger:12, invalidation:10, target_1:20, target_2:30}})",
+    )
+    assert result["target"] == 20
+    missing = _run_node([overlay], "canonicalChartOverlay({setup:{target_2:30}})")
+    assert "target" not in missing or missing["target"] is None
+    assert "target_2" in overlay  # documented fail-closed rationale
+
+
+def test_wave_explanation_deduplicates_metadata_and_normalizes_optional_values():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceText")
+    assert _run_node([helper], "waveEvidenceText([null, 'close', {source: 'daily'}])") == 'close · {"source":"daily"}'
+    assert _run_node([helper], "waveEvidenceText([])") == "Unavailable"
+    explanation = _extract_function(js, "showWaveExplanation")
+    assert explanation.count('"<div>Timeframe: "') == 1
+    assert explanation.count('"<div>Confidence: "') == 1
+    assert explanation.count('"<div>Evidence refs: "') == 1
+    assert explanation.count('"<div>Snapshot: "') == 1
+    assert "marker.explanation && typeof marker.explanation === \"object\"" in explanation
+    assert 'if (!marker || typeof marker !== "object" || Array.isArray(marker)) {' in explanation
+    assert 'panel.hidden = true; panel.textContent = ""; return;' in explanation
+
+
+def test_wave_controls_guard_optional_dom_nodes():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for listener in ("drawerClose", "drawerOverlay", "drawerPrev", "drawerNext", "drawer", "drawerCanvas", "chartWaveEvidence"):
+        assert f"if (dom.{listener})" in js
+    assert "if (!dom.drawer) return;" in js
+
+
+def test_setup_targets_render_ordered_metadata_and_malformed_targets_fail_closed():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "targets = Array.isArray(setup.targets) ? setup.targets : [];" in js
+    assert 'var name = displayValue(target.name);' in js
+    assert 'var price = displayValue(target.price);' in js
+    assert 'var method = displayValue(target.method);' in js
+    assert 'return name + " " + price + " (" + method + ")";' in js
+
+
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -333,7 +445,7 @@ def test_vcp_payloads_are_cached_and_presentation_filters_do_not_duplicate_fetch
     assert "if (force) delete cache[key];" in cache
     assert "if (inFlight[key] === entry) cache[key] = data;" in cache
     assert "if (inFlight[key] === entry) delete inFlight[key];" in cache
-    assert "renderDailyVcpData(data);" in js
+    assert "function renderDailyVcpData(data)" in js
     assert "renderVcpData(data);" in js
     assert "loadDailyVcp(true);" in js
     assert 'loadVcp(true);' in js
@@ -519,12 +631,81 @@ def test_daily_trade_value_filter_callback_fails_without_return_value():
 def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'var endpoint = "/api/setup-candidates?page=1&page_size=100";' in js
+    assert 'var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";' in js
     assert "function renderSetupCandidates(data)" in js
     assert "setupCandidateCard" in js
     assert "Trend " in js and "Wave" in js and "Targets" in js and "VCP bonus" in js
+
+
+def test_vcp_is_not_primary_navigation_and_api_is_marked_audit_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="tab-vcp"' in html
+    assert "VCP Audit · Compatibility / Rollback" in html
+    assert "Audit / compatibility / rollback only" in html
+    assert 'id="tab-daily-vcp"' in html
+    assert 'if (dom.tabVcp) dom.tabVcp.addEventListener' in js
     assert 'id="daily-setup-sector"' in html
-    assert "legacy/audit" in html
+    assert "Audit / compatibility / rollback" in html
+
+
+def test_setup_candidate_payload_validation_fails_closed_and_checks_lane_totals():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateSetupCandidatePayload")
+    base = {
+        "items": [{"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"}],
+        "counts": {"DAILY_CANDIDATE": 1, "DATA_BLOCKED": 0},
+        "evaluated_count": 1,
+    }
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(base) + ")") is True
+    malformed = dict(base, items={"symbol": "AAA"})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(malformed) + ")") is False
+    negative = dict(base, counts={"DAILY_CANDIDATE": -1, "DATA_BLOCKED": 2})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(negative) + ")") is False
+    inconsistent = dict(base, counts={"DAILY_CANDIDATE": 0, "DATA_BLOCKED": 1})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(inconsistent) + ")") is False
+
+
+def test_setup_candidate_compact_items_and_canonical_detail_merge_are_safe():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateSetupCandidatePayload")
+    compact = {
+        "items": [{"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"}],
+        "counts": {"DAILY_CANDIDATE": 1},
+        "evaluated_count": 1,
+    }
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(compact) + ")") is True
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    fields = ("trend", "wave", "setup", "context", "bonus_evidence", "chart_evidence")
+    item = {field: {"source": "list"} for field in fields}
+    item.update({"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"})
+    detail = {field: {"source": "detail"} for field in fields}
+    detail["name"] = "Alpha"
+    result = _run_node([merge], "mergeCanonicalSetupDetail(" + json.dumps(item) + ", " + json.dumps(detail) + ")")
+    for field in fields:
+        assert result[field] == {"source": "list"}
+    assert result["name"] == "Alpha"
+
+
+def test_canonical_chart_failure_never_uses_snapshot_fallback():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "shouldUseSnapshotChartFallback")
+    assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA","decision_lane":"DAILY_CANDIDATE"})') is False
+    assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA"})') is True
+    assert "if (!shouldUseSnapshotChartFallback(item)) throw err;" in js
+
+
+def test_setup_candidate_pagination_is_reachable_and_accessible():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for marker in ('id="daily-setup-pagination"', 'id="daily-setup-prev"',
+                   'id="daily-setup-next"', 'aria-live="polite"'):
+        assert marker in html
+    assert "dailySetupPage - 1" in js
+    assert "dailySetupPage + 1" in js
+    assert "data.total_pages || 0" in js
+    assert js.count("loadDailyVcp(false, 1)") >= 3
+    assert 'if (force && typeof force === "object")' in js
 
 
 def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mobile_safe():

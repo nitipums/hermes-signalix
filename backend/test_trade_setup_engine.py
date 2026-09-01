@@ -73,6 +73,39 @@ def test_flat_or_insufficient_intraday_data_fails_closed():
     assert _intraday_anchors(anchor_frame([100, 96])) == {}
 
 
+def test_missing_and_invalid_60m_have_explicit_data_reason_codes():
+    missing = build_trade_setup(daily_wave_two_evidence(), None)
+    invalid = anchor_frame([100, 99, 101, 100])
+    invalid.loc[invalid.index[-1], "High"] = 0
+
+    assert missing["status"] == "DATA_BLOCKED"
+    assert missing["data_reason_code"] == "NO_60M_DATA"
+    assert build_trade_setup(daily_wave_two_evidence(), invalid)["data_reason_code"] == "INVALID_60M_OHLCV"
+
+
+def test_valid_60m_without_anchor_is_no_setup_not_blocked():
+    result = build_trade_setup(daily_wave_two_evidence(), anchor_frame([100, 100, 100]))
+
+    assert result["status"] == "FORMING"
+    assert result["reason_code"] == "NO_SETUP_DETECTED"
+    assert "data_reason_code" not in result
+
+
+def test_invalid_fib_is_explicit_invalid_risk_not_blocked():
+    class InvalidFib:
+        @staticmethod
+        def compute_fib_targets(*args):
+            return {"status": "INVALID", "fib_1272": None, "fib_1618": None}
+
+    result = build_trade_setup(
+        daily_wave_two_evidence(), rising_60m_frame(), risk_helper=InvalidFib
+    )
+
+    assert result["status"] == "INVALIDATED"
+    assert result["risk_status"] == "INVALID"
+    assert result["reason_code"] == "RISK_INVALID"
+
+
 def test_wick_test_is_not_a_completed_trigger():
     tested = rising_60m_frame()
     tested.loc[tested.index[-1], ["Open", "High", "Low", "Close"]] = [117, 119, 116, 117]
@@ -131,3 +164,30 @@ def test_thesis_invalidation_is_separate_from_trade_stop():
     assert result["thesis_invalidation"] != result["trade_stop"]
     assert result["risk_stop_separate"] is True
     json.dumps(result)
+
+
+def test_targets_are_ordered_metadata_and_levels_use_source_pivots():
+    result = build_trade_setup(daily_wave_two_evidence(), rising_60m_frame(), risk_helper=GoodFib)
+
+    assert [target["name"] for target in result["targets"]] == ["target_1", "target_2"]
+    assert [target["method"] for target in result["targets"]] == ["fib_1272", "fib_1618"]
+    assert result["targets"][0]["price"] == result["target_1"]
+    assert result["trigger_timestamp"] != result["provenance"]["as_of"]
+    assert result["trade_stop_timestamp"] != result["provenance"]["as_of"]
+    json.dumps(result)
+
+
+def test_target_one_preserves_method_when_nearest_fib_is_filtered():
+    class Fib1272BelowTrigger:
+        @staticmethod
+        def compute_fib_targets(*args):
+            _, high, _ = args
+            return {"fib_1272": high - 1, "fib_1618": high + 22, "status": "OK"}
+
+    result = build_trade_setup(
+        daily_wave_two_evidence(), rising_60m_frame(), risk_helper=Fib1272BelowTrigger
+    )
+
+    assert result["targets"] == [{"name": "target_1", "price": 140.0, "method": "fib_1618"}]
+    assert result["target_1"] == 140.0
+    assert result["rr"]["to_target_1"] == 2.4444

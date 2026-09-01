@@ -29,6 +29,27 @@ _setup_candidates_cache = None
 _setup_candidates_inflight = None
 _setup_candidates_cache_lock = threading.Lock()
 
+VCP_AUDIT_DEPRECATION = {
+    "status": "audit_only",
+    "boundary": "one_day",
+    "window": "one_day",
+    "message": "VCP is retained for audit/rollback only; use /api/setup-candidates for the canonical decision spine.",
+}
+
+LEGACY_ROUTE_DEPRECATION = {
+    "status": "audit_only",
+    "boundary": "one_day",
+    "message": "Legacy MVP projection is retained for audit/replay only; use /api/setup-candidates.",
+}
+
+
+def _legacy_response(payload):
+    """Mark compatibility output without changing its historical item shape."""
+    if isinstance(payload, dict):
+        return {**payload, "audit_only": True,
+                "deprecation": dict(LEGACY_ROUTE_DEPRECATION)}
+    return payload
+
 
 def clear_vcp_watchlist_cache():
     """Clear the bounded presentation cache (used by deterministic tests)."""
@@ -44,15 +65,41 @@ def clear_setup_candidates_cache():
         _setup_candidates_cache = None
 
 
+def _setup_candidates_source_version(pg):
+    """Cheap read-only fingerprint so a completed ingestion expires the cache."""
+    cur = pg.cursor()
+    try:
+        cur.execute("SELECT MAX(date) FROM price_data WHERE market=%s", ("TH",))
+        daily = cur.fetchone()
+        cur.execute("""SELECT fetch_completed_at FROM intraday_ingestion_runs
+                       WHERE status IN ('full_success','partial_success')
+                       ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1""")
+        ingestion = cur.fetchone()
+        return daily, ingestion
+    finally:
+        cur.close()
+
+
 def _load_setup_candidates_cached(builder, pg, *, market="TH"):
     """Reuse one bounded read-only build and coalesce concurrent requests."""
     global _setup_candidates_cache, _setup_candidates_inflight
+    request_started = time.monotonic()
+    waited = False
+    try:
+        source_version = _setup_candidates_source_version(pg)
+    except (AttributeError, TypeError):
+        # Pure unit-test builders need not emulate PostgreSQL. Production
+        # connections always use the ingestion-aware fingerprint above.
+        source_version = None
     while True:
         now = time.monotonic()
         with _setup_candidates_cache_lock:
             cached = _setup_candidates_cache
-            if cached and cached[0] > now:
-                return cached[1]
+            if cached and cached[0] > now and cached[1] == source_version:
+                return _setup_candidates_observed(
+                    cached[2], "single_flight" if waited else "warm",
+                    request_started, wait_started if waited else None,
+                )
             waiter = _setup_candidates_inflight
             if waiter is None:
                 waiter = threading.Event()
@@ -62,21 +109,49 @@ def _load_setup_candidates_cached(builder, pg, *, market="TH"):
                 owner = False
         if owner:
             break
+        wait_started = time.monotonic()
+        waited = True
         waiter.wait()
 
     try:
+        build_started = time.monotonic()
         items, source_meta = builder(pg, market=market)
         payload = {"items": items, **source_meta}
+        build_observability = dict(payload.get("build_observability") or {})
+        build_observability.setdefault(
+            "duration_ms", round((time.monotonic() - build_started) * 1000, 3)
+        )
+        payload["build_observability"] = build_observability
         with _setup_candidates_cache_lock:
             _setup_candidates_cache = (
                 time.monotonic() + _SETUP_CANDIDATES_CACHE_TTL_SECONDS,
+                source_version,
                 payload,
             )
-        return payload
+        return _setup_candidates_observed(payload, "cold", request_started, None)
     finally:
         with _setup_candidates_cache_lock:
             _setup_candidates_inflight = None
             waiter.set()
+
+
+def _setup_candidates_observed(payload, status, request_started, wait_started):
+    """Return request-specific cache metadata without mutating the cached source."""
+    observed = dict(payload)
+    build_observability = dict(payload.get("build_observability") or {})
+    stages_ms = dict(build_observability.get("stages_ms") or {})
+    build_observability["stages_ms"] = stages_ms
+    build_observability["cache_status"] = status
+    build_observability["request_duration_ms"] = round(
+        (time.monotonic() - request_started) * 1000, 3
+    )
+    if wait_started is not None:
+        build_observability["single_flight_wait_ms"] = round(
+            (time.monotonic() - wait_started) * 1000, 3
+        )
+    observed["build_observability"] = build_observability
+    observed["cache_status"] = status
+    return observed
 
 
 
@@ -205,6 +280,8 @@ def handle_mvp_api(path, handler) -> bool:
             if payload is None:
                 json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
                 return True
+            payload = {**payload, "audit_only": True,
+                       "deprecation": dict(VCP_AUDIT_DEPRECATION)}
             if daily_watchlist:
                 # The watchlist consumes only capped lanes. Preserve full-universe
                 # counts/coverage metadata, but do not serialize audit results.
@@ -219,20 +296,13 @@ def handle_mvp_api(path, handler) -> bool:
         pg = None
         try:
             import mvp_api
-            try:
-                payload = load_payload()
-                items = payload["items"]
-                # A snapshot is usable here only when its producer serialized
-                # the complete canonical contract. Legacy MVP cards must use
-                # the real OHLCV source below, never a shape-changing adapter.
-                for item in items:
-                    mvp_api._setup_candidate_from_snapshot(item, payload)
-            except (FileNotFoundError, ValueError, json.JSONDecodeError, KeyError):
-                pg = _vcp_pg()
-                payload = _load_setup_candidates_cached(
-                    mvp_api.build_setup_candidates_from_data, pg, market="TH"
-                )
-                items = payload["items"]
+            # Canonical serving is always built from authoritative OHLCV. The
+            # legacy MVP artifact is neither a source nor a fallback here.
+            pg = _vcp_pg()
+            payload = _load_setup_candidates_cached(
+                mvp_api.build_setup_candidates_from_data, pg, market="TH"
+            )
+            items = payload["items"]
             page = int(qs.get("page", ["1"])[0])
             page_size = int(qs.get("page_size", ["50"])[0])
             result = mvp_api.project_setup_candidates_response(
@@ -270,10 +340,10 @@ def handle_mvp_api(path, handler) -> bool:
         marginable_filter = qs.get("marginable", ["krungsri"])[0] or "krungsri"
         margin_rates = qs.get("margin_rates", [""])[0]
         price_band = qs.get("price_band", ["all"])[0]
-        json_response(handler, mvp_api.project_shortlist_response(
+        json_response(handler, _legacy_response(mvp_api.project_shortlist_response(
             items, snapshot_meta=payload, marginable_filter=marginable_filter,
             margin_rates=margin_rates, price_band=price_band,
-        )); return True
+        ))); return True
     if route in ("/api/explorer", "/api/explorer/"):
         result = mvp_api.project_explorer_response(
             items,
@@ -286,14 +356,14 @@ def handle_mvp_api(path, handler) -> bool:
             margin_rates=qs.get("margin_rates", [""])[0],
             price_band=qs.get("price_band", ["all"])[0],
         )
-        json_response(handler, result); return True
+        json_response(handler, _legacy_response(result)); return True
     if route.startswith("/api/symbol/"):
         symbol = route[len("/api/symbol/"):].strip().rstrip("/")
         if not symbol:
             json_response(handler, {"error": "symbol required"}, status=400); return True
         result = mvp_api.project_symbol_detail(items, symbol)
         if result is None: _not_found(handler, symbol)
-        else: json_response(handler, result)
+        else: json_response(handler, _legacy_response(result))
         return True
     if route.startswith("/api/chart-db/"):
         symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
@@ -306,7 +376,7 @@ def handle_mvp_api(path, handler) -> bool:
         except ValueError as exc:
             json_response(handler, {"error": "invalid_request"}, status=400); return True
         if result is None: _not_found(handler, symbol)
-        else: json_response(handler, result)
+        else: json_response(handler, _legacy_response(result))
         return True
     if route.startswith("/api/chart/"):
         symbol = route[len("/api/chart/"):].strip().rstrip("/")
@@ -322,6 +392,6 @@ def handle_mvp_api(path, handler) -> bool:
             except ValueError as exc:
                 json_response(handler, {"error": "invalid_request"}, status=400); return True
         if result is None: _not_found(handler, symbol)
-        else: json_response(handler, result)
+        else: json_response(handler, _legacy_response(result))
         return True
     return False

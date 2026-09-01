@@ -4,10 +4,12 @@ from decimal import Decimal
 import numpy as np
 
 from setup_candidate_contract import (
+    _setup_evidence_markers,
     build_peer_context,
     build_setup_candidate,
     project_setup_candidate_list,
 )
+from trade_setup_engine import build_trade_setup
 
 
 def sample_inputs():
@@ -35,6 +37,14 @@ def test_candidate_contract_keeps_layers_separate():
     json.dumps(item)
 
 
+def test_60m_marker_timestamp_uses_chart_datetime_form():
+    markers = _setup_evidence_markers(
+        {"trigger": 12.5, "trigger_timestamp": "2026-01-02 11:00:00"},
+        {}, {},
+    )
+    assert markers[0]["timestamp"] == "2026-01-02T11:00:00"
+
+
 def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
     inputs = sample_inputs()
     inputs["wave"] = {"timeframe": "60m", "state": "WAVE_2_NEAR_COMPLETION"}
@@ -52,6 +62,18 @@ def test_missing_timeframes_are_defaulted_by_contract_construction():
     item = build_setup_candidate(**inputs)
     assert item["wave"]["timeframe"] == "daily"
     assert item["setup"]["timeframe"] == "60m"
+
+
+def test_non_unknown_wave_always_has_three_evidence_arrays():
+    inputs = sample_inputs()
+    inputs["wave"] = {"state": "WAVE_1_ADVANCE", "confidence": "MEDIUM"}
+
+    wave = build_setup_candidate(**inputs)["wave"]
+
+    assert wave["primary_state"] == "WAVE_1_ADVANCE"
+    assert wave["supporting_evidence"] == []
+    assert wave["contradicting_evidence"] == []
+    assert wave["missing_evidence"] == []
 
 
 def test_peer_context_derives_breadth_breakouts_and_leadership():
@@ -100,6 +122,42 @@ def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
     assert build_setup_candidate(**non_vcp)["decision_lane"] == "DAILY_CANDIDATE"
 
 
+def test_lane_plan_requires_ordered_target_1_and_never_uses_target_2_only():
+    base = sample_inputs()
+    base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    base["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 12.5,
+        "invalidation": 10.0, "rr": {"to_target_1": 3.0},
+        "targets": [{"name": "target_1", "price": 20.0},
+                    {"name": "target_2", "price": 25.0}],
+        "target_1": 20.0,
+    }
+    assert build_setup_candidate(**base)["decision_lane"] == "REVIEW_NOW"
+
+    for targets, target_1 in (
+        ([{"name": "target_2", "price": 25.0}], None),
+        ([{"name": "target_2", "price": 25.0}], 20.0),
+        ([{"name": "target_1", "price": "not-a-price"}], "not-a-price"),
+        ([{"name": "target_2", "price": 25.0}, {"name": "target_1", "price": 20.0}], 20.0),
+    ):
+        blocked_plan = dict(base["setup"], targets=targets, target_1=target_1)
+        result = build_setup_candidate(**dict(base, setup=blocked_plan))
+        assert result["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_legacy_scalar_targets_remain_compatible_without_downgrading_mixed_targets():
+    base = sample_inputs()
+    base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    legacy_setup = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 100,
+        "invalidation": 90, "targets": [120], "rr": {"to_target_1": 2.0},
+    }
+    assert build_setup_candidate(**dict(base, setup=legacy_setup))["decision_lane"] == "REVIEW_NOW"
+
+    mixed_setup = dict(legacy_setup, targets=[120, {"name": "target_2", "price": 130}])
+    assert build_setup_candidate(**dict(base, setup=mixed_setup))["decision_lane"] == "DAILY_CANDIDATE"
+
+
 def test_explicit_failed_structure_and_risk_statuses_avoid():
     for status in ("FAILED", "BROKEN", "DO_NOT_CHASE", "FAILED_STRUCTURE"):
         inputs = sample_inputs()
@@ -122,6 +180,38 @@ def test_blocked_data_precedes_failed_statuses():
     inputs["data_status"] = {"sufficient": False, "freshness": "stale"}
     inputs["setup"] = {"status": "DO_NOT_CHASE"}
     assert build_setup_candidate(**inputs)["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_reason_codes_project_no_setup_and_invalid_risk_without_text_matching():
+    no_setup = sample_inputs()
+    no_setup["setup"] = {"status": "FORMING", "reason_code": "NO_SETUP_DETECTED",
+                         "reason": "localized display text"}
+    assert build_setup_candidate(**no_setup)["decision_lane"] == "DAILY_CANDIDATE"
+
+    invalid_risk = sample_inputs()
+    invalid_risk["setup"] = {"status": "INVALIDATED", "risk_status": "INVALID",
+                              "reason_code": "RISK_INVALID", "reason": "display only"}
+    assert build_setup_candidate(**invalid_risk)["decision_lane"] == "AVOID"
+
+    blocked = sample_inputs()
+    blocked["data_status"] = {"sufficient": False, "freshness": "unknown",
+                              "reason_code": "NO_60M_DATA"}
+    blocked["setup"] = {"status": "FORMING", "reason_code": "NO_SETUP_DETECTED"}
+    assert build_setup_candidate(**blocked)["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_direct_engine_data_reason_is_serialized_under_data_status_only():
+    inputs = sample_inputs()
+    inputs["data_status"] = {"sufficient": False, "freshness": "unknown"}
+    inputs["setup"] = build_trade_setup(
+        {"timeframe": "daily", "state": "UNKNOWN"}, None
+    )
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["data_status"]["reason_code"] == "NO_60M_DATA"
+    assert item["data_status"]["reason_codes"] == ["NO_60M_DATA"]
+    assert "data_reason_code" not in item["setup"]
 
 
 def test_recursive_json_conversion_returns_plain_primitives_or_null():
