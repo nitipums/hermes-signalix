@@ -92,6 +92,51 @@ def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
     assert 'Wave ' in js and 'Confidence ' in js
 
 
+def test_t08_daily_wave_bucket_accepts_each_canonical_state_and_rejects_invalid_values():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "setupCandidateWaveBucket")
+    states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
+              "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"]
+    declaration = 'var canonicalDailyWaveStates = ' + json.dumps(states) + ';'
+    result = _run_node([declaration, helper], "[" + ",".join(
+        "setupCandidateWaveBucket({wave:{primary_state:" + json.dumps(state) + "}})" for state in states
+    ) + ", setupCandidateWaveBucket({wave:{primary_state:'INVALID'}}), setupCandidateWaveBucket({})]")
+    assert result == states + ["UNKNOWN", "UNKNOWN"]
+
+
+def test_t08_wave_filter_composes_with_search_and_lane_without_inference():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "setupCandidateMatchesToolbar")
+    bucket = _extract_function(js, "setupCandidateWaveBucket")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}, dailySetupWave:{value:"EARLY_WAVE_3"}};'
+    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE'}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}})]"
+    assert _run_node([states, bucket, dom, helper], expression) == [True, False, False]
+
+
+def test_t08_grouping_has_canonical_wave_order_unknown_bucket_and_stable_symbol_order():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "groupSetupCandidates")
+    bucket = _extract_function(js, "setupCandidateWaveBucket")
+    stable = _extract_function(js, "stableSetupCandidateOrder")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    items = "[{symbol:'ZZZ',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}},{symbol:'AAA',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE'}},{symbol:'BAD',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'NOPE'}}]"
+    result = _run_node([states, bucket, stable, helper], "(function(g){return {order:g.waveOrder, first:g.waveGroups.WAVE_1_ADVANCE[0].symbol, third:g.waveGroups.EARLY_WAVE_3[0].symbol, unknown:g.waveGroups.UNKNOWN[0].symbol};})(groupSetupCandidates(" + items + "))")
+    assert result == {"order": ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE", "UNKNOWN"], "first": "AAA", "third": "ZZZ", "unknown": "BAD"}
+
+
+def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_reconciliation():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="daily-setup-wave"' in html
+    assert "Unknown / Not verified" in html and "Unknown / Not verified" in js
+    assert "laneItems.length + ' / ' + Number(laneTotals[lane] || 0)" in js
+    assert "No setup candidates matched the current presentation filters." in js
+    assert 'dom.dailySetupWave.addEventListener("change"' in js
+    assert "reconcileDailyDrawerNavigation();" in js
+    assert '"#panel-daily-vcp .setup-candidate-card[data-symbol]"' in js
+
+
 def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")

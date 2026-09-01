@@ -34,6 +34,7 @@
     dailyVcpMeta:    $("#daily-vcp-meta"),
     dailySetupSearch: $("#daily-setup-search"),
     dailySetupLane: $("#daily-setup-lane"),
+    dailySetupWave: $("#daily-setup-wave"),
     dailySetupRefresh: $("#daily-setup-refresh"),
     dailySetupUpdated: $("#daily-setup-updated"),
     dailySetupLiveRefresh: $("#daily-setup-live-refresh"),
@@ -528,6 +529,15 @@
     var states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3",
       "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
     return states.indexOf(state) >= 0 ? state : "Unavailable";
+  }
+
+  var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
+    "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
+
+  function setupCandidateWaveBucket(item) {
+    var wave = item && item.wave;
+    var state = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.primary_state : null;
+    return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "UNKNOWN";
   }
 
   function compactWaveConfidence(item) {
@@ -1290,8 +1300,18 @@
   function setupCandidateMatchesToolbar(item) {
     var search = dom.dailySetupSearch ? dom.dailySetupSearch.value.trim().toLowerCase() : "";
     var lane = dom.dailySetupLane ? dom.dailySetupLane.value : "ALL";
+    var wave = dom.dailySetupWave ? dom.dailySetupWave.value : "ALL";
     var haystack = ((item.symbol || "") + " " + (item.name || "")).toLowerCase();
-    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane);
+    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane) &&
+      (wave === "ALL" || setupCandidateWaveBucket(item) === wave);
+  }
+
+  function stableSetupCandidateOrder(items) {
+    return (items || []).map(function(item, index) { return {item: item, index: index}; }).sort(function(a, b) {
+      var left = String(a.item.symbol || "").toUpperCase();
+      var right = String(b.item.symbol || "").toUpperCase();
+      return left < right ? -1 : left > right ? 1 : a.index - b.index;
+    }).map(function(entry) { return entry.item; });
   }
 
   function groupSetupCandidates(items) {
@@ -1299,7 +1319,7 @@
     var groups = {};
     var reviewOrder = ["PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"];
     laneOrder.forEach(function(lane) { groups[lane] = []; });
-    (items || []).forEach(function(item) {
+    stableSetupCandidateOrder(items).forEach(function(item) {
       var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED";
       groups[lane].push(item);
     });
@@ -1316,7 +1336,24 @@
         return result.concat(reviewGroups[status]);
       }, []).concat(reviewUnknown);
     }
-    return {order: laneOrder, groups: groups};
+    var waveOrder = canonicalDailyWaveStates.concat(["UNKNOWN"]);
+    var waveGroups = {};
+    waveOrder.forEach(function(state) { waveGroups[state] = []; });
+    groups.DAILY_CANDIDATE.forEach(function(item) { waveGroups[setupCandidateWaveBucket(item)].push(item); });
+    return {order: laneOrder, groups: groups, waveOrder: waveOrder, waveGroups: waveGroups};
+  }
+
+  function reconcileDailyDrawerNavigation() {
+    if (!dom.drawer || dom.drawer.classList.contains("drawer--hidden")) return;
+    var symbols = visibleDrawerSymbols();
+    var index = chartSymbol ? symbols.indexOf(chartSymbol) : -1;
+    if (index < 0) {
+      closeDrawer();
+      return;
+    }
+    drawerSymbols = symbols;
+    drawerIndex = index;
+    updateDrawerNav();
   }
 
   function setupDrawerCollection(items) {
@@ -1408,11 +1445,18 @@
     var groupedHTML = grouped.order.reduce(function(html, lane) {
       var laneItems = grouped.groups[lane];
       if (!laneItems.length) return html;
-      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + laneItems.map(setupCandidateCard).join("") + '</section>';
+      var content = lane === "DAILY_CANDIDATE" ? grouped.waveOrder.reduce(function(waveHTML, wave) {
+        var waveItems = grouped.waveGroups[wave];
+        if (!waveItems.length) return waveHTML;
+        var label = wave === "UNKNOWN" ? "Unknown / Not verified" : wave;
+        return waveHTML + '<section class="setup-candidate-wave-group"><h3 class="section-head">' + escapeHTML(label) + ' <span class="section-subhead">' + waveItems.length + '</span></h3>' + waveItems.map(setupCandidateCard).join("") + '</section>';
+      }, "") : laneItems.map(setupCandidateCard).join("");
+      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + content + '</section>';
     }, "");
     dom.dailyVcpCards.innerHTML = groupedHTML ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
     if (dom.dailySetupUpdated) dom.dailySetupUpdated.textContent = "Updated " + formatProvenance(freshness.fetch_completed_at || data.fetch_completed_at || data.as_of || "unknown");
+    reconcileDailyDrawerNavigation();
   }
 
   function loadDailyVcp(force, page) {
@@ -1528,6 +1572,9 @@
     if (dailySetupData) renderSetupCandidates(dailySetupData);
   });
   if (dom.dailySetupLane) dom.dailySetupLane.addEventListener("change", function() {
+    if (dailySetupData) renderSetupCandidates(dailySetupData);
+  });
+  if (dom.dailySetupWave) dom.dailySetupWave.addEventListener("change", function() {
     if (dailySetupData) renderSetupCandidates(dailySetupData);
   });
   function scheduleLiveRefresh() {
