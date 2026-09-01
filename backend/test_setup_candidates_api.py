@@ -347,6 +347,61 @@ def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypat
     assert meta["build_observability"]["candidate_evaluation_parallel"] is False
 
 
+def test_setup_candidate_full_frames_use_process_workers_in_symbol_order(monkeypatch):
+    import mvp_api
+    import pandas as pd
+
+    symbols = ["AAA", "BBB", "CCC"]
+    index = pd.date_range("2026-07-01", periods=25)
+    values = [10.0 + i / 10 for i in range(25)]
+    daily = pd.DataFrame(
+        {"Open": values, "High": [v + .1 for v in values],
+         "Low": [v - .1 for v in values], "Close": values,
+         "Volume": [10] * 25}, index=index
+    )
+    intraday = daily.copy()
+    intraday.attrs["timeframe"] = "60m"
+    intraday.attrs["as_of"] = intraday.index[-1]
+    submitted = []
+
+    class FakePool:
+        def __init__(self, max_workers):
+            submitted.append(("workers", max_workers))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def map(self, fn, args):
+            args = list(args)
+            submitted.append(("args", len(args)))
+            return [mvp_api._evaluate_candidate_engines(*item) for item in args]
+
+    monkeypatch.setattr(mvp_api, "ProcessPoolExecutor", FakePool)
+    monkeypatch.setattr(mvp_api, "resolve_universe", lambda pg, universe: (symbols, {
+        "universe_filter": "marginable_long", "eligible_count": len(symbols)
+    }))
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr("screening.load_market", lambda *a, **k: None)
+    monkeypatch.setattr(mvp_api, "expected_market_date", lambda: index[-1].date())
+    monkeypatch.setattr(mvp_api, "build_setup_candidate", lambda symbol, *args: {"symbol": symbol})
+    monkeypatch.setattr(mvp_api, "build_peer_context", lambda *args: {})
+    monkeypatch.setattr(mvp_api, "compute_trend_strength", lambda *args, **kwargs: {})
+    monkeypatch.setattr(mvp_api, "_bulk_candidate_frames", lambda *args, **kwargs: (
+        {symbol: daily.copy() for symbol in symbols},
+        {symbol: intraday.copy() for symbol in symbols}, 2,
+    ))
+
+    rows, meta = mvp_api.build_setup_candidates_from_data(object())
+
+    assert submitted == [("workers", 3), ("args", 3)]
+    assert [row["symbol"] for row in rows] == symbols
+    assert meta["build_observability"]["candidate_evaluation_workers"] == 3
+    assert meta["build_observability"]["candidate_evaluation_parallel"] is True
+
+
 def test_setup_candidate_data_build_is_cached(monkeypatch):
     import mvp_routes
     calls = []

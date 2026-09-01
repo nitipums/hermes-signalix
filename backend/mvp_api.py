@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -512,6 +512,11 @@ def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
     return wave, setup
 
 
+def _evaluate_candidate_engines_worker(args):
+    """Process-pool adapter for the CPU-bound per-symbol evaluator."""
+    return _evaluate_candidate_engines(*args)
+
+
 def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
     """Load bounded Daily and 60m frames in two queries, grouped by symbol."""
     import pandas as pd
@@ -732,9 +737,10 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             intraday_available, intraday_current, intraday_freshness, intraday_as_of,
         )
 
-    # Daily Elliott and 60m setup calculations are independent per symbol and
-    # spend most of their time in pandas operations. Bounded workers reduce
-    # wall time without sharing mutable frames between symbols. executor.map
+    # Daily Elliott and 60m setup calculations are independent per symbol but
+    # are CPU-bound Python/pandas work. Threads do not bypass the GIL here and
+    # made the cold full-universe build slower; processes provide actual CPU
+    # concurrency without changing the pure engine inputs. executor.map
     # preserves symbol order, so ranking/pagination and all output ordering
     # remain deterministic. The fallback path stays serial for pure test
     # sentinels and legacy loaders.
@@ -742,14 +748,11 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     evaluation_workers = 1
     if daily_frames is not None and intraday_frames is not None and len(symbols) > 1:
         evaluation_workers = min(4, len(symbols))
-        with ThreadPoolExecutor(max_workers=evaluation_workers,
-                                thread_name_prefix="setup-eval") as executor:
+        with ProcessPoolExecutor(max_workers=evaluation_workers) as executor:
             results = executor.map(
-                lambda symbol: _evaluate_candidate_engines(
-                    evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
-                    evaluation_inputs[symbol][2]
-                ),
-                symbols,
+                _evaluate_candidate_engines_worker,
+                ((evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
+                  evaluation_inputs[symbol][2]) for symbol in symbols),
             )
             engine_results = dict(zip(symbols, results))
 
