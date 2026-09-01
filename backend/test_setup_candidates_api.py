@@ -343,6 +343,8 @@ def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypat
     assert "peer_symbols" in item["context"]
     assert item["bonus_evidence"]["vcp"]["source"] == "legacy_audit_only"
     assert meta["source"] == "price_data+intraday_price_data"
+    assert meta["build_observability"]["candidate_evaluation_workers"] == 1
+    assert meta["build_observability"]["candidate_evaluation_parallel"] is False
 
 
 def test_setup_candidate_data_build_is_cached(monkeypatch):
@@ -363,6 +365,7 @@ def test_setup_candidate_data_build_is_cached(monkeypatch):
     assert first["scan_time"] == second["scan_time"] == "2026-08-30"
     assert first["build_observability"]["cache_status"] == "cold"
     assert second["build_observability"]["cache_status"] == "warm"
+    assert first["items"] == second["items"]
     assert len(calls) == 1
     mvp_routes.clear_setup_candidates_cache()
 
@@ -395,7 +398,7 @@ def test_setup_candidate_cache_expires_immediately_after_ingestion(monkeypatch):
 
     def builder(pg, market="TH"):
         calls.append(1)
-        return [candidate("VERSIONED")], {"scan_time": "2026-08-30"}
+        return [candidate(f"VERSIONED_{len(calls)}")], {"scan_time": "2026-08-30"}
 
     mvp_routes.clear_setup_candidates_cache()
     cold = mvp_routes._load_setup_candidates_cached(builder, object())
@@ -405,8 +408,81 @@ def test_setup_candidate_cache_expires_immediately_after_ingestion(monkeypatch):
     assert cold["cache_status"] == "cold"
     assert warm["cache_status"] == "warm"
     assert refreshed is not warm
+    assert cold["items"] == warm["items"]
+    assert refreshed["items"] != warm["items"]
     assert len(calls) == 2
     mvp_routes.clear_setup_candidates_cache()
+
+
+def test_setup_candidate_source_version_uses_one_freshness_query():
+    class Cursor:
+        def __init__(self):
+            self.calls = []
+
+        def execute(self, sql, params):
+            self.calls.append((sql, params))
+
+        def fetchone(self):
+            return ("2026-08-31", "2026-09-01T01:00:00+00:00")
+
+        def close(self):
+            pass
+
+    class PG:
+        def __init__(self):
+            self.cur = Cursor()
+
+        def cursor(self):
+            return self.cur
+
+    pg = PG()
+    assert mvp_routes._setup_candidates_source_version(pg) == (
+        "2026-08-31", "2026-09-01T01:00:00+00:00"
+    )
+    assert len(pg.cur.calls) == 1
+    assert "SELECT MAX(date)" in pg.cur.calls[0][0]
+    assert "fetch_completed_at" in pg.cur.calls[0][0]
+
+
+def test_bulk_candidate_frames_uses_two_indexed_full_universe_queries():
+    import mvp_api
+
+    class Cursor:
+        def __init__(self, owner):
+            self.owner = owner
+            self.sql = ""
+
+        def execute(self, sql, params):
+            self.sql = sql
+            self.owner.calls.append((sql, params))
+
+        def fetchall(self):
+            if "price_data" in self.sql:
+                return [("AAA", "2026-08-29", 10, 11, 9, 10.5, 100)]
+            return [("AAA", "2026-08-29 15:00", 10, 11, 9, 10.5, 100)]
+
+        def close(self):
+            pass
+
+    class PG:
+        def __init__(self):
+            self.calls = []
+
+        def cursor(self):
+            return Cursor(self)
+
+    pg = PG()
+    daily, intraday, query_count = mvp_api._bulk_candidate_frames(
+        pg, ["AAA", "MISSING"], market="TH", lookback=400
+    )
+    assert query_count == 2
+    assert len(pg.calls) == 2
+    assert all("LATERAL" in sql and "LIMIT %s" in sql for sql, _ in pg.calls)
+    assert pg.calls[0][1] == (["AAA", "MISSING"], "TH", 400)
+    assert pg.calls[1][1] == (["AAA", "MISSING"], "60m", 400)
+    assert list(daily) == ["AAA"]
+    assert list(intraday) == ["AAA"]
+    assert intraday["AAA"].attrs["timeframe"] == "60m"
 
 
 def test_build_exposes_stage_timing_and_bounded_bulk_query_count(monkeypatch):
@@ -422,6 +498,8 @@ def test_build_exposes_stage_timing_and_bounded_bulk_query_count(monkeypatch):
     assert observed["duration_ms"] >= 0
     assert set(observed["stages_ms"]) == {"source_context", "ohlcv_load", "candidate_evaluation"}
     assert observed["ohlcv_query_count"] == 0
+    assert observed["candidate_evaluation_workers"] == 1
+    assert observed["candidate_evaluation_parallel"] is False
 
 
 def test_setup_candidate_concurrent_build_is_single_flight():

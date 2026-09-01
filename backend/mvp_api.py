@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -493,6 +494,24 @@ def _load_intraday_for_symbol(screening, symbol, pg, market):
     return frame
 
 
+def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
+    """Run the independent Daily/60m engines for one symbol.
+
+    The engines are pure transforms over per-symbol frames. Keeping this
+    adapter small makes bounded parallel evaluation deterministic (the caller
+    consumes ``executor.map`` in symbol order) while preserving the existing
+    evidence inputs and the historical setup-state adapter.
+    """
+    daily_input = daily_df if daily_evidence_valid else None
+    wave = build_wave_contract(
+        daily_input, _wave_inputs(daily_df) if daily_evidence_valid else {}
+    )
+    setup = build_trade_setup(
+        {**wave, "state": wave.get("primary_state", "UNKNOWN")}, intraday_df
+    )
+    return wave, setup
+
+
 def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
     """Load bounded Daily and 60m frames in two queries, grouped by symbol."""
     import pandas as pd
@@ -520,18 +539,32 @@ def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
             frames[symbol] = frame
         return frames
 
-    ranked_daily = """SELECT symbol, date, open, high, low, close, volume FROM (
-        SELECT symbol, date, open, high, low, close, volume,
-               ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) AS rn
-        FROM price_data WHERE market=%s AND symbol = ANY(%s)
-    ) rows WHERE rn <= %s ORDER BY symbol, date"""
-    ranked_intraday = """SELECT symbol, ts, open, high, low, close, volume FROM (
-        SELECT symbol, ts, open, high, low, close, volume,
-               ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY ts DESC) AS rn
-        FROM intraday_price_data WHERE interval=%s AND symbol = ANY(%s)
-    ) rows WHERE rn <= %s ORDER BY symbol, ts"""
-    daily = load(ranked_daily, (market.upper(), list(symbols), lookback))
-    intraday = load(ranked_intraday, ("60m", list(symbols), lookback), "60m")
+    # A partitioned window query makes PostgreSQL scan/sort the complete
+    # matching history before discarding all but 400 rows per symbol.  The
+    # candidate universe is bounded, so indexed per-symbol probes are both
+    # cheaper and preserve the full-universe result without changing evidence.
+    ranked_daily = """SELECT symbols.symbol, rows.date, rows.open, rows.high,
+                             rows.low, rows.close, rows.volume
+                      FROM unnest(%s::text[]) AS symbols(symbol)
+                      CROSS JOIN LATERAL (
+                          SELECT date, open, high, low, close, volume
+                          FROM price_data
+                          WHERE market=%s AND symbol=symbols.symbol
+                          ORDER BY date DESC LIMIT %s
+                      ) rows
+                      ORDER BY symbols.symbol, rows.date"""
+    ranked_intraday = """SELECT symbols.symbol, rows.ts, rows.open, rows.high,
+                                rows.low, rows.close, rows.volume
+                         FROM unnest(%s::text[]) AS symbols(symbol)
+                         CROSS JOIN LATERAL (
+                             SELECT ts, open, high, low, close, volume
+                             FROM intraday_price_data
+                             WHERE interval=%s AND symbol=symbols.symbol
+                             ORDER BY ts DESC LIMIT %s
+                         ) rows
+                         ORDER BY symbols.symbol, rows.ts"""
+    daily = load(ranked_daily, (list(symbols), market.upper(), lookback))
+    intraday = load(ranked_intraday, (list(symbols), "60m", lookback), "60m")
     return daily, intraday, 2
 
 
@@ -680,6 +713,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     expected_daily_session = expected_market_date()
     expected_intraday_interval = _expected_intraday_interval_start()
     freshness_statuses = []
+    evaluation_inputs = {}
     for symbol in symbols:
         daily_df = (daily_frames.get(symbol) if daily_frames is not None
                     else _load_daily_for_symbol(screening, symbol, pg, market))
@@ -688,6 +722,42 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         if intraday_df is not None:
             intraday_df.attrs["as_of"] = intraday_df.index[-1]
         daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
+        daily_current = (daily_evidence_valid
+                         and _daily_final_session_available(daily_df, expected_daily_session))
+        intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
+            _intraday_60m_status(intraday_df, expected_intraday_interval)
+        )
+        evaluation_inputs[symbol] = (
+            daily_df, intraday_df, daily_evidence_valid, daily_current,
+            intraday_available, intraday_current, intraday_freshness, intraday_as_of,
+        )
+
+    # Daily Elliott and 60m setup calculations are independent per symbol and
+    # spend most of their time in pandas operations. Bounded workers reduce
+    # wall time without sharing mutable frames between symbols. executor.map
+    # preserves symbol order, so ranking/pagination and all output ordering
+    # remain deterministic. The fallback path stays serial for pure test
+    # sentinels and legacy loaders.
+    engine_results = {}
+    evaluation_workers = 1
+    if daily_frames is not None and intraday_frames is not None and len(symbols) > 1:
+        evaluation_workers = min(4, len(symbols))
+        with ThreadPoolExecutor(max_workers=evaluation_workers,
+                                thread_name_prefix="setup-eval") as executor:
+            results = executor.map(
+                lambda symbol: _evaluate_candidate_engines(
+                    evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
+                    evaluation_inputs[symbol][2]
+                ),
+                symbols,
+            )
+            engine_results = dict(zip(symbols, results))
+
+    for symbol in symbols:
+        (daily_df, intraday_df, daily_evidence_valid, daily_current,
+         intraday_available, intraday_current, intraday_freshness, intraday_as_of) = (
+            evaluation_inputs[symbol]
+        )
         as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
         if as_of and (latest_daily is None or as_of > latest_daily):
             latest_daily = as_of
@@ -699,21 +769,12 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             daily_df if daily_evidence_valid else None,
             relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath
         )
-        daily_current = (daily_evidence_valid
-                         and _daily_final_session_available(daily_df, expected_daily_session))
-        intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
-            _intraday_60m_status(intraday_df, expected_intraday_interval)
-        )
-        wave = build_wave_contract(
-            daily_df if daily_evidence_valid else None,
-            _wave_inputs(daily_df) if daily_evidence_valid else {}
-        )
-        # The trade-setup engine still consumes its historical ``state`` input;
-        # keep that adapter local while the candidate contract remains
-        # canonical and exposes only ``primary_state``.
-        setup = build_trade_setup(
-            {**wave, "state": wave.get("primary_state", "UNKNOWN")}, intraday_df
-        )
+        if engine_results:
+            wave, setup = engine_results[symbol]
+        else:
+            wave, setup = _evaluate_candidate_engines(
+                daily_df, intraday_df, daily_evidence_valid
+            )
         if not daily_current:
             wave = {
                 **wave,
@@ -813,6 +874,8 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                             "stages_ms": {"source_context": source_ms, "ohlcv_load": load_ms,
                                           "candidate_evaluation": evaluate_ms},
                             "ohlcv_query_count": ohlcv_query_count,
+                            "candidate_evaluation_workers": evaluation_workers,
+                            "candidate_evaluation_parallel": evaluation_workers > 1,
                         },
                         **universe_manifest}
 

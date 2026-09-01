@@ -73,12 +73,16 @@ def _setup_candidates_source_version(pg):
     """Cheap read-only fingerprint so a completed ingestion expires the cache."""
     cur = pg.cursor()
     try:
-        cur.execute("SELECT MAX(date) FROM price_data WHERE market=%s", ("TH",))
-        daily = cur.fetchone()
-        cur.execute("""SELECT fetch_completed_at FROM intraday_ingestion_runs
-                       WHERE status IN ('full_success','partial_success')
-                       ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1""")
-        ingestion = cur.fetchone()
+        # Keep both freshness inputs in one round trip.  This runs before the
+        # process-local candidate cache lookup, so it must stay cheap while
+        # still expiring the cache after either Daily or 60m ingestion moves.
+        cur.execute("""SELECT
+                          (SELECT MAX(date) FROM price_data WHERE market=%s),
+                          (SELECT fetch_completed_at FROM intraday_ingestion_runs
+                           WHERE status IN ('full_success','partial_success')
+                           ORDER BY fetch_completed_at DESC NULLS LAST LIMIT 1)""",
+                    ("TH",))
+        daily, ingestion = cur.fetchone()
         return daily, ingestion
     finally:
         cur.close()
