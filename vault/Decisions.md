@@ -34,6 +34,16 @@ The public 390px failure→Retry→recovery browser gate passed through an isola
 
 Evaluator auto-caller definition: an optional future wiring in which the completed-60m evaluator invokes the lifecycle persistence hook automatically, appending candidate/setup snapshots and revalidation evidence. It is not broker execution or automatic trading. Status: `PENDING / OWNER DECISION`. Alerts and automatic trading/broker execution remain `PENDING / FUTURE FEATURE` and OFF.
 
+## 2026-09-01 — User-validation contract decisions
+
+Arm approved the next bounded UX/data contract after reviewing TASCO and representative current candidates:
+
+- Remove silent overview refresh. Use a compact Search/Lane/Refresh toolbar; advanced filters are collapsed by default and explicit refresh shows the update boundary.
+- Card primary surface shows decision essentials: price/change, lane/action, Wave/confidence, trigger/stop/target/R:R, two-digit RS, compact 52W/ATH/breakout evidence, and explicit freshness/data status. Sector/Peer/VCP/full evidence belongs in the drawer with explicit availability states.
+- Latest official Daily remains structural Wave authority. Current 60m is setup/entry evidence and may be provisional. Missing current-session official Daily EOD must not automatically collapse usable evidence into generic `DATA_BLOCKED`; data availability/freshness and setup readiness are separate concepts.
+- Daily markers may appear as contextual overlays on Week/60m only with an explicit `Daily source · not 60m wave` label; 60m setup markers remain separate.
+- Current status: documentation/design decision recorded; implementation requires a new bounded spec/ticket cycle. Arm's semantic Wave confirmation remains an owner validation gate.
+
 Evidence: release commits `8573b9d`..`2f6e790` (T1–T8), `9589fca` (T7), `00dd37c`/`04d6639`/`ddf1a87`/`7b3ed49` (T9), full backend suite green on release after promotion; lifecycle production e2e on :8000 passed (GET/POST/401/409/idempotency, append-only trigger verified); migration `007` applied to the canonical database with owner approval.
 
 ## 2026-08-31 — T8 full-universe ranking source (LITE-VERIFIED; served gate held)

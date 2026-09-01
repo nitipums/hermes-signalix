@@ -71,6 +71,15 @@ This is a usable release handoff, not a claim that machine-generated Elliott lab
 
 Arm will try the current `/mvp` manually. Any uncertainty or incorrect-looking Elliott identification should be collected as chart-review feedback, then handled as a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle. Do not silently tune wave labels from subjective feedback without an explicit owner-approved contract.
 
+## Feedback decision frontier — 2026-09-01
+
+Arm's TASCO feedback is recorded in `vault/Product-Feedback.md`. The owner-approved redesign spec and dependency-ordered planning packet are:
+
+- Spec: `docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md`
+- Tickets: `.scratch/2026-09-01-user-validation/issues/README.md`
+- T01–T04: engineering follow-up slices; T05: owner Wave-identification confirmation.
+- No source implementation has started from this packet. Alerts, automatic trading, broker execution, and evaluator auto-caller remain outside scope/pending.
+
 ## User-validation preflight — 2026-09-01
 
 ### Rendered usability journey — PASS
