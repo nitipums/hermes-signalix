@@ -168,6 +168,9 @@ body {
 .setup-candidate__readiness span, .setup-candidate__readiness b { min-width:0; overflow-wrap:anywhere; }
 .setup-candidate__readiness b { text-align:right; }
 .setup-candidate__decision { color:var(--accent); font-size:.78rem; letter-spacing:.02em; }
+.setup-candidate__wave { display:flex; flex-wrap:wrap; gap:6px 12px; margin:8px 0; color:var(--text-2); font-size:.78rem; }
+.setup-candidate__wave span { min-width:0; overflow-wrap:anywhere; }
+.setup-candidate__wave b { color:var(--text); }
 .setup-candidate__plan { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:0; font-size:.78rem; }
 .setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
 .setup-candidate__plan b { display:block; margin-top:2px; overflow-wrap:anywhere; }
@@ -370,6 +373,9 @@ body {
 .drawer-decision { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .drawer-trend { color:var(--text-2); font-size:13px; }
 .drawer-action { color:var(--accent); font-size:16px; }
+.drawer-wave-summary { display:flex; flex-wrap:wrap; gap:5px 12px; margin:0 0 12px; color:var(--text-2); font-size:12px; }
+.drawer-wave-summary span { min-width:0; overflow-wrap:anywhere; }
+.drawer-wave-summary strong { color:var(--text); }
 .drawer-company-context { display:flex; flex-wrap:wrap; gap:4px 8px; font-size:12px; color:var(--text-2); }
 .drawer-company-context span { border:1px solid var(--border); border-radius:4px; padding:2px 5px; }
 .drawer-description { color:var(--text-2); font-size:12px; margin:8px 0 12px; }

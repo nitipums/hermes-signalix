@@ -77,6 +77,38 @@ def test_v2_success_empty_and_transport_error_states_are_distinct():
     assert 'dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message' in js
 
 
+def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    wave_state = _extract_function(js, "canonicalWaveState")
+    wave_confidence = _extract_function(js, "compactWaveConfidence")
+    assert _run_node(
+        [wave_state, wave_confidence],
+        "({state: canonicalWaveState({wave: {primary_state: 'WAVE_2_FORMING', confidence: 'MEDIUM'}}), confidence: compactWaveConfidence({wave: {primary_state: 'WAVE_2_FORMING', confidence: 'MEDIUM'}})})",
+    ) == {"state": "WAVE_2_FORMING", "confidence": "MEDIUM"}
+    assert _run_node(
+        [wave_state, wave_confidence],
+        "({state: canonicalWaveState({wave: {primary_state: 'UNKNOWN'}}), confidence: compactWaveConfidence({wave: {confidence: 'UNSURE'}})})",
+    ) == {"state": "Unavailable", "confidence": "NOT_VERIFIED"}
+    assert 'Wave ' in js and 'Confidence ' in js
+
+
+def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="drawer-wave"' in html
+    assert 'id="drawer-wave-confidence"' in html
+    assert 'id="drawer-wave-source"' in html
+    assert 'Daily structural' in html
+    card = _extract_function(js, "setupCandidateCard")
+    assert 'canonicalWaveState(item)' in card
+    assert 'compactWaveConfidence(item)' in card
+    drawer = _extract_function(js, "renderDrawerDetail")
+    assert 'dom.drawerWave.textContent = canonicalWaveState(item)' in drawer
+    assert 'dom.drawerWaveSource.textContent = item && item.wave ? "Daily structural" : "Unavailable · no Daily wave"' in drawer
+    assert 'setup.minor_structure' not in drawer
+    assert '60m' in js
+
+
 def test_canonical_chart_overlay_uses_trade_stop_not_thesis_invalidation():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     overlay = _extract_function(js, "canonicalChartOverlay")

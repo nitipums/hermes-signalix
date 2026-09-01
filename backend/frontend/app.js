@@ -113,6 +113,9 @@
     drawerChange:  $("#drawer-change"),
     drawerTrend:    $("#drawer-trend"),
     drawerAction:   $("#drawer-action"),
+    drawerWave:     $("#drawer-wave"),
+    drawerWaveConfidence: $("#drawer-wave-confidence"),
+    drawerWaveSource: $("#drawer-wave-source"),
     drawerSector:   $("#drawer-sector"),
     drawerIndustry: $("#drawer-industry"),
     drawerMarketCap: $("#drawer-market-cap"),
@@ -516,6 +519,21 @@
     return String(value);
   }
 
+  function canonicalWaveState(item) {
+    var wave = item && item.wave;
+    var state = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.primary_state : null;
+    var states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3",
+      "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
+    return states.indexOf(state) >= 0 ? state : "Unavailable";
+  }
+
+  function compactWaveConfidence(item) {
+    var wave = item && item.wave;
+    var confidence = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.confidence : null;
+    confidence = confidence == null ? "" : String(confidence).toUpperCase();
+    return ["LOW", "MEDIUM", "HIGH"].indexOf(confidence) >= 0 ? confidence : "NOT_VERIFIED";
+  }
+
   function showWaveExplanation(marker) {
     var panel = dom.chartWaveExplanation;
     if (!panel) return;
@@ -586,6 +604,9 @@
     dom.drawerName.textContent = item.name || "–";
     dom.drawerTrend.textContent = shortStage(item.stage);
     dom.drawerAction.textContent = item.vcp_result ? item.action : shortAction(item.action || item.phase);
+    if (dom.drawerWave) dom.drawerWave.textContent = canonicalWaveState(item);
+    if (dom.drawerWaveConfidence) dom.drawerWaveConfidence.textContent = compactWaveConfidence(item);
+    if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = item && item.wave ? "Daily structural" : "Unavailable · no Daily wave";
     if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
     if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
     dom.drawerSector.textContent = item.sector || "Sector –";
@@ -1238,6 +1259,7 @@
     var valueOrUnavailable = function(value) { return value == null || value === "" ? "Unavailable" : value; };
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b class="setup-candidate__decision">' + escapeHTML(decision) + '</b></div>' +
+      '<div class="setup-candidate__wave"><span>Wave <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span>Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>Trigger readiness</span><b>' + escapeHTML(readiness) + '</b></p>' +
       '<div class="setup-candidate__plan"><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span>' +
       '<span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span>' +

@@ -1,8 +1,8 @@
 # Signalix User-Validation Refresh, Card, and Wave Contract
 
-> **STATUS: OWNER-APPROVED DESIGN FRONTIER — T04 SOURCE SLICE IMPLEMENTED; SERVED ACCEPTANCE PENDING** · 2026-09-01
+> **STATUS: OWNER-APPROVED DESIGN FRONTIER — T06 SOURCE SLICE IMPLEMENTED; SERVED ACCEPTANCE PENDING** · 2026-09-01
 > **Scope:** public `/mvp` setup-candidate review surface after Arm's TASCO feedback.
-> **Implementation boundary:** T04 source slice only; no deployment, broker, alert, or automatic-trading authorization.
+> **Implementation boundary:** T06 source slice now implemented; no deployment, broker, alert, or automatic-trading authorization.
 
 ## Problem Statement
 
@@ -81,3 +81,9 @@ Daily/weekly derived candles remain confirmed unless they include a current-sess
 provisional aggregate; served runtime and public browser acceptance remain pending.
 
 The current live TASCO probe showed `daily_available=true` and fresh 60m data while `daily_final_session_available=false` forced `STALE_DAILY_DATA` and `DATA_BLOCKED`. The first implementation slice should make this boundary explicit and testable before UI polish. Arm's manual Wave confirmation remains a separate owner-validation gate after the rendered contract is improved.
+
+T06 adds the bounded source presentation for the canonical Daily `wave.primary_state` and
+`LOW`/`MEDIUM`/`HIGH` confidence on setup-candidate cards and the drawer. The drawer labels
+this as `Daily structural`; missing canonical wave data remains `Unavailable`/`NOT_VERIFIED`,
+and legacy VCP-only drawer items do not claim Daily wave provenance. Served/public acceptance
+and desktop/390px browser evidence remain pending.
