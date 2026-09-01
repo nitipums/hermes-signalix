@@ -29,10 +29,10 @@
 |---|---|---|---|
 || `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
 || `Memory-Cleanup-Candidates.md` | Fact/memory cleanup record | ✅ current | Cleanup completed 2026-08-26; historical vault preserved |
-|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-26; stable MVP `4c7bf9c` |
+|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-09-01; T1–T9 release and 390px failure/recovery gate closed |
 || `Canonical-Source-of-Truth-2026-08-25.md` | Current repo/worktree/runtime authority | ✅ current | Sole source authority after cutover |
 || `Krungsri-Credit-Balance-Marginable-2026-08-25.md` | Owner-selected marginable list, rates, permissions, refresh policy | ✅ current | PDF effective 2026-08-25; dataset in `backend/marginable_securities.json` |
-| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
+|| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **Elliott/Trend/Trade-Setup spine and 390px failure/recovery gate reconciled 2026-09-01** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
@@ -44,8 +44,9 @@
 | `2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Historical v2 VCP serving/replay closeout evidence | 🟡 historical | Superseded as primary surface by the Elliott/Trend/Trade-Setup spine |
 | `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
 | `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
-| `../docs/current/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 current review | before askmatt; no code fix authorized yet |
-| `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; production promotion and served acceptance pending owner approval |
+|| `../docs/current/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by 2026-09-01 session closeout; findings retained |
+|| `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
+|| `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | Arm manual Wave-identification review is next |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline (**historical/audit**) | 20 daily snapshots, 18,620 rows, no-lookahead; VCP is bonus evidence not primary spine |
 | `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate (**historical/audit**) | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
 | `Scan-Evaluation-Logic-Map-2026-08-29.md` | ~~Current scan/evaluation architecture~~ **⛔ HISTORICAL/SUPERSEDED 2026-08-31** — retained for audit; current authority is Elliott/Trend spine | ⛔ historical | superseded by Elliott prototype |
@@ -99,7 +100,7 @@ Codex CLI (`gpt-5.6-luna`) became the default Signalix coding/review/implementat
 
 ## 6. Changelog
 
-- **2026-09-01 (documentation reconciliation):** T1–T9 Elliott/Trend/Trade-Setup source is promoted on `release/signalix-mvp-stable`; `/api/setup-candidates` is served from the live DB builder with honest fail-closed lanes. Public desktop/mobile/error journey remains pending. VCP notes are compatibility/audit history, not primary authority.
+- **2026-09-01 (release closeout):** T1–T9 Elliott/Trend/Trade-Setup source is promoted on `release/signalix-mvp-stable`; `/api/setup-candidates` is served from the live DB builder with honest fail-closed lanes. Public 390px failure→Retry→recovery browser gate is PASS; Arm manual Wave-identification review is next. VCP notes are compatibility/audit history, not primary authority. Alerts/automatic trading remain future features; evaluator auto-caller is pending owner decision.
 - **2026-08-25 (canonical source cutover):** `release/signalix-mvp-stable` at `3ec48f7` became current. `/root/signalix` is the canonical release worktree and production bind-mount source; later prototype/feature worktrees remain separate and must not be treated as release authority.
 
 - **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
