@@ -809,8 +809,8 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         if not daily_evidence_usable:
             wave = {
                 **wave,
-                "primary_state": "UNKNOWN",
-                "alternative_state": "UNKNOWN",
+                "primary_state": "NOT_VERIFIABLE",
+                "alternative_state": "NOT_VERIFIABLE",
                 "confidence": "LOW",
                 "supporting_evidence": [],
                 "contradicting_evidence": [],

@@ -652,7 +652,7 @@ def test_missing_final_daily_session_is_blocked(monkeypatch):
     monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
     rows, _ = mvp_api.build_setup_candidates_from_data(object())
     assert rows[0]["decision_lane"] == "DATA_BLOCKED"
-    assert rows[0]["wave"]["primary_state"] == "UNKNOWN"
+    assert rows[0]["wave"]["primary_state"] == "NOT_VERIFIABLE"
 
 
 def test_builder_missing_daily_is_explicitly_blocked(monkeypatch):
@@ -905,7 +905,7 @@ def test_pending_daily_eod_preserves_latest_official_wave_with_current_60m(monke
     monkeypatch.setattr(mvp_api, "_load_daily_for_symbol", lambda *a, **k: stale_daily)
     stale_rows, _ = mvp_api.build_setup_candidates_from_data(object())
     stale_item = stale_rows[0]
-    assert stale_item["wave"]["primary_state"] == "UNKNOWN"
+    assert stale_item["wave"]["primary_state"] == "NOT_VERIFIABLE"
     assert stale_item["data_status"]["daily_freshness"] == "stale"
     assert stale_item["data_status"]["reason_code"] == "STALE_DAILY_DATA"
     assert stale_item["decision_lane"] == "DATA_BLOCKED"
