@@ -1208,38 +1208,26 @@
   }
 
   function setupCandidateCard(item) {
-    var trend = item.trend || {}, wave = item.wave || {}, setup = item.setup || {};
-    var context = item.context || {}, bonus = item.bonus_evidence || {};
-    var rr = setup.rr || {}, targets = Array.isArray(setup.targets) ? setup.targets : [];
+    var setup = item.setup || {};
+    var rr = setup.rr || {};
     var decision = item.decision_lane || "DATA_BLOCKED";
-    var evidence = "Trend " + (trend.state || "UNKNOWN") + " · " +
-      (trend.rise_20d_pct == null ? "20D –" : "20D " + Number(trend.rise_20d_pct).toFixed(1) + "%") +
-      " · 60D " + (trend.rise_60d_pct == null ? "–" : Number(trend.rise_60d_pct).toFixed(1) + "%") +
-      " · RS " + (trend.relative_strength == null ? "–" : trend.relative_strength) +
-      " · 52W " + (trend.is_52w_high_breakout ? "BREAKOUT" : trend.near_52w_high ? "NEAR HIGH" : "–") +
-      " · ATH " + (trend.is_ath_breakout == null ? "UNKNOWN" : trend.is_ath_breakout ? "BREAKOUT" : "NO BREAKOUT");
-    var waveEvidence = (wave.primary_state || wave.state || "UNKNOWN") + " · confidence " +
-      (wave.confidence || "UNKNOWN") + " · " +
-      ((wave.evidence || {}).structure_intact == null ? "structure unknown" :
-       (wave.evidence || {}).structure_intact ? "structure intact" : "structure broken");
-    var setupEvidence = (setup.status || "UNKNOWN") + " · trigger " + displayValue(setup.trigger) +
-      " · invalidation " + displayValue(setup.invalidation) +
-      " · entry " + displayValue((setup.entry_zone || {}).low) + "–" + displayValue((setup.entry_zone || {}).high);
-    var targetText = targets.length ? targets.map(function(target) {
-      if (!target || typeof target !== "object" || Array.isArray(target)) return displayValue(target);
-      var name = displayValue(target.name);
-      var price = displayValue(target.price);
-      var method = displayValue(target.method);
-      return name + " " + price + " (" + method + ")";
-    }).join(" / ") : "–";
-    var vcp = bonus.vcp ? (bonus.vcp.present === true ? "VCP bonus" : bonus.vcp.present === false ? "VCP not present" : "VCP bonus unknown") : "VCP bonus unknown";
+    var status = setup.status || "NOT_VERIFIED";
+    var triggerReady = setup.trigger != null && setup.trigger !== "";
+    var readiness = status === "DATA_BLOCKED" ? "DATA_BLOCKED · trigger unavailable" :
+      status + " · " + (triggerReady ? "trigger ready" : "trigger unavailable");
+    var target1 = setup.target_1;
+    if (target1 == null) {
+      var targets = Array.isArray(setup.targets) ? setup.targets : [];
+      var firstTarget = targets.find(function(target) { return target && target.name === "target_1"; });
+      target1 = firstTarget && firstTarget.price;
+    }
+    var valueOrUnavailable = function(value) { return value == null || value === "" ? "Unavailable" : value; };
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b>' + escapeHTML(decision) + '</b></div>' +
-      '<p class="setup-candidate__evidence">' + escapeHTML(evidence) + ' · 52W/ATH ' + (trend.is_52w_high_breakout ? "breakout" : trend.near_52w_high ? "near high" : "–") + '</p>' +
-      '<div class="setup-candidate__grid"><span>Wave <b>' + escapeHTML(waveEvidence) + '</b></span><span>Setup <b>' + escapeHTML(setupEvidence) + '</b></span>' +
-      '<span>Targets <b>' + escapeHTML(targetText) + '</b></span><span>R:R <b>' + escapeHTML(displayValue(rr.to_target_1)) + '</b></span>' +
-      '<span>Market / sector <b>' + escapeHTML((context.market_regime || "UNKNOWN") + " · " + (context.sector || "UNKNOWN")) + '</b></span><span>Peers <b>' + escapeHTML(context.peer_trend_breadth || "UNKNOWN") + '</b></span></div>' +
-      '<p class="setup-candidate__bonus">' + escapeHTML(vcp) + ' · ' + escapeHTML(item.as_of || "as of unknown") + '</p></article>';
+      '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b class="setup-candidate__decision">' + escapeHTML(decision) + '</b></div>' +
+      '<p class="setup-candidate__readiness"><span>Trigger readiness</span><b>' + escapeHTML(readiness) + '</b></p>' +
+      '<div class="setup-candidate__plan"><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span>' +
+      '<span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span>' +
+      '<span>Stop <b>' + escapeHTML(valueOrUnavailable(setup.trade_stop)) + '</b></span></div></article>';
   }
 
   function setupCandidateMatchesToolbar(item) {

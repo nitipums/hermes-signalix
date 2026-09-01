@@ -408,10 +408,9 @@ def test_wave_controls_guard_optional_dom_nodes():
 def test_setup_targets_render_ordered_metadata_and_malformed_targets_fail_closed():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "targets = Array.isArray(setup.targets) ? setup.targets : [];" in js
-    assert 'var name = displayValue(target.name);' in js
-    assert 'var price = displayValue(target.price);' in js
-    assert 'var method = displayValue(target.method);' in js
-    assert 'return name + " " + price + " (" + method + ")";' in js
+    assert 'target.name === "target_1"' in js
+    assert "target1 = firstTarget && firstTarget.price;" in js
+    assert 'Target 1 <b>' in js
 
 
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
@@ -697,7 +696,26 @@ def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     assert 'var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";' in js
     assert "function renderSetupCandidates(data)" in js
     assert "setupCandidateCard" in js
-    assert "Trend " in js and "Wave" in js and "Targets" in js and "VCP bonus" in js
+    assert "setupCandidateCard" in js
+    assert "Trigger readiness" in js and "Target 1" in js and "Stop" in js
+
+
+def test_t03_compact_card_keeps_decision_hierarchy_and_moves_evidence_to_drawer():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    assert 'class="setup-candidate__decision"' in card
+    assert 'class="setup-candidate__readiness"' in card
+    assert 'class="setup-candidate__plan"' in card
+    for marker in ("Trigger readiness", "R:R", "Target 1", "Stop"):
+        assert marker in card
+    for evidence_marker in ("setup-candidate__evidence", "Market / sector", "Peers", "VCP bonus", "as of"):
+        assert evidence_marker not in card
+    assert "function openDrawer" in js
+    assert "waveEvidenceForItem" in js and "formatProvenance" in js
+    assert ".setup-candidate__plan {" in css
+    assert ".setup-candidate__plan span {" in css
+    assert ".setup-candidate__plan b {" in css
 
 
 def test_setup_candidate_review_uses_explicit_compact_toolbar_and_collapsed_advanced_filters():
@@ -860,8 +878,11 @@ def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mob
 def test_setup_candidates_use_canonical_lane_and_wave_evidence_projection():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "item.decision ||" not in js
-    for marker in ("item.decision_lane", "wave.primary_state || wave.state", "wave.confidence", "setup.entry_zone", "rr.to_target_1"):
+    for marker in ("item.decision_lane", "rr.to_target_1", "function waveEvidenceForItem", "function openDrawer"):
         assert marker in js
+    card = _extract_function(js, "setupCandidateCard")
+    assert "wave.primary_state" not in card
+    assert "setup.entry_zone" not in card
 
 
 def test_setup_candidates_group_in_canonical_lane_order_and_block_unknown_lanes():

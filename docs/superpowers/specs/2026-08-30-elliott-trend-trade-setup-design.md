@@ -204,6 +204,12 @@ DATA_BLOCKED / AVOID
 
 Within a lane, use explainable lexicographic ordering rather than one opaque score: Elliott confidence → established/emerging trend → trigger proximity → target-1 R:R → trend strength/RS/52W-ATH → sector/peer context → VCP bonus.
 
+The compact card projection follows the same hierarchy: show only symbol, canonical
+decision lane, setup/trigger readiness, and the essential plan (R:R, target 1,
+trade stop). Full Daily trend/Elliott evidence, market and peer context, bonus
+evidence, provenance, and unavailable detail remain in the drawer. Missing values
+use explicit `Unavailable`/`NOT_VERIFIED` states; the card never infers them.
+
 Market regime changes warnings, ordering, and confirmation strictness. It never removes a valid `DAILY_CANDIDATE` or blanket-blocks `REVIEW_NOW`; individual leaders can remain reviewable in a defensive regime. Only invalid market data, a market halt, or another explicit inability to evaluate produces `DATA_BLOCKED`.
 
 ### 2.12 Candidate, setup, and owner-review lifecycle
