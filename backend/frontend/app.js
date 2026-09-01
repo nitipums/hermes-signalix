@@ -806,7 +806,7 @@
 
   function visibleDrawerSymbols() {
     var selector = currentTab === "daily-vcp"
-      ? "#panel-daily-vcp .vcp-card[data-symbol]"
+      ? "#panel-daily-vcp [data-symbol].setup-candidate-card, #panel-daily-vcp .vcp-card[data-symbol]"
       : currentTab === "vcp"
         ? "#panel-vcp .vcp-card[data-symbol]"
         : "#panel-explorer .explorer-card[data-symbol]";
