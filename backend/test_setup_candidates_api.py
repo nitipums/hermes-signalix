@@ -53,6 +53,50 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["items"][0]["wave"]["state"] == "EARLY_WAVE_3"
     assert payload["items"][0]["setup"]
     assert payload["evaluated_count"] == 1
+    assert payload["total_items"] == 1
+    assert payload["total_pages"] == 1
+    assert payload["counts"]["REVIEW_NOW"] == 1
+    assert payload["universe_filter"] == "marginable_long"
+
+
+@pytest.mark.parametrize("builder_result", [
+    [candidate()],
+    (candidate(), {"scan_time": "2026-08-30"}),
+    ([candidate()], {"items": [candidate("OVERRIDE")] }),
+])
+def test_setup_candidates_route_rejects_malformed_builder_result(monkeypatch, builder_result):
+    class PG:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: None)
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
+                        lambda pg, market="TH": builder_result)
+    mvp_routes.clear_setup_candidates_cache()
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 503
+    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
+    mvp_routes.clear_setup_candidates_cache()
+
+
+def test_setup_candidates_route_does_not_classify_builder_type_error_as_bad_request(monkeypatch):
+    class PG:
+        def close(self): pass
+
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: None)
+
+    def builder(pg, market="TH"):
+        raise TypeError("programmer failure")
+
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data", builder)
+    mvp_routes.clear_setup_candidates_cache()
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 503
+    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
+    mvp_routes.clear_setup_candidates_cache()
 
 
 def test_route_never_uses_snapshot_as_canonical_source(monkeypatch):

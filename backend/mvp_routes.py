@@ -29,6 +29,10 @@ _setup_candidates_cache = None
 _setup_candidates_inflight = None
 _setup_candidates_cache_lock = threading.Lock()
 
+
+class SetupCandidatesBuilderContractError(RuntimeError):
+    """The canonical builder returned something other than (items, metadata)."""
+
 VCP_AUDIT_DEPRECATION = {
     "status": "audit_only",
     "boundary": "one_day",
@@ -115,7 +119,15 @@ def _load_setup_candidates_cached(builder, pg, *, market="TH"):
 
     try:
         build_started = time.monotonic()
-        items, source_meta = builder(pg, market=market)
+        built = builder(pg, market=market)
+        if (not isinstance(built, tuple) or len(built) != 2
+                or not isinstance(built[0], list)
+                or not isinstance(built[1], dict)
+                or "items" in built[1]):
+            raise SetupCandidatesBuilderContractError(
+                "setup-candidate builder must return (items, metadata)"
+            )
+        items, source_meta = built
         payload = {"items": items, **source_meta}
         build_observability = dict(payload.get("build_observability") or {})
         build_observability.setdefault(
@@ -295,6 +307,12 @@ def handle_mvp_api(path, handler) -> bool:
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
         pg = None
         try:
+            page = int(qs.get("page", ["1"])[0])
+            page_size = int(qs.get("page_size", ["50"])[0])
+        except (ValueError, TypeError):
+            json_response(handler, {"error": "invalid_request"}, status=400)
+            return True
+        try:
             import mvp_api
             # Canonical serving is always built from authoritative OHLCV. The
             # legacy MVP artifact is neither a source nor a fallback here.
@@ -303,8 +321,6 @@ def handle_mvp_api(path, handler) -> bool:
                 mvp_api.build_setup_candidates_from_data, pg, market="TH"
             )
             items = payload["items"]
-            page = int(qs.get("page", ["1"])[0])
-            page_size = int(qs.get("page_size", ["50"])[0])
             result = mvp_api.project_setup_candidates_response(
                 items, snapshot_meta=payload,
                 lifecycle=(qs.get("lifecycle", [None])[0] or None),
@@ -314,8 +330,6 @@ def handle_mvp_api(path, handler) -> bool:
                 page=page, page_size=page_size,
             )
             json_response(handler, result)
-        except (ValueError, TypeError):
-            json_response(handler, {"error": "invalid_request"}, status=400)
         except (FileNotFoundError, json.JSONDecodeError, ImportError, KeyError, RuntimeError, ConnectionError):
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
         except Exception:
