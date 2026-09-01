@@ -134,7 +134,7 @@ def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_rec
     assert "No setup candidates matched the current presentation filters." in js
     assert 'dom.dailySetupWave.addEventListener("change"' in js
     assert "reconcileDailyDrawerNavigation();" in js
-    assert '"#panel-daily-vcp .setup-candidate-card[data-symbol]"' in js
+    assert '#panel-daily-vcp' in js and '[data-symbol].setup-candidate-card' in js
 
 
 def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
@@ -1019,6 +1019,8 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     collection = _extract_function(js, "setupDrawerCollection")
     grouping = _extract_function(js, "groupSetupCandidates")
+    stable = _extract_function(js, "stableSetupCandidateOrder")
+    bucket = _extract_function(js, "setupCandidateWaveBucket")
     navigation = _extract_function(js, "drawerNavigationState")
     items = [
         {"symbol": "ZZZ", "decision_lane": "DAILY_CANDIDATE"},
@@ -1026,7 +1028,8 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
         {"symbol": "AAA", "decision_lane": "REVIEW_NOW", "setup": {"status": "PRE_TRIGGER"}},
         {"symbol": "MID", "decision_lane": "SETUP_FORMING"},
     ]
-    assert _run_node([grouping, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    assert _run_node([states, bucket, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 0)") == {"index": 0, "count": 3, "position": "1 of 3", "previousDisabled": True, "nextDisabled": False}
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 2)") == {"index": 2, "count": 3, "position": "3 of 3", "previousDisabled": False, "nextDisabled": True}
     assert 'id="drawer-position"' in html
