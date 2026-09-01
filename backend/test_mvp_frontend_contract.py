@@ -312,6 +312,16 @@ def test_unavailable_hour_chart_is_explicit_not_blank():
     assert "chartRequestSeq" in js
 
 
+def test_chart_provisional_status_is_visible_and_timestamped():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="drawer-chart-status"' in html
+    assert "function renderChartStatus(chart)" in js
+    assert "Provisional" in js
+    assert "latest_time" in js
+    assert "chart.candles[chart.candles.length - 1].provisional" in js
+
+
 def test_wave_evidence_layer_is_toggleable_and_explains_payload_without_frontend_rules():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")

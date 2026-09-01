@@ -121,6 +121,7 @@
     drawerChart:    $("#drawer-chart"),
     drawerCanvas:  $("#drawer-canvas"),
     drawerChartPH: $("#drawer-chart-placeholder"),
+    drawerChartStatus: $("#drawer-chart-status"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
     indMa20:       $("#ind-ma20"),
@@ -624,8 +625,21 @@
     return value != null && Number.isFinite(Number(value)) ? Number(value) : null;
   }
 
+  function renderChartStatus(chart) {
+    if (!dom.drawerChartStatus) return;
+    var candles = chart && Array.isArray(chart.candles) ? chart.candles : [];
+    var latest = candles.length ? candles[candles.length - 1] : null;
+    var provisional = chart && chart.provisional === true;
+    if (chart && chart.candles && chart.candles.length && chart.candles[chart.candles.length - 1].provisional === true) provisional = true;
+    var timestamp = chart && chart.latest_time || (latest && (latest.date || latest.time));
+    var label = provisional ? "Provisional · current candle" : "Confirmed candle";
+    dom.drawerChartStatus.textContent = "Chart status: " + label + (timestamp ? " · " + timestamp : "");
+    dom.drawerChartStatus.classList.toggle("chart-status--provisional", provisional);
+  }
+
   function renderDrawerChart(chart) {
     window.__signalixLastChart = chart;
+    renderChartStatus(chart);
     if (chart.candles && chart.candles.length > 0) {
       // A real OHLCV series is present — draw it (basic canvas line render).
       dom.drawerChartPH.style.display = "none";

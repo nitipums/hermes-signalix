@@ -1,8 +1,8 @@
 # Signalix User-Validation Refresh, Card, and Wave Contract
 
-> **STATUS: OWNER-APPROVED DESIGN FRONTIER — READY FOR TICKETS** · 2026-09-01
+> **STATUS: OWNER-APPROVED DESIGN FRONTIER — T04 SOURCE SLICE IMPLEMENTED; SERVED ACCEPTANCE PENDING** · 2026-09-01
 > **Scope:** public `/mvp` setup-candidate review surface after Arm's TASCO feedback.
-> **Implementation boundary:** design/spec only in this document; no code, deployment, broker, alert, or automatic-trading authorization.
+> **Implementation boundary:** T04 source slice only; no deployment, broker, alert, or automatic-trading authorization.
 
 ## Problem Statement
 
@@ -74,5 +74,10 @@ Make the review surface explicit and stable:
 - Broad product navigation or multi-user SaaS work.
 
 ## Further Notes
+
+T04 source slice now carries an explicit chart status in the drawer and preserves
+the exact latest bar timestamp/provisional flag through the 60m chart adapter.
+Daily/weekly derived candles remain confirmed unless they include a current-session
+provisional aggregate; served runtime and public browser acceptance remain pending.
 
 The current live TASCO probe showed `daily_available=true` and fresh 60m data while `daily_final_session_available=false` forced `STALE_DAILY_DATA` and `DATA_BLOCKED`. The first implementation slice should make this boundary explicit and testable before UI polish. Arm's manual Wave confirmation remains a separate owner-validation gate after the rendered contract is improved.

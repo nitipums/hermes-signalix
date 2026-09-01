@@ -34,3 +34,18 @@ def test_60m_empty_rows_remain_empty_without_fabricating_provisional_bar():
 
     assert actual == []
     assert "latest candle may be in progress" in label
+
+
+def test_chart_response_exposes_provisional_status_and_exact_as_of():
+    """The chart contract must let the UI distinguish an open bar from EOD."""
+    rows = [
+        (datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc), 10, 11, 9, 10.5, 100, False),
+        (datetime(2026, 8, 27, 6, 0, tzinfo=timezone.utc), 10.5, 12, 10, 11.5, 200, True),
+    ]
+    cursor = _Cursor(rows)
+
+    # Avoid DB setup; exercise the response shaping seam directly.
+    actual_rows, label = fetch_chart_rows(cursor, "SIS", "60M", 30)
+    assert actual_rows[-1][-1] is True
+    assert actual_rows[-1][0].isoformat() == "2026-08-27T06:00:00+00:00"
+    assert "in progress" in label

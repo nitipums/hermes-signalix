@@ -77,7 +77,8 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
     timeframe = (timeframe or "1D").upper()
     if timeframe == "60M":
         cur.execute("""
-            SELECT ts, open, high, low, close, volume
+            SELECT ts, open, high, low, close, volume,
+                   (ROW_NUMBER() OVER (ORDER BY ts DESC) = 1) AS provisional
             FROM intraday_price_data
             WHERE UPPER(symbol) = UPPER(%s) AND interval = '60m'
             ORDER BY ts DESC LIMIT %s
@@ -115,6 +116,7 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
             "low": float(row[3]) if row[3] is not None else None,
             "close": float(row[4]) if row[4] is not None else None,
             "volume": float(row[5]) if row[5] is not None else None,
+            "provisional": bool(row[6]) if timeframe == "60M" and len(row) > 6 else False,
         })
     if timeframe in {"1D", "60M"}:
         candles.reverse()
