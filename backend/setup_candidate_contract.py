@@ -337,7 +337,7 @@ def project_decision_lane(data_status: dict, wave: dict, setup: dict,
     if has_plan and (confidence == "LOW" or setup_status == "FORMING"
                      or (rr is not None and rr < 2)):
         return "SETUP_FORMING"
-    if wave_state not in {"", "UNKNOWN", "INSUFFICIENT"}:
+    if wave_state not in {"", "UNKNOWN", "INSUFFICIENT", "NOT_VERIFIABLE"}:
         return "DAILY_CANDIDATE"
     return "WAIT"
 

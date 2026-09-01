@@ -146,6 +146,12 @@ A distant target cannot compensate for `target_1` failing the minimum R:R gate.
 
 Elliott v1 uses a conservative observable proxy. It derives candidates only from measurable prior advance, retracement/Fib zone, correction duration, confirmed swing structure, structure integrity, and 60m breakout/confirmation evidence. It must not claim that a wave count is objectively confirmed.
 
+Owner-tuned 2026-09-01 Wave-3 publication boundary:
+- The canonical detector publishes only `EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, or fail-closed `NOT_VERIFIABLE`. Wave 1/2 anchors are prerequisites/evidence, not public primary states. The prior full-wave interpretation may remain only in an explicit audit/compatibility namespace.
+- Required Daily structure is strictly ordered `W1 low -> W1 high -> W2 low`, with `W1_low < W2_low < W1_high`, a significant advance, and a 23.6%–78.6% retracement. Centred pivots are usable only after their right-hand confirmation bars exist.
+- `EARLY_WAVE_3` requires a valid W1/W2 sequence approaching/testing the W1 high without sustained confirmation. `WAVE_3_CONTINUATION` requires final Daily closes above W1 high with follow-through. A wick never confirms.
+- A confirmed post-impulse correction is excluded as `NOT_VERIFIABLE`; it must not remain Wave 3 continuation. MA and volume affect confidence only and never create state.
+
 Owner-tuned 2026-08-31:
 - Wave 1: `measurable_advance` from confirmed swing engine (no fixed % threshold; C) — engine must not require `prior_advance + confirmed_swing_anchors + structure_intact` simultaneously to reach MEDIUM.
 - Wave 2 `NEAR_COMPLETION`: retracement 30-60% of Wave 1 (Fib 0.382-0.618), duration 5-25 days, low holds above Wave 1 swing low; <30% = `WAVE_2_FORMING`, >60% or break of Wave 1 low = `WAVE_4_CORRECTION`/`UNKNOWN`.

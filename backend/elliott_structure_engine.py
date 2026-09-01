@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 import pandas as pd
 
+from wave3_candidate_engine import classify_frame as classify_wave3_candidate
+
 WAVE_STATES = {
     "WAVE_1_ADVANCE",
     "WAVE_2_FORMING",
@@ -1331,49 +1333,80 @@ def build_wave_contract(daily_df, swing_evidence: dict | None = None, *, snapsho
     an objectively confirmed count; dual-degree small waves remain evidence-only
     inside ``evidence`` and never alter the large primary state.
     """
-    raw = classify_wave_candidate(daily_df, swing_evidence)
-    evidence = dict(raw.get("evidence") or {})
-    state = raw.get("state")
-    if state not in _WAVE_CONTRACT_STATES or state is None:
-        state = "UNKNOWN"
-    raw_confidence = str(raw.get("confidence", "")).upper()
-    if state == "UNKNOWN" or raw_confidence in {"INSUFFICIENT", "PARTIAL", ""}:
-        confidence = {"INSUFFICIENT": "LOW", "PARTIAL": "MEDIUM"}.get(raw_confidence, "LOW")
-        if state == "UNKNOWN":
-            confidence = "LOW"
-    elif raw_confidence in _CONFIDENCE_ORDER:
-        confidence = raw_confidence
-    else:  # unknown token must not masquerade as actionable confidence
+    # The full-wave classifier remains available only as explicit compatibility
+    # evidence.  The canonical producer is deliberately narrower and fails
+    # closed when a current Wave-3 interpretation is not structurally verifiable.
+    legacy_raw = classify_wave_candidate(daily_df, swing_evidence)
+    candidate = classify_wave3_candidate(daily_df)
+    published = candidate.get("published_state", "NOT_VERIFIABLE")
+    state = published if published in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"} else "NOT_VERIFIABLE"
+    confidence = candidate.get("confidence") if state != "NOT_VERIFIABLE" else "LOW"
+    if confidence not in _CONFIDENCE_ORDER:
         confidence = "LOW"
-    alternative = _NEXT_PLAUSIBLE.get(state, "WAVE_2_FORMING")
-    if state == "UNKNOWN":
-        alternative = "UNKNOWN"
-    dual_degree = evidence.get("dual_degree")
+    alternative = "WAVE_3_CONTINUATION" if state == "EARLY_WAVE_3" else "NOT_VERIFIABLE"
+    anchors = candidate.get("anchors") or {}
+    evidence = {
+        **dict(candidate.get("evidence") or {}),
+        "anchors": anchors,
+        "retracement": candidate.get("retracement"),
+        "close_vs_wick_confirmation": candidate.get("close_vs_wick_confirmation"),
+        "follow_through": candidate.get("follow_through"),
+        "rejection_reasons": list(candidate.get("rejection_reasons") or []),
+    }
+    supporting = []
+    if anchors.get("w1_low") and anchors.get("w1_high") and anchors.get("w2_low"):
+        supporting.append("ordered_w1_low_w1_high_w2_low")
+    if candidate.get("close_vs_wick_confirmation") == "CLOSE":
+        supporting.append("daily_close_above_wave1_high")
+    if (candidate.get("follow_through") or {}).get("status") == "PASS":
+        supporting.append("daily_close_follow_through")
+    if evidence.get("trend_support"):
+        supporting.append("ma_trend_support_confidence_only")
+    if evidence.get("volume_support"):
+        supporting.append("volume_support_confidence_only")
+    contradicting = list(candidate.get("rejection_reasons") or [])
+    missing = contradicting if state == "NOT_VERIFIABLE" else []
     contract = {
         "timeframe": "daily",
         "primary_state": state,
+        "state": state,
         "alternative_state": alternative,
         "confidence": confidence,
-        "supporting_evidence": _supporting_evidence(evidence, state),
-        "contradicting_evidence": _contradicting_evidence(evidence, state),
-        "missing_evidence": _missing_evidence(evidence, state),
+        "supporting_evidence": supporting,
+        "contradicting_evidence": contradicting,
+        "missing_evidence": missing,
         "evidence": evidence,
-        "policy": "elliott-v1-observable-proxy",
+        "policy": "wave3-confirmed-pivots-v1",
+        "audit_compatibility": {
+            "legacy_full_wave": _json_value(legacy_raw),
+            "raw_candidate_state": candidate.get("raw_state"),
+        },
     }
     as_of = _marker_timestamp(daily_df, len(daily_df) - 1) if daily_df is not None and len(daily_df) else None
     identity = snapshot_id or ("daily:" + as_of if as_of is not None else None)
     contract["snapshot_id"] = identity
-    contract["evidence_markers"] = build_wave_evidence_markers(
-        daily_df, evidence, confidence=confidence, snapshot_id=identity
-    )
+    marker_specs = [
+        ("WAVE_1_LOW", anchors.get("w1_low"), "Wave 1 low", "WAVE_1"),
+        ("WAVE_1_HIGH", anchors.get("w1_high"), "Wave 1 high", "WAVE_1"),
+        ("WAVE_2_PULLBACK_LOW", anchors.get("w2_low"), "Wave 2 pullback low", "WAVE_2"),
+        ("WAVE_3_CLOSE_CONFIRMATION", anchors.get("breakout_confirmation"),
+         "Wave 3 close confirmation", "WAVE_3"),
+    ]
+    contract["evidence_markers"] = [
+        _evidence_marker(kind, "daily", anchor.get("date"), anchor.get("price"), label,
+                         role, "daily_ohlcv", confidence,
+                         ["ordered_confirmed_daily_pivots", "daily_close"], identity,
+                         {"rule": "Confirmed Daily Wave-3 candidate anchor.",
+                          "evidence": ["daily_ohlcv"], "alternative": alternative,
+                          "missing": missing, "policy": contract["policy"]})
+        for kind, anchor, label, role in marker_specs if anchor
+    ]
     contract["markers"] = contract["evidence_markers"]
     contract["evidence_explanation"] = {
-        "rule": "Daily Elliott interpretation uses observable OHLCV structure.",
+        "rule": "Daily Wave-3 candidate uses ordered confirmed pivots and close-only confirmation.",
         "evidence": contract["supporting_evidence"],
         "alternative": alternative,
         "missing": contract["missing_evidence"],
         "policy": contract["policy"],
     }
-    if isinstance(dual_degree, dict):
-        contract["dual_degree"] = dual_degree
     return _json_value(contract)

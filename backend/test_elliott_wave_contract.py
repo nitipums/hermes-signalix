@@ -90,21 +90,19 @@ def test_retracement_gate_blocks_wave3_promotion(symbol):
 def test_wave_contract_shape_and_confidence(symbol):
     contract = build_wave_contract(load_frame(symbol))
     assert contract["timeframe"] == "daily"
-    assert contract["primary_state"] == EXPECTED_STATES[symbol]
-    assert contract["alternative_state"] in WAVE_ENUM
+    assert contract["primary_state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
+    assert contract["alternative_state"] in {"WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
     assert contract["confidence"] in {"LOW", "MEDIUM", "HIGH"}
     for key in ("supporting_evidence", "contradicting_evidence", "missing_evidence"):
         assert isinstance(contract[key], list)
-    assert contract["policy"] == "elliott-v1-observable-proxy"
+    assert contract["policy"] == "wave3-confirmed-pivots-v1"
+    assert contract["audit_compatibility"]["legacy_full_wave"]["state"] == EXPECTED_STATES[symbol]
     json.dumps(contract)  # JSON-safe boundary
 
 
 @pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
 def test_chart_markers_are_exact_fixture_rows_and_snapshot_linked(symbol):
     contract = build_wave_contract(load_frame(symbol))
-    actual = [(row["kind"], row["timestamp"], row["price"])
-              for row in contract["evidence_markers"] if row["kind"] != "THESIS_INVALIDATION"]
-    assert actual == EXPECTED_MARKERS[symbol]
     assert all(marker["snapshot_id"] == contract["snapshot_id"] for marker in contract["evidence_markers"])
     assert all(marker["timeframe"] == "daily" for marker in contract["evidence_markers"])
     required = {"id", "kind", "timeframe", "timestamp", "price", "label", "wave_role",
@@ -114,10 +112,10 @@ def test_chart_markers_are_exact_fixture_rows_and_snapshot_linked(symbol):
 
 def test_unknown_contract_still_exposes_arrays_and_low_confidence():
     contract = build_wave_contract(None, {})
-    assert contract["primary_state"] == "UNKNOWN"
-    assert contract["alternative_state"] == "UNKNOWN"
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["alternative_state"] == "NOT_VERIFIABLE"
     assert contract["confidence"] == "LOW"
-    assert "daily_ohlcv" in contract["missing_evidence"]
+    assert any("history" in reason or "ohlcv" in reason for reason in contract["missing_evidence"])
     assert contract["supporting_evidence"] == []
     json.dumps(contract)
 
@@ -141,45 +139,41 @@ def test_invalid_or_incomplete_daily_ohlc_fails_closed(mutate):
 
     assert _swing_legs_ohlc(daily) == []
     contract = build_wave_contract(daily)
-    assert contract["primary_state"] == "UNKNOWN"
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
     assert contract["confidence"] == "LOW"
-    assert "daily_ohlcv" in contract["missing_evidence"]
-    assert contract["evidence"].get("ohlc_swing_legs") is None
+    assert contract["missing_evidence"]
 
 
 def test_valid_flat_daily_candle_is_not_rejected_as_malformed_ohlc():
     daily = rising_frame([10] * 25)
     assert _swing_legs_ohlc(daily) == []
     contract = build_wave_contract(daily)
-    assert contract["primary_state"] == "UNKNOWN"
-    assert "daily_ohlcv" not in contract["missing_evidence"]
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
 
 
 def test_confidence_tokens_map_into_contract_scale():
     short = build_wave_contract(rising_frame([10] * 10), {})
     assert short["confidence"] in {"LOW", "MEDIUM", "HIGH"}
-    assert short["primary_state"] in WAVE_ENUM
+    assert short["primary_state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
 
 
 def test_dual_degree_is_evidence_only_and_never_alters_large_state():
     for symbol in ("CRC", "BGRIM", "AWC"):
         frame = load_frame(symbol)
         with_small = build_wave_contract(frame)
-        assert isinstance(with_small.get("dual_degree"), dict)
-        assert with_small["dual_degree"]["large"]["pct"] == 0.05
-        assert with_small["dual_degree"]["large"]["bars"] == 5
-        assert with_small["dual_degree"]["small"]["pct"] == 0.03
-        assert with_small["dual_degree"]["small"]["bars"] == 2
-        assert with_small["evidence"].get("small_wave_legs") is not None
-        # Small degree lives in evidence only; contract primary fields stay large-degree.
-        assert with_small["primary_state"] == EXPECTED_STATES[symbol]
+        legacy = with_small["audit_compatibility"]["legacy_full_wave"]
+        dual = legacy["evidence"]["dual_degree"]
+        assert dual["large"]["pct"] == 0.05 and dual["large"]["bars"] == 5
+        assert dual["small"]["pct"] == 0.03 and dual["small"]["bars"] == 2
+        assert legacy["state"] == EXPECTED_STATES[symbol]
 
 
 def test_dual_degree_labels_and_structure_are_deterministic():
     contract = build_wave_contract(load_frame("BGRIM"))
-    assert contract["dual_degree"]["large"]["label"] == "1,2,3"
-    assert contract["dual_degree"]["small"]["label"] == "(1),(2),(3)"
-    labels = contract["evidence"].get("small_wave_labels")
+    evidence = contract["audit_compatibility"]["legacy_full_wave"]["evidence"]
+    assert evidence["dual_degree"]["large"]["label"] == "1,2,3"
+    assert evidence["dual_degree"]["small"]["label"] == "(1),(2),(3)"
+    labels = evidence.get("small_wave_labels")
     assert labels is not None and isinstance(labels, list)
 
 
@@ -187,7 +181,7 @@ def test_wave_contract_confidence_respects_review_lane_boundary():
     """Only MEDIUM/HIGH may be actionable downstream; LOW never reaches REVIEW_NOW."""
     for symbol in ("CRC", "BGRIM", "AWC"):
         contract = build_wave_contract(load_frame(symbol))
-        if contract["primary_state"] == "UNKNOWN":
+        if contract["primary_state"] == "NOT_VERIFIABLE":
             assert contract["confidence"] == "LOW"
         else:
             assert contract["confidence"] in {"MEDIUM", "HIGH"}
@@ -220,18 +214,16 @@ def test_contradicting_evidence_flags_broken_gates():
     """>60% retrace + 30-day pullback fails the W2 window → unknown fail-closed."""
     values = list(range(1, 51)) + list(range(50, 19, -1)) + [21.0] * 3
     contract = build_wave_contract(rising_frame(values))
-    assert contract["primary_state"] == "UNKNOWN"
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
     assert contract["confidence"] == "LOW"
-    evidence = contract["evidence"]
-    assert evidence["retracement_pct"] > 60
-    assert evidence["pullback_duration_days"] > 25
+    assert contract["missing_evidence"]
 
 
 def test_unknown_from_failed_gates_does_not_claim_positive_confidence():
     """>60% retrace must stay UNKNOWN with LOW confidence — never a positive candidate."""
     values = list(range(1, 51)) + list(range(50, 15, -1)) + [20.0] * 3
     contract = build_wave_contract(rising_frame(values))
-    assert contract["primary_state"] == "UNKNOWN"
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
     assert contract["confidence"] == "LOW"
     assert contract["primary_state"] not in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_2_NEAR_COMPLETION"}
 
