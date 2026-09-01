@@ -753,6 +753,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                 _evaluate_candidate_engines_worker,
                 ((evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
                   evaluation_inputs[symbol][2]) for symbol in symbols),
+                chunksize=8,
             )
             engine_results = dict(zip(symbols, results))
 

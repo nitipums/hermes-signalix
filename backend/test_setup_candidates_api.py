@@ -374,9 +374,10 @@ def test_setup_candidate_full_frames_use_process_workers_in_symbol_order(monkeyp
         def __exit__(self, *exc):
             return False
 
-        def map(self, fn, args):
+        def map(self, fn, args, *, chunksize):
             args = list(args)
             submitted.append(("args", len(args)))
+            submitted.append(("chunksize", chunksize))
             return [mvp_api._evaluate_candidate_engines(*item) for item in args]
 
     monkeypatch.setattr(mvp_api, "ProcessPoolExecutor", FakePool)
@@ -396,7 +397,7 @@ def test_setup_candidate_full_frames_use_process_workers_in_symbol_order(monkeyp
 
     rows, meta = mvp_api.build_setup_candidates_from_data(object())
 
-    assert submitted == [("workers", 3), ("args", 3)]
+    assert submitted == [("workers", 3), ("args", 3), ("chunksize", 8)]
     assert [row["symbol"] for row in rows] == symbols
     assert meta["build_observability"]["candidate_evaluation_workers"] == 3
     assert meta["build_observability"]["candidate_evaluation_parallel"] is True
