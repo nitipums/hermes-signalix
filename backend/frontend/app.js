@@ -16,6 +16,8 @@
     freshness:       $("#freshness"),
     freshnessDot:    $(".freshness-dot"),
     freshnessLabel:  $(".freshness-label"),
+    freshnessDaily:  $("#freshness-daily"),
+    freshness60m:    $("#freshness-60m"),
 
     tabShortlist:    $("#tab-shortlist"),
     tabExplorer:     $("#tab-explorer"),
@@ -347,14 +349,21 @@
   }
 
   /* ── freshness ── */
-  function setFreshness(status, asOf, intradayAt) {
+  function setFreshness(status, asOf, intradayAt, dailyStatus) {
     dom.freshnessDot.className = "freshness-dot freshness-dot--" + status;
-    dom.freshnessLabel.textContent = status === "loading" ? "60m loading…"
-      : intradayAt ? "60m updated · " + timeAgo(intradayAt)
-      : status === "fresh" ? "60m updated · " + timeAgo(asOf)
-      : status === "market_closed" ? "60m updated · " + (intradayAt ? timeAgo(intradayAt) : "–")
-      : status === "stale" ? "60m stale · " + timeAgo(asOf)
-      : "60m update unavailable";
+    var effectiveDailyStatus = dailyStatus || status;
+    var daily = effectiveDailyStatus === "loading" ? "Daily EOD: Loading…"
+      : effectiveDailyStatus === "fresh" || effectiveDailyStatus === "market_closed" ? "Daily EOD: " + timeAgo(asOf)
+      : effectiveDailyStatus === "stale" ? "Daily EOD: stale · " + timeAgo(asOf)
+      : "Daily EOD: unavailable";
+    var intraday = intradayAt ? "60m: fresh · " + timeAgo(intradayAt) : "60m: unavailable";
+    if (dom.freshnessDaily) dom.freshnessDaily.textContent = daily;
+    if (dom.freshness60m) dom.freshness60m.textContent = intraday;
+    dom.freshnessLabel.textContent = status === "loading" ? "Freshness loading…"
+      : status === "fresh" ? "Freshness available"
+      : status === "market_closed" ? "Market closed"
+      : status === "stale" ? "Freshness stale"
+      : "Freshness unavailable";
   }
 
   /* ── render card ── */
@@ -480,24 +489,38 @@
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
       panel.hidden = true; panel.textContent = ""; return;
     }
+    var valid = marker;
     var details = marker.explanation && typeof marker.explanation === "object" && !Array.isArray(marker.explanation)
-      ? marker.explanation : {};
+      ? marker.explanation : valid;
     function text(value) { return waveEvidenceText(value); }
-    panel.hidden = false;
     var refs = Array.isArray(marker.evidence_refs) ? marker.evidence_refs.map(text).filter(function(ref) {
       return ref !== "Unavailable";
     }) : [];
     var snapshot = marker.snapshot_identity || marker.snapshot_id;
-    panel.innerHTML = "<strong>" + escapeHTML(waveEvidenceText(marker.label || marker.kind || "Wave evidence")) + "</strong>" +
+    panel.hidden = false;
+    panel.innerHTML = "<strong>How this wave was identified</strong>" +
       "<div>Timeframe: " + escapeHTML(text(marker.timeframe)) + " · Source: " + escapeHTML(text(marker.source)) + "</div>" +
-      "<div>Confidence: " + escapeHTML(text(marker.confidence)) + " · Snapshot: " + escapeHTML(text(snapshot)) + "</div>" +
+      "<div>Confidence: " + escapeHTML(text(marker.confidence)) + "</div>" +
       "<div>Rule: " + escapeHTML(text(details.rule)) + "</div>" +
-      "<div>Evidence: " + escapeHTML(text(details.evidence)) + "</div>" +
-      "<div>Alternative: " + escapeHTML(text(details.alternative)) + "</div>" +
-      "<div>Missing: " + escapeHTML(text(details.missing)) + "</div>" +
-      "<div>Policy: " + escapeHTML(text(details.policy)) + "</div>" +
+      "<div>Supporting evidence: " + escapeHTML(text(details.supporting_evidence != null ? details.supporting_evidence : details.evidence)) + "</div>" +
+      "<div>Contradicting evidence: " + escapeHTML(text(details.contradicting_evidence)) + "</div>" +
+      "<div>Missing evidence: " + escapeHTML(text(details.missing_evidence != null ? details.missing_evidence : details.missing)) + "</div>" +
+      "<div>Alternative state: " + escapeHTML(text(details.alternative_state != null ? details.alternative_state : details.alternative)) + " · Policy: " + escapeHTML(text(details.policy)) + "</div>" +
       "<div>Evidence refs: " + escapeHTML(refs.length ? refs.join(" · ") : "Unavailable") + "</div>" +
-      "<div>Snapshot: " + escapeHTML(text(snapshot)) + "</div>";
+      "<div>Snapshot: " + escapeHTML(text(snapshot)) + " · identity</div>";
+  }
+
+  function waveEvidenceForItem(item) {
+    var wave = item && item.wave;
+    if (!wave || typeof wave !== "object" || Array.isArray(wave)) return {};
+    var provenance = item.provenance && typeof item.provenance === "object" && !Array.isArray(item.provenance) ? item.provenance : {};
+    return {
+      timeframe: "1D", source: provenance.daily_source || "price_data", confidence: wave.confidence,
+      supporting_evidence: wave.supporting_evidence, contradicting_evidence: wave.contradicting_evidence,
+      missing_evidence: wave.missing_evidence, alternative_state: wave.alternative_state,
+      snapshot_identity: wave.snapshot_identity || wave.snapshot_id || provenance.snapshot_identity || provenance.snapshot_id,
+      explanation: wave.explanation && typeof wave.explanation === "object" && !Array.isArray(wave.explanation) ? wave.explanation : {}
+    };
   }
 
   function renderDrawerDetail(item) {
@@ -546,6 +569,7 @@
     dom.drawerATH.textContent = formatRange(item.ath_high, item.ath_low, metadataPending);
     var prov = item.provenance || {};
     dom.drawerProv.textContent = formatProvenance(prov.scan_time || item.as_of);
+    showWaveExplanation(waveEvidenceForItem(item));
   }
 
   function latestIndicatorValue(value) {
@@ -583,6 +607,9 @@
 
   function drawChart(chart) {
     var canvas = dom.drawerCanvas;
+    // Clear hit targets before validating optional chart evidence so malformed
+    // or absent payloads cannot leave stale markers clickable.
+    window.__signalixWaveMarkerHits = [];
     if (!canvas || !chart || !chart.candles || chart.candles.length < 2) return;
     var ctx = canvas.getContext("2d");
     var w = canvas.width, h = canvas.height;
@@ -658,7 +685,6 @@
     decisionLine(chart.trigger, "#f4c95d", "Required close");
     decisionLine(chart.stop, "#ef7777", "Stop");
     decisionLine(chart.target, "#6ee7b7", "Target");
-    window.__signalixWaveMarkerHits = [];
     if (chartLayers.waveEvidence && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
       var markerColors = {WAVE_1_LOW: "#a78bfa", WAVE_1_HIGH: "#a78bfa", WAVE_2_PULLBACK_LOW: "#60a5fa",
         WAVE_3_CLOSE_CONFIRMATION: "#26a69a", TESTED_HIGH: "#ffa726", STRUCTURE_BREAK: "#ef5350",
@@ -958,7 +984,14 @@
   if (dom.chartWaveEvidence) dom.chartWaveEvidence.addEventListener("change", function() {
     chartLayers.waveEvidence = dom.chartWaveEvidence.checked;
     if (window.__signalixLastChart) drawChart(window.__signalixLastChart);
-    if (!chartLayers.waveEvidence) showWaveExplanation(null);
+    if (!chartLayers.waveEvidence) {
+      if (dom.chartWaveExplanation) {
+        dom.chartWaveExplanation.hidden = false;
+        dom.chartWaveExplanation.innerHTML = "<strong>Wave Evidence hidden</strong><div>Markers and evidence overlays are turned off.</div>";
+      }
+    } else if (chartSymbol) {
+      showWaveExplanation(waveEvidenceForItem(drawerItemForSymbol(chartSymbol)));
+    }
   });
   if (dom.drawerCanvas) dom.drawerCanvas.addEventListener("click", function(e) {
     if (!chartLayers.waveEvidence || !window.__signalixWaveMarkerHits) return;
@@ -1246,9 +1279,18 @@
     }
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
-    setFreshness((data.freshness || {}).status || "unknown", data.as_of, (data.freshness || {}).data_fetched_at);
+    var freshness = data.freshness || {};
+    var intradayFetchedAt = freshness.intraday_fetched_at || items.reduce(function(latest, item) {
+      var status = item && item.data_status || {}, provenance = item && item.provenance || {};
+      var candidate = status.intraday_60m_as_of || provenance.intraday_as_of;
+      return candidate && (!latest || String(candidate) > String(latest)) ? candidate : latest;
+    }, null);
+    var dailyStatuses = items.map(function(item) { return (item.data_status || {}).daily_freshness; }).filter(Boolean);
+    var dailyStatus = dailyStatuses.indexOf("stale") >= 0 ? "stale" : dailyStatuses.length && dailyStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null;
+    setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
-    dom.dailyVcpMeta.textContent = universeLabel + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    var provenanceSource = freshness.source || (items[0] && items[0].provenance && items[0].provenance.source) || "price_data+intraday_price_data";
+    dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
     dailySetupPage = data.page || 1;
     dailySetupTotalPages = totalPages;
     dom.dailySetupPageInfo.textContent = dailySetupTotalPages ? "Page " + dailySetupPage + " of " + dailySetupTotalPages : "Page 0 of 0";

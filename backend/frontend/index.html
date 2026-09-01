@@ -16,6 +16,8 @@
       <div id="freshness" class="freshness" aria-live="polite">
         <span class="freshness-dot freshness-dot--loading"></span>
         <span class="freshness-label">Loading…</span>
+        <span id="freshness-daily" class="freshness-label">Daily EOD: Loading…</span>
+        <span id="freshness-60m" class="freshness-label">60m: Loading…</span>
       </div>
     </header>
 
@@ -358,7 +360,15 @@
             <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
           </div>
           <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
-          <section id="chart-wave-explanation" class="chart-wave-explanation" hidden aria-live="polite"></section>
+          <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">
+            <strong>How this wave was identified</strong>
+            <div>Rule: Unavailable</div>
+            <div>Supporting evidence: Unavailable</div>
+            <div>Contradicting evidence: Unavailable</div>
+            <div>Missing evidence: Unavailable</div>
+            <div>Alternative state: Unavailable · Policy: Unavailable</div>
+            <div>Snapshot identity: Unavailable</div>
+          </section>
 
           <dl class="drawer-fields">
             <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>

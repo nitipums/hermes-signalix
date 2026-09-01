@@ -268,10 +268,15 @@ def test_daily_vcp_default_filters_are_literal_presentation_filters():
 
 
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
     assert "intraday_fetched_at" in source
-    assert "setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of, freshness.intraday_fetched_at)" in js
+    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus)" in js
+    assert 'id="freshness-daily"' in html
+    assert 'id="freshness-60m"' in html
+    assert "Daily EOD" in js
+    assert "intraday_60m_as_of" in js
     assert 'scan_time: vm.fetch_completed_at || vm.as_of' in js
     assert "60m " in js
 
@@ -295,7 +300,31 @@ def test_wave_evidence_layer_is_toggleable_and_explains_payload_without_frontend
                   "marker.timeframe", "marker.source", "marker.confidence", "marker.evidence_refs",
                   "marker.snapshot_identity"):
         assert field in js
+    for label in ("How this wave was identified", "Supporting evidence", "Contradicting evidence", "Missing evidence", "Alternative state", "Snapshot identity"):
+        assert label in js or label in html
     assert 'timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null' in js
+
+
+def test_wave_drawer_projects_daily_contract_and_toggle_has_visible_fail_closed_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceForItem")
+    result = _run_node([helper], "waveEvidenceForItem({wave:{confidence:'MEDIUM',supporting_evidence:['advance'],contradicting_evidence:[],missing_evidence:['60m'],alternative_state:'WAVE_2_FORMING',snapshot_id:'snap-1'},provenance:{daily_source:'price_data'}})")
+    assert result["timeframe"] == "1D"
+    assert result["snapshot_identity"] == "snap-1"
+    assert result["supporting_evidence"] == ["advance"]
+    assert _run_node([helper], "waveEvidenceForItem({wave:[]})") == {}
+    assert 'innerHTML = "<strong>Wave Evidence hidden</strong>' in js
+    assert "window.__signalixWaveMarkerHits = [];" in js
+
+
+def test_setup_retry_recovers_from_transport_error_without_changing_contract():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="daily-vcp-error"' in html and 'id="daily-vcp-retry"' in html
+    assert "show(dom.dailyVcpError)" in js
+    assert "loadDailyVcp(true)" in js
+    assert "hide(dom.dailyVcpError); hide(dom.dailyVcpContent);" in js
+    assert "renderSetupCandidates(data);" in js
 
 
 def test_wave_marker_window_alignment_uses_source_candle_index():
