@@ -16,6 +16,7 @@ EVIDENCE_DIR="$(realpath -m "$EVIDENCE_DIR")"
 PUBLIC_URL="${SIGNALIX_PUBLIC_URL:-http://91.98.72.120:3001/mvp}"
 VIEWPORT_W="${SIGNALIX_VIEWPORT_WIDTH:-390}"
 VIEWPORT_H="${SIGNALIX_VIEWPORT_HEIGHT:-844}"
+RECOVERY_WAIT_MS="${SIGNALIX_RECOVERY_WAIT_MS:-10000}"
 SESSION="signalix-failure-retry-$$"
 ROUTE='**/api/setup-candidates*'
 mkdir -p "$EVIDENCE_DIR"
@@ -79,7 +80,7 @@ PY
 browser network unroute >"$EVIDENCE_DIR/unroute.txt"
 browser wait 250 >/dev/null
 browser click '#daily-vcp-retry' >"$EVIDENCE_DIR/retry-click.txt"
-browser wait 2500 >/dev/null
+browser wait "$RECOVERY_WAIT_MS" >/dev/null
 
 recovery_json=$(eval_json 'JSON.stringify({errorVisible:!document.querySelector("#daily-vcp-error").classList.contains("state--hidden"),contentVisible:!document.querySelector("#daily-vcp-content").classList.contains("state--hidden"),cards:document.querySelectorAll("#daily-vcp-cards [data-symbol]").length,meta:document.querySelector("#daily-vcp-meta").textContent,scroll:{innerWidth,clientWidth:document.documentElement.clientWidth,scrollWidth:document.documentElement.scrollWidth,bodyScrollWidth:document.body.scrollWidth}})')
 printf '%s\n' "$recovery_json" >"$EVIDENCE_DIR/recovery-state.json"
