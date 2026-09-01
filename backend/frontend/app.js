@@ -526,13 +526,10 @@
   function canonicalWaveState(item) {
     var wave = item && item.wave;
     var state = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.primary_state : null;
-    var states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3",
-      "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
-    return states.indexOf(state) >= 0 ? state : "Unavailable";
+    return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "Unknown / Not verified";
   }
 
-  var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
-    "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
+  var canonicalDailyWaveStates = ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"];
 
   function setupCandidateWaveBucket(item) {
     var wave = item && item.wave;
