@@ -451,7 +451,6 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
     freshness = str(data_status.get("freshness", "")).lower()
     if (data_status.get("sufficient") is False
             or freshness in {"stale", "unknown", "invalid", "unavailable"}
-            or data_status.get("daily_final_session_available") is False
             or data_status.get("intraday_60m_freshness") in {"stale", "unknown"}):
         if item.get("decision_lane") != "DATA_BLOCKED":
             raise ValueError("canonical snapshot violates fail-closed data contract")
@@ -601,6 +600,28 @@ def _daily_final_session_available(daily_df, expected_session):
         return False
 
 
+def _previous_set_session(session):
+    """Return the immediately preceding SET trading session."""
+    session -= timedelta(days=1)
+    while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+        session -= timedelta(days=1)
+    return session
+
+
+def _daily_evidence_status(daily_df, expected_session, evidence_valid):
+    """Separate usable official Daily evidence from current EOD publication."""
+    if not evidence_valid:
+        return (False, "unknown", "missing") if daily_df is None or len(daily_df) == 0 else (
+            False, "invalid", "invalid"
+        )
+    daily_session = daily_df.index[-1].date()
+    if daily_session == expected_session:
+        return True, "fresh", "available"
+    if daily_session == _previous_set_session(expected_session):
+        return True, "fresh", "pending"
+    return False, "stale", "missing"
+
+
 def _valid_candidate_ohlcv(frame) -> bool:
     """Validate required OHLCV without rejecting valid positive flat candles."""
     import pandas as pd
@@ -729,11 +750,15 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
         daily_current = (daily_evidence_valid
                          and _daily_final_session_available(daily_df, expected_daily_session))
+        daily_usable, daily_freshness, daily_final_status = _daily_evidence_status(
+            daily_df, expected_daily_session, daily_evidence_valid
+        )
         intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
             _intraday_60m_status(intraday_df, expected_intraday_interval)
         )
         evaluation_inputs[symbol] = (
-            daily_df, intraday_df, daily_evidence_valid, daily_current,
+            daily_df, intraday_df, daily_usable, daily_current, daily_freshness,
+            daily_final_status,
             intraday_available, intraday_current, intraday_freshness, intraday_as_of,
         )
 
@@ -758,10 +783,12 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             engine_results = dict(zip(symbols, results))
 
     for symbol in symbols:
-        (daily_df, intraday_df, daily_evidence_valid, daily_current,
+        (daily_df, intraday_df, daily_evidence_usable, daily_current, daily_freshness,
+         daily_final_status,
          intraday_available, intraday_current, intraday_freshness, intraday_as_of) = (
             evaluation_inputs[symbol]
         )
+        daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
         as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
         if as_of and (latest_daily is None or as_of > latest_daily):
             latest_daily = as_of
@@ -777,9 +804,9 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             wave, setup = engine_results[symbol]
         else:
             wave, setup = _evaluate_candidate_engines(
-                daily_df, intraday_df, daily_evidence_valid
+                daily_df, intraday_df, daily_evidence_usable
             )
-        if not daily_current:
+        if not daily_evidence_usable:
             wave = {
                 **wave,
                 "primary_state": "UNKNOWN",
@@ -788,7 +815,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                 "supporting_evidence": [],
                 "contradicting_evidence": [],
                 "missing_evidence": sorted(set(
-                    list(wave.get("missing_evidence") or []) + ["final_session_daily"]
+                    list(wave.get("missing_evidence") or []) + ["usable_official_daily"]
                 )),
             }
         if not intraday_current:
@@ -804,25 +831,23 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         context = build_peer_context(symbol, peer_data)
         daily_ok = daily_df is not None and len(daily_df) > 0
         intraday_ok = intraday_current
-        daily_freshness = "unknown"
-        if daily_ok and daily_evidence_valid:
-            daily_date = daily_df.index[-1].date()
-            daily_freshness = "fresh" if daily_date == expected_daily_session else "stale"
-        if daily_current and intraday_current:
+        if daily_evidence_usable and intraday_current:
             candidate_freshness = "fresh"
         elif "stale" in {daily_freshness, intraday_freshness}:
             candidate_freshness = "stale"
         else:
             candidate_freshness = "unknown"
         data_status = {
-            "sufficient": bool(daily_current and intraday_current),
+            "sufficient": bool(daily_evidence_usable and intraday_current),
             "freshness": candidate_freshness,
             "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
             "daily_available": daily_ok,
             "daily_final_session_available": daily_current,
+            "daily_final_session_status": daily_final_status,
             "daily_freshness": daily_freshness,
             "intraday_60m_available": intraday_available,
             "intraday_60m_freshness": intraday_freshness,
+            "intraday_60m_status": ("provisional" if intraday_current else intraday_freshness),
             "intraday_60m_as_of": intraday_as_of,
         }
         engine_data_reason = setup.pop("data_reason_code", None)
@@ -847,6 +872,9 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             data_status["freshness"] = "invalid"
             setup["status"] = "DATA_BLOCKED"
             candidate_freshness = "invalid"
+        if "INVALID_60M_OHLCV" in data_reason_codes:
+            data_status["intraday_60m_freshness"] = "invalid"
+            data_status["intraday_60m_status"] = "invalid"
         freshness_statuses.append(candidate_freshness)
         bonus_evidence = {}
         attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {

@@ -848,6 +848,69 @@ def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     assert item["provenance"]["as_of"].startswith("2026-08-28")
 
 
+def test_pending_daily_eod_preserves_latest_official_wave_with_current_60m(monkeypatch):
+    import datetime as dt
+    import mvp_api
+    import pandas as pd
+    import screening
+
+    daily = pd.DataFrame({
+        "Open": [10.0] * 25, "High": [11.0 + i / 10 for i in range(25)],
+        "Low": [9.0] * 25, "Close": [10.0 + i / 10 for i in range(25)],
+        "Volume": [1000] * 25,
+    }, index=pd.bdate_range(end="2026-08-28", periods=25))
+    intraday = pd.DataFrame({
+        "Open": [10.0] * 3, "High": [10.5] * 3, "Low": [9.8] * 3,
+        "Close": [10.1, 10.2, 10.3], "Volume": [100] * 3,
+    }, index=pd.date_range("2026-08-31 14:00", periods=3, freq="60min"))
+    intraday.attrs["timeframe"] = "60m"
+
+    monkeypatch.setattr(mvp_api, "expected_market_date", lambda: dt.date(2026, 8, 31))
+    monkeypatch.setattr(mvp_api, "_expected_intraday_interval_start",
+                        lambda: dt.datetime(2026, 8, 31, 16, 0))
+    monkeypatch.setattr(mvp_api.instruments, "active_ord_symbols", lambda pg: ["AAA"])
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "eligible_symbols", lambda active: (["AAA"], {
+        "universe_filter": "marginable_long", "schema_version": "test",
+        "source_document": "test", "effective_date": "2026-08-25",
+        "base_active_ord_count": 1, "eligible_count": 1, "excluded_count": 0}))
+    monkeypatch.setattr(mvp_api, "_load_daily_for_symbol", lambda *a, **k: daily)
+    monkeypatch.setattr(mvp_api, "_load_intraday_for_symbol", lambda *a, **k: intraday)
+    monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
+    monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "compute_trend_strength", lambda *a, **k: {"state": "uptrend"})
+    monkeypatch.setattr(mvp_api, "build_wave_contract", lambda *a, **k: {
+        "primary_state": "WAVE_1_ADVANCE", "alternative_state": "WAVE_2_FORMING",
+        "confidence": "MEDIUM", "supporting_evidence": ["prior advance"],
+        "contradicting_evidence": [], "missing_evidence": [], "evidence": {}})
+    monkeypatch.setattr(mvp_api, "build_trade_setup", lambda *a, **k: {
+        "timeframe": "60m", "status": "FORMING", "reason_code": "NO_SETUP_DETECTED"})
+
+    rows, _ = mvp_api.build_setup_candidates_from_data(object())
+
+    item = rows[0]
+    assert item["wave"]["primary_state"] == "WAVE_1_ADVANCE"
+    assert item["data_status"]["daily_final_session_available"] is False
+    assert item["data_status"]["daily_final_session_status"] == "pending"
+    assert item["data_status"]["daily_freshness"] == "fresh"
+    assert item["data_status"]["intraday_60m_freshness"] == "fresh"
+    assert item["data_status"]["intraday_60m_status"] == "provisional"
+    assert item["data_status"]["sufficient"] is True
+    assert "reason_code" not in item["data_status"]
+    assert item["setup"]["reason_code"] == "NO_SETUP_DETECTED"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
+
+    stale_daily = daily.copy()
+    stale_daily.index = pd.bdate_range(end="2026-08-27", periods=len(stale_daily))
+    monkeypatch.setattr(mvp_api, "_load_daily_for_symbol", lambda *a, **k: stale_daily)
+    stale_rows, _ = mvp_api.build_setup_candidates_from_data(object())
+    stale_item = stale_rows[0]
+    assert stale_item["wave"]["primary_state"] == "UNKNOWN"
+    assert stale_item["data_status"]["daily_freshness"] == "stale"
+    assert stale_item["data_status"]["reason_code"] == "STALE_DAILY_DATA"
+    assert stale_item["decision_lane"] == "DATA_BLOCKED"
+
+
 def test_stale_60m_session_fails_closed(monkeypatch):
     import datetime as dt
     import mvp_api
