@@ -93,9 +93,11 @@ Arm's TASCO feedback is recorded in `vault/Product-Feedback.md`. The owner-appro
 - Mobile metrics: `innerWidth=390`, `clientWidth=390`, `scrollWidth=390`, `body.scrollWidth=390`; no horizontal overflow.
 - Console and page-error logs were empty. Evidence: `.scratch/2026-09-01-user-validation/`.
 
-### Semantic Wave confirmation — NOT VERIFIED
+### Semantic Wave confirmation — PASS for reviewed fixtures
 
-The rendered explanation is available for Arm's review, but Lite does not mark the machine-generated Wave interpretation correct on Arm's behalf. Arm must compare the chart/evidence points and confirm or report disagreement. Any disagreement starts a new bounded `grill-with-docs → spec → tickets → implementation` loop.
+Arm's chart gate approval is recorded for the frozen 1Y no-lookahead fixtures at snapshot/as-of `2026-08-28`: CRC `WAVE_1_ADVANCE`, AWC `WAVE_1_ADVANCE`, and BGRIM `WAVE_3_CONTINUATION` (`HIGH`). No dispute is recorded for these three cases. TASCO examples (KCE, IRPC, BCP, RCL, BBGI) remain unconfirmed feedback inputs and are not hard-coded production expectations.
+
+The detailed validation matrix and machine-readable evidence are `docs/current/2026-09-01-owner-wave-validation.md` and `t05_wave_validation_evidence.json`. Any new disagreement starts a bounded `grill-with-docs → spec → tickets → implementation` loop; no semantic auto-tuning is authorized by this gate.
 
 ## Related authority
 
