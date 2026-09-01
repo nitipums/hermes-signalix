@@ -514,12 +514,16 @@
     var wave = item && item.wave;
     if (!wave || typeof wave !== "object" || Array.isArray(wave)) return {};
     var provenance = item.provenance && typeof item.provenance === "object" && !Array.isArray(item.provenance) ? item.provenance : {};
+    var explanation = wave.evidence_explanation && typeof wave.evidence_explanation === "object" && !Array.isArray(wave.evidence_explanation)
+      ? wave.evidence_explanation : wave.explanation && typeof wave.explanation === "object" && !Array.isArray(wave.explanation) ? wave.explanation : {};
     return {
       timeframe: "1D", source: provenance.daily_source || "price_data", confidence: wave.confidence,
+      rule: explanation.rule, evidence: explanation.evidence, policy: explanation.policy,
       supporting_evidence: wave.supporting_evidence, contradicting_evidence: wave.contradicting_evidence,
       missing_evidence: wave.missing_evidence, alternative_state: wave.alternative_state,
       snapshot_identity: wave.snapshot_identity || wave.snapshot_id || provenance.snapshot_identity || provenance.snapshot_id,
-      explanation: wave.explanation && typeof wave.explanation === "object" && !Array.isArray(wave.explanation) ? wave.explanation : {}
+      evidence_refs: explanation.evidence_refs,
+      markers: Array.isArray(wave.markers) ? wave.markers : Array.isArray(wave.evidence_markers) ? wave.evidence_markers : []
     };
   }
 
@@ -768,12 +772,17 @@
   }
 
   function mergeCanonicalSetupDetail(item, detail) {
-    // The symbol endpoint supplies optional drawer metadata only. Keep the
-    // list response as the authority for setup/evidence, especially chart
-    // markers which are intentionally absent from compact cards.
-    var merged = Object.assign({}, item, detail || {});
-    ["trend", "wave", "setup", "context", "bonus_evidence", "decision_lane", "chart_evidence", "provenance"].forEach(function(field) {
-      if (item[field] !== undefined) merged[field] = item[field];
+    // /api/setup-candidates is authoritative. /api/symbol is an audit/detail
+    // lookup and may fill presentation metadata only; never spread its
+    // response over canonical evidence. This also preserves both marker
+    // aliases and wave snapshot identity as opaque nested evidence.
+    var merged = Object.assign({}, item || {});
+    var metadataFields = ["name", "sector", "industry", "market_cap", "description",
+      "close", "change_pct", "change_amount", "trade_value", "avgDailyValue20",
+      "index_membership", "margin_pct", "margin_rate_pct", "high52", "low52",
+      "ath_high", "ath_low"];
+    metadataFields.forEach(function(field) {
+      if (merged[field] == null && detail && detail[field] != null) merged[field] = detail[field];
     });
     merged._canonicalMetadataPending = false;
     return merged;

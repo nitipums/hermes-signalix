@@ -317,6 +317,16 @@ def test_wave_drawer_projects_daily_contract_and_toggle_has_visible_fail_closed_
     assert "window.__signalixWaveMarkerHits = [];" in js
 
 
+def test_wave_drawer_projects_evidence_explanation_and_marker_aliases():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceForItem")
+    result = _run_node([helper], "waveEvidenceForItem({wave:{confidence:'HIGH',evidence_explanation:{rule:'Daily close rule',evidence:['close_above_high'],policy:'elliott-v1'},evidence_markers:[{kind:'WAVE_3_CLOSE_CONFIRMATION'}],snapshot_id:'daily:2026-08-31'},provenance:{daily_source:'price_data'}})")
+    assert result["rule"] == "Daily close rule"
+    assert result["evidence"] == ["close_above_high"]
+    assert result["markers"] == [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}]
+    assert result["snapshot_identity"] == "daily:2026-08-31"
+
+
 def test_setup_retry_recovers_from_transport_error_without_changing_contract():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -716,12 +726,56 @@ def test_setup_candidate_compact_items_and_canonical_detail_merge_are_safe():
     assert result["name"] == "Alpha"
 
 
+def test_canonical_detail_merge_preserves_nested_evidence_aliases_and_only_fills_metadata():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    item = {
+        "symbol": "AAA",
+        "decision_lane": "REVIEW_NOW",
+        "wave": {
+            "primary_state": "EARLY_WAVE_3",
+            "confidence": "HIGH",
+            "supporting_evidence": ["daily breakout"],
+            "contradicting_evidence": [],
+            "missing_evidence": ["volume"],
+            "evidence_explanation": "canonical explanation",
+            "markers": [{"timestamp": "2026-08-31", "snapshot_id": "snap-canonical"}],
+            "evidence_markers": [{"timestamp": "2026-08-31", "snapshot_id": "snap-canonical"}],
+            "snapshot_id": "snap-canonical",
+        },
+        "setup": {"trigger": 12, "trade_stop": 10, "target_1": 20},
+        "chart_evidence": {"60m": {"markers": ["canonical-marker"]}},
+        "provenance": {"snapshot_id": "snap-canonical", "source": "setup-candidates"},
+        "name": "Canonical name",
+    }
+    detail = {
+        "name": "Legacy name",
+        "sector": "Technology",
+        "wave": {"primary_state": "WAVE_1_ADVANCE", "snapshot_id": "snap-legacy"},
+        "setup": {"trigger": 99},
+        "chart_evidence": {"60m": {"markers": ["legacy-marker"]}},
+        "provenance": {"snapshot_id": "snap-legacy"},
+        "decision_lane": "AVOID",
+        "unexpected_legacy_field": "must not enter canonical item",
+    }
+    result = _run_node([merge], "mergeCanonicalSetupDetail(" + json.dumps(item) + ", " + json.dumps(detail) + ")")
+    assert result["name"] == "Canonical name"
+    assert result["sector"] == "Technology"
+    assert result["wave"] == item["wave"]
+    assert result["setup"] == item["setup"]
+    assert result["chart_evidence"] == item["chart_evidence"]
+    assert result["provenance"] == item["provenance"]
+    assert result["decision_lane"] == "REVIEW_NOW"
+    assert "unexpected_legacy_field" not in result
+
+
 def test_canonical_chart_failure_never_uses_snapshot_fallback():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "shouldUseSnapshotChartFallback")
     assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA","decision_lane":"DAILY_CANDIDATE"})') is False
     assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA"})') is True
     assert "if (!shouldUseSnapshotChartFallback(item)) throw err;" in js
+    assert 'data-detail-source="canonical-setup-candidate"' in (ROOT / "index.html").read_text(encoding="utf-8")
 
 
 def test_setup_candidate_pagination_is_reachable_and_accessible():
