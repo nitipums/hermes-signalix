@@ -6,7 +6,7 @@
 
 ## Keep / current candidates
 
-- User identity/preferences and memory policy: facts 23, 25, 160, 200, 208, 211.
+- User identity/preferences and memory policy: facts 23, 25, 200, 208, 211.
 - Current Signalix contract/Wave semantics: facts 215, 219, 220, 226.
 - Current release/automation boundary: facts 227, 229; canonical detail is in the current handoff and Execution-Pipeline.
 - Browser/Git safety: facts 71, 228 and current verification skills.

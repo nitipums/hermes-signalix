@@ -28,7 +28,7 @@ The 60m lifecycle trend gate is strict: Daily trend context cannot promote 60m `
 
 ## Review lanes
 
-The current VCP lifecycle state remains authoritative. A separate `review_lane` preserves actionable context when a price/volume event exists before full VCP morphology qualifies:
+Within the compatibility/audit route, VCP lifecycle state remains authoritative for its own historical contract. A separate `review_lane` preserves actionable context when a price/volume event exists before full VCP morphology qualifies:
 
 - `PRICE_VOLUME_BREAKOUT` — close and breakout volume pass, but full structure does not.
 - `PIVOT_TOUCH_VOLUME_WATCH` — pivot touched/near with volume evidence, close confirmation pending.
