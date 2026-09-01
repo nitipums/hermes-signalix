@@ -526,7 +526,8 @@ def test_vcp_tables_use_canonical_rr_and_compact_tags():
 
 def test_vcp_filter_events_render_the_selected_client_state():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert "dom.dailyVcpType.addEventListener(\"change\", loadDailyVcp)" in js
+    assert 'dom.dailySetupRefresh.addEventListener("click", function() { loadDailyVcp(true, 1); });' in js
+    assert 'dom.dailyVcpType.addEventListener("change", loadDailyVcp)' not in js
     assert "dom.vcpState.addEventListener(\"change\", loadVcp)" in js
     assert "dom.vcpType.addEventListener(\"change\", loadVcp)" in js
     assert "results = results.filter(priceMatches)" in js
@@ -699,6 +700,36 @@ def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     assert "Trend " in js and "Wave" in js and "Targets" in js and "VCP bonus" in js
 
 
+def test_setup_candidate_review_uses_explicit_compact_toolbar_and_collapsed_advanced_filters():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="daily-setup-toolbar"' in html
+    assert 'id="daily-setup-search"' in html
+    assert 'id="daily-setup-lane"' in html
+    assert 'id="daily-setup-refresh"' in html
+    assert 'id="daily-setup-advanced"' in html
+    assert 'id="daily-setup-live-refresh"' in html
+    assert 'id="daily-setup-updated"' in html
+    assert 'dom.dailySetupRefresh.addEventListener("click"' in js
+    assert 'dom.dailySetupSearch.addEventListener("input"' in js
+    assert 'dom.dailySetupLane.addEventListener("change"' in js
+    assert 'dailySetupData' in js
+    assert 'dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice' in js
+    assert 'liveRefreshTimer = liveRefreshEnabled ? setTimeout' in js
+    assert 'setInterval(function()' not in js
+
+
+def test_setup_candidate_refresh_is_the_update_boundary_and_idle_is_not_live_by_default():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'Refresh' in html
+    assert 'aria-live="polite"' in html
+    assert "liveRefreshEnabled" in js
+    assert "dailySetupUpdated.textContent" in js
+    assert 'liveRefreshTimer = liveRefreshEnabled ? setTimeout' in js
+    assert 'setInterval(function()' not in js
+
+
 def test_vcp_is_not_primary_navigation_and_api_is_marked_audit_only():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -810,8 +841,8 @@ def test_setup_candidate_pagination_is_reachable_and_accessible():
     assert "dailySetupPage - 1" in js
     assert "dailySetupPage + 1" in js
     assert "data.total_pages || 0" in js
-    assert js.count("loadDailyVcp(false, 1)") >= 3
-    assert 'if (force && typeof force === "object")' in js
+    assert 'loadDailyVcp(true, 1)' in js
+    assert 'if (force && typeof force === "object")' not in js
 
 
 def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mobile_safe():

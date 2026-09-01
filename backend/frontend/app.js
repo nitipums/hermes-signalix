@@ -32,6 +32,11 @@
     dailyVcpContent: $("#daily-vcp-content"),
     dailyVcpCards:   $("#daily-vcp-cards"),
     dailyVcpMeta:    $("#daily-vcp-meta"),
+    dailySetupSearch: $("#daily-setup-search"),
+    dailySetupLane: $("#daily-setup-lane"),
+    dailySetupRefresh: $("#daily-setup-refresh"),
+    dailySetupUpdated: $("#daily-setup-updated"),
+    dailySetupLiveRefresh: $("#daily-setup-live-refresh"),
     dailySetupPrev:  $("#daily-setup-prev"),
     dailySetupNext:  $("#daily-setup-next"),
     dailySetupPageInfo: $("#daily-setup-page-info"),
@@ -163,6 +168,9 @@
   let dailyVcpRequestSeq = 0;
   let dailySetupPage = 1;
   let dailySetupTotalPages = 1;
+  let dailySetupData = null;
+  let liveRefreshEnabled = false;
+  let liveRefreshTimer = null;
   let vcpRequestSeq = 0;
   var dailyVcpRequests = SignalixRequestCache();
   var vcpRequests = SignalixRequestCache();
@@ -1234,6 +1242,13 @@
       '<p class="setup-candidate__bonus">' + escapeHTML(vcp) + ' · ' + escapeHTML(item.as_of || "as of unknown") + '</p></article>';
   }
 
+  function setupCandidateMatchesToolbar(item) {
+    var search = dom.dailySetupSearch ? dom.dailySetupSearch.value.trim().toLowerCase() : "";
+    var lane = dom.dailySetupLane ? dom.dailySetupLane.value : "ALL";
+    var haystack = ((item.symbol || "") + " " + (item.name || "")).toLowerCase();
+    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane);
+  }
+
   function groupSetupCandidates(items) {
     var laneOrder = ["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"];
     var groups = {};
@@ -1287,6 +1302,7 @@
 
   function renderSetupCandidates(data) {
     data = data || {};
+    dailySetupData = data;
     hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
     var items = data && Array.isArray(data.items) ? data.items : [];
     var returnedCount = Number(data.returned_count);
@@ -1310,6 +1326,7 @@
       dom.dailyVcpCards.innerHTML = '<div class="state"><div class="state-icon">⚠️</div><p class="state-text">Setup candidate data is inconsistent.</p><p class="state-hint">Refresh before reviewing evidence.</p></div>';
       return;
     }
+    items = items.filter(setupCandidateMatchesToolbar);
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     var freshness = data.freshness || {};
@@ -1339,18 +1356,12 @@
     }, "");
     dom.dailyVcpCards.innerHTML = groupedHTML ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
+    if (dom.dailySetupUpdated) dom.dailySetupUpdated.textContent = "Updated " + formatProvenance(freshness.fetch_completed_at || data.fetch_completed_at || data.as_of || "unknown");
   }
 
   function loadDailyVcp(force, page) {
     // Legacy DOM/function names remain for compatibility; primary requests use
     // the canonical setup-candidates contract.
-    // Filter event handlers pass the DOM event as the first argument. Treat
-    // those calls as a new presentation query so they always start at page 1;
-    // timer refreshes and explicit pagination retain their current page.
-    if (force && typeof force === "object") {
-      force = false;
-      page = 1;
-    }
     if (page != null) dailySetupPage = Math.max(1, Number(page) || 1);
     var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";
     if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) endpoint += "&sector=" + encodeURIComponent(dom.dailySetupSector.value.trim());
@@ -1451,15 +1462,29 @@
         renderVcpResults(results);
   }
 
-  [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) {
+  if (dom.dailySetupRefresh) dom.dailySetupRefresh.addEventListener("click", function() { loadDailyVcp(true, 1); });
+  [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice,
+   dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
     if (input) input.addEventListener("change", function() { loadDailyVcp(false, 1); });
   });
-  if (dom.dailyVcpType) dom.dailyVcpType.addEventListener("change", loadDailyVcp);
-  if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", function() {
-    loadDailyVcp(false, 1);
+  if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", function() { loadDailyVcp(false, 1); });
+  if (dom.dailySetupSearch) dom.dailySetupSearch.addEventListener("input", function() {
+    if (dailySetupData) renderSetupCandidates(dailySetupData);
   });
-  [dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
-    if (input) input.addEventListener("change", function() { loadDailyVcp(false, 1); });
+  if (dom.dailySetupLane) dom.dailySetupLane.addEventListener("change", function() {
+    if (dailySetupData) renderSetupCandidates(dailySetupData);
+  });
+  function scheduleLiveRefresh() {
+    if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+    liveRefreshTimer = liveRefreshEnabled ? setTimeout(function() {
+      liveRefreshTimer = null;
+      if (currentTab === "daily-vcp") loadDailyVcp(true);
+      scheduleLiveRefresh();
+    }, 60000) : null;
+  }
+  if (dom.dailySetupLiveRefresh) dom.dailySetupLiveRefresh.addEventListener("change", function() {
+    liveRefreshEnabled = dom.dailySetupLiveRefresh.checked;
+    scheduleLiveRefresh();
   });
   /* ── tab switching ── */
   function switchTab(tab) {
@@ -1722,8 +1747,4 @@
   /* ── init ── */
   setFreshness("loading");
   loadDailyVcp();
-  setInterval(function() {
-    if (currentTab === "daily-vcp") loadDailyVcp(true);
-    else if (currentTab === "vcp" && dom.vcpState.value !== "ALL") loadVcp(true);
-  }, 60000);
 })();

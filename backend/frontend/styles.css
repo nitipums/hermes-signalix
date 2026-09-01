@@ -292,6 +292,20 @@ body {
 .explorer-control select, .explorer-control input { min-height:44px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); color:var(--text); padding:0 9px; font:inherit; }
 .explorer-search { flex:1; min-width:150px; }
 .btn--filter { min-height:38px; padding:0 12px; }
+.setup-toolbar {
+  display:flex; align-items:end; gap:8px; flex-wrap:wrap;
+  margin:0 0 8px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:var(--radius);
+  background:var(--surface-2);
+}
+.setup-toolbar > label { display:flex; flex-direction:column; gap:3px; color:var(--text-3); font-size:10px; font-weight:600; }
+.setup-toolbar input, .setup-toolbar select { min-height:44px; min-width:0; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); padding:0 9px; font:inherit; }
+.setup-toolbar__search { flex:1 1 145px; }
+.setup-toolbar__updated { flex:1 1 100%; color:var(--text-3); font-size:10px; }
+.setup-advanced { margin:0 0 10px; color:var(--text-2); font-size:11px; }
+.setup-advanced summary { min-height:38px; padding:9px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); cursor:pointer; }
+.setup-advanced[open] summary { border-radius:var(--radius) var(--radius) 0 0; }
+.setup-advanced .watchlist-default-filters { margin:0; border-top:0; border-radius:0 0 var(--radius) var(--radius); }
 
 /* ── pagination ── */
 .pagination {

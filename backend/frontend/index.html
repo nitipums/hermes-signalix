@@ -36,14 +36,34 @@
       <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
       <section id="daily-vcp-content" class="state--hidden">
         <p class="explorer-note">Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal.</p>
-        <div class="watchlist-default-filters" aria-label="Watchlist default filters">
-          <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
-          <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
-          <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
-          <label>Sector <input id="daily-setup-sector" aria-label="Filter setup candidates by sector"></label>
-          <!-- Retained only for legacy DOM compatibility; the primary contract never filters by VCP type. -->
-          <select id="daily-vcp-type" hidden aria-hidden="true"><option value="all">All types</option><option value="low_cheat_vcp">Low-Cheat</option><option value="standard_vcp">VCP</option></select>
-          <label>Decision state
+        <div id="daily-setup-toolbar" class="setup-toolbar" aria-label="Setup candidate controls">
+          <label class="setup-toolbar__search">Search
+            <input id="daily-setup-search" type="search" placeholder="Symbol / name" aria-label="Search setup candidates">
+          </label>
+          <label>Lane
+            <select id="daily-setup-lane" aria-label="Filter setup candidates by lane">
+              <option value="ALL" selected>All lanes</option>
+              <option value="REVIEW_NOW">Review now</option>
+              <option value="SETUP_FORMING">Setup forming</option>
+              <option value="DAILY_CANDIDATE">Daily candidate</option>
+              <option value="WAIT">Wait</option>
+              <option value="AVOID">Avoid</option>
+              <option value="DATA_BLOCKED">Data blocked</option>
+            </select>
+          </label>
+          <button id="daily-setup-refresh" class="btn btn--filter" type="button">Refresh</button>
+          <span id="daily-setup-updated" class="setup-toolbar__updated" aria-live="polite">No update applied</span>
+        </div>
+        <details id="daily-setup-advanced" class="setup-advanced">
+          <summary>Advanced filters</summary>
+          <div class="watchlist-default-filters" aria-label="Advanced setup candidate filters">
+            <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
+            <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
+            <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
+            <label>Sector <input id="daily-setup-sector" aria-label="Filter setup candidates by sector"></label>
+            <!-- Retained only for legacy DOM compatibility; the primary contract never filters by VCP type. -->
+            <select id="daily-vcp-type" hidden aria-hidden="true"><option value="all">All types</option><option value="low_cheat_vcp">Low-Cheat</option><option value="standard_vcp">VCP</option></select>
+            <label>Decision state
             <select id="daily-vcp-decision-state" aria-label="Filter setup candidates by canonical decision state">
               <option value="ALL" selected>All decision states</option>
               <option value="FORMING">Forming</option>
@@ -52,16 +72,16 @@
               <option value="EXTENDED">Extended</option>
               <option value="INVALIDATED">Invalidated</option>
             </select>
-          </label>
-          <label>Decision
+            </label>
+            <label>Decision
             <select id="daily-vcp-decision" aria-label="Filter setup candidates by canonical decision">
               <option value="ALL" selected>All decisions</option>
               <option value="REVIEW">Review</option>
               <option value="WAIT">Wait</option>
               <option value="AVOID">Avoid</option>
             </select>
-          </label>
-          <label>Quality
+            </label>
+            <label>Quality
             <select id="daily-vcp-quality" aria-label="Filter setup candidates by canonical quality">
               <option value="ALL" selected>All quality</option>
               <option value="PASS">Pass</option>
@@ -69,8 +89,10 @@
               <option value="FAIL">Fail</option>
               <option value="UNKNOWN">Unknown</option>
             </select>
-          </label>
-        </div>
+            </label>
+            <label><input type="checkbox" id="daily-setup-live-refresh"> Live refresh (opt in)</label>
+          </div>
+        </details>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
         <nav id="daily-setup-pagination" class="pagination" aria-label="Setup candidate pages">
