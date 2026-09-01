@@ -284,6 +284,21 @@ def test_canonical_snapshot_requires_exact_envelope_and_complete_provenance():
         _setup_candidate_from_snapshot(incomplete)
 
 
+def test_canonical_snapshot_accepts_nested_aai_style_chart_evidence():
+    from mvp_api import _setup_candidate_from_snapshot
+
+    row = candidate()
+    row["setup"]["chart_evidence"] = {
+        "daily": {"timeframe": "daily", "markers": []},
+        "60m": {"timeframe": "60m", "markers": []},
+    }
+
+    result = _setup_candidate_from_snapshot(row)
+
+    assert result["setup"]["chart_evidence"]["daily"]["timeframe"] == "daily"
+    assert "chart_evidence" not in result
+
+
 def test_data_source_calls_completed_engines_and_preserves_missing_60m(monkeypatch):
     import mvp_api
     import screening

@@ -45,6 +45,23 @@ def test_60m_marker_timestamp_uses_chart_datetime_form():
     assert markers[0]["timestamp"] == "2026-01-02T11:00:00"
 
 
+def test_chart_evidence_stays_inside_setup_canonical_namespace():
+    inputs = sample_inputs()
+    inputs["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 12.5,
+        "trigger_timestamp": "2026-01-02 11:00:00",
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert "chart_evidence" not in item
+    assert item["setup"]["chart_evidence"]["60m"]["timeframe"] == "60m"
+    assert item["setup"]["chart_evidence"]["daily"]["timeframe"] == "daily"
+    assert item["setup"]["chart_evidence"]["60m"]["markers"][0]["timestamp"] == (
+        "2026-01-02T11:00:00"
+    )
+
+
 def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
     inputs = sample_inputs()
     inputs["wave"] = {"timeframe": "60m", "state": "WAVE_2_NEAR_COMPLETION"}

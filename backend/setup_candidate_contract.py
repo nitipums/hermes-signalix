@@ -391,6 +391,11 @@ def build_setup_candidate(
     chart_evidence = {"daily": {"timeframe": "daily", "markers": daily_markers},
                       "60m": {"timeframe": "60m", "markers": setup_markers,
                               "daily_mapping": None}}
+    # Chart-linked evidence is part of the setup presentation payload, not a
+    # competing top-level canonical field.  Keeping it nested preserves the
+    # exact serving envelope while retaining the Daily/60m boundary.
+    if daily_markers or setup_markers:
+        setup_out["chart_evidence"] = chart_evidence
     item = {
         "symbol": str(symbol),
         "as_of": as_of,
@@ -403,9 +408,6 @@ def build_setup_candidate(
         "decision_lane": lane,
         "provenance": provenance_out,
     }
-    # Preserve the exact legacy/caller shape when no chart-linked evidence exists.
-    if daily_markers or setup_markers:
-        item["chart_evidence"] = chart_evidence
     return _json_value(item)
 
 
