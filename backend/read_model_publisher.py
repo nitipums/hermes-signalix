@@ -11,6 +11,8 @@ import copy
 import hashlib
 import json
 import os
+import threading
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
@@ -24,6 +26,36 @@ EXPECTED_UNIVERSE = "marginable_long"
 EXPECTED_COUNT = 237
 LANES = ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED")
 DEFAULT_ROOT = Path(__file__).resolve().parent / "read-model"
+_READ_MODEL_CACHE_LIMIT = 2
+_READ_MODEL_CACHE_LOCK = threading.RLock()
+_READ_MODEL_CACHE: OrderedDict[tuple[str, str, str, str], dict] = OrderedDict()
+_READ_MODEL_CURRENT_IDENTITIES: dict[str, tuple[str, str, str, str]] = {}
+
+
+class _ReadOnlyDict(dict):
+    """A JSON-serializable dict that rejects mutation of cached data."""
+
+    def _readonly(self, *args, **kwargs):
+        raise TypeError("cached read model is read-only")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = _readonly
+
+
+class _ReadOnlyList(list):
+    """A JSON-serializable list that rejects mutation of cached data."""
+
+    def _readonly(self, *args, **kwargs):
+        raise TypeError("cached read model is read-only")
+
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = append = extend = insert = pop = remove = reverse = sort = _readonly
+
+
+def _freeze_read_model(value: Any) -> Any:
+    if isinstance(value, dict):
+        return _ReadOnlyDict({key: _freeze_read_model(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return _ReadOnlyList(_freeze_read_model(item) for item in value)
+    return value
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -154,41 +186,64 @@ def load_current_read_model(root: str | Path | None = None) -> dict:
     writes, falls back to another artifact, or rebuilds a model.
     """
     root = Path(root or os.getenv("SIGNALIX_READ_MODEL_ROOT", DEFAULT_ROOT))
-    pointer_path = root / "current.json"
-    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
-    if (not isinstance(pointer, dict)
-            or pointer.get("contract_version") != CONTRACT_VERSION
-            or not isinstance(pointer.get("source_version"), str)
-            or not isinstance(pointer.get("path"), str)
-            or Path(pointer["path"]).name != pointer["path"]):
-        raise ValueError("invalid canonical read-model pointer")
+    root_key = str(root.resolve())
 
-    version_path = root / "versions" / pointer["path"]
-    if version_path.parent != (root / "versions") or version_path.stem != pointer["source_version"]:
-        raise ValueError("canonical read-model pointer path does not match source version")
-    model = json.loads(version_path.read_text(encoding="utf-8"))
-    if not isinstance(model, dict) or model.get("contract_version") != CONTRACT_VERSION:
-        raise ValueError("invalid canonical read-model envelope")
-    provenance = model.get("provenance")
-    if not isinstance(provenance, dict):
-        raise ValueError("read-model provenance is required")
-    items, counts = _validate_build(
-        model.get("items"),
-        {
-            "universe_filter": model.get("universe"),
-            "eligible_count": model.get("eligible_count"),
-            "excluded_count": model.get("excluded_count"),
-        },
-        provenance.get("source_versions"),
-    )
-    if (model.get("source_version") != pointer["source_version"]
-            or model.get("source_version") != _source_version(provenance["source_versions"])
-            or model.get("items") != items
-            or model.get("counts") != counts
-            or model.get("count") != EXPECTED_COUNT
-            or model.get("evaluated_count") != EXPECTED_COUNT):
-        raise ValueError("canonical read-model contents are not valid")
-    return model
+    # Keep pointer reads inside the same lock as cache selection.  This makes
+    # a pointer change and the corresponding cache invalidation one operation,
+    # while concurrent misses naturally become a single file load/validation.
+    with _READ_MODEL_CACHE_LOCK:
+        pointer_path = root / "current.json"
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+        if (not isinstance(pointer, dict)
+                or pointer.get("contract_version") != CONTRACT_VERSION
+                or not isinstance(pointer.get("source_version"), str)
+                or not isinstance(pointer.get("path"), str)
+                or Path(pointer["path"]).name != pointer["path"]):
+            raise ValueError("invalid canonical read-model pointer")
+
+        identity = (root_key, pointer["contract_version"], pointer["source_version"], pointer["path"])
+        previous_identity = _READ_MODEL_CURRENT_IDENTITIES.get(root_key)
+        if previous_identity != identity:
+            if previous_identity is not None:
+                _READ_MODEL_CACHE.pop(previous_identity, None)
+            _READ_MODEL_CURRENT_IDENTITIES[root_key] = identity
+        cached = _READ_MODEL_CACHE.get(identity)
+        if cached is not None:
+            _READ_MODEL_CACHE.move_to_end(identity)
+            return cached
+
+        version_path = root / "versions" / pointer["path"]
+        if version_path.parent != (root / "versions") or version_path.stem != pointer["source_version"]:
+            raise ValueError("canonical read-model pointer path does not match source version")
+        model = json.loads(version_path.read_text(encoding="utf-8"))
+        if not isinstance(model, dict) or model.get("contract_version") != CONTRACT_VERSION:
+            raise ValueError("invalid canonical read-model envelope")
+        provenance = model.get("provenance")
+        if not isinstance(provenance, dict):
+            raise ValueError("read-model provenance is required")
+        items, counts = _validate_build(
+            model.get("items"),
+            {
+                "universe_filter": model.get("universe"),
+                "eligible_count": model.get("eligible_count"),
+                "excluded_count": model.get("excluded_count"),
+            },
+            provenance.get("source_versions"),
+        )
+        if (model.get("source_version") != pointer["source_version"]
+                or model.get("source_version") != _source_version(provenance["source_versions"])
+                or model.get("items") != items
+                or model.get("counts") != counts
+                or model.get("count") != EXPECTED_COUNT
+                or model.get("evaluated_count") != EXPECTED_COUNT):
+            raise ValueError("canonical read-model contents are not valid")
+
+        cached = _freeze_read_model(model)
+        _READ_MODEL_CACHE[identity] = cached
+        _READ_MODEL_CACHE.move_to_end(identity)
+        while len(_READ_MODEL_CACHE) > _READ_MODEL_CACHE_LIMIT:
+            _READ_MODEL_CACHE.popitem(last=False)
+        return cached
 
 
 def publish_builder_result(

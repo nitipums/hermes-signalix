@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -91,3 +93,91 @@ def test_load_current_read_model_preserves_stale_and_in_flight_metadata(tmp_path
     loaded = load_current_read_model(tmp_path)
     assert loaded["freshness"] == metadata["freshness"]
     assert loaded["provenance"]["source_versions"] == VERSIONS
+
+
+def test_repeated_loads_cache_validated_model_and_prevent_mutation(tmp_path, monkeypatch):
+    items, metadata = _build()
+    publish_read_model(build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1"), tmp_path)
+    import read_model_publisher as publisher
+    calls = {"validate": 0, "version_read": 0}
+    original_validate = publisher._validate_build
+    original_read_text = Path.read_text
+
+    def counted_validate(*args, **kwargs):
+        calls["validate"] += 1
+        return original_validate(*args, **kwargs)
+
+    def counted_read_text(path, *args, **kwargs):
+        if path.name != "current.json":
+            calls["version_read"] += 1
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(publisher, "_validate_build", counted_validate)
+    monkeypatch.setattr(Path, "read_text", counted_read_text)
+    first = load_current_read_model(tmp_path)
+    second = load_current_read_model(tmp_path)
+    assert first is second
+    assert calls == {"validate": 1, "version_read": 1}
+    with pytest.raises(TypeError):
+        first["items"][0] = {}
+    with pytest.raises(TypeError):
+        first["items"][0]["symbol"] = "MUTATED"
+
+
+def test_pointer_change_invalidates_cached_model(tmp_path):
+    items, metadata = _build()
+    first_model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    publish_read_model(first_model, tmp_path)
+    first = load_current_read_model(tmp_path)
+    changed_versions = {**VERSIONS, "intraday": {"run_id": "60m-2", "as_of": VERSIONS["intraday"]["as_of"]}}
+    second_model = build_read_model(items, metadata, source_versions=changed_versions, published_at="t2")
+    publish_read_model(second_model, tmp_path)
+    second = load_current_read_model(tmp_path)
+    assert second is not first
+    assert second["source_version"] != first["source_version"]
+    assert load_current_read_model(tmp_path) is second
+
+
+def test_cached_model_does_not_mask_malformed_or_missing_pointer(tmp_path):
+    items, metadata = _build()
+    publish_read_model(build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1"), tmp_path)
+    load_current_read_model(tmp_path)
+    pointer_path = tmp_path / "current.json"
+    pointer_path.unlink()
+    with pytest.raises(FileNotFoundError):
+        load_current_read_model(tmp_path)
+    pointer_path.write_text(json.dumps({"contract_version": "wrong"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="pointer"):
+        load_current_read_model(tmp_path)
+
+
+def test_concurrent_cache_misses_coalesce_to_one_validation(tmp_path, monkeypatch):
+    items, metadata = _build()
+    publish_read_model(build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1"), tmp_path)
+    import read_model_publisher as publisher
+    calls = 0
+    original_validate = publisher._validate_build
+
+    def counted_validate(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        time.sleep(0.02)
+        return original_validate(*args, **kwargs)
+
+    monkeypatch.setattr(publisher, "_validate_build", counted_validate)
+    barrier = threading.Barrier(4)
+    results = []
+
+    def read():
+        barrier.wait()
+        results.append(load_current_read_model(tmp_path))
+
+    threads = [threading.Thread(target=read) for _ in range(3)]
+    for thread in threads:
+        thread.start()
+    barrier.wait()
+    for thread in threads:
+        thread.join()
+    assert calls == 1
+    assert len(results) == 3
+    assert all(result is results[0] for result in results)
