@@ -185,6 +185,19 @@ def replay_symbol(symbol: str, frame, start: dt.date, end: dt.date) -> list[dict
     return results
 
 
+def replay_symbol_as_of(symbol: str, frame, as_of: dt.date) -> list[dict[str, Any]]:
+    """Classify one exact Daily observation using its complete bounded prefix."""
+    return replay_symbol(symbol, frame, as_of, as_of)
+
+
+def select_symbols(all_eligible: bool, eligible_symbols: list[str]) -> tuple[str, tuple[str, ...]]:
+    """Return the deterministic replay scope without changing the fixed chart sample."""
+    if not all_eligible:
+        return "owner_labelled_10", SYMBOLS
+    normalized = tuple(sorted({str(symbol).strip().upper() for symbol in eligible_symbols if str(symbol).strip()}))
+    return "all_marginable_long_eligible", normalized
+
+
 def _summarize(symbol: str, rows: list[dict[str, Any]], eligible: bool) -> dict[str, Any]:
     state_counts = Counter(row["structural_state"] for row in rows)
     context_counts = Counter(row["context_marker"] for row in rows)
@@ -199,11 +212,26 @@ def _summarize(symbol: str, rows: list[dict[str, Any]], eligible: bool) -> dict[
     for row in rows:
         key = row["context_marker"]
         spans.setdefault(key, {"first": row["as_of"], "last": row["as_of"]})["last"] = row["as_of"]
+    final = rows[-1] if rows else None
+    if not rows:
+        accounting_status = "NO_DAILY_DATA"
+        accounting_reason = "no Daily price_data observation in the requested replay window"
+    elif final and final["missing_evidence"]:
+        accounting_status = "INSUFFICIENT_EVIDENCE"
+        accounting_reason = "final observation reports missing evidence"
+    elif final and final["ambiguous"]:
+        accounting_status = "AMBIGUOUS"
+        accounting_reason = "final observation is ambiguous or maps to unknown context"
+    else:
+        accounting_status = "EVALUATED"
+        accounting_reason = "Daily prefixes evaluated"
     return {
         "symbol": symbol,
         "marginable_long_eligible": eligible,
+        "accounting_status": accounting_status,
+        "accounting_reason": accounting_reason,
         "trading_date_prefix_count": len(rows),
-        "final": rows[-1] if rows else None,
+        "final": final,
         "state_counts": dict(sorted(state_counts.items())),
         "context_counts": dict(sorted(context_counts.items())),
         "secondary_counts": dict(sorted(secondary_counts.items())),
@@ -214,13 +242,52 @@ def _summarize(symbol: str, rows: list[dict[str, Any]], eligible: bool) -> dict[
     }
 
 
-def build_manifest(all_rows: dict[str, list[dict[str, Any]]], eligibility: dict[str, bool]) -> dict[str, Any]:
-    summaries = [_summarize(symbol, all_rows.get(symbol, []), eligibility.get(symbol, False)) for symbol in SYMBOLS]
+def build_manifest(
+    all_rows: dict[str, list[dict[str, Any]]],
+    eligibility: dict[str, bool],
+    symbols: tuple[str, ...] = SYMBOLS,
+    universe_meta: dict[str, Any] | None = None,
+    replay_mode: str = "owner_labelled_10",
+    window_start: dt.date = WINDOW_START,
+    window_end: dt.date = WINDOW_END,
+) -> dict[str, Any]:
+    summaries = [_summarize(symbol, all_rows.get(symbol, []), eligibility.get(symbol, False)) for symbol in symbols]
+    unique_count = len(set(symbols))
+    evaluated_count = sum(summary["trading_date_prefix_count"] > 0 for summary in summaries)
+    no_data_count = sum(summary["accounting_status"] == "NO_DAILY_DATA" for summary in summaries)
+    insufficient_count = sum(summary["accounting_status"] == "INSUFFICIENT_EVIDENCE" for summary in summaries)
+    ambiguous_count = sum(summary["accounting_status"] == "AMBIGUOUS" for summary in summaries)
+    prefix_count = sum(summary["trading_date_prefix_count"] for summary in summaries)
+    observed_eligible = int((universe_meta or {}).get("eligible_count", sum(eligibility.values())))
+    expected_eligible = int((universe_meta or {}).get("expected_eligible", observed_eligible))
+    coverage = {
+        "expected_eligible_count": expected_eligible,
+        "observed_eligible_count": observed_eligible,
+        "selected_symbol_count": len(symbols),
+        "unique_symbol_count": unique_count,
+        "symbols_unique": unique_count == len(symbols),
+        "evaluated_symbol_count": evaluated_count,
+        "prefix_evaluation_count": prefix_count,
+        "no_daily_data_symbol_count": no_data_count,
+        "insufficient_evidence_symbol_count": insufficient_count,
+        "ambiguous_symbol_count": ambiguous_count,
+        "returned_accounting_row_count": len(summaries),
+        "symbol_totals_reconcile": evaluated_count + no_data_count == len(summaries),
+        "prefix_totals_reconcile": prefix_count == sum(len(all_rows.get(symbol, [])) for symbol in symbols),
+    }
+    if replay_mode == "all_marginable_long_eligible":
+        if len(symbols) != observed_eligible or not coverage["symbols_unique"]:
+            raise AssertionError("all-eligible selection does not match the authoritative observed eligible universe")
+        if not coverage["symbol_totals_reconcile"] or not coverage["prefix_totals_reconcile"]:
+            raise AssertionError("all-eligible evaluated/no-data totals do not reconcile")
     return {
         "prototype": "wave-context-groups",
+        "replay_mode": replay_mode,
         "generated_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-        "window": {"from": WINDOW_START.isoformat(), "to": WINDOW_END.isoformat(), "inclusive": True},
-        "symbols": list(SYMBOLS),
+        "window": {"from": window_start.isoformat(), "to": window_end.isoformat(), "inclusive": True},
+        "symbols": list(symbols),
+        "coverage": coverage,
+        "universe": universe_meta or {},
         "rule": {
             "name": RULE_NAME,
             "version": RULE_VERSION,
@@ -230,23 +297,26 @@ def build_manifest(all_rows: dict[str, list[dict[str, Any]]], eligibility: dict[
         },
         "no_lookahead": "For each trading date as_of, classifier input is the sorted Daily prefix containing only rows with date <= as_of. The DB loader itself uses date <= window end.",
         "canonical_state_unchanged": True,
-        "rows_included": False,
+        "classification_rows_included": False,
+        "accounting_rows_included": True,
         "per_symbol": summaries,
     }
 
 
 def render_markdown(manifest: dict[str, Any]) -> str:
+    window = manifest["window"]
     lines = [
         "# Wave context-group replay report", "",
-        f"Window: `{WINDOW_START}` through `{WINDOW_END}` inclusive. Rule: `{RULE_NAME}` v`{RULE_VERSION}`.", "",
+        f"Window: `{window['from']}` through `{window['to']}` inclusive. Rule: `{RULE_NAME}` v`{RULE_VERSION}`.", "",
         "No lookahead: each classification receives only the Daily prefix with `date <= as_of`. Structural state is recorded unchanged; all context fields are exploratory.", "",
-        "| Symbol | Eligible | Prefixes | Final state | Final context | Missing | Ambiguous | Transitions |",
-        "|---|---:|---:|---|---|---:|---:|---:|",
+        f"Replay mode: `{manifest['replay_mode']}`. Coverage: `{json.dumps(manifest['coverage'], sort_keys=True)}`.", "",
+        "| Symbol | Eligible | Status | Prefixes | Final state | Final context | Missing | Ambiguous | Transitions |",
+        "|---|---:|---|---:|---|---|---:|---:|---:|",
     ]
     for summary in manifest["per_symbol"]:
         final = summary["final"] or {}
         lines.append(
-            f"| {summary['symbol']} | {str(summary['marginable_long_eligible']).lower()} | {summary['trading_date_prefix_count']} | "
+            f"| {summary['symbol']} | {str(summary['marginable_long_eligible']).lower()} | {summary['accounting_status']} | {summary['trading_date_prefix_count']} | "
             f"{final.get('structural_state', 'NO_DATA')} | {final.get('context_marker', 'NO_DATA')} / {final.get('secondary_marker', 'NOT_EXPOSED')} | "
             f"{summary['missing_count']} | {summary['ambiguous_count']} | {len(summary['transitions'])} |"
         )
@@ -295,11 +365,31 @@ def _tmp_path(raw: str) -> Path:
     return path
 
 
+def _iso_date(raw: str) -> dt.date:
+    try:
+        value = dt.date.fromisoformat(raw)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a valid date in YYYY-MM-DD format") from exc
+    if value.isoformat() != raw:
+        raise argparse.ArgumentTypeError("must be a valid date in YYYY-MM-DD format")
+    return value
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Read-only Daily replay for exploratory Wave context groups")
     parser.add_argument("--manifest", default="/tmp/wave_context_groups_manifest.json", help="JSON output under /tmp")
     parser.add_argument("--report", default="/tmp/wave_context_groups_report.md", help="Markdown output under /tmp")
     parser.add_argument("--synthetic-smoke", action="store_true", help="run pure deterministic mapping checks; no DB access")
+    parser.add_argument(
+        "--as-of",
+        type=_iso_date,
+        help="replay exactly one Daily prefix ending on YYYY-MM-DD for every selected symbol",
+    )
+    parser.add_argument(
+        "--all-eligible",
+        action="store_true",
+        help="replay every authoritative marginable_long eligible symbol; default remains the fixed owner-labelled 10",
+    )
     return parser.parse_args(argv)
 
 
@@ -320,17 +410,31 @@ def main(argv=None) -> int:
     try:
         eligible_symbols, universe_meta = helpers.resolve_universe(conn, "marginable_long")
         eligible = set(eligible_symbols)
+        replay_mode, symbols = select_symbols(args.all_eligible, eligible_symbols)
+        window_start = window_end = args.as_of if args.as_of is not None else None
+        load_end = args.as_of or WINDOW_END
         all_rows: dict[str, list[dict[str, Any]]] = {}
-        for symbol in SYMBOLS:
-            frame, _latest = _load_bounded_daily(conn, helpers, symbol, WINDOW_END)
-            all_rows[symbol] = replay_symbol(symbol, frame, WINDOW_START, WINDOW_END)
-        manifest = build_manifest(all_rows, {symbol: symbol in eligible for symbol in SYMBOLS})
-        manifest["universe"] = universe_meta
+        for symbol in symbols:
+            frame, _latest = _load_bounded_daily(conn, helpers, symbol, load_end)
+            all_rows[symbol] = (
+                replay_symbol_as_of(symbol, frame, args.as_of)
+                if args.as_of is not None
+                else replay_symbol(symbol, frame, WINDOW_START, WINDOW_END)
+            )
+        manifest = build_manifest(
+            all_rows,
+            {symbol: symbol in eligible for symbol in symbols},
+            symbols,
+            universe_meta,
+            replay_mode,
+            window_start or WINDOW_START,
+            window_end or WINDOW_END,
+        )
     finally:
         conn.close()
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     report_path.write_text(render_markdown(manifest), encoding="utf-8")
-    outside = [symbol for symbol in SYMBOLS if not any(s["symbol"] == symbol and s["marginable_long_eligible"] for s in manifest["per_symbol"])]
+    outside = [symbol for symbol in manifest["symbols"] if not any(s["symbol"] == symbol and s["marginable_long_eligible"] for s in manifest["per_symbol"])]
     if outside:
         print("WARN outside marginable_long (replayed, not dropped): " + ", ".join(outside), file=sys.stderr)
     print(f"wrote {manifest_path} and {report_path}")
