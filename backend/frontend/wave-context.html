@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Signalix Daily Wave Context review">
+  <title>Signalix · Wave Context</title>
+  <link rel="stylesheet" href="wave-context.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><a href="/mvp" class="brand">Signalix</a><span class="surface">Wave Context</span></div>
+    <p id="provenance" aria-live="polite">Loading canonical marginable_long universe…</p>
+  </header>
+  <main>
+    <section class="controls" aria-label="Stock selector and filters">
+      <label>Find stock <input id="search" type="search" placeholder="Symbol / name" autocomplete="off"></label>
+      <label>Wave <select id="wave-filter"><option value="ALL">All contexts</option><option value="WAVE_1_ADVANCE">Wave 1</option><option value="WAVE_2_FORMING">Wave 2 forming</option><option value="WAVE_2_NEAR_COMPLETION">Wave 2 near completion</option><option value="EARLY_WAVE_3">Early Wave 3</option><option value="WAVE_3_CONTINUATION">Wave 3 continuation</option><option value="WAVE_4_CORRECTION">Wave 4</option><option value="WAVE_5_ADVANCE">Wave 5</option><option value="UNKNOWN">Unknown</option></select></label>
+      <label>Lane <select id="lane-filter"><option value="ALL">All lanes</option><option>REVIEW_NOW</option><option>SETUP_FORMING</option><option>DAILY_CANDIDATE</option><option>WAIT</option><option>AVOID</option><option>DATA_BLOCKED</option></select></label>
+      <label>Stock <select id="symbol-select" aria-label="Select stock"></select></label>
+      <button id="retry" type="button">Retry</button>
+    </section>
+
+    <section id="loading" class="state" aria-live="polite">Loading all candidate pages…</section>
+    <section id="error" class="state error" hidden aria-live="assertive"><strong>Unable to load Wave Context.</strong><span id="error-message"></span><button id="error-retry" type="button">Retry</button></section>
+    <section id="empty" class="state" hidden aria-live="polite">No stocks match these filters.</section>
+
+    <section id="workspace" class="workspace" hidden>
+      <article class="chart-card">
+        <div class="chart-heading"><div><h1 id="symbol">—</h1><p id="chart-status">Daily chart loading…</p></div><span id="lane" class="pill">—</span></div>
+        <div id="blocked" class="blocked" hidden></div>
+        <div class="chart-wrap"><canvas id="chart" width="1000" height="520" aria-label="Authoritative Daily OHLC chart"></canvas><div id="chart-empty" class="chart-empty" hidden>Daily chart unavailable from the authoritative chart route.</div></div>
+        <div id="legend" class="legend" aria-label="Wave marker legend"></div>
+        <p class="timeframe-note"><strong>Daily:</strong> price and exact source-linked Wave markers. <strong>60m:</strong> setup confirmation remains separate; no 60m marker is plotted on this Daily chart.</p>
+      </article>
+
+      <aside class="evidence-card">
+        <h2>Context evidence</h2>
+        <dl id="summary"></dl>
+        <h3>Supporting</h3><ul id="supporting"></ul>
+        <h3>Contradicting</h3><ul id="contradicting"></ul>
+        <h3>Missing</h3><ul id="missing"></ul>
+        <h3>Transitions</h3><ul id="transitions"></ul>
+      </aside>
+    </section>
+  </main>
+  <script src="wave-context.js"></script>
+</body>
+</html>

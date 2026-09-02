@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: Wave 1/3/5 review gating; 03: Full-universe replay + coverage parity
 
-**Status:** DONE (source/test) — runtime/public browser NOT VERIFIED; implementation commit pending promotion
+**Status:** DONE (source/static) — runtime/data/browser happy path NOT VERIFIED; local route/error smoke PASS
 
 - [x] Chart uses authoritative Daily source and exact `as_of`/close marker coordinates; source timeframe is explicit.
 - [x] Wave 1/2/3/4/5/unknown and `WAVE_3_EXTENDED` secondary marker have distinct readable colors/labels.

@@ -1,7 +1,8 @@
 """MVP dashboard server.
 
-Serves the owner-only MVP app at /mvp.  The former dashboard.html surface is
-retired and deliberately returns 404.  This entrypoint has no dependency on
+Serves the owner-only Classic Review app at /mvp and the presentation-only
+Wave Context app at /wave-context. The former dashboard.html surface is
+retired and deliberately returns 404. This entrypoint has no dependency on
 legacy_routes, legacy_server, portal.html, portfolio.html, or legacy snapshots.
 """
 from __future__ import annotations
@@ -41,6 +42,8 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             return
         if path in ("/mvp", "/mvp/"):
             self.path = "/index.html" + suffix
+        elif path in ("/wave-context", "/wave-context/"):
+            self.path = "/wave-context.html" + suffix
         elif path in ("/", "/index", "/index.html"):
             self.path = "/index.html" + suffix
         else:
