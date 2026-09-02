@@ -1,6 +1,7 @@
 import datetime as dt
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import update_data
@@ -10,6 +11,242 @@ UTC = dt.timezone.utc
 
 
 class IntradayUpsertAccountingTests(unittest.TestCase):
+    @patch("update_data.publish_canonical_read_model")
+    @patch("update_data.refresh_dashboard_from_existing_scan")
+    @patch("update_data.run_vcp_after_ingestion")
+    @patch("update_data.record_intraday_run_summary")
+    @patch("update_data.update_intraday_feed_status")
+    @patch("update_data.ingest_intraday")
+    @patch("update_data.ensure_intraday_table")
+    @patch("update_data._intraday_universe", return_value=["AAA"])
+    @patch("update_data.get_pg")
+    def test_intraday_run_publishes_once_at_shared_boundary(
+        self, get_pg, universe, ensure_table, ingest, update_status,
+        record_summary, run_vcp, refresh, publish,
+    ):
+        ingest.return_value = {
+            "run_id": "60m-run-1", "status": "full_success",
+            "fetch_completed_at": "2026-09-02T09:00:00+00:00",
+            "symbols_attempted": 1, "rows_offered": 1, "symbols_failed": 0,
+        }
+        args = SimpleNamespace(
+            intraday_only=True,
+            intraday_mode="full",
+            intraday_interval="60m",
+            dry_run=False,
+            scan=False,
+            intraday_full_universe=False,
+            intraday_shortlist=False,
+            intraday_universe="marginable_long",
+            intraday_limit=None,
+            intraday_batch_size=1,
+            intraday_batch_delay=0,
+            intraday_batch_jitter=0,
+            intraday_session_retries=0,
+            intraday_retry_backoff=0,
+        )
+
+        self.assertEqual(update_data.run(args), 0)
+        # Intraday refresh must not rebuild/publish Daily decisions.
+        publish.assert_not_called()
+
+    @patch("mvp_api.resolve_universe", side_effect=[
+        (["AAA"], {"universe_filter": "marginable_long"}),
+        (["AAA", "BBB", "CCC"], {"universe_filter": "active_ord"}),
+    ])
+    def test_intraday_default_scope_is_canonical_and_active_ord_is_explicit(self, resolver):
+        assert update_data._intraday_universe(MagicMock(), "marginable_long") == ["AAA"]
+        assert update_data._intraday_universe(MagicMock(), "active_ord") == ["AAA", "BBB", "CCC"]
+        assert [call.args[1] for call in resolver.call_args_list] == ["marginable_long", "active_ord"]
+
+    @patch("update_data.time.sleep")
+    @patch("update_data._parse_settrade_intraday", return_value=[("AAA", "bar")])
+    @patch("update_data._settrade_market")
+    @patch("update_data._intraday_universe", return_value=["AAA"])
+    def test_legacy_fetch_intraday_returns_rows_without_undefined_summary(
+        self, universe, market_factory, parse, sleep,
+    ):
+        market_factory.return_value.get_candlestick.return_value = {"time": []}
+
+        rows = update_data.fetch_intraday(MagicMock(), {}, limit=4)
+
+        assert rows == [("AAA", "bar")]
+        market_factory.return_value.get_candlestick.assert_called_once_with(
+            symbol="AAA", interval="60m", limit=4, normalized=update_data.SETTRADE_NORMALIZED)
+
+    def test_intraday_only_rejects_scan_to_prevent_overlapping_rounds(self):
+        args = SimpleNamespace(intraday_only=True, scan=True)
+        with self.assertRaisesRegex(ValueError, "not allowed"):
+            update_data.run(args)
+
+    @patch("update_data.publish_canonical_read_model")
+    @patch("build_dashboard.build", return_value={"ok": True})
+    @patch("update_data.get_pg")
+    def test_intraday_refresh_does_not_publish_before_shared_boundary(self, get_pg, build, publish):
+        pg = get_pg.return_value
+        pg.cursor.return_value.fetchone.return_value = ("daily-run-1",)
+        pg.cursor.return_value.fetchall.return_value = [({"symbol": "AAA"},)]
+
+        self.assertEqual(update_data.refresh_dashboard_from_existing_scan(), {"ok": True})
+        build.assert_called_once_with(scanned=[{"symbol": "AAA"}], run_id="daily-run-1")
+        publish.assert_not_called()
+
+    @patch("read_model_publisher.publish_builder_result")
+    @patch("update_data.get_pg")
+    def test_read_model_publish_uses_persisted_daily_and_intraday_lineage(self, get_pg, publish):
+        daily_date = dt.date(2026, 9, 1)
+        daily_timestamp = dt.datetime(2026, 9, 1, 11, 0, tzinfo=UTC)
+        intraday_completed = dt.datetime(2026, 9, 2, 9, 0, tzinfo=UTC)
+        pg = get_pg.return_value
+        pg.cursor.return_value.fetchone.side_effect = [
+            ("daily-run-1", daily_date, daily_timestamp, {"source": "price_data"}),
+            ("60m-run-1", "partial_success", intraday_completed, "marginable_long"),
+        ]
+
+        update_data.publish_canonical_read_model()
+
+        kwargs = publish.call_args.kwargs
+        assert kwargs["source_versions"] == {
+            "daily": {
+                "run_id": "daily-run-1",
+                "as_of": "2026-09-01",
+                "run_timestamp": "2026-09-01T11:00:00+00:00",
+                "source_lineage": {"source": "price_data"},
+            },
+            "intraday": {
+                "run_id": "60m-run-1",
+                "status": "partial_success",
+                "as_of": "2026-09-02T09:00:00+00:00",
+            },
+        }
+        assert kwargs["market"] == "TH"
+        from read_model_publisher import DEFAULT_ROOT
+        assert kwargs["root"] == str(DEFAULT_ROOT)
+        pg.close.assert_called_once()
+
+    @patch.dict("os.environ", {"SIGNALIX_READ_MODEL_ROOT": "/tmp/signalix-test-read-model"})
+    @patch("read_model_publisher.publish_builder_result")
+    @patch("update_data.get_pg")
+    def test_read_model_publish_preserves_root_override(self, get_pg, publish):
+        daily_date = dt.date(2026, 9, 1)
+        daily_timestamp = dt.datetime(2026, 9, 1, 11, 0, tzinfo=UTC)
+        pg = get_pg.return_value
+        pg.cursor.return_value.fetchone.side_effect = [
+            ("daily-run-1", daily_date, daily_timestamp, {"source": "price_data"}),
+            ("60m-run-1", "full_success", "2026-09-02T09:00:00+00:00", "marginable_long"),
+        ]
+
+        update_data.publish_canonical_read_model()
+
+        assert publish.call_args.kwargs["root"] == "/tmp/signalix-test-read-model"
+
+    @patch("read_model_publisher.publish_builder_result")
+    @patch("update_data.get_pg")
+    def test_read_model_publish_skips_without_both_completed_lineages(self, get_pg, publish):
+        pg = get_pg.return_value
+        pg.cursor.return_value.fetchone.side_effect = [(None,), ("60m-run-1", "full_success", "now", "marginable_long")]
+
+        assert update_data.publish_canonical_read_model() is None
+        publish.assert_not_called()
+
+    @patch("update_data.get_pg")
+    def test_canonical_lineage_selects_only_product_universe_and_fails_closed_for_legacy_rows(self, get_pg):
+        pg = get_pg.return_value
+        cur = pg.cursor.return_value
+        cur.fetchone.side_effect = [
+            ("daily-run-1", dt.date(2026, 9, 1), dt.datetime(2026, 9, 1, tzinfo=UTC), {}),
+            ("product-run", "full_success", dt.datetime(2026, 9, 2, tzinfo=UTC), "marginable_long"),
+        ]
+        result = update_data._canonical_read_model_source_versions(pg)
+        assert result["intraday"]["run_id"] == "product-run"
+        intraday_sql = cur.execute.call_args_list[1].args[0]
+        assert "fetch_universe = 'marginable_long'" in intraday_sql
+
+        cur.fetchone.side_effect = [
+            ("daily-run-1", dt.date(2026, 9, 1), dt.datetime(2026, 9, 1, tzinfo=UTC), {}),
+            ("legacy-run", "full_success", dt.datetime(2026, 9, 2, tzinfo=UTC), None),
+        ]
+        assert update_data._canonical_read_model_source_versions(pg) is None
+
+    @patch("mvp_routes._acquire_setup_candidates_pg")
+    @patch("read_model_publisher.load_intraday_metadata")
+    def test_api_metadata_overlay_uses_published_run_without_request_db(self, load, acquire):
+        load.return_value = {
+            "schema_version": "signalix.intraday-metadata.v1",
+            "run_id": "60m-new", "status": "partial_success",
+            "fetch_completed_at": "2026-09-02T09:00:00+00:00",
+            "universe": "marginable_long",
+        }
+        payload = {"freshness": {}, "provenance": {"source_versions": {
+            "intraday": {"run_id": "60m-old", "as_of": "2026-09-02T08:00:00+00:00"}}}}
+        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+        acquire.assert_not_called()
+        assert actual["freshness"]["intraday_latest_run_id"] == "60m-new"
+        assert actual["intraday_latest_run"]["fetch_completed_at"] == "2026-09-02T09:00:00+00:00"
+        assert actual["provenance"]["source_versions"]["intraday"] == {
+            "run_id": "60m-new", "status": "partial_success",
+            "as_of": "2026-09-02T09:00:00+00:00",
+        }
+        assert actual["provenance"]["intraday_as_of"] == "2026-09-02T09:00:00+00:00"
+
+    @patch("mvp_routes._acquire_setup_candidates_pg")
+    @patch("read_model_publisher.load_intraday_metadata")
+    def test_api_metadata_overlay_preserves_read_model_identity_and_daily_lineage(self, load, acquire):
+        load.return_value = {
+            "schema_version": "signalix.intraday-metadata.v1",
+            "run_id": "60m-new", "status": "full_success",
+            "fetch_completed_at": "2026-09-02T09:00:00+00:00",
+            "universe": "marginable_long",
+        }
+        payload = {
+            "source_version": "immutable-read-model-id",
+            "provenance": {"as_of": "2026-09-01", "intraday_as_of": "old",
+                            "source_versions": {
+                                "daily": {"run_id": "daily-1", "as_of": "2026-09-01"},
+                                "intraday": {"run_id": "60m-old", "as_of": "old"}}},
+        }
+
+        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+
+        assert actual["source_version"] == "immutable-read-model-id"
+        assert actual["provenance"]["source_versions"]["daily"] == {
+            "run_id": "daily-1", "as_of": "2026-09-01"}
+        assert payload["provenance"]["intraday_as_of"] == "old"
+        acquire.assert_not_called()
+
+    @patch("read_model_publisher.load_intraday_metadata", return_value=None)
+    def test_api_metadata_overlay_missing_sidecar_preserves_embedded_metadata(self, load):
+        payload = {"freshness": {"intraday_fetched_at": "embedded"},
+                   "provenance": {"source_versions": {
+                       "daily": {"run_id": "daily-1", "as_of": "2026-09-01"},
+                       "intraday": {"run_id": "embedded", "as_of": "2026-09-02T09:00:00+00:00"}}}}
+        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+        assert actual == payload
+
+    @patch("read_model_publisher.load_intraday_metadata")
+    def test_api_metadata_overlay_stale_sidecar_falls_back_to_embedded(self, load):
+        load.return_value = {
+            "schema_version": "signalix.intraday-metadata.v1", "run_id": "old",
+            "status": "full_success", "fetch_completed_at": "2026-09-02T08:00:00+00:00",
+            "universe": "marginable_long",
+        }
+        payload = {"freshness": {}, "provenance": {"source_versions": {
+            "intraday": {"run_id": "embedded", "status": "partial_success",
+                          "as_of": "2026-09-02T09:00:00+00:00"}}}}
+        assert __import__("mvp_routes")._overlay_latest_intraday_metadata(payload) == payload
+
+    def test_vcp_handoff_skips_provenance_incomplete_success(self):
+        pg = MagicMock()
+
+        result = update_data.run_vcp_after_ingestion(pg, {
+            "run_id": None,
+            "status": "full_success",
+            "fetch_completed_at": "2026-08-29T09:00:00+00:00",
+        })
+
+        self.assertIsNone(result)
+        pg.cursor.assert_not_called()
+
     @patch("update_data.psycopg2.extras.execute_values")
     def test_upsert_reports_inserted_and_updated_rows(self, execute_values):
         execute_values.return_value = [(True,), (False,), (False,)]
@@ -72,6 +309,7 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
 
         self.assertEqual(summary["rows_inserted"], 1)
         self.assertEqual(summary["rows_updated"], 1)
+        self.assertEqual(summary["attempted_symbols"], ["AAA", "BBB"])
         self.assertEqual(summary["batches"][0]["rows_inserted"], 1)
         self.assertEqual(summary["batches"][1]["rows_updated"], 1)
 
@@ -83,6 +321,8 @@ class SystemdResilienceContractTests(unittest.TestCase):
         self.assertIn("ExecStopPost=", unit)
         self.assertIn("-m backend.run_intraday_evaluation", unit)
         self.assertNotIn("ExecStartPost=", unit)
+        self.assertIn("--intraday-universe marginable_long", unit)
+        self.assertIn("--no-scan", unit)
 
 
 if __name__ == "__main__":

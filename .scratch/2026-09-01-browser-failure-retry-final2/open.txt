@@ -1,0 +1,4 @@
+✓
+  about:blank
+✓ Signalix · Setup Candidates
+  http://91.98.72.120:3001/mvp?browser-harness=failure-retry

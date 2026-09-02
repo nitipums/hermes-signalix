@@ -1,7 +1,8 @@
 # Signalix Documentation Governance
 
-> **Status:** CURRENT — governance layer
-> **Last reviewed:** 2026-08-23
+> **STATUS: CURRENT** · governance layer
+> **Last reviewed:** 2026-09-01
+> **Current reconciliation:** T1–T9 source is promoted to `release/signalix-mvp-stable`; public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 
@@ -15,10 +16,18 @@
 | Current component behavior | `Components.md` | historical implementation notes |
 | Current deployment and operations | `Deployment.md` | stale terminal logs, worker workspaces |
 | Current execution sequence / acceptance | `Execution-Pipeline.md` | archived Kanban cards, old plans |
-| Active work state, owner, dependency, retry, run state | `Execution-Pipeline.md` + focused plans under `/root/signalix/.hermes/plans/` | Kanban board is audit/archive only; do not dispatch from it |
+| Active work state, owner, dependency, retry, run state | Kanban board `signalix` | Do not mirror live card status into vault notes; `Execution-Pipeline.md` owns scope/acceptance, not live worker state |
 | Historical incidents and migration evidence | `Postmortems/` and dated handoffs | current product direction |
 | Durable cross-session invariants | compact MEMORY / `fact_store` | raw sessions, task progress, secrets |
 | Repeatable procedures | one primary Hermes skill per workflow | copied instructions in many notes |
+
+## Handoff naming and timeline convention
+
+- New Signalix handoffs use `YYYY-MM-DD-HHmm-<topic>-handoff.md`.
+- The filename timestamp is always `Asia/Bangkok (ICT)`.
+- If multiple handoffs are created within the same minute, use `YYYY-MM-DD-HHmmss-<topic>-handoff.md`.
+- Every new handoff must include a `## Timeline` section with timestamped events, evidence-backed status changes, and links to the previous/superseding handoff when applicable.
+- Historical handoffs keep their original names for reference integrity; add a timeline and explicit `HISTORICAL`/superseded note rather than silently renaming them.
 
 ## Status vocabulary
 
@@ -31,6 +40,10 @@ Use one of these banners at the top of project notes:
 - `STATUS: REVIEW_REQUIRED` — currentness or ownership is unresolved.
 
 ## Current canonical set
+
+**First read:** `../docs/START-HERE.md`
+
+**Cleanup matrix:** `../docs/current/2026-09-02-documentation-authority-matrix.md`
 
 1. `Product-Strategy-Market-to-Action.md`
 2. `Decisions.md`
@@ -45,6 +58,9 @@ Use one of these banners at the top of project notes:
 11. `INDEX.md`
 12. `Documentation-Governance.md`
 13. `Memory-Cleanup-Candidates.md`
+14. `../docs/current/2026-08-31-elliott-grill-decision-record.md`
+15. `../docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
+16. `../docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` (`LIFECYCLE-T9`)
 
 ## Historical set
 
@@ -52,7 +68,7 @@ Dated handoffs and postmortems remain valuable as evidence.
 
 ## Known conflict — resolved 2026-08-23
 
-Arm chose **Markdown `Execution-Pipeline.md` as the active work source**. Kanban is audit/archive only.
+Arm chose Markdown `Execution-Pipeline.md` and linked focused plans/specs as the product-scope/acceptance authority. Kanban owns active named-worker execution state only when a bounded run exists; the 2026-09-02 board was empty. Live card status must not be copied into vault notes.
 
 ## Cleanup policy
 

@@ -53,7 +53,7 @@ app.add_middleware(
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["X-Portfolio-Token"],
+    allow_headers=["X-Portfolio-Token", "X-Authenticated-User", "X-Idempotency-Key"],
 )
 
 # ---------- Connections (lazy) ----------
@@ -235,6 +235,8 @@ def tiers():
 # Deferred Portfolio/owner routes are isolated from the MVP app core.
 from portfolio_routes import create_portfolio_router
 app.include_router(create_portfolio_router(get_pg))
+from lifecycle_routes import create_lifecycle_router
+app.include_router(create_lifecycle_router(get_pg))
 
 
 @app.post("/webhook")
@@ -326,18 +328,23 @@ def list_excluded_symbols():
 @app.get("/instruments")
 def list_instruments(limit: int = 200):
     """Return bounded authoritative active-ORD identity/taxonomy records."""
-    from instruments import instrument_master, profile_taxonomy
+    from instruments import instrument_master, instrument_quality_summary, profile_taxonomy, validate_instrument_record
     limit = max(1, min(int(limit), 1000))
     pg = get_pg()
     try:
         records = instrument_master(pg)[:limit]
         profiles = profile_taxonomy(pg, [r["symbol"] for r in records])
         for record in records:
+            record["quality"] = validate_instrument_record(record)
             record["profile"] = profiles.get(record["symbol"], {
                 "symbol": record["symbol"], "missing": True,
                 "source": None,
             })
-        return {"count": len(records), "limit": limit, "source": "symbol_master", "instruments": records}
+        return {
+            "count": len(records), "limit": limit, "source": "symbol_master",
+            "quality": instrument_quality_summary(records),
+            "instruments": records,
+        }
     finally:
         pg.close()
 
@@ -359,6 +366,7 @@ def get_instrument(symbol: str):
 
 # ---------- Phase 3 delivery (shared with the real-time consumer) ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results, load_symbol_intraday  # noqa: E402
+from provenance_contract import screen_price_provenance  # noqa: E402
 from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, breakout_event_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
 # All senders + formatters live in delivery.py so the batch scan (here) and the
 # standalone Redis consumer format + push identically.
@@ -370,17 +378,17 @@ from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 
-def build_and_push_summary(cands, near, scan_time, scanned):
+def build_and_push_summary(cands, near, scan_time, scanned, run_id=None):
     """Build the dashboard HTML, then push a summary + link to Telegram."""
     # build dashboard (runs build_dashboard.build in-process)
     try:
         import build_dashboard
-        info = build_dashboard.build(scanned)
+        info = build_dashboard.build(scanned=scanned, run_id=run_id)
         vcp_n = info["vcp"]
     except Exception as e:
         print(f"  ! dashboard build failed: {repr(e)[:120]}")
         vcp_n = sum(1 for c in cands if c.get("vcp", {}).get("is_vcp"))
-    url = DASHBOARD_PUBLIC_URL.rstrip("/") + "/dashboard.html" if DASHBOARD_PUBLIC_URL else ""
+    url = DASHBOARD_PUBLIC_URL.rstrip("/") + "/mvp" if DASHBOARD_PUBLIC_URL else ""
     top = sorted(cands, key=lambda c: c["trend_template"]["rs_rating"], reverse=True)[:8]
     lines = [f"📊 *Signalix Scan* — {scan_time[:19].replace('T',' ')} UTC",
              f"✅ ผ่าน Trend Template 8/8: *{len(cands)}* หุ้น  |  🔺 VCP: *{vcp_n}*  |  Near-miss 6/8: {len(near)}",
@@ -456,6 +464,53 @@ def screen_symbol(symbol: str):
     if result is None:
         raise HTTPException(status_code=404,
                             detail=f"{symbol} not found or insufficient history")
+    # /screen is Daily/EOD analysis only.  Its fresh scan_time must never be
+    # interpreted as a current quote timestamp; current price belongs to /chart.
+    result.update(screen_price_provenance(
+        last_date=result.get("last_date"),
+        scan_time=result.get("scan_time"),
+    ))
+    result["daily_eod"] = {
+        "source": "price_data",
+        "as_of": result.get("last_date"),
+        "close": result.get("close"),
+    }
+    # Keep Daily analytics immutable, but expose the latest stored intraday
+    # quote separately.  A fresh scan must not make an older EOD close look
+    # like the current market price.
+    quote_cur = get_pg().cursor()
+    quote_cur.execute(
+        """SELECT ts, open, high, low, close, volume
+           FROM intraday_price_data
+           WHERE symbol=%s AND interval='60m'
+           ORDER BY ts DESC LIMIT 1""",
+        (symbol.upper(),),
+    )
+    quote_row = quote_cur.fetchone()
+    quote_cur.close()
+    if quote_row:
+        quote_ts, quote_open, quote_high, quote_low, quote_close, quote_volume = quote_row
+        quote_iso = quote_ts.isoformat()
+        quote_freshness = compute_freshness(quote_ts)
+        result.update({
+            "quote_source": "intraday_price_data",
+            "quote_provider": "settrade_intraday_60m",
+            "quote_timestamp": quote_iso,
+            "quote_is_provisional": True,
+            "freshness_verdict": quote_freshness,
+            "current_quote": {
+                "price": float(quote_close),
+                "timestamp": quote_iso,
+                "open": float(quote_open),
+                "high": float(quote_high),
+                "low": float(quote_low),
+                "volume": float(quote_volume or 0),
+                "source": "intraday_price_data",
+                "provider": "settrade_intraday_60m",
+                "is_provisional": True,
+                "freshness": quote_freshness,
+            },
+        })
     _publish_screen(result, result["trend_template"]["conditions_met"])
     # Two-layer actionable setup state (quality gate + proximity timing).
     # Mirrors group_scan_results' daily_state attachment for a single symbol.
@@ -931,78 +986,8 @@ def dashboard_shortlist_compact(page: int = 1, page_size: int = 20,
 
 @app.get("/dashboard/snapshot")
 def dashboard_snapshot():
-    """Progressive refresh: return the complete persisted scan card contract.
-
-    The browser swaps these cards in without rebuilding the static asset.  The
-    DB work is set-based (same path as build_dashboard), and no Daily state or
-    scan membership is changed here.
-    """
-    try:
-        import build_dashboard
-        from reconciled_projection import apply_projection, snapshot_payload
-        scan_path = os.path.join(os.path.dirname(__file__), "scan_results.json")
-        scan = dashboard_overview_payload(scan_path)
-        last_valid_session = max((row.get("last_date") for values in scan.get("groups", {}).values()
-                                  for row in values if row.get("last_date")), default=None)
-        try:
-            freshness_pg = build_dashboard.get_pg()
-            try:
-                freshness = build_dashboard.dashboard_freshness(freshness_pg, last_valid_session=last_valid_session)
-            finally:
-                freshness_pg.close()
-        finally:
-            pass
-        cache_path = os.path.join(os.path.dirname(__file__), "dashboard_snapshot.json")
-        try:
-            with open(cache_path) as handle:
-                payload = json.load(handle)
-            # The dashboard builder writes the snapshot after the scan envelope
-            # and may legitimately produce a newer timestamp.  A timestamp
-            # mismatch is metadata, not cache corruption; treating it as a
-            # miss caused every request to run the expensive DB fallback.
-            if not isinstance(payload.get("items"), list):
-                raise ValueError("snapshot cache has no items")
-            # Preserve build/dashboard metadata from the file before snapshot_payload
-            # overwrites the file-derived keys (it resets scan_time, market, refresh,
-            # projection_version, etc. but does not carry dashboard_meta/build_timestamp).
-            saved_build_ts = payload.get("build_timestamp")
-            saved_dashboard_meta = payload.get("dashboard_meta")
-            payload["items"] = apply_projection(payload.get("items", []))
-            payload.update(snapshot_payload(payload["items"], payload.get("scan_time") or scan.get("scan_time")))
-            if saved_build_ts is not None:
-                payload["build_timestamp"] = saved_build_ts
-            if saved_dashboard_meta is not None:
-                payload["dashboard_meta"] = saved_dashboard_meta
-            # Ensure market_regime is included in dashboard_meta for the template
-            if "market_regime" in payload and "dashboard_meta" in payload:
-                payload["dashboard_meta"]["market_regime"] = payload["market_regime"]
-        except (OSError, ValueError, json.JSONDecodeError):
-            # Safe fallback for a scan generated before the cache artifact was
-            # introduced; normal deploys/builds never take this slow path.
-            pg_fallback = get_pg()
-            try:
-                fallback_items = build_dashboard.snapshot_items(pg_fallback, scan)
-            finally:
-                pg_fallback.close()
-            payload = {"scan_time": scan.get("scan_time"), "market": "TH",
-                       "refresh": "progressive_cards", "items": fallback_items}
-            payload.update(snapshot_payload(payload["items"], scan.get("scan_time")))
-        return {**payload,
-                "build_timestamp": payload.get("build_timestamp"),
-                "data_fetched_at": freshness["data_fetched_at"],
-                "data_freshness_source": freshness["source"],
-                "data_freshness_status": freshness["status"],
-                "data_intraday_status": freshness.get("intraday_status"),
-                "data_global_status": freshness.get("global_status"),
-                "market_session": freshness.get("market_session"),
-                "last_valid_session": (freshness.get("market_session") or {}).get("last_valid_session"),
-                "data_freshness_age_hours": freshness.get("age_hours"),
-                # P0: expose append-only intraday emerging-event reconciliation
-                # state. Daily is the official state; these are lower-confidence
-                # intraday observations awaiting/confirming EOD reconciliation.
-                "intradayEvents": _active_intraday_events(payload.get("items", []))}
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"dashboard snapshot unavailable: {exc}")
+    """Retired legacy contract; the MVP uses /api/vcp-finder instead."""
+    raise HTTPException(status_code=410, detail="legacy dashboard snapshot retired; use /api/vcp-finder")
 
 
 @app.get("/watchlists/us-ai-buildout")
@@ -1061,57 +1046,7 @@ def intraday_events(confidence: str | None = None):
         pg.close()
 
 
-def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
-    """Return stored bars, rolling the latest 60m price into Day/Week/Month.
-
-    The current-session Daily candle is provisional. Week and Month are derived
-    strictly by aggregating those stored Daily bars—no additional market fetch.
-    """
-    if timeframe == "60M":
-        if market.upper() != "TH":
-            return [], "60-minute data is not configured for this market"
-        cur.execute("""SELECT ts, open, high, low, close, volume, false AS provisional
-                       FROM intraday_price_data WHERE symbol=%s AND interval='60m'
-                       ORDER BY ts DESC LIMIT %s""", (symbol, limit))
-        return cur.fetchall(), "60-minute (latest candle may be in progress)"
-    daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
-    cur.execute("""SELECT date::timestamp, open, high, low, close, volume, false AS provisional
-                   FROM price_data WHERE market=%s AND symbol=%s ORDER BY date DESC LIMIT %s""",
-                (market.upper(), symbol, daily_limit))
-    daily = cur.fetchall()
-    cur.execute("""SELECT ts, open, high, low, close, volume FROM intraday_price_data
-                   WHERE symbol=%s AND interval='60m' AND (ts AT TIME ZONE 'Asia/Bangkok')::date = (NOW() AT TIME ZONE 'Asia/Bangkok')::date
-                   ORDER BY ts ASC""", (symbol,))
-    intra = cur.fetchall()
-    if intra:
-        stamp = intra[-1][0]
-        today = stamp.astimezone(dt.timezone(dt.timedelta(hours=7))).date()
-        # Avoid duplicate EOD/provisional day: EOD is authoritative when already present.
-        if not daily or daily[0][0].date() != today:
-            provisional = (dt.datetime.combine(today, dt.time()), intra[0][1], max(r[2] for r in intra),
-                           min(r[3] for r in intra), intra[-1][4], sum(float(r[5] or 0) for r in intra), True)
-            daily.append(provisional)
-    daily.sort(key=lambda r: r[0], reverse=True)
-    if timeframe == "1D":
-        return daily[:limit], "Daily EOD + current session (in progress)"
-    # Aggregate Daily OHLCV into a higher period.  The first daily open and
-    # latest daily close are retained; high/low/volume span the period.
-    periods = {}
-    for stamp, open_, high, low, close, volume, provisional in reversed(daily):
-        day = stamp.date()
-        key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
-        if key not in periods:
-            periods[key] = [dt.datetime.combine(key, dt.time()), open_, high, low, close, float(volume or 0), bool(provisional)]
-        else:
-            p = periods[key]
-            p[2] = max(p[2], high)
-            p[3] = min(p[3], low)
-            p[4] = close
-            p[5] += float(volume or 0)
-            p[6] = p[6] or bool(provisional)
-    rows = list(reversed(sorted(periods.values(), key=lambda r: r[0])))[:limit]
-    label = "Weekly + current week (in progress)" if timeframe == "1W" else "Monthly + current month (in progress)"
-    return rows, label
+from chart_rows import fetch_chart_rows
 
 
 @app.get("/chart/{symbol}")
@@ -1134,11 +1069,19 @@ def chart_data(symbol: str, timeframe: str = "1D", limit: int = 180, market: str
     cur.close()
     if not rows:
         raise HTTPException(status_code=404, detail=f"no stored {label} chart data")
+    has_provisional = any(bool(row[-1]) for row in rows)
     bars = [{"time": str(stamp), "open": float(open_), "high": float(high), "low": float(low),
              "close": float(close), "volume": float(volume or 0), "provisional": bool(provisional)}
             for stamp, open_, high, low, close, volume, provisional in reversed(rows)]
     return {"symbol": symbol, "timeframe": timeframe, "label": label,
-            "latest_time": bars[-1]["time"], "provisional": bars[-1]["provisional"], "bars": bars}
+            "latest_time": bars[-1]["time"], "provisional": bars[-1]["provisional"],
+            "provenance": {
+                "source": "price_data + intraday_price_data" if has_provisional else "price_data",
+                "intraday_current_session": has_provisional,
+                "daily_decision_source": "price_data EOD",
+                "note": ("current-session 60m aggregate is provisional/as-is; not official EOD"
+                         if has_provisional else "no current-session 60m data; Daily EOD bars shown"),
+            }, "bars": bars}
 
 
 @app.post("/scan")
@@ -1169,9 +1112,18 @@ def run_scan(
         for row in scanned:
             if row["symbol"] in events:
                 row["active_breakout_event"] = events[row["symbol"]]
-        # Persist the complete deterministic evaluator output before filtering
-        # delivery candidates. This captures monitor/risk names too.
-        latest_market_dates = sorted({row.get("last_date") for row in scanned if row.get("last_date")})
+        # The canonical Daily as-of must come from the official price_data
+        # boundary, never from a benchmark/current-session row in scan output.
+        eod_pg = get_pg()
+        try:
+            eod_cur = eod_pg.cursor()
+            eod_cur.execute("SELECT MAX(date) FROM price_data WHERE market='TH'")
+            eod_row = eod_cur.fetchone()
+            eod_cur.close()
+        finally:
+            eod_pg.close()
+        official_eod_date = eod_row[0].isoformat() if eod_row and eod_row[0] else None
+        latest_market_dates = [official_eod_date] if official_eod_date else []
         pg = get_pg()
         try:
             snapshot = persist_daily_scan_snapshot(
@@ -1248,7 +1200,7 @@ def run_scan(
     url = None
     if push:
         from datetime import datetime as _dt
-        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned)
+        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned, run_id=snapshot["run_id"])
     else:
         try:
             import build_dashboard

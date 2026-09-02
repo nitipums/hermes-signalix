@@ -1,7 +1,6 @@
 # P2-07/P2-08 — MVP Data Independence and Stable Pipeline
 
-> **STATUS: CURRENT** · Audit date: 2026-08-25
-> Stable release: `signalix-mvp-stable-20260825.2` · commit `c84ecb4`
+> **STATUS: HISTORICAL** · Audit evidence from pre-cutover release candidate; current source is `Canonical-Source-of-Truth-2026-08-25.md`
 
 ## Final verdict
 

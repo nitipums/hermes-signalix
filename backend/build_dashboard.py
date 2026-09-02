@@ -12,6 +12,7 @@ from reconciled_projection import PRIMARY_GROUPS, PRIMARY_META, apply_projection
 from artifact_writer import atomic_write_json, atomic_write_text, write_artifact_manifest
 from mvp_snapshot import build_mvp_snapshot, daily_freshness_from_run
 from stage_classifier import STAGE_LABELS, PHASE_LABELS
+from decision_dimensions import project_decision_dimensions
 
 try:
     from set_market_day_guard import SET_CLOSED_DATES
@@ -25,7 +26,9 @@ MARKET_SESSION_TIMEZONE = "Asia/Bangkok"
 MARKET_SESSION_SOURCE = "set_market_day_guard"
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCAN_JSON = os.path.join(HERE, "scan_results.json")
-OUT_HTML = os.path.join(HERE, "dashboard.html")
+# Retired public artifact. Keep the builder's projection work for snapshot
+# compatibility, but never write or advertise the former dashboard.html page.
+OUT_HTML = None
 SNAPSHOT_JSON = os.path.join(HERE, "dashboard_snapshot.json")
 GROUPS = (
     ("breakout_new", "เบรกใหม่", "opportunity", "positive", "Daily breakout cycle ยังทำงานอยู่; ดู stage และรอ 1H confirmation"),
@@ -1072,6 +1075,18 @@ def serialize(group, row, snapshot, intraday_state=None, layer2=None, set50=None
         "quality": (row.get("daily_state") or {}).get("quality") or {},
         "setup_quality": setup_q,
         "setup_proximity": setup_p,
+        # Additive Daily contract: keep the source projection on every full
+        # universe card; mvp_api maps it through the canonical Daily route.
+        "decision_dimensions": project_decision_dimensions({
+            "stage": stage,
+            "phase": phase,
+            "action_queue": _queue,
+            "action": action,
+            "close": decision_snapshot.get("close", row.get("close")),
+            "breakoutLevel": readiness.get("breakout_level_20d"),
+            "setup_quality": setup_q,
+            "setup_proximity": setup_p,
+        }),
         "radar": radar,
         "action_queue": _queue,
         "action_queue_label": queue_label(_queue),
@@ -1444,10 +1459,9 @@ def build(scanned=None, run_id=None):
                                                         "data_freshness_source": freshness.get("source"),
                                                         "market_session": freshness.get("market_session", {}),
                                                         "market_regime": market_regime}, separators=(",", ":"), default=_json_default)))
-    atomic_write_text(OUT_HTML, page)
     write_artifact_manifest(os.path.join(HERE, "artifact_manifest.json"), run_id, os.path.join(HERE, "mvp_snapshot.json"))
     return {"securities": len(items), "shortlist": len(shortlist_items),
-            "groups": counts, "out": OUT_HTML}
+            "groups": counts, "out": "/mvp"}
 
 if __name__ == "__main__":
     print(build())

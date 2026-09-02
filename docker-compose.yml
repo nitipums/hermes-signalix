@@ -46,7 +46,8 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # Host-only analytical API; the public dashboard reaches it over Compose.
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
     healthcheck:
@@ -62,6 +63,8 @@ services:
     container_name: signalix_dashboard
     restart: unless-stopped
     env_file: .env
+    environment:
+      DASHBOARD_BIND_HOST: 0.0.0.0
     command: ["python", "-u", "mvp_server.py"]
     depends_on:
       backend:
@@ -81,6 +84,7 @@ services:
   # (redis + requests already installed) and runs in the same docker network,
   # so REDIS_URL=redis://redis:6379 resolves natively — no host hacks.
   delivery:
+    profiles: ["alerts"]
     build: ./backend
     container_name: signalix_delivery
     restart: unless-stopped

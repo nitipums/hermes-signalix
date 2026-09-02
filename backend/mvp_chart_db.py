@@ -5,7 +5,7 @@ indicators (MA20/50/200, MACD, RSI) when the database is available.
 Never writes, never mutates.
 
   GET /api/chart-db/{symbol} → {symbol, candles, ma20, ma50, ma200,
-                                 macd, rsi, source, as_of, provenance}
+                                 macd, rsi, source, as_of, latest_time, provenance}
 
 All fields are null (None) when no authoritative data exists.
 NOT_VERIFIED when computed values are unavailable due to insufficient data.
@@ -23,6 +23,10 @@ import os
 import datetime as dt
 from typing import Any, Optional
 from threading import Lock
+
+from canonical_chart_read import ChartReadResult, read_chart_result
+from chart_wave_evidence import (build_legacy_chart_wave_evidence,
+                                 canonical_chart_wave_evidence)
 
 
 _POOL = None
@@ -70,51 +74,30 @@ def _release_db_connection(pg: Any, *, close: bool = False) -> None:
 def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
                    timeframe: str = "1D") -> list[dict]:
     """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
-    timeframe = (timeframe or "1D").upper()
-    if timeframe == "60M":
-        cur.execute("""
-            SELECT ts, open, high, low, close, volume
-            FROM intraday_price_data
-            WHERE UPPER(symbol) = UPPER(%s) AND interval = '60m'
-            ORDER BY ts DESC LIMIT %s
-        """, (symbol, limit))
-        rows = cur.fetchall()
-    else:
-        daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
-        cur.execute("""
-            SELECT date, open, high, low, close, volume
-            FROM price_data
-            WHERE market = %s AND UPPER(symbol) = UPPER(%s) AND instrument_type = 'ORD'
-            ORDER BY date DESC LIMIT %s
-        """, (market, symbol, daily_limit))
-        rows = cur.fetchall()
-        if timeframe in {"1W", "1M"}:
-            periods = {}
-            for stamp, open_, high, low, close, volume in reversed(rows):
-                day = stamp if isinstance(stamp, dt.date) else stamp.date()
-                key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
-                if key not in periods:
-                    periods[key] = [key, open_, high, low, close, float(volume or 0)]
-                else:
-                    p = periods[key]
-                    p[2] = max(p[2], high)
-                    p[3] = min(p[3], low)
-                    p[4] = close
-                    p[5] += float(volume or 0)
-            rows = sorted(periods.values(), key=lambda r: r[0])[-limit:]
-    candles: list[dict] = []
-    for row in rows:
-        candles.append({
-            "date": str(row[0]),
-            "open": float(row[1]) if row[1] is not None else None,
-            "high": float(row[2]) if row[2] is not None else None,
-            "low": float(row[3]) if row[3] is not None else None,
-            "close": float(row[4]) if row[4] is not None else None,
-            "volume": float(row[5]) if row[5] is not None else None,
-        })
-    if timeframe in {"1D", "60M"}:
-        candles.reverse()
-    return candles
+    return read_chart_result(cur, symbol, timeframe, limit, market=market).candles
+
+
+def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+                                 timeframe: str = "1D") -> tuple[list[dict], dict]:
+    """Fetch candles and preserve the latest stored intraday source timestamp."""
+    result: ChartReadResult = read_chart_result(cur, symbol, timeframe, limit, market=market)
+    return result.candles, {"latest_time": result.latest_time, "as_of": result.as_of,
+                            "provisional": result.provisional}
+
+
+def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
+    """Serialize Daily dates and 60m datetimes in the same ISO form as markers."""
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    if str(timeframe).upper() != "60M":
+        return raw[:10] if len(raw) >= 10 else raw
+    if len(raw) > 10 and raw[10] == " ":
+        raw = raw[:10] + "T" + raw[11:]
+    return raw
 
 
 
@@ -231,7 +214,12 @@ def _compute_rsi(closes: list[float], period: int = 14) -> list[Optional[float]]
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[dict]:
+def _chart_source(timeframe: str) -> str:
+    """Return the authoritative storage relation for a chart timeframe."""
+    return "intraday_price_data" if str(timeframe).upper() == "60M" else "price_data"
+
+
+def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
     Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
@@ -239,6 +227,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     timeframe = (timeframe or "1D").upper()
     if timeframe not in {"1D", "1W", "60M", "1M"}:
         raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
+    chart_source = _chart_source(timeframe)
     pg = _get_db_connection()
     if pg is None:
         return {
@@ -249,8 +238,11 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
                 "source": None,
                 "as_of": None,
@@ -260,10 +252,16 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     try:
         cur = pg.cursor()
-        candles = _fetch_candles(cur, symbol, timeframe=timeframe)
+        candles, chart_metadata = _fetch_candles_with_metadata(cur, symbol, timeframe=timeframe)
         cur.close()
     except Exception as e:
         # Fail-graceful: return NOT_VERIFIED
+        # psycopg2 connections are transactional; return a clean connection
+        # to the pool so a failed query cannot poison the next chart request.
+        try:
+            pg.rollback()
+        except Exception:
+            pass
         return {
             "symbol": symbol.upper(),
             "candles": None,
@@ -272,10 +270,13 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
-                "source": "price_data",
+                "source": chart_source,
                 "as_of": None,
                 "note": f"NOT_VERIFIED: DB query failed — {str(e)[:200]}",
             },
@@ -297,8 +298,12 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                 "ma200": None,
                 "macd": None,
                 "rsi": None,
+                "wave_evidence": {"timeframe": "60m", "markers": [],
+                                  "mapping": {"daily": "not_projected", "60m": "setup_only"},
+                                  "missing": ["daily_markers_not_projected"]},
                 "source": None,
                 "as_of": None,
+                "latest_time": None,
                 "availability": "unavailable",
                 "provenance": {
                     "source": None,
@@ -310,6 +315,12 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
+    latest_time = (
+        chart_metadata.get("latest_time")
+        or _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")
+        or _chart_timestamp(chart_metadata.get("latest_confirmed_time"), "1D")
+        or as_of
+    )
 
     # Build NOT_VERIFIED notes
     notes: list[str] = []
@@ -331,9 +342,16 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     macd = _compute_macd(closes) if len(closes) >= 35 else None
     rsi = _compute_rsi(closes, 14) if len(closes) >= 15 else None
 
-    note = (", ".join(notes) if notes else
-            "Computed from price_data (SELECT only). All indicators available.")
+    provisional_note = ("Current session is represented by provisional 60m aggregation; "
+                        "Daily EOD decision data is unchanged. "
+                        if any(c.get("provisional") for c in candles) else "")
+    note = (provisional_note + (", ".join(notes) if notes else
+            f"Computed from {chart_source} (SELECT only). All indicators available."))
 
+    wave_evidence = (canonical_chart_wave_evidence(canonical_item)
+                     if timeframe == "1D" else None)
+    if wave_evidence is None:
+        wave_evidence = build_legacy_chart_wave_evidence(candles, timeframe, as_of)
     return {
         "symbol": symbol.upper(),
         "timeframe": timeframe,
@@ -343,10 +361,12 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
         "ma200": ma200,
         "macd": macd,
         "rsi": rsi,
-        "source": "price_data",
+        "wave_evidence": wave_evidence,
+        "source": chart_source,
         "as_of": as_of,
+        "latest_time": latest_time,
         "provenance": {
-            "source": "price_data",
+            "source": chart_source,
             "as_of": as_of,
             "note": note,
         },

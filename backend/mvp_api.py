@@ -7,23 +7,71 @@ API contract shapes for:
   GET /api/explorer         → project_explorer_response(items, page, page_size, search, stage)
   GET /api/symbol/{symbol}  → project_symbol_detail(items, symbol)
 
-Uses existing daily_shortlist module for eligibility/ranking.
-Never queries DB, never rescans, never mutates data.
+Uses existing daily_shortlist module for eligibility/ranking. Canonical setup
+candidate construction performs bounded read-only DB queries; no path mutates
+market data.
 """
 
 from __future__ import annotations
 
 import math
+import time
+from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
-from daily_shortlist import project_shortlist, project_shortlist_lanes
+from decision_dimensions import project_decision_dimensions
 from provenance_contract import (
     DECISION_STATE_OFFICIAL_DAILY,
     DECISION_STATE_PROVISIONAL,
     resolve_decision_state,
-    compute_freshness,
 )
+from marginable import (
+    eligible_symbols,
+    enrich_item,
+    filter_items,
+    metadata as marginable_metadata,
+    normalize_filter,
+    normalize_rates,
+)
+import instruments
+from eod_healthcheck import expected_market_date
+from set_market_day_guard import SET_CLOSED_DATES
+from freshness_assessment import (assess_projection_freshness as _resolve_freshness,
+                                  daily_eod_status as _daily_eod_status)
+from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
+                                      build_setup_candidate)
+from elliott_structure_engine import build_wave_contract
+from trade_setup_engine import build_trade_setup
+from trend_strength_engine import compute_trend_strength
+from candidate_row_evidence import (assemble_candidate_data_status,
+                                    assemble_candidate_provenance)
+from canonical_setup_projection import (
+    _validate_canonical_setup_candidate,
+    project_setup_candidates_response,
+)
+
+
+def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=None):
+    """Resolve the bounded serving universe from the authoritative master."""
+    if universe_filter not in {"marginable_long", "active_ord"}:
+        raise ValueError(f"unknown universe filter: {universe_filter}")
+    active = list(active_symbols if active_symbols is not None
+                  else instruments.active_ord_symbols(pg))
+    if universe_filter == "active_ord":
+        symbols = sorted({str(symbol).strip().upper() for symbol in active if str(symbol).strip()})
+        return symbols, {
+            "universe_filter": "active_ord", "audit_only": True,
+            "base_active_ord_count": len(symbols), "eligible_count": len(symbols),
+            "excluded_count": 0, "excluded_reason": None,
+        }
+    symbols, manifest = eligible_symbols(active)
+    manifest = dict(manifest)
+    manifest["universe_filter"] = "marginable_long"
+    manifest["audit_only"] = False
+    return symbols, manifest
 
 
 def _number(value, default=None):
@@ -52,7 +100,10 @@ def _resolve_market_cap(item: dict) -> float | None:
 
 
 def _resolve_index_membership(item: dict) -> list[str]:
-    """Index membership: is_set50 flag → SET50/SET100."""
+    """Prefer normalized as-of membership; retain the legacy flag fallback."""
+    normalized = item.get("index_membership")
+    if isinstance(normalized, (list, tuple)):
+        return [str(value) for value in normalized if value]
     ind = item.get("independence") or {}
     result = []
     if bool(ind.get("is_set50")):
@@ -157,6 +208,7 @@ def _resolve_description(item: dict) -> str | None:
 
 def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str | None) -> dict:
     """Map one serialized card to the frontend shortlist item contract."""
+    item = enrich_item(item)
     sp = item.get("setup_proximity") or {}
     sq = item.get("setup_quality") or {}
     daily_fresh = item.get("daily_eod_freshness") or {}
@@ -179,10 +231,12 @@ def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str 
         "trade_value": _number(item.get("tradeValue") or item.get("turnover")),
         "index_membership": _resolve_index_membership(item),
         "margin_pct": _number(item.get("margin_pct") or item.get("marginPct")),
-        # NOT_VERIFIED: No authoritative data source for margin_pct exists
-        # in the current data pipeline.  Value is null (None) unless a
-        # future Settrade / Exchange feed provides verified margin rates.
-        # Do NOT fabricate or hardcode margin values.
+        "margin_rate_pct": _number(item.get("margin_rate_pct")),
+        "margin_marker": item.get("margin_marker"),
+        "margin_can_buy": item.get("margin_can_buy"),
+        "margin_can_add_collateral": item.get("margin_can_add_collateral"),
+        "margin_can_short": item.get("margin_can_short"),
+        "marginable": dict(item.get("marginable") or {}),
         "target": _resolve_target(item),
         "rr": _resolve_rr(item),
         "high52": _number(item.get("high52")),
@@ -212,6 +266,7 @@ def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str 
             "distance_pct": _number(sp.get("distance_pct")),
             "zone": sp.get("zone"),
         },
+        "decision_dimensions": project_decision_dimensions(item),
         "trigger": _resolve_trigger(item),
         "invalidation": _resolve_invalidation(item),
         "risk_stop": _number(item.get("riskStop") or item.get("stop")),
@@ -294,60 +349,6 @@ def _watch_lane_projection(items: list[dict], *, excluded_symbols: set[str],
     return rising, caution
 
 
-def _daily_eod_status(as_of: str | None, now: datetime | None = None) -> str | None:
-    """Classify today's Daily EOD as market-closed, not stale intraday data."""
-    if not as_of:
-        return None
-    now = now or datetime.now(timezone(timedelta(hours=7)))
-    if str(as_of)[:10] == now.astimezone(timezone(timedelta(hours=7))).date().isoformat():
-        return "market_closed"
-    return None
-
-
-def _resolve_freshness(items: list[dict]) -> dict:
-    """Build freshness block from items' timestamps.
-
-    Returns {status, source, as_of, data_fetched_at}.
-    Uses the latest daily_as_of across items as the authoritative as_of.
-    """
-    latest_as_of = None
-    latest_source = None
-    for item in items:
-        daily = item.get("daily_eod_freshness") or {}
-        as_of = daily.get("as_of") or item.get("daily_as_of") or item.get("date")
-        if as_of:
-            if latest_as_of is None or str(as_of) > str(latest_as_of):
-                latest_as_of = str(as_of)
-                latest_source = daily.get("source") or item.get("priceSource") or "Daily EOD"
-
-    status = "unknown"
-    if latest_as_of:
-        try:
-            dt_obj = datetime.fromisoformat(latest_as_of.replace("Z", "+00:00")
-                                            if isinstance(latest_as_of, str) else
-                                            latest_as_of)
-            # Try to parse date-only vs datetime
-            found_ts = dt_obj if dt_obj.tzinfo else dt_obj
-            # For date-only, treat as end of day in Bangkok
-            if len(str(latest_as_of)) <= 10:  # date only
-                found_ts = dt_obj.replace(
-                    hour=16, minute=30, tzinfo=timezone(timedelta(hours=7))
-                )
-            status = compute_freshness(latest_as_of)
-            status = _daily_eod_status(latest_as_of) or status
-            if status == "unknown":
-                status = "fresh"  # have data, treat optimistically
-        except (ValueError, TypeError):
-            status = "fresh"  # have a string, treat as having data
-
-    return {
-        "status": status,
-        "source": latest_source or "Daily EOD",
-        "as_of": latest_as_of,
-        "data_fetched_at": latest_as_of,
-    }
-
-
 def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
     """Case-insensitive symbol lookup."""
     upper = symbol.upper()
@@ -359,12 +360,661 @@ def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
 
 # ── Public API ────────────────────────────────────────────────────────
 
-def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None) -> dict:
+def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
+    """Presentation-only price band filter; never changes scan eligibility."""
+    band = str(price_band or "all").strip().lower()
+    if band not in {"all", "below_2", "2_to_10", "above_10"}:
+        band = "all"
+    if band == "all":
+        return list(items)
+    result = []
+    for item in items:
+        try:
+            price = float(item.get("close"))
+        except (TypeError, ValueError):
+            continue
+        if band == "below_2" and price < 2:
+            result.append(item)
+        elif band == "2_to_10" and 2 <= price <= 10:
+            result.append(item)
+        elif band == "above_10" and price > 10:
+            result.append(item)
+    return result
+
+
+def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
+    """Compatibility-only validator for callers that explicitly load snapshots.
+
+    The canonical route does not call this adapter or load a snapshot. It is
+    retained for replay/audit callers and deliberately refuses legacy cards.
+    """
+    return _validate_canonical_setup_candidate(item)
+
+
+def _wave_inputs(daily_df):
+    """Derive only observable v1 evidence from the Daily OHLCV series."""
+    if daily_df is None or "Close" not in daily_df:
+        return {}
+    close = daily_df["Close"].astype(float).dropna()
+    if len(close) < 21:
+        return {}
+    prior_advance = float(close.iloc[-1]) > float(close.iloc[-21])
+    anchors = close.iloc[-20:]
+    confirmed = anchors.nunique() >= 3
+    structure_intact = float(close.iloc[-1]) >= float(anchors.min())
+    return {
+        "prior_advance": prior_advance,
+        "confirmed_swing_anchors": confirmed,
+        "structure_intact": structure_intact,
+    }
+
+
+def _load_daily_for_symbol(screening, symbol, pg, market):
+    return screening.load_symbol(symbol, pg=pg, lookback=400, market=market)
+
+
+def _load_intraday_for_symbol(screening, symbol, pg, market):
+    frame = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
+    return frame
+
+
+def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
+    """Run the independent Daily/60m engines for one symbol.
+
+    The engines are pure transforms over per-symbol frames. Keeping this
+    adapter small makes bounded parallel evaluation deterministic (the caller
+    consumes ``executor.map`` in symbol order) while preserving the existing
+    evidence inputs and the historical setup-state adapter.
+    """
+    daily_input = daily_df if daily_evidence_valid else None
+    wave = build_wave_contract(
+        daily_input, _wave_inputs(daily_df) if daily_evidence_valid else {}
+    )
+    setup = build_trade_setup(
+        {**wave, "state": wave.get("primary_state", "UNKNOWN")}, intraday_df
+    )
+    return wave, setup
+
+
+def _evaluate_candidate_engines_worker(args):
+    """Process-pool adapter for the CPU-bound per-symbol evaluator."""
+    return _evaluate_candidate_engines(*args)
+
+
+def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
+    """Load bounded Daily and 60m frames in two queries, grouped by symbol."""
+    import pandas as pd
+    if not symbols:
+        return {}, {}, 0
+
+    def load(sql, params, timeframe=None):
+        cur = pg.cursor()
+        try:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        finally:
+            cur.close()
+        grouped = {}
+        for row in rows:
+            grouped.setdefault(str(row[0]), []).append(row[1:])
+        frames = {}
+        for symbol, values in grouped.items():
+            frame = pd.DataFrame(values, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+            frame["Date"] = pd.to_datetime(frame["Date"])
+            frame = frame.set_index("Date").sort_index()
+            if timeframe:
+                frame.attrs["timeframe"] = timeframe
+                frame.attrs["as_of"] = frame.index[-1]
+            frames[symbol] = frame
+        return frames
+
+    # A partitioned window query makes PostgreSQL scan/sort the complete
+    # matching history before discarding all but 400 rows per symbol.  The
+    # candidate universe is bounded, so indexed per-symbol probes are both
+    # cheaper and preserve the full-universe result without changing evidence.
+    ranked_daily = """SELECT symbols.symbol, rows.date, rows.open, rows.high,
+                             rows.low, rows.close, rows.volume
+                      FROM unnest(%s::text[]) AS symbols(symbol)
+                      CROSS JOIN LATERAL (
+                          SELECT date, open, high, low, close, volume
+                          FROM price_data
+                          WHERE market=%s AND symbol=symbols.symbol
+                          ORDER BY date DESC LIMIT %s
+                      ) rows
+                      ORDER BY symbols.symbol, rows.date"""
+    ranked_intraday = """SELECT symbols.symbol, rows.ts, rows.open, rows.high,
+                                rows.low, rows.close, rows.volume
+                         FROM unnest(%s::text[]) AS symbols(symbol)
+                         CROSS JOIN LATERAL (
+                             SELECT ts, open, high, low, close, volume
+                             FROM intraday_price_data
+                             WHERE interval=%s AND symbol=symbols.symbol
+                             ORDER BY ts DESC LIMIT %s
+                         ) rows
+                         ORDER BY symbols.symbol, rows.ts"""
+    daily = load(ranked_daily, (list(symbols), market.upper(), lookback))
+    intraday = load(ranked_intraday, (list(symbols), "60m", lookback), "60m")
+    return daily, intraday, 2
+
+
+def _load_daily_canonical_metadata(pg, symbols, as_of_by_symbol, *, market="TH"):
+    """Load point-in-time Daily high/low and normalized index evidence.
+
+    The 52W window is the latest 252 Daily rows at each candidate as-of date;
+    ATH is the observed Daily high/low over all rows through that date.  Both
+    queries are read-only and fail closed when a compatibility test seam does
+    not provide a PostgreSQL-shaped cursor.
+    """
+    if not symbols:
+        return {}
+    dates = [str(as_of_by_symbol.get(symbol) or "")[:10] or None for symbol in symbols]
+    metadata = {symbol: {} for symbol in symbols}
+    cur = pg.cursor()
+    try:
+        cur.execute("""WITH requested(symbol, as_of) AS (
+                         SELECT * FROM unnest(%s::text[], %s::date[])
+                       )
+                       SELECT requested.symbol, w.high52, w.low52, ath.ath_high, ath.ath_low
+                       FROM requested
+                       LEFT JOIN LATERAL (
+                         SELECT MAX(high) AS high52, MIN(low) AS low52
+                         FROM (SELECT high, low FROM price_data
+                               WHERE market=%s AND symbol=requested.symbol AND date <= requested.as_of
+                               ORDER BY date DESC LIMIT 252) windowed
+                       ) w ON TRUE
+                       LEFT JOIN LATERAL (
+                         SELECT MAX(high) AS ath_high, MIN(low) AS ath_low
+                         FROM price_data
+                         WHERE market=%s AND symbol=requested.symbol AND date <= requested.as_of
+                       ) ath ON TRUE""", (list(symbols), dates, market.upper(), market.upper()))
+        for row in cur.fetchall():
+            symbol, high52, low52, ath_high, ath_low = row
+            metadata.setdefault(str(symbol), {}).update({
+                "high52": _number(high52), "low52": _number(low52),
+                "ath_high": _number(ath_high), "ath_low": _number(ath_low),
+                "index_membership_evidence": {"source": "price_data", "as_of": dates[symbols.index(str(symbol))]},
+            })
+    finally:
+        cur.close()
+
+    cur = pg.cursor()
+    try:
+        cur.execute("""WITH requested(symbol, as_of) AS (
+                         SELECT * FROM unnest(%s::text[], %s::date[])
+                       )
+                       SELECT m.symbol, m.index_name, m.effective_from, m.effective_to, m.source,
+                              requested.as_of
+                       FROM index_memberships m
+                       JOIN requested ON requested.symbol = m.symbol
+                       WHERE m.effective_from <= requested.as_of
+                         AND (m.effective_to IS NULL OR m.effective_to >= requested.as_of)
+                       ORDER BY m.symbol, m.index_name""", (list(symbols), dates))
+        for symbol, index_name, effective_from, effective_to, source, as_of in cur.fetchall():
+            entry = {"index_name": str(index_name), "effective_from": str(effective_from),
+                     "effective_to": str(effective_to) if effective_to else None,
+                     "source": str(source), "as_of": str(as_of)}
+            row = metadata.setdefault(str(symbol), {})
+            row.setdefault("index_membership", []).append(str(index_name))
+            row.setdefault("index_membership_evidence", {}).setdefault("memberships", []).append(entry)
+    finally:
+        cur.close()
+    return metadata
+
+
+def _relative_strength_ranks(daily_frames, market_df):
+    import pandas as pd
+    lookback = 252
+    if market_df is None or len(market_df) < lookback:
+        # Zero is a real-looking percentile and therefore fabricates evidence.
+        # Omit the rank until both benchmark and symbol history are sufficient.
+        return {}
+    market_return = market_df["Close"].iloc[-1] / market_df["Close"].iloc[-lookback] - 1
+    returns = {}
+    for symbol, frame in daily_frames.items():
+        if frame is not None and len(frame) >= lookback:
+            close = frame["Close"]
+            returns[symbol] = close.iloc[-1] / close.iloc[-lookback] - 1 - market_return
+    if not returns:
+        return {}
+    ranks = pd.Series(returns).rank(pct=True) * 100
+    return {symbol: float(value) for symbol, value in ranks.items()}
+
+
+def _daily_final_session_available(daily_df, expected_session):
+    if daily_df is None or len(daily_df) == 0:
+        return False
+    try:
+        return daily_df.index[-1].date() == expected_session
+    except (AttributeError, IndexError):
+        return False
+
+
+def _previous_set_session(session):
+    """Return the immediately preceding SET trading session."""
+    session -= timedelta(days=1)
+    while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+        session -= timedelta(days=1)
+    return session
+
+
+def _daily_evidence_status(daily_df, expected_session, evidence_valid):
+    """Separate usable official Daily evidence from current EOD publication."""
+    if not evidence_valid:
+        return (False, "unknown", "missing") if daily_df is None or len(daily_df) == 0 else (
+            False, "invalid", "invalid"
+        )
+    daily_session = daily_df.index[-1].date()
+    if daily_session == expected_session:
+        return True, "fresh", "available"
+    if daily_session == _previous_set_session(expected_session):
+        return True, "fresh", "pending"
+    return False, "stale", "missing"
+
+
+def _valid_candidate_ohlcv(frame) -> bool:
+    """Validate required OHLCV without rejecting valid positive flat candles."""
+    import pandas as pd
+    required = ["Open", "High", "Low", "Close", "Volume"]
+    if (frame is None or len(frame) == 0
+            or not isinstance(frame.index, pd.DatetimeIndex)
+            or frame.index.hasnans
+            or not frame.index.is_unique
+            or not frame.index.is_monotonic_increasing
+            or not set(required).issubset(frame.columns)):
+        return False
+    values = frame[required].apply(pd.to_numeric, errors="coerce")
+    if values.isna().any().any() or not (values > 0).all().all():
+        return False
+    return bool(((values["High"] >= values[["Open", "Close"]].max(axis=1))
+                 & (values["Low"] <= values[["Open", "Close"]].min(axis=1))
+                 & (values["High"] >= values["Low"])).all())
+
+
+def _expected_intraday_session_date(now=None):
+    """Return the SET session that should have current 60m observations."""
+    current = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Bangkok"))
+    session = current.date()
+    before_first_completed_bar = (current.hour, current.minute) < (10, 15)
+    if (session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES
+            or before_first_completed_bar):
+        session -= timedelta(days=1)
+        while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+            session -= timedelta(days=1)
+    return session
+
+
+def _expected_intraday_interval_start(now=None):
+    """Return the latest 60m bar start that should be complete by ``now``."""
+    current = (now or datetime.now(timezone.utc)).astimezone(ZoneInfo("Asia/Bangkok"))
+    session = _expected_intraday_session_date(current)
+    current_time = (current.hour, current.minute)
+    if current.date() != session or current_time < (11, 0):
+        if current.date() == session:
+            session -= timedelta(days=1)
+            while session.weekday() >= 5 or session.isoformat() in SET_CLOSED_DATES:
+                session -= timedelta(days=1)
+        return datetime.combine(session, datetime.min.time(), tzinfo=ZoneInfo("Asia/Bangkok")).replace(hour=16)
+    if current_time < (12, 0):
+        hour = 10
+    elif current_time < (12, 30):
+        hour = 11
+    elif current_time < (15, 0):
+        hour = 12
+    elif current_time < (16, 0):
+        hour = 14
+    elif current_time < (16, 30):
+        hour = 15
+    else:
+        hour = 16
+    return datetime.combine(session, datetime.min.time(), tzinfo=ZoneInfo("Asia/Bangkok")).replace(hour=hour)
+
+
+def _intraday_60m_status(intraday_df, expected_interval_start):
+    valid_interval = (intraday_df is not None and len(intraday_df) >= 3
+                      and intraday_df.attrs.get("timeframe") == "60m")
+    if not valid_interval:
+        return False, False, "unknown", None
+    try:
+        timestamp = intraday_df.index[-1]
+        as_of = timestamp.isoformat()
+        if getattr(timestamp, "tzinfo", None) is None:
+            timestamp = timestamp.replace(tzinfo=ZoneInfo("Asia/Bangkok"))
+        else:
+            timestamp = timestamp.astimezone(ZoneInfo("Asia/Bangkok"))
+    except (AttributeError, IndexError, TypeError, ValueError):
+        return True, False, "unknown", None
+    if expected_interval_start.tzinfo is None:
+        expected_interval_start = expected_interval_start.replace(
+            tzinfo=ZoneInfo("Asia/Bangkok")
+        )
+    else:
+        expected_interval_start = expected_interval_start.astimezone(
+            ZoneInfo("Asia/Bangkok")
+        )
+    current = timestamp >= expected_interval_start
+    return True, current, "fresh" if current else "stale", as_of
+
+
+@dataclass(frozen=True)
+class _CandidateRowContext:
+    """Inputs owned by the builder stages that finalize one candidate row."""
+
+    symbol: str
+    daily_df: Any
+    daily_evidence_valid: bool
+    daily_evidence_usable: bool
+    daily_current: bool
+    daily_freshness: str
+    daily_final_status: str
+    intraday_available: bool
+    intraday_current: bool
+    intraday_freshness: str
+    intraday_as_of: str | None
+    rs_rank: float | None
+    profile: dict[str, Any]
+    universe_manifest: dict[str, Any]
+    wave: dict[str, Any]
+    setup: dict[str, Any]
+    canonical_metadata: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class _CandidateRowResult:
+    """Named outputs needed to aggregate the finalized candidate rows."""
+
+    row: dict[str, Any]
+    candidate_freshness: str
+    daily_freshness: str
+    intraday_freshness: str
+
+
+def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResult:
+    """Finalize one evaluated symbol into the canonical candidate contract."""
+    symbol = context.symbol
+    daily_df = context.daily_df
+    daily_evidence_valid = context.daily_evidence_valid
+    daily_evidence_usable = context.daily_evidence_usable
+    daily_current = context.daily_current
+    daily_freshness = context.daily_freshness
+    daily_final_status = context.daily_final_status
+    intraday_available = context.intraday_available
+    intraday_current = context.intraday_current
+    intraday_freshness = context.intraday_freshness
+    intraday_as_of = context.intraday_as_of
+    rs_rank = context.rs_rank
+    profile = context.profile
+    universe_manifest = context.universe_manifest
+    wave = context.wave
+    setup = dict(context.setup)
+    canonical_metadata = context.canonical_metadata
+    as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
+    prior_ath = None
+    if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
+        prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
+        prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
+    trend = compute_trend_strength(
+        daily_df if daily_evidence_valid else None,
+        relative_strength=rs_rank, prior_ath=prior_ath
+    )
+    if not daily_evidence_usable:
+        wave = {
+            **wave,
+            "primary_state": "NOT_VERIFIABLE",
+            "alternative_state": "NOT_VERIFIABLE",
+            "confidence": "LOW",
+            "supporting_evidence": [],
+            "contradicting_evidence": [],
+            "missing_evidence": sorted(set(
+                list(wave.get("missing_evidence") or []) + ["usable_official_daily"]
+            )),
+        }
+    if not intraday_current:
+        setup = {**setup, "status": "DATA_BLOCKED"}
+    peer_data = {
+        "sector": profile.get("sector"), "industry": profile.get("industry"),
+        "peer_data_status": "UNKNOWN",
+    }
+    peer_symbols = profile.get("peer_symbols") or profile.get("peers")
+    if peer_symbols is not None:
+        peer_data["peer_symbols"] = peer_symbols
+    peer_context = build_peer_context(symbol, peer_data)
+    data_status, setup, candidate_freshness = assemble_candidate_data_status(
+        daily_df=daily_df,
+        daily_evidence_valid=daily_evidence_valid,
+        daily_evidence_usable=daily_evidence_usable,
+        daily_current=daily_current,
+        daily_freshness=daily_freshness,
+        daily_final_status=daily_final_status,
+        intraday_available=intraday_available,
+        intraday_current=intraday_current,
+        intraday_freshness=intraday_freshness,
+        intraday_as_of=intraday_as_of,
+        setup=setup,
+    )
+    bonus_evidence = {}
+    attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
+        "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
+    })
+    # Keep the compatibility provenance on the legacy audit placeholder;
+    # attach_bonus_vcp has already enforced its non-positive shape.
+    bonus_evidence["vcp"]["source"] = "legacy_audit_only"
+    provenance = assemble_candidate_provenance(
+        as_of=as_of,
+        intraday_as_of=intraday_as_of,
+        candidate_freshness=candidate_freshness,
+        universe_manifest=universe_manifest,
+    )
+    row = build_setup_candidate(
+        symbol, as_of, data_status, trend, wave, setup, peer_context,
+        bonus_evidence,
+        provenance,
+        canonical_metadata,
+    )
+    return _CandidateRowResult(
+        row=row,
+        candidate_freshness=candidate_freshness,
+        daily_freshness=daily_freshness,
+        intraday_freshness=intraday_freshness,
+    )
+
+
+def build_setup_candidates_from_data(pg, *, market="TH"):
+    """Build the canonical source from the authoritative read-only data path."""
+    import screening
+    # RS ranking only reads the latest and 252nd benchmark closes. Keep the
+    # market query bounded to that actual dependency; candidate Daily/60m
+    # history remains the full 400-row evidence window below.
+    rs_lookback = 252
+    build_started = time.monotonic()
+    stage_started = build_started
+    symbols, universe_manifest = resolve_universe(pg, "marginable_long")
+    profiles = instruments.profile_taxonomy(pg, symbols=symbols)
+    market_df = screening.load_market(pg, lookback=rs_lookback, market=market)
+    source_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    stage_started = time.monotonic()
+    try:
+        daily_frames, intraday_frames, ohlcv_query_count = _bulk_candidate_frames(
+            pg, symbols, market=market
+        )
+        rs_ranks = _relative_strength_ranks(daily_frames, market_df)
+    except (AttributeError, TypeError):
+        # Small pure tests may provide a sentinel instead of a DB connection.
+        daily_frames = intraday_frames = None
+        ohlcv_query_count = len(symbols) * 2
+        rs_ranks = screening._universe_rs_ranks(pg, market_df, symbols)
+        # The legacy adapter historically filled unavailable ranks with 0.0.
+        # Canonical setup candidates must expose unknown RS as null instead.
+        rs_ranks = {
+            symbol: value for symbol, value in (rs_ranks or {}).items()
+            if _number(value) is not None and _number(value) > 0
+        }
+    load_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    stage_started = time.monotonic()
+    candidates = []
+    latest_daily = None
+    expected_daily_session = expected_market_date()
+    expected_intraday_interval = _expected_intraday_interval_start()
+    freshness_statuses = []
+    daily_freshness_statuses = []
+    intraday_freshness_statuses = []
+    evaluation_inputs = {}
+    for symbol in symbols:
+        daily_df = (daily_frames.get(symbol) if daily_frames is not None
+                    else _load_daily_for_symbol(screening, symbol, pg, market))
+        intraday_df = (intraday_frames.get(symbol) if intraday_frames is not None
+                       else _load_intraday_for_symbol(screening, symbol, pg, market))
+        if intraday_df is not None:
+            intraday_df.attrs["as_of"] = intraday_df.index[-1]
+        daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
+        daily_current = (daily_evidence_valid
+                         and _daily_final_session_available(daily_df, expected_daily_session))
+        daily_usable, daily_freshness, daily_final_status = _daily_evidence_status(
+            daily_df, expected_daily_session, daily_evidence_valid
+        )
+        intraday_available, intraday_current, intraday_freshness, intraday_as_of = (
+            _intraday_60m_status(intraday_df, expected_intraday_interval)
+        )
+        evaluation_inputs[symbol] = (
+            daily_df, intraday_df, daily_usable, daily_current, daily_freshness,
+            daily_final_status,
+            intraday_available, intraday_current, intraday_freshness, intraday_as_of,
+            daily_evidence_valid,
+        )
+
+    as_of_by_symbol = {
+        symbol: (frame.index[-1].date().isoformat() if frame is not None and len(frame) else None)
+        for symbol, (frame, *_rest) in evaluation_inputs.items()
+    }
+    try:
+        canonical_metadata = _load_daily_canonical_metadata(
+            pg, symbols, as_of_by_symbol, market=market
+        ) if daily_frames is not None else {}
+    except (AttributeError, TypeError, ValueError, IndexError):
+        canonical_metadata = {}
+
+    # Daily Elliott and 60m setup calculations are independent per symbol but
+    # are CPU-bound Python/pandas work. Threads do not bypass the GIL here and
+    # made the cold full-universe build slower; processes provide actual CPU
+    # concurrency without changing the pure engine inputs. executor.map
+    # preserves symbol order, so ranking/pagination and all output ordering
+    # remain deterministic. The fallback path stays serial for pure test
+    # sentinels and legacy loaders.
+    engine_results = {}
+    evaluation_workers = 1
+    if daily_frames is not None and intraday_frames is not None and len(symbols) > 1:
+        evaluation_workers = min(4, len(symbols))
+        with ProcessPoolExecutor(max_workers=evaluation_workers) as executor:
+            results = executor.map(
+                _evaluate_candidate_engines_worker,
+                ((evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
+                  evaluation_inputs[symbol][2]) for symbol in symbols),
+                chunksize=8,
+            )
+            engine_results = dict(zip(symbols, results))
+
+    for symbol in symbols:
+        (daily_df, intraday_df, daily_evidence_usable, daily_current, daily_freshness,
+         daily_final_status,
+         intraday_available, intraday_current, intraday_freshness, intraday_as_of,
+         daily_evidence_valid) = (
+            evaluation_inputs[symbol]
+        )
+        as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
+        if as_of and (latest_daily is None or as_of > latest_daily):
+            latest_daily = as_of
+        if engine_results:
+            wave, setup = engine_results[symbol]
+        else:
+            wave, setup = _evaluate_candidate_engines(
+                daily_df, intraday_df, daily_evidence_usable
+            )
+        profile = profiles.get(symbol) or {}
+        result = _build_candidate_row(context=_CandidateRowContext(
+            symbol=symbol,
+            daily_df=daily_df,
+            daily_evidence_valid=daily_evidence_valid,
+            daily_evidence_usable=daily_evidence_usable,
+            daily_current=daily_current,
+            daily_freshness=daily_freshness,
+            daily_final_status=daily_final_status,
+            intraday_available=intraday_available,
+            intraday_current=intraday_current,
+            intraday_freshness=intraday_freshness,
+            intraday_as_of=intraday_as_of,
+            rs_rank=rs_ranks.get(symbol),
+            profile=profile,
+            universe_manifest=universe_manifest,
+            wave=wave,
+            setup=setup,
+            canonical_metadata=canonical_metadata.get(symbol),
+        ))
+        freshness_statuses.append(result.candidate_freshness)
+        daily_freshness_statuses.append(result.daily_freshness)
+        intraday_freshness_statuses.append(result.intraday_freshness)
+        candidates.append(result.row)
+    overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
+                         else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
+    evaluate_ms = round((time.monotonic() - stage_started) * 1000, 3)
+    total_ms = round((time.monotonic() - build_started) * 1000, 3)
+    def aggregate_statuses(statuses):
+        statuses = set(statuses)
+        if "stale" in statuses:
+            return "stale"
+        if "unknown" in statuses:
+            return "unknown"
+        if "fresh" in statuses:
+            return "fresh"
+        return "unknown"
+
+    return candidates, {"scan_time": latest_daily, "freshness": {
+                            "status": overall_freshness,
+                            "daily_status": aggregate_statuses(daily_freshness_statuses),
+                            "intraday_status": aggregate_statuses(intraday_freshness_statuses),
+                        },
+                        "source": "price_data+intraday_price_data", "universe": "TH-ORD",
+                        "build_observability": {
+                            "duration_ms": total_ms,
+                            "stages_ms": {"source_context": source_ms, "ohlcv_load": load_ms,
+                                          "candidate_evaluation": evaluate_ms},
+                            "ohlcv_query_count": ohlcv_query_count,
+                            "ohlcv_row_count": (
+                                sum(len(frame) for frame in daily_frames.values())
+                                + sum(len(frame) for frame in intraday_frames.values())
+                            ) if daily_frames is not None and intraday_frames is not None else None,
+                            "evaluated_row_count": len(candidates),
+                            "candidate_evaluation_workers": evaluation_workers,
+                            "candidate_evaluation_parallel": evaluation_workers > 1,
+                        },
+                        **universe_manifest}
+
+
+def persist_setup_candidate_lifecycle(cur, candidate: dict, **kwargs) -> dict:
+    """Explicit completed-60m persistence hook for a producer result.
+
+    The canonical builder above remains read-only.  A completed-60m evaluator
+    may opt into this adapter with its caller-owned cursor/transaction.
+    """
+    from lifecycle_persistence import persist_completed_60m_candidate
+    return persist_completed_60m_candidate(cur, candidate, **kwargs)
+
+
+def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,
+                               marginable_filter: str = "krungsri",
+                               margin_rates=None, price_band: str = "all") -> dict:
     """Build the GET /api/daily-shortlist response from serialized cards.
 
     Uses daily_shortlist.project_shortlist() for eligibility/ranking,
-    then maps to frontend contract shape.
+    then maps to frontend contract shape. The default surface is the
+    owner-selected Krungsri Credit Balance marginable list.
     """
+    # Keep the retired shortlist classifier out of the canonical setup import
+    # path.  This compatibility route is the only consumer that needs it.
+    from daily_shortlist import project_shortlist
+
+    marginable_filter = normalize_filter(marginable_filter)
+    margin_rates = normalize_rates(margin_rates)
+    items = filter_price_band(filter_items(items, marginable_filter, margin_rates), price_band)
+    margin_meta = marginable_metadata()
     if not items:
         return {
             "decision_state": DECISION_STATE_PROVISIONAL,
@@ -380,6 +1030,10 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
             "caution": [],
             "scan_time": None,
             "scan_run_id": None,
+            "marginable_filter": marginable_filter,
+            "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "margin_rates": margin_rates,
+            "marginable_source": margin_meta,
         }
 
     # Normalize the explicit Daily EOD contract before classification. The
@@ -431,8 +1085,10 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         result["action"] = cand.get("action") or result["action"]
         result["action_queue"] = cand.get("action_queue") or result.get("action_queue")
         result["decision_state"] = DECISION_STATE_OFFICIAL_DAILY  # shortlist = official daily
-        result["trigger"] = cand.get("trigger") or result["trigger"]
-        result["invalidation"] = cand.get("invalidation") or result["invalidation"]
+        # Let the shortlist projection's fail-closed trigger/invalidation
+        # override any stale raw-card wording; None is a deliberate signal.
+        result["trigger"] = cand.get("trigger")
+        result["invalidation"] = cand.get("invalidation")
         return result
 
     ready_items = [enrich(r) for r in ready]
@@ -457,6 +1113,10 @@ def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = N
         "caution": caution_items,
         "scan_time": scan_time,
         "scan_run_id": root_run_id or scan_run_id or "",
+        "marginable_filter": marginable_filter,
+        "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "margin_rates": margin_rates,
+        "marginable_source": margin_meta,
     }
 
 
@@ -467,12 +1127,19 @@ def project_explorer_response(
     search: str | None = None,
     stage: str | None = None,
     snapshot_meta: dict | None = None,
+    marginable_filter: str = "krungsri",
+    margin_rates=None,
+    price_band: str = "all",
 ) -> dict:
     """Build the GET /api/explorer response from serialized cards.
 
     Returns paginated, filterable list of all symbols in research-only format.
-    No shortlist eligibility filter — explorer shows full universe.
+    The default view is limited to the owner-selected Krungsri list.
     """
+    marginable_filter = normalize_filter(marginable_filter)
+    margin_rates = normalize_rates(margin_rates)
+    items = filter_price_band(filter_items(items, marginable_filter, margin_rates), price_band)
+    margin_meta = marginable_metadata()
     page = max(1, page)
     page_size = max(1, min(page_size, 100))
 
@@ -492,6 +1159,10 @@ def project_explorer_response(
             "total_items": 0,
             "scan_time": None,
             "scan_run_id": None,
+            "marginable_filter": marginable_filter,
+            "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+            "margin_rates": margin_rates,
+            "marginable_source": margin_meta,
         }
 
     # Filter
@@ -536,6 +1207,10 @@ def project_explorer_response(
                 or daily_fresh.get("status"),
             "decision_state": item.get("decision_state")
                 or DECISION_STATE_PROVISIONAL,
+            "margin_pct": _number(item.get("margin_pct")),
+            "margin_rate_pct": _number(item.get("margin_rate_pct")),
+            "margin_marker": item.get("margin_marker"),
+            "marginable": dict(item.get("marginable") or {}),
         }
 
     result_items = [to_explorer_item(it) for it in page_items]
@@ -551,6 +1226,10 @@ def project_explorer_response(
         "total_items": total_items,
         "scan_time": scan_time,
         "scan_run_id": root_run_id or scan_run_id or "",
+        "marginable_filter": marginable_filter,
+        "marginable_filter_label": marginable_filter.replace("_", " ").title(),
+        "margin_rates": margin_rates,
+        "marginable_source": margin_meta,
     }
 
 
@@ -572,7 +1251,7 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
     # Drawer must use the same shortlist projection as the card; otherwise raw
     # producer action can disagree with the publication/action queue shown in
     # Daily Shortlist.
-    projected = project_shortlist_response(items)
+    projected = project_shortlist_response(items, marginable_filter="all")
     projected_by_symbol = {
         entry.get("symbol"): entry
         for lane in ("ready", "pre_ready")
@@ -583,3 +1262,31 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
         detail["action"] = shortlist_item.get("action") or detail.get("action")
         detail["action_queue"] = shortlist_item.get("action_queue") or detail.get("action_queue")
     return detail
+
+
+def project_canonical_symbol_detail(items: list[dict], symbol: str,
+                                   snapshot_meta: dict | None = None) -> dict | None:
+    """Return one canonical setup item plus metadata used by the drawer."""
+    item = _find_item_by_symbol(items, symbol)
+    if item is None:
+        return None
+    scan_time = (snapshot_meta or {}).get("scan_time") or item.get("as_of")
+    scan_run_id = ((snapshot_meta or {}).get("run_id")
+                   or (item.get("provenance") or {}).get("scan_run_id"))
+    drawer_metadata = _card_to_shortlist_item(item, scan_time, scan_run_id)
+    metadata_fields = (
+        "name", "sector", "industry", "market_cap", "description", "close",
+        "change_pct", "change_amount", "trade_value", "avgDailyValue20",
+        "index_membership", "margin_pct", "margin_rate_pct", "high52", "low52",
+        "ath_high", "ath_low",
+    )
+    context = item.get("context") or {}
+    if drawer_metadata.get("sector") is None:
+        drawer_metadata["sector"] = context.get("sector")
+    if drawer_metadata.get("industry") is None:
+        drawer_metadata["industry"] = context.get("industry")
+    return {
+        **item,
+        **{field: drawer_metadata[field] for field in metadata_fields
+           if drawer_metadata.get(field) is not None},
+    }

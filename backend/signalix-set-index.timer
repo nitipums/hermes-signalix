@@ -1,0 +1,11 @@
+[Unit]
+Description=Monthly check for official SET50/SET100 revision
+
+[Timer]
+OnCalendar=Sun *-*-01..07 03:30:00 Asia/Bangkok
+Persistent=true
+RandomizedDelaySec=15m
+Unit=signalix-set-index.service
+
+[Install]
+WantedBy=timers.target

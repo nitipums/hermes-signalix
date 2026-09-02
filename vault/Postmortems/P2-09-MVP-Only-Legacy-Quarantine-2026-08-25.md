@@ -1,6 +1,6 @@
 # P2-09 — MVP-Only Server and Legacy Quarantine
 
-> **STATUS: CURRENT** · Production quarantine completed 2026-08-25
+> **STATUS: HISTORICAL** · Production quarantine completed 2026-08-25; temporary quarantine copies were retired after stable cutover
 > Release: `signalix-mvp-stable-20260825.3` · commit `47fab54`
 
 ## Production boundary
@@ -21,10 +21,10 @@ Dashboard healthcheck now probes `/mvp`, not `/dashboard.html`.
 
 ## Quarantined legacy files
 
-Moved out of the release tree and retained at:
+Moved out of the release tree during the historical cleanup wave; the temporary quarantine copy is no longer retained:
 
 ```text
-/root/signalix-legacy-quarantine-20260825/
+`/root/signalix` stable source is the only current implementation authority.
 ```
 
 The release removed:
@@ -40,7 +40,7 @@ backend/verify_scan_dashboard.py
 legacy generated dashboard/snapshot/scan artifacts
 ```
 
-The old production source remains at `/root/signalix` for rollback; no old data tables were deleted.
+No old data tables were deleted. Rollback is through GitHub stable history/tags, not a second local worktree.
 
 ## EOD boundary
 

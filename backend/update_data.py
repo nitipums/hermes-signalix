@@ -214,9 +214,11 @@ def ensure_intraday_table(pg):
             fetch_completed_at TIMESTAMPTZ NOT NULL,
             db_upsert_result JSONB NOT NULL,
             failed_symbols JSONB NOT NULL,
-            batch_metrics JSONB NOT NULL
+            batch_metrics JSONB NOT NULL,
+            fetch_universe TEXT
         )
     """)
+    cur.execute("ALTER TABLE intraday_ingestion_runs ADD COLUMN IF NOT EXISTS fetch_universe TEXT")
     pg.commit()
     cur.close()
 
@@ -270,8 +272,8 @@ def record_intraday_run_summary(pg, summary):
         """INSERT INTO intraday_ingestion_runs(
                run_id,status,symbols_attempted,symbols_succeeded,symbols_failed,
                retry_count,fetch_started_at,fetch_completed_at,db_upsert_result,
-               failed_symbols,batch_metrics)
-           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb)
+               failed_symbols,batch_metrics,fetch_universe)
+           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s)
            ON CONFLICT(run_id) DO UPDATE SET
                status=EXCLUDED.status,
                symbols_attempted=EXCLUDED.symbols_attempted,
@@ -282,7 +284,8 @@ def record_intraday_run_summary(pg, summary):
                fetch_completed_at=EXCLUDED.fetch_completed_at,
                db_upsert_result=EXCLUDED.db_upsert_result,
                failed_symbols=EXCLUDED.failed_symbols,
-               batch_metrics=EXCLUDED.batch_metrics""",
+               batch_metrics=EXCLUDED.batch_metrics,
+               fetch_universe=EXCLUDED.fetch_universe""",
         (
             summary["run_id"], summary["status"], summary["symbols_attempted"],
             summary["symbols_succeeded"], summary["symbols_failed"],
@@ -290,6 +293,7 @@ def record_intraday_run_summary(pg, summary):
             summary["fetch_completed_at"],
             json.dumps({"rows_offered": summary["rows_offered"]}),
             json.dumps(summary["failed_symbols"]), json.dumps(summary["batches"]),
+            summary.get("fetch_universe"),
         ),
     )
     pg.commit()
@@ -317,12 +321,10 @@ def update_intraday_feed_status(pg, summary, cooldown_hours=24):
     """Track per-symbol intraday capability without excluding Daily/EOD data."""
     ensure_intraday_feed_status_table(pg)
     failed = set(summary.get("failed_symbols") or [])
-    attempted = set()
-    # Summary failed_symbols is authoritative for failures; attempted symbols
-    # are read from the active universe so successful symbols can be reset.
+    attempted = set(summary.get("attempted_symbols") or [])
+    # Only symbols in this run may have their feed status changed.  The
+    # product fetch scope is intentionally narrower than active ORD.
     cur = pg.cursor()
-    cur.execute("SELECT symbol FROM symbol_master WHERE instrument_type='ORD' AND (status IS NULL OR status='active')")
-    attempted.update(row[0] for row in cur.fetchall())
     now = dt.datetime.now(dt.timezone.utc)
     for symbol in sorted(attempted):
         if symbol in failed:
@@ -475,7 +477,7 @@ def _bangkok_date_from_settrade_ts(ts):
     return dt.datetime.fromtimestamp(int(ts), BANGKOK_TZ).date().isoformat()
 
 
-def _parse_settrade_candlestick(sym, itype, res, after, stats):
+def _parse_settrade_candlestick(sym, itype, res, after, stats, until=None):
     """Convert Settrade get_candlestick response to price_data rows."""
     rows = []
     if isinstance(res, list) and res:
@@ -500,6 +502,8 @@ def _parse_settrade_candlestick(sym, itype, res, after, stats):
         try:
             d = _bangkok_date_from_settrade_ts(times[i])
             if after and dt.date.fromisoformat(d) <= after:
+                continue
+            if until and dt.date.fromisoformat(d) > until:
                 continue
             vol = float(vols[i] or 0)
             if vol == 0:
@@ -539,28 +543,22 @@ def _parse_settrade_intraday(sym, interval, res, stats):
     return rows
 
 
-def _intraday_universe(pg, instrument_types=("ORD",)):
-    """Return the complete active Settrade universe for every 60m run.
-
-    Intraday follows the current universe contract directly from symbol_master;
-    it is independent of scan output, groups, and scan timing.
-    """
+def _intraday_universe(pg, universe="marginable_long"):
+    """Resolve the canonical product scope; active_ord is explicit audit mode."""
+    if universe not in {"marginable_long", "active_ord"}:
+        raise ValueError("intraday universe must be marginable_long or active_ord")
+    from mvp_api import resolve_universe
+    symbols, _manifest = resolve_universe(pg, universe)
     ensure_intraday_feed_status_table(pg)
     cur = pg.cursor()
     cur.execute(
-        "SELECT sm.symbol FROM symbol_master sm "
-        "WHERE sm.instrument_type = ANY(%s) "
-        "AND (sm.status IS NULL OR sm.status = 'active') "
-        "AND NOT EXISTS ("
-        "  SELECT 1 FROM intraday_feed_status fs "
-        "  WHERE fs.symbol = sm.symbol AND fs.feed='settrade_intraday_60m' "
-        "    AND fs.status='unavailable' AND (fs.retry_at IS NULL OR fs.retry_at > now())"
-        ") ORDER BY sm.symbol",
-        (list(instrument_types),),
+        "SELECT symbol FROM intraday_feed_status "
+        "WHERE feed='settrade_intraday_60m' AND status='unavailable' "
+        "AND (retry_at IS NULL OR retry_at > now())"
     )
-    symbols = [row[0] for row in cur.fetchall() if row[0] != "SET"]
+    unavailable = {row[0] for row in cur.fetchall()}
     cur.close()
-    return symbols
+    return [symbol for symbol in symbols if symbol != "SET" and symbol not in unavailable]
 
 
 def fetch_intraday(pg, stats, limit=10, mode="full", interval="60m"):
@@ -609,6 +607,7 @@ def _utc_now_iso():
 
 def ingest_intraday(
         pg, stats, *, symbols=None, limit=10, mode="full", interval="60m",
+        universe="marginable_long",
         batch_size=SETTRADE_BATCH_SIZE,
         batch_delay=SETTRADE_BATCH_DELAY_SECONDS,
         batch_jitter=SETTRADE_BATCH_JITTER_SECONDS,
@@ -630,15 +629,19 @@ def ingest_intraday(
     if session_retries < 0 or retry_backoff < 0:
         raise ValueError("intraday retry settings must not be negative")
 
-    symbols = list(_intraday_universe(pg) if symbols is None else symbols)
+    if universe not in {"marginable_long", "active_ord"}:
+        raise ValueError("intraday universe must be marginable_long or active_ord")
+    symbols = list(_intraday_universe(pg, universe) if symbols is None else symbols)
     run_id = uuid.uuid4().hex
     summary = {
         "run_id": run_id, "status": "failure",
         "symbols_attempted": len(symbols), "symbols_succeeded": 0,
-        "symbols_failed": 0, "failed_symbols": [], "retry_count": 0,
+        "symbols_failed": 0, "attempted_symbols": list(symbols),
+        "failed_symbols": [], "retry_count": 0,
         "fetch_started_at": _utc_now_iso(), "fetch_completed_at": None,
         "rows_offered": 0, "rows_inserted": 0, "rows_updated": 0,
         "batches": [],
+        "fetch_universe": universe,
     }
     stats["intraday_symbols"] = len(symbols)
     stats.setdefault("intraday_failed", 0)
@@ -851,7 +854,7 @@ def _fetch_one_intraday(sym, interval, market, *, workers, limit, sleep_fn, retr
     return result
 
 
-def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instrument_types=None, flush_batch=0, repair_gaps=False, symbols=None):
+def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instrument_types=None, flush_batch=0, repair_gaps=False, symbols=None, until=None):
     """Preferred automated SET source via Settrade Open API v2.
 
     Uses get_candlestick(symbol, interval='1d', normalized=True). The API needs
@@ -912,7 +915,7 @@ def fetch_settrade(pg, after: dt.date, stats, limit=30, max_symbols=None, instru
             print(f"  ! settrade {sym} failed: {repr(error)[:120]}")
             continue
         try:
-            parsed = _parse_settrade_candlestick(sym, itype, res, sym_after, stats)
+            parsed = _parse_settrade_candlestick(sym, itype, res, sym_after, stats, until=until)
             if parsed:
                 stats["settrade_rows_kept"] = stats.get("settrade_rows_kept", 0) + len(parsed)
                 rows.extend(parsed)
@@ -1111,6 +1114,162 @@ def refresh_dashboard_from_existing_scan():
     return result
 
 
+def _canonical_read_model_source_versions(pg):
+    """Read both source identities from persisted canonical ingestion lineage."""
+    cur = pg.cursor()
+    try:
+        cur.execute("""
+            SELECT r.id, r.scan_date, r.run_timestamp, r.source_lineage
+            FROM daily_scan_runs r
+            WHERE r.scanner_version = 'signalix/daily-state-v2'
+              AND r.source_lineage->>'source' = 'price_data'
+              AND COALESCE(r.source_lineage->>'mode', '') <> 'historical_backfill'
+            ORDER BY r.run_timestamp DESC, r.id DESC
+            LIMIT 1
+        """)
+        daily = cur.fetchone()
+        cur.execute("""
+            SELECT run_id, status, fetch_completed_at, fetch_universe
+            FROM intraday_ingestion_runs
+            WHERE status IN ('full_success', 'partial_success')
+              AND fetch_completed_at IS NOT NULL
+              AND fetch_universe = 'marginable_long'
+            ORDER BY fetch_completed_at DESC, run_id DESC
+            LIMIT 1
+        """)
+        intraday = cur.fetchone()
+    finally:
+        cur.close()
+    if not daily or not intraday:
+        return None
+    daily_run_id, daily_scan_date, daily_run_timestamp, daily_lineage = daily
+    intraday_run_id, intraday_status, intraday_completed_at, intraday_universe = intraday
+    if (not daily_run_id or not daily_scan_date or not daily_run_timestamp
+            or not isinstance(daily_lineage, dict)
+            or not intraday_run_id or not intraday_status or not intraday_completed_at
+            or intraday_universe != "marginable_long"):
+        return None
+    return {
+        "daily": {
+            "run_id": str(daily_run_id),
+            "as_of": daily_scan_date.isoformat() if hasattr(daily_scan_date, "isoformat") else str(daily_scan_date),
+            "run_timestamp": daily_run_timestamp.isoformat() if hasattr(daily_run_timestamp, "isoformat") else str(daily_run_timestamp),
+            "source_lineage": daily_lineage,
+        },
+        "intraday": {
+            "run_id": str(intraday_run_id),
+            "status": intraday_status,
+            "as_of": intraday_completed_at.isoformat() if hasattr(intraday_completed_at, "isoformat") else str(intraday_completed_at),
+        },
+    }
+
+
+def publish_canonical_read_model():
+    """Build and publish only a complete canonical 237-row result."""
+    from read_model_publisher import DEFAULT_ROOT, publish_builder_result
+
+    root = os.getenv("SIGNALIX_READ_MODEL_ROOT", str(DEFAULT_ROOT))
+    pg = get_pg()
+    try:
+        source_versions = _canonical_read_model_source_versions(pg)
+        if source_versions is None:
+            print("READ_MODEL_SKIP " + json.dumps({"reason": "source_lineage_incomplete"}))
+            return None
+        import mvp_api
+        result = publish_builder_result(
+            mvp_api.build_setup_candidates_from_data,
+            pg,
+            root=root,
+            source_versions=source_versions,
+            published_at=_utc_now_iso(),
+            market="TH",
+        )
+        print("READ_MODEL_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except Exception as exc:
+        print("READ_MODEL_SKIP " + json.dumps({"reason": "canonical_build_or_publish_failed", "detail": repr(exc)[:240]}))
+        return None
+    finally:
+        pg.close()
+
+
+def publish_intraday_metadata_after_commit(summary):
+    """Publish product freshness only after the run summary commit succeeds."""
+    if (summary.get("fetch_universe") != "marginable_long"
+            or summary.get("status") not in {"full_success", "partial_success"}):
+        return None
+    from read_model_publisher import publish_intraday_metadata
+    try:
+        result = publish_intraday_metadata({
+            "run_id": summary.get("run_id"),
+            "status": summary.get("status"),
+            "fetch_completed_at": summary.get("fetch_completed_at"),
+            "universe": summary.get("fetch_universe"),
+            "published_at": _utc_now_iso(),
+        })
+        print("INTRADAY_METADATA_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except (OSError, TypeError, ValueError) as exc:
+        # The committed DB run remains authoritative for the next refresh;
+        # never turn a sidecar publication failure into fabricated freshness.
+        print("INTRADAY_METADATA_SKIP " + json.dumps({"reason": repr(exc)[:240]}))
+        return None
+
+
+def run_vcp_after_ingestion(pg, summary):
+    """Evaluate/persist VCP only after a committed successful ingestion."""
+    if summary.get("status") not in {"full_success", "partial_success"}:
+        print("VCP_FINDER_SKIP " + json.dumps({"reason": "ingestion_not_eligible", "status": summary.get("status")}))
+        return None
+    from vcp_finder_db import validate_vcp_run_provenance
+    provenance_error = validate_vcp_run_provenance(
+        ingestion_run_id=summary.get("run_id"),
+        ingestion_status=summary.get("status"),
+        fetch_completed_at=summary.get("fetch_completed_at"),
+    )
+    if provenance_error:
+        print("VCP_FINDER_SKIP " + json.dumps({
+            "reason": "ingestion_provenance_incomplete",
+            "detail": provenance_error,
+        }, sort_keys=True))
+        return None
+    cur = pg.cursor()
+    cur.execute("SELECT pg_try_advisory_lock(hashtext('signalix:vcp-finder-60m'))")
+    locked = bool(cur.fetchone()[0])
+    cur.close()
+    if not locked:
+        print("VCP_FINDER_SKIP " + json.dumps({"reason": "run_lock_busy"}))
+        return None
+    try:
+        from vcp_finder_db import find_vcp_universe_60m, persist_vcp_run
+        completed = summary.get("fetch_completed_at")
+        as_of = dt.datetime.fromisoformat(completed) if completed else dt.datetime.now(dt.timezone.utc)
+        payload = find_vcp_universe_60m(
+            pg, market="TH", as_of=as_of,
+            ingestion_run_id=summary.get("run_id"),
+            ingestion_status=summary.get("status"),
+            fetch_completed_at=completed,
+        )
+        persist_vcp_run(pg, payload)
+        print("VCP_FINDER_RUN " + json.dumps({
+            "run_id": payload["run_id"], "ingestion_run_id": summary.get("run_id"),
+            "status": summary.get("status"), "universe": payload["universe"],
+        }, sort_keys=True))
+        return payload
+    finally:
+        cur = pg.cursor()
+        cur.execute("SELECT pg_advisory_unlock(hashtext('signalix:vcp-finder-60m'))")
+        pg.commit()
+        cur.close()
+
+
+def _finish_successful_run(args):
+    """Publish once, after the complete daily/intraday canonical build."""
+    if args.scan and not args.dry_run:
+        publish_canonical_read_model()
+    return 0
+
+
 # ---------- main ----------
 def run(args):
     started_at = dt.datetime.now(dt.timezone.utc)
@@ -1118,21 +1277,25 @@ def run(args):
     print(f"timestamp={started_at.isoformat()} run_id={run_id} event=run_started")
     stats = {"files": 0, "rows_kept": 0, "dropped": 0, "bad_row": 0, "inserted": 0}
     full_intraday = getattr(args, "intraday_full_universe", getattr(args, "intraday_shortlist", False))
-    # Intraday scheduler path: full active ORD universe, no scan-derived filter.
+    # Intraday scheduler path is fetch/evaluate only. A Daily scan is an
+    # explicit EOD operation and must never overlap every 60m round.
     if args.intraday_only:
+        if args.scan:
+            raise ValueError("--scan is not allowed with --intraday-only")
         mode = args.intraday_mode
         interval = args.intraday_interval
+        universe = getattr(args, "intraday_universe", "marginable_long")
         pg = get_pg()
         try:
-            symbols = _intraday_universe(pg)
-            print(f"intraday-only mode=full interval={interval} universe : {len(symbols)} symbols")
+            symbols = _intraday_universe(pg, universe)
+            print(f"intraday-only mode={mode} interval={interval} universe={universe} : {len(symbols)} symbols")
             if args.dry_run:
                 print("  symbols: " + (", ".join(symbols) if symbols else "none"))
                 return 0
             ensure_intraday_table(pg)
             summary = ingest_intraday(
                 pg, stats, symbols=symbols, limit=args.intraday_limit,
-                mode="full", interval=interval,
+                mode=mode, interval=interval, universe=universe,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
@@ -1142,6 +1305,8 @@ def run(args):
             )
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
+            publish_intraday_metadata_after_commit(summary)
+            run_vcp_after_ingestion(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
             print(format_intraday_run_log(
                 run_id=summary["run_id"],
@@ -1158,9 +1323,12 @@ def run(args):
             pg.close()
         # Partial coverage is recorded in the run summary and is operationally
         # successful: one bad/empty symbol must not mark the whole timer failed.
-        return 0 if summary["status"] in ("full_success", "partial_success") else 1
+        if summary["status"] not in ("full_success", "partial_success"):
+            return 1
+        return _finish_successful_run(args)
 
     pg = get_pg()
+    until = dt.date.fromisoformat(args.until) if args.until else None
     if args.since:
         after = dt.date.fromisoformat(args.since) - dt.timedelta(days=1)
     elif args.repair_gaps:
@@ -1204,6 +1372,7 @@ def run(args):
                 symbols=(args.symbols.split(",") if args.symbols else None),
                 flush_batch=(args.flush_batch if not args.dry_run else 0),
                 repair_gaps=args.repair_gaps,
+                until=until,
             )
         except RuntimeError as e:
             print(f"  ! settrade unavailable: {e}")
@@ -1266,9 +1435,11 @@ def run(args):
         pg = get_pg()
         try:
             ensure_intraday_table(pg)
+            symbols = _intraday_universe(pg, getattr(args, "intraday_universe", "marginable_long"))
             summary = ingest_intraday(
-                pg, stats, limit=args.intraday_limit,
+                pg, stats, symbols=symbols, limit=args.intraday_limit,
                 interval=args.intraday_interval,
+                universe=getattr(args, "intraday_universe", "marginable_long"),
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
@@ -1278,6 +1449,7 @@ def run(args):
             )
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
+            publish_intraday_metadata_after_commit(summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
         finally:
             pg.close()
@@ -1285,7 +1457,7 @@ def run(args):
         # successful: one bad/empty symbol must not mark the whole timer failed.
         if summary["status"] not in ("full_success", "partial_success"):
             return 1
-    return 0
+    return _finish_successful_run(args)
 
 
 def main():
@@ -1293,6 +1465,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true",
                     help="list what would be fetched; never writes to the DB")
     ap.add_argument("--since", help="override start date (YYYY-MM-DD, inclusive)")
+    ap.add_argument("--until", help="optional inclusive end date (YYYY-MM-DD); prevents ingesting newer in-progress bars")
     ap.add_argument("--source", default="auto",
                     choices=["auto", "local", "drive", "settrade", "yfinance"])
     ap.add_argument("--settrade-limit", type=int, default=30,
@@ -1313,13 +1486,16 @@ def main():
                     help="if Settrade credentials/import fail, fall back to yfinance")
     ap.add_argument("--scan", action="store_true",
                     help="trigger a universe rescan after loading (default off)")
-    # Full-universe intraday refresh; legacy flag remains accepted as an alias.
+    # Explicit opt-in post-scan refresh; legacy flag remains accepted as alias.
     ap.add_argument("--intraday-full-universe", dest="intraday_full_universe", action="store_true",
-                    help="after scan fetch 60m for every active ORD symbol")
+                    help="after scan fetch 60m for the selected intraday universe")
     ap.add_argument("--intraday-shortlist", dest="intraday_full_universe", action="store_true",
                     help=argparse.SUPPRESS)
     ap.add_argument("--intraday-only", action="store_true",
-                    help="refresh 60m for every active ORD symbol; skips daily fetch and scan")
+                    help="refresh 60m for the selected universe; skips daily fetch and scan")
+    ap.add_argument("--intraday-universe", choices=("marginable_long", "active_ord"),
+                    default="marginable_long",
+                    help="60m fetch scope; active_ord is explicit audit/rollback mode")
     ap.add_argument("--intraday-limit", type=int, default=4,
                     help="60m bars per active ORD symbol (default 4)")
     ap.add_argument("--intraday-workers", type=int, default=SETTRADE_INTRADAY_WORKERS,

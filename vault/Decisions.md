@@ -1,14 +1,188 @@
 # Signalix Decisions
 
-> **STATUS: CURRENT** · Canonical decision ledger. Active work-management rule is recorded below: Markdown pipeline active; Kanban audit/archive only.
+> **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
+>
+> **Current reconciliation:** T1–T9 is promoted; `/api/setup-candidates` is primary; narrow 390px failure→Retry→recovery is PASS; broader UI semantics and evaluator auto-caller remain separate. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+
+## 2026-09-02 — Session closeout: timestamp semantics and Kanban reconciliation
+
+Decision: The Signalix UI must show intraday ingestion completion (`fetch_completed_at`) separately from the latest completed 60m candle timestamp. A fetch round may run at 16:45 while the newest completed candle is 16:00; both values are valid and must remain labeled distinctly.
+
+Evidence: commits `2efed71` and `cfc2c22`; public `/mvp` after runtime reload displayed `60m fetched 01 Sept 2026 16:47 ICT` and `latest completed 60m candle 01 Sept 2026 16:00 ICT`. Kanban stale R4/R5 todo/blocked graph was archived, not purged; active queue is empty. A bounded official Daily repair for `3BBIF,COM7,PR9` on `2026-09-01` returned zero Settrade rows, so source data remains pending timer retry and was not fabricated.
+
+## 2026-09-01 — Session boundary before implementation
+
+Arm instructed: record the complete review/spec/ticket state, stop, switch to a fresh session, then implement. The old VCP todo/blocked cards were archived; no new Kanban cards were published or dispatched. Local ticket drafts are under `.scratch/2026-09-01-signalix-review/issues/`. Next session must re-read the handoff and re-check git/worktrees/runtime before publishing cards.
+
+
+Arm refined the review contract: distinguish no Daily data from no 60m data; call valid Daily evidence without qualifying 60m anchors `NO_SETUP_DETECTED`/setup-forming; call invalid Fib/risk `RISK_INVALID`; prohibit legacy fallback; use a 1-day legacy deprecation window; and audit code/import reuse before removal.
+
+Arm refined Q5–Q9 and approved the next operating boundary: technical reason-field/enum design is delegated to Lite + Codex, with independent review; canonical fallback is prohibited; valid Daily plus valid 60m without qualifying anchors is user-visible `NO_SETUP_DETECTED`; legacy deprecation is one day; Lite manages Kanban and dispatches Codex per bounded task, then independently reviews the result. Q14 approves updating the focused spec before ticket creation.
+
+
+
+Arm approved the four review directions: (1) separate true unavailable/stale/invalid data from incomplete 60m setup; (2) target warm API ≤500ms, cold API ≤3s, first meaningful UI ≤2s, with compact list payload and heavy evidence on detail; (3) add chart-linked Daily Elliott markers and “How this wave was identified”; (4) retire legacy in stages: primary migration → audit-only quarantine → deprecation → removal/410 after rollback sign-off.
+
+These decisions authorize contract/design refinement, not implementation or deployment. The review packet is `../docs/archive/reviews/2026-09-01-signalix-independent-review.md`; next step is close the remaining design frontier, then create bounded Kanban cards.
+
+
+Decision: Do not fix, delete legacy, deploy, or dispatch implementation cards from the review alone. First take the consolidated review `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` to askmatt, then create bounded Kanban cards for reason-level DATA_BLOCKED semantics, cold-path performance, chart-ready Elliott markers, and staged legacy quarantine.
+
+Evidence: Lite, Ploy, and Codex independently reviewed the same release. All four owner concerns are `REVISE`; runtime transport is PASS but served semantics and public browser acceptance are not closed. Ploy aggregated all 237 rows: 227 DATA_BLOCKED, 10 AVOID, zero positive review/forming/candidate/wait lanes.
+
+
+The owner-approved current stock-setup authority is the Elliott/Trend/Trade-Setup design and its T1–T9 promoted implementation. `/api/setup-candidates` is primary; VCP Finder notes/routes are compatibility, audit, or replay evidence. Current runtime evidence is closed for the release handoff, including public 390px failure→Retry→recovery browser acceptance; Arm manual Wave-identification review is next. Evaluator auto-caller remains a separate pending owner decision. This entry supersedes older VCP-first wording in this ledger without deleting historical decisions.
+
+
+Decision: Promote the complete T1–T8 spine plus T7/T9 lifecycle work from `prototype/elliott-state-replay` to `release/signalix-mvp-stable` after Lite source/DB/runtime gates. Served spine acceptance on the public URL (desktop/390px/error journeys) is the next gate before calling the spine production-ready; evaluator-caller wiring for lifecycle persistence stays a separate owner decision.
+
+## 2026-09-01 — Current closeout reconciliation
+
+The public 390px failure→Retry→recovery browser gate passed through an isolated `agent-browser` session against `/mvp`: only `/api/setup-candidates` was intercepted; the failure state showed no stale rows and an actionable Retry; restoring the route and clicking Retry returned HTTP 200 with 50 rows from 237 evaluated. Evidence is retained under `.scratch/2026-09-01-browser-failure-retry-final2/` and summarized in `vault/2026-09-01-Current-Session-Handoff.md`. The evaluator auto-caller decision and broader desktop/drawer acceptance remain separate.
+
+Evaluator auto-caller definition: an optional future wiring in which the completed-60m evaluator invokes the lifecycle persistence hook automatically, appending candidate/setup snapshots and revalidation evidence. It is not broker execution or automatic trading. Status: `PENDING / OWNER DECISION`. Alerts and automatic trading/broker execution remain `PENDING / FUTURE FEATURE` and OFF.
+
+## 2026-09-01 — User-validation contract decisions
+
+Arm approved the next bounded UX/data contract after reviewing TASCO and representative current candidates:
+
+- Remove silent overview refresh. Use a compact Search/Lane/Refresh toolbar; advanced filters are collapsed by default and explicit refresh shows the update boundary.
+- Card primary surface shows decision essentials: price/change, lane/action, Wave/confidence, trigger/stop/target/R:R, two-digit RS, compact 52W/ATH/breakout evidence, and explicit freshness/data status. Sector/Peer/VCP/full evidence belongs in the drawer with explicit availability states.
+- Latest official Daily remains structural Wave authority. Current 60m is setup/entry evidence and may be provisional. Missing current-session official Daily EOD must not automatically collapse usable evidence into generic `DATA_BLOCKED`; data availability/freshness and setup readiness are separate concepts.
+- Daily markers may appear as contextual overlays on Week/60m only with an explicit `Daily source · not 60m wave` label; 60m setup markers remain separate.
+- Current status: documentation/design decision recorded; implementation requires a new bounded spec/ticket cycle. Arm's semantic Wave confirmation remains an owner validation gate.
+
+Evidence: release commits `8573b9d`..`2f6e790` (T1–T8), `9589fca` (T7), `00dd37c`/`04d6639`/`ddf1a87`/`7b3ed49` (T9), full backend suite green on release after promotion; lifecycle production e2e on :8000 passed (GET/POST/401/409/idempotency, append-only trigger verified); migration `007` applied to the canonical database with owner approval.
+
+## 2026-08-31 — T8 full-universe ranking source (LITE-VERIFIED; served gate held)
+
+Decision: Apply deterministic lexicographic ordering to the complete canonical candidate set before presentation filters/pagination. Preserve all evaluated rows and six lane counts; no legacy positive labels or silent exclusions. Source implementation is complete, but the currently running container is not the prototype artifact: `/api/setup-candidates` returned 404 and served `/app.js` lacked the new grouping function. No restart/deploy was performed; served/public acceptance remains NOT VERIFIED and production promotion is held.
+
+Evidence: Codex gpt-5.6-luna implementation + Lite diff/test gate; full backend suite 622 passed / 2 skipped. Source commit pending with docs sync.
+
+## 2026-08-31 — T7 append-only lifecycle contract (LITE-VERIFIED)
+
+Decision: Candidate thesis identity and setup-attempt identity are separate stable hashes. Machine snapshots and Arm review events are append-only; changed trigger/stop/target structure creates a new setup_id, while stopped/expired/invalidated history remains immutable. Revalidation expires an attempt for structure change, thesis invalidation, non-current data, or target-1 R:R below 2:1. Implemented as pure JSON-safe `backend/lifecycle_contract.py`; database persistence/API wiring is intentionally deferred.
+
+Evidence: commit `c61cf7b`; lifecycle tests pass; full backend suite 619 passed / 2 skipped at closeout. Next T8 is full-universe ranking and served acceptance.
+
+## 2026-08-31 — T6 sector/peer + VCP bonus enrichment (LITE-VERIFIED)
+
+Decision: Sector/peer context remains evidence/ranking only; missing profile data is explicit UNKNOWN. VCP attaches only on explicitly verified positive evidence and never gates a valid candidate.
+
+Evidence: commit `de65be3`; full backend suite 614 passed / 2 skipped.
+
+## 2026-08-31 — T5 MVP decision-first source rendering (LITE-VERIFIED)
+
+Decision: `/mvp` reads canonical `decision_lane`, groups six lanes in primary order, exposes Daily wave primary_state/confidence and 60m setup evidence, and routes unknown lane values to DATA_BLOCKED. Public served/browser acceptance is deferred to T8.
+
+Evidence: commit `0787fca`; full backend suite 611 passed / 2 skipped.
+
+## 2026-08-31 — T4 canonical decision lanes (LITE-VERIFIED)
+
+Decision: `/api/setup-candidates` projects REVIEW_NOW, SETUP_FORMING, DAILY_CANDIDATE, WAIT, AVOID, DATA_BLOCKED with fail-closed confidence, completeness, freshness, and R:R gates.
+
+Evidence: commit `57cd291`; full backend suite 609 passed / 2 skipped.
+
+## 2026-08-31 — T3 60m trade-setup production boundary (LITE-VERIFIED)
+
+Decision: 60m setup status distinguishes PRE_TRIGGER, TESTED_TRIGGER, TRIGGERED, EXTENDED, INVALIDATED, EXPIRED, and DATA_BLOCKED. Entry zone is risk-bounded; target-1 R:R ≥2:1 is the minimum review gate; trade_stop remains separate from Daily thesis_invalidation.
+
+Evidence: commit `347aed5`; full backend suite 600 passed / 2 skipped.
+
+## 2026-08-31 — T2 Elliott production boundary + close-gate (LITE-VERIFIED)
+
+Decision: `EARLY_WAVE_3`/`WAVE_3_CONTINUATION` require a Daily Close above the Wave 1 high; a wick alone is `TESTED_HIGH` and never promotes. Volume/markers are supporting evidence only. Invalid or incomplete Daily OHLC fails closed (no Close-derived substitute evidence).
+
+Evidence: commit `d31a2d2` + OHLC fail-closed remediation; frozen fixtures CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION HIGH.
+
+## 2026-08-31 — Elliott grill and AiPASS consultation record
+Decision: Preserve the owner-approved Elliott/Trend/Trade-Setup grill decisions, prototype/replay evidence, open gates, and AiPASS routing caveat in `docs/current/2026-08-31-elliott-grill-decision-record.md`. Treat the record as a curated decision/evidence index; it does not promote the prototype, override runtime evidence, or attribute mismatched AiPASS output to Claude Opus 5.
+Reason: Keep the latest product reasoning and external challenger input durable and reviewable without confusing advisory output with owner decisions or deterministic production truth.
+
+## 2026-08-30 — Marginable-long v2 serving scope
+Decision: Serve `signalix/vcp-decision-shadow-v2` as the decision-facing projection on the owner dashboard, using `marginable_long` as the current operational universe: active Thai ORD intersected with the owner-supplied marginable dataset and `can_buy=true` (currently 237 symbols). Keep the 931-symbol active-ORD path only as an explicit audit/rollback mode; it is not the default dashboard scope. Do not expand replay to three months, promote Low-Cheat, enable alerts, or enable auto-trading.
+Reason: Arm wants the new decision version used now on the real trading surface, limited to instruments that can be bought through the current margin workflow. Replay evidence is sufficient for this bounded operational scope; broader-universe generalization and sequence A/B promotion are deferred.
+
+Decision: Use structure-first candidate discovery on the dashboard: incomplete volume is retained as evidence/warning but is not a hard blocker for `EVENT_WATCH`; expose the full uncapped event-watch lane as `WATCH_ONLY`. Keep `REVIEW_NOW` as the only actionable lane and preserve failed/stale/invalidation safety gates.
+Reason: Arm wants more structure/event candidates for manual review while keeping confirmation and actionability conservative.
+
+## 2026-08-28 — Dashboard-first scope; alerts paused
+Decision: For the current MVP focus, keep only the dashboard surfaces: **Daily VCP Watchlist** for fast actionable review and **All VCP · 60m / Explorer** for full-universe research and audit. Pause alert delivery; the Docker `delivery` service is stopped and assigned to Compose profile `alerts`, so normal `docker compose up -d` does not start it. Backend, dashboard, PostgreSQL, and Redis remain active.
+
+Reason: Generated alert volume made action difficult. Arm explicitly chose to focus on watchlist + explorer before revisiting alerts. This is a reversible operational/product boundary; alert source code and historical evidence remain preserved.
 
 Canonical product/architecture decisions for Signalix. Keep concise and cite the reason.
 
+## 2026-08-27 — VCP type semantics
+Decision: Treat `standard_vcp` as the normal valid VCP morphology/entry profile and `low_cheat_vcp` as a stricter early-entry profile that is a subset of valid VCP morphology. Low-Cheat requires healthy 60m trend, valid H-L-H-L-H structure, valid base/contraction/leg-volume evidence, near-pivot price, usable tight invalidation risk, and an early non-confirmed lifecycle state. ATH proximity is not a prerequisite. Type never promotes lifecycle state or actionability.
+Reason: The previous shallow/near-pivot heuristic could label trend-failed or structurally incomplete results as Low-Cheat. The owner approved clarifying that “cheat” describes entry timing before confirmation, not a looser pattern class.
+
+Decision: VCP lifecycle `trend_pass` uses 60m evidence only. Daily trend remains supporting context and may produce `DAILY_CONTEXT_WATCH`, but cannot promote `READY`, `CONFIRMED`, or structural VCP state. Re-run after correction showed TWP downgrade from invalid prior `CONFIRMED` to review-only `BREAKOUT_WATCH`.
+Reason: Prevent a Daily-context OR fallback from creating a misleading 60m confirmation.
+
+Decision: Add `review_lane` overlays for price/volume breakout, pivot-touch volume watch, close-breakout volume pending, and insurance context. These lanes surface BGRIM/TIPH/AOT/BH-style evidence without changing VCP lifecycle state or `CONFIRMED` requirements.
+Reason: Current strict VCP gates were correct but hid useful price-event context from the fast review queue; user needs take-action context without false confirmation.
+
+Decision: Preserve `last_watch_event`/`late_watch` separately from current VCP state, and expose `DAILY_CONTEXT_WATCH` for Daily waiting-breakout symbols whose 60m VCP is not qualified. These overlays never promote state/actionability.
+Reason: Prevent BA/BGRIM/TIPH-style opportunities from disappearing when current state changes or Daily and 60m evidence diverge.
+
+
+## 2026-08-26 — Stable v1 closeout checkpoint
+Decision: Treat `release/signalix-mvp-stable` commit `e5c7139` as the latest stable checkpoint for today's Signalix MVP. The earlier product baseline `0ab8c44` remains historical; e5c7139 adds the 60m-only confirmation correction and review-lane evidence surface.
+Reason: Owner approved closing today's session at the verified pushed stable version; future VCP type/replay refinements branch from this checkpoint.
+
+Decision: Retain only TH ORD/INDEX in `price_data` for the current Signalix product. Delete historical TH DR and US price rows after replay completion, then run `VACUUM FULL`, `REINDEX`, and `ANALYZE`. Preserve VCP replay tables and TH historical source data.
+Reason: Current VCP/Watchlist/All VCP workflow is Thai ORD 60m; DR/US rows were unused in the current MVP and consumed storage/index space.
+
+Decision: Preserve a one-month append-only point-in-time VCP replay baseline using 20 daily as-of snapshots and full 931-symbol retention. Use it for logic review only; do not call the forward proxy a win rate or final accuracy. Exact 60m breakout timing remains a follow-up replay pass.
+Reason: Establish empirical evidence before locking VCP v1/type thresholds while preserving no-lookahead and live-run isolation.
+
+Decision: Add candidate metadata `vcp_type.base_type`, `vcp_type.overlays`, `vcp_type.types`, `type_evidence`, and `type_policy_version` without changing state/actionability. Historical `price_data` is the observed ATH source. `new_stock` remains unassigned until listing-date provenance exists.
+Reason: Enable sample-driven type review while preserving the stable VCP state machine and full-universe evidence.
+
+Decision: Treat `break_ath`, `new_stock`, `low_cheat_vcp`, and `standard_vcp` as candidate VCP types for the next v1 fine-tuning pass. Keep type separate from state/actionability; no type alone can promote READY/CONFIRMED.
+Reason: Arm wants distinct VCP archetypes without locking ambiguous rules before reviewing real sample cases.
+
+Decision: Rename Daily VCP Shortlist to Daily VCP Watchlist. Default removable presentation filters are Marginable (all rates), 20-day average trade value > THB 10M, and current 60m price > THB 0.60. Watchlist state review includes actionable setups plus breakout watch.
+Reason: Standardize watchlist language and keep the fast review queue focused on tradable/liquid names without changing full-universe scan eligibility.
+
+Decision: Add `BREAKOUT_WATCH` as a review-only state (not `actionable`) when price reaches the 60m pivot and volume evidence passes before the bar closes. Daily VCP Watchlist may display it above confirmed/near/ready lanes; `CONFIRMED` still requires closed-bar close + volume confirmation. Daily trend is supporting context; 60m pivot/trigger remains authoritative.
+Reason: Avoid losing intraday timing while preserving the distinction between early watch and confirmed breakout.
+
+Decision: Run active ORD 60m fetch/VCP rounds at `10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30, 16:45` Bangkok weekday time. The final 16:45 round is an explicit session-close round.
+Reason: Align monitoring with the requested SET continuous-session windows `10:00–12:30` and `14:00–16:45`.
+
+Decision: Split the VCP-first MVP into two visible surfaces: `Daily VCP Shortlist` as the fastest default page showing only actionable review (`READY`, `NEAR_TRIGGER`, `CONFIRMED`), and `All VCP · 60m` as the current full-universe table with forming/state filters. Retire the former Daily Shortlist and All Stocks Explorer from visible MVP navigation while preserving backend/history for rollback and audit.
+Reason: Arm wants a minimal fast review queue without losing access to the complete VCP universe and evidence.
+
+Decision: Make VCP Finder · 60m the default/primary owner-only MVP surface. Remove Daily Shortlist from visible MVP navigation; retain backend/routes and historical evidence for rollback. Keep Explorer only as secondary Research / Full Universe. VCP presentation uses compact tables with Symbol, Price, % Change, Distance, and R/R; contraction/breakout volume remain evidence-driven sorting inputs. Price ranges are multi-select; margin rates use Select all/Clear/Apply. Missing index or margin metadata produces no tag, never a `NOT_VERIFIED` placeholder.
+Reason: Arm uses VCP Finder as the core workflow and needs dense, sortable opportunity review without oversized cards or refresh-on-every-filter-click.
+
+## 2026-08-26 — VCP auto-run and forming lanes
+Decision: Run isolated VCP 60m after each committed full/partial intraday ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Forming presentation lanes are `maturing`, `early`, and `needs_work`; full-universe retention remains mandatory.
+Reason: Avoid stale evaluations while preserving opportunities and make the large forming population reviewable.
+
+Decision: Add the owner-provided Krungsri Securities Credit Balance Marginable Securities List as `signalix.marginable.v1`. VCP Finder uses it for optional multi-select margin filtering; legacy Daily/Explorer routes retain their existing filters for secondary/audit use. Cards show compact `%Margin X%`; drawer shows only `Marginable: X%` when present.
+Reason: Arm normally trades through this Credit Balance list and wants the decision surface pre-filtered to usable collateral/shorting context. Margin metadata is presentation/filter-only and must not mutate canonical scan eligibility or Daily state. Owner workflow checks for a new PDF monthly; each PDF's effective date is authoritative.
+
+## 2026-08-25 — Drawer stock navigation and cleanup boundary
+Decision: The MVP drawer supports previous/next navigation across the currently visible stock cards on the active surface, via buttons, ArrowLeft/ArrowRight, and horizontal touch swipe. Navigation preserves the same authoritative symbol-detail fetch and chart contract. Retired local Signalix quarantine/audit copies are disposable after stable GitHub cutover; source, runtime artifacts, database volumes, and user research files remain protected.
+Reason: Restore the legacy review flow without reintroducing a second source/worktree or deleting user-owned research data.
+
+## 2026-08-25 — Canonical MVP source and worktree cutover
+Decision: Treat GitHub `nitipums/hermes-signalix`, branch `release/signalix-mvp-stable`, as the current Signalix MVP source. The canonical local worktree is `/root/signalix`; it is the only registered worktree and is the production Docker bind-mount source. Former feature/release worktrees and temporary cleanup copies are retired and must not be treated as current implementation.
+Reason: Multiple dirty worktrees and stale vault notes caused source confusion. One clean stable worktree is now the release authority; generated artifacts remain runtime outputs and secrets remain host-only.
+
 ## Work management — final owner decision 2026-08-23
 
-Decision: **Markdown `Execution-Pipeline.md` is the active Signalix work source. Kanban is audit/archive only and must not be used for new dispatches.** Focused executable plans live under `/root/signalix/.hermes/plans/` and must link back to the pipeline row.
+Decision: **Markdown `Execution-Pipeline.md` and focused plans define product scope and acceptance. Kanban is the active durable execution/orchestration state for named workers, dependencies, heartbeats, retries, and evidence handoffs; do not mirror live card status into vault notes.**
 
-Reason: Kanban generated duplicate/blocked graph noise and required more orchestration than the bounded work justified. Keep its history for audit, but use one controlled Markdown sequence for active work.
+Reason: The prior audit-only wording caused the monitor to ignore the active gated run and select stale diagnostic blockers. Separate product authority from execution state instead: one explicit active chain in Kanban, no stale-card selection, and no duplicate status copies in documentation.
+
+## 2026-08-28 — Terminal card reporting and REVISE recovery
+Decision: Every active-chain Kanban card reaching `PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED` must emit one delivered report to Arm with task/run ID, owner, verdict, evidence, next action, downstream holds, and production readiness. `REVISE`/`FAIL` stops downstream promotion and requires a bounded remediation card for the responsible implementation owner, linked to the failed card, unless explicitly blocked by human input/capability/resource safety.
+Reason: A monitor previously missed a completed card and later stopped after `REVISE` without creating the next remediation. This invariant makes terminal delivery and recovery auditable and prevents silent flow breaks.
 
 
 ## 2026-08-12 — LINE dropped

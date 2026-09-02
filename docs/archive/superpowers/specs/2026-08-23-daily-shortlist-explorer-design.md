@@ -1,6 +1,6 @@
 # Signalix Daily Shortlist + All Stocks Explorer — Design
 
-> **STATUS: APPROVED DESIGN**
+> **STATUS: SUPERSEDED 2026-08-26** · Replaced as the current MVP surface by `vault/VCP-Finder-MVP.md`. Preserved as historical design evidence.
 >
 > **Owner approval:** 2026-08-23
 >

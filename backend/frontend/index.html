@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="description" content="Signalix — Daily decision surface for Thai equities. Owner-only MVP.">
-  <title>Signalix · Daily Shortlist</title>
+  <meta name="description" content="Signalix — Trend, Elliott and trade-setup review for Thai equities.">
+  <title>Signalix · Setup Candidates</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,122 +16,111 @@
       <div id="freshness" class="freshness" aria-live="polite">
         <span class="freshness-dot freshness-dot--loading"></span>
         <span class="freshness-label">Loading…</span>
+        <span id="freshness-daily" class="freshness-label">Daily EOD: Loading…</span>
+        <span id="freshness-60m" class="freshness-label">60m: Loading…</span>
       </div>
     </header>
 
-    <!-- nav tabs -->
     <nav class="nav" role="tablist" aria-label="Surface">
-      <button id="tab-shortlist" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-shortlist">
-        Daily Shortlist
-      </button>
-      <button id="tab-explorer" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-explorer">
-        All Stocks Explorer
+      <button id="tab-daily-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-daily-vcp">
+        Trend · Elliott · Trade Setup
       </button>
     </nav>
 
-    <!-- ── Daily Shortlist panel ── -->
-    <main id="panel-shortlist" class="panel panel--active" role="tabpanel" aria-labelledby="tab-shortlist">
-
-      <!-- loading state -->
-      <section id="shortlist-loading" class="state" aria-live="polite">
-        <div class="state-icon">⌛</div>
-        <p class="state-text">Loading daily shortlist…</p>
-      </section>
-
-      <!-- error state -->
-      <section id="shortlist-error" class="state state--hidden" aria-live="assertive">
-        <div class="state-icon">⚠️</div>
-        <p id="shortlist-error-msg" class="state-text">Unable to load data.</p>
-        <button id="shortlist-retry" class="btn btn--retry">Retry</button>
-      </section>
-
-      <!-- empty state -->
-      <section id="shortlist-empty" class="state state--hidden">
-        <div class="state-icon">📋</div>
-        <p class="state-text">No candidates today. Check back after the market close.</p>
-      </section>
-
-      <!-- stale state -->
-      <section id="shortlist-stale" class="state state--hidden" aria-live="polite">
-        <div class="state-icon">🕐</div>
-        <p class="state-text">Data may be stale. Last update: <span id="shortlist-stale-time">–</span></p>
-        <button id="shortlist-stale-retry" class="btn btn--retry">Refresh</button>
-      </section>
-
-      <!-- decision_state, freshness, trigger, invalidation, quality, source exposed in card data -->
-      <section id="shortlist-rising" class="shortlist-section shortlist-section--rising state--hidden" data-lane="rising-movers">
-        <h2 class="section-head section-head--rising">RISING MOVERS <span class="section-subhead">WATCH ONLY · not actionable</span></h2>
-        <div id="shortlist-rising-cards" class="card-list"></div>
-      </section>
-      <section id="shortlist-caution" class="shortlist-section shortlist-section--caution state--hidden" data-lane="caution">
-        <h2 class="section-head section-head--caution">CAUTION <span class="section-subhead">DO NOT CHASE</span></h2>
-        <div id="shortlist-caution-cards" class="card-list"></div>
-      </section>
-      <!-- ready cards -->
-      <section id="shortlist-ready" class="shortlist-section" data-decision-state="ready">
-        <h2 class="section-head section-head--ready">READY</h2>
-        <div id="shortlist-ready-cards" class="card-list"></div>
-      </section>
-
-      <!-- pre-ready cards -->
-      <section id="shortlist-pre-ready" class="shortlist-section">
-        <h2 class="section-head section-head--pre-ready">PRE-READY</h2>
-        <div id="shortlist-pre-ready-cards" class="card-list"></div>
-      </section>
-    </main>
-
-    <!-- ── All Stocks Explorer panel ── -->
-    <main id="panel-explorer" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-explorer">
-
-      <!-- loading state -->
-      <section id="explorer-loading" class="state" aria-live="polite">
-        <div class="state-icon">⌛</div>
-        <p class="state-text">Loading explorer…</p>
-      </section>
-
-      <!-- error state -->
-      <section id="explorer-error" class="state state--hidden" aria-live="assertive">
-        <div class="state-icon">⚠️</div>
-        <p id="explorer-error-msg" class="state-text">Unable to load explorer.</p>
-        <button id="explorer-retry" class="btn btn--retry">Retry</button>
-      </section>
-
-      <!-- empty state -->
-      <section id="explorer-empty" class="state state--hidden">
-        <div class="state-icon">📭</div>
-        <p class="state-text">No stocks found.</p>
-      </section>
-
-      <!-- explorer list -->
-      <section id="explorer-content">
-        <p class="explorer-note">Research view only — not trade advice.</p>
-        <div class="explorer-controls" aria-label="Explorer filters">
-          <label class="explorer-control">Stage
-            <select id="explorer-stage" aria-label="Filter by Stage">
-              <option value="">All stages</option>
-              <option value="S1_basing">S1 Base</option>
-              <option value="S2_uptrend">S2 Uptrend</option>
-              <option value="S3_distributing">S3 Distribution</option>
-              <option value="S4_down">S4 Down</option>
+    <!-- ── Canonical setup-candidate panel ── -->
+    <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
+      <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading setup candidates…</p></section>
+      <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
+      <section id="daily-vcp-content" class="state--hidden">
+        <p class="explorer-note">Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal.</p>
+        <details id="method-guide" class="method-guide">
+          <summary>Method / Evidence Guide</summary>
+          <div id="method-guide-content" class="method-guide__content">
+            <p>Daily establishes trend and the primary Elliott candidate. 60m confirms structure and entry timing.</p>
+            <p>Supporting evidence, contradicting evidence, missing evidence, alternative state, and Snapshot identity appear here when available.</p>
+          </div>
+        </details>
+        <div id="daily-setup-toolbar" class="setup-toolbar" aria-label="Setup candidate controls">
+          <label class="setup-toolbar__search">Search
+            <input id="daily-setup-search" type="search" placeholder="Symbol / name" aria-label="Search setup candidates">
+          </label>
+          <label>Lane
+            <select id="daily-setup-lane" aria-label="Filter setup candidates by lane">
+              <option value="ALL" selected>All lanes</option>
+              <option value="REVIEW_NOW">Review now</option>
+              <option value="SETUP_FORMING">Setup forming</option>
+              <option value="DAILY_CANDIDATE">Daily candidate</option>
+              <option value="WAIT">Wait</option>
+              <option value="AVOID">Avoid</option>
+              <option value="DATA_BLOCKED">Data blocked</option>
             </select>
           </label>
-          <label class="explorer-control explorer-search">Search
-            <input id="explorer-search" type="search" inputmode="search" placeholder="Symbol / name" aria-label="Search symbol or name">
+          <label>Wave
+            <select id="daily-setup-wave" aria-label="Filter Daily candidates by wave">
+              <option value="ALL" selected>All waves</option>
+              <option value="WAVE_1_ADVANCE">Wave 1 advance</option>
+              <option value="WAVE_2_FORMING">Wave 2 forming</option>
+              <option value="WAVE_2_NEAR_COMPLETION">Wave 2 near completion</option>
+              <option value="EARLY_WAVE_3">Early Wave 3</option>
+              <option value="WAVE_3_CONTINUATION">Wave 3 continuation</option>
+              <option value="WAVE_4_CORRECTION">Wave 4 correction</option>
+              <option value="WAVE_5_ADVANCE">Wave 5 advance</option>
+              <option value="UNKNOWN">Unknown / Not verified</option>
+            </select>
           </label>
+          <button id="daily-setup-refresh" class="btn btn--filter" type="button">Refresh</button>
+          <span id="daily-setup-updated" class="setup-toolbar__updated" aria-live="polite">No update applied</span>
         </div>
-        <div id="explorer-cards" class="card-list card-list--explorer"></div>
-
-        <!-- pagination -->
-        <nav id="explorer-pagination" class="pagination" aria-label="Explorer pages">
-          <button id="explorer-prev" class="btn btn--page" disabled aria-label="Previous page">← Prev</button>
-          <span id="explorer-page-info" class="page-info">Page 1 of –</span>
-          <button id="explorer-next" class="btn btn--page" disabled aria-label="Next page">Next →</button>
+        <details id="daily-setup-advanced" class="setup-advanced">
+          <summary>Advanced filters</summary>
+          <div class="watchlist-default-filters" aria-label="Advanced setup candidate filters">
+            <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
+            <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
+            <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
+            <label>Sector <input id="daily-setup-sector" aria-label="Filter setup candidates by sector"></label>
+            <label>Decision state
+            <select id="daily-vcp-decision-state" aria-label="Filter setup candidates by canonical decision state">
+              <option value="ALL" selected>All decision states</option>
+              <option value="FORMING">Forming</option>
+              <option value="READY">Ready</option>
+              <option value="CONFIRMED">Confirmed</option>
+              <option value="EXTENDED">Extended</option>
+              <option value="INVALIDATED">Invalidated</option>
+            </select>
+            </label>
+            <label>Decision
+            <select id="daily-vcp-decision" aria-label="Filter setup candidates by canonical decision">
+              <option value="ALL" selected>All decisions</option>
+              <option value="REVIEW">Review</option>
+              <option value="WAIT">Wait</option>
+              <option value="AVOID">Avoid</option>
+            </select>
+            </label>
+            <label>Quality
+            <select id="daily-vcp-quality" aria-label="Filter setup candidates by canonical quality">
+              <option value="ALL" selected>All quality</option>
+              <option value="PASS">Pass</option>
+              <option value="PARTIAL">Partial</option>
+              <option value="FAIL">Fail</option>
+              <option value="UNKNOWN">Unknown</option>
+            </select>
+            </label>
+            <label><input type="checkbox" id="daily-setup-live-refresh"> Live refresh (opt in)</label>
+          </div>
+        </details>
+        <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
+        <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
+        <nav id="daily-setup-pagination" class="pagination" aria-label="Setup candidate pages">
+          <button id="daily-setup-prev" class="btn btn--page" disabled aria-label="Previous setup candidate page">← Prev</button>
+          <span id="daily-setup-page-info" class="page-info" aria-live="polite">Page 1 of –</span>
+          <button id="daily-setup-next" class="btn btn--page" disabled aria-label="Next setup candidate page">Next →</button>
         </nav>
       </section>
     </main>
 
+
     <!-- ── Detail Drawer ── -->
-    <aside id="drawer" class="drawer drawer--hidden" role="dialog" aria-modal="true" aria-label="Stock detail">
+    <aside id="drawer" class="drawer drawer--hidden" role="dialog" aria-modal="true" aria-label="Stock detail" data-detail-source="canonical-setup-candidate">
       <div class="drawer-overlay" id="drawer-overlay"></div>
       <div class="drawer-panel">
         <header class="drawer-header">
@@ -141,6 +130,11 @@
             <div class="drawer-company-context">
               <span id="drawer-sector">–</span><span id="drawer-industry">–</span><span id="drawer-market-cap">Market cap –</span>
             </div>
+          </div>
+          <div class="drawer-nav" aria-label="Navigate stocks">
+            <button id="drawer-prev" class="drawer-nav-button" type="button" aria-label="Previous stock">←</button>
+            <span id="drawer-position" class="drawer-position" aria-live="polite">– of –</span>
+            <button id="drawer-next" class="drawer-nav-button" type="button" aria-label="Next stock">→</button>
           </div>
           <button id="drawer-close" class="drawer-close" aria-label="Close detail">&times;</button>
         </header>
@@ -154,6 +148,12 @@
             <span id="drawer-trend" class="drawer-trend">–</span>
             <strong id="drawer-action" class="drawer-action">–</strong>
           </div>
+          <div class="drawer-wave-summary" aria-label="Daily structural wave">
+            <span>Daily context <strong id="drawer-wave">Unavailable</strong></span>
+            <span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span>
+            <span id="drawer-wave-source">Daily structural · source unavailable</span>
+          </div>
+          <section id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></section>
           <p id="drawer-description" class="drawer-description">–</p>
 
           <!-- chart area: overlays are supplied by the real API contract -->
@@ -161,34 +161,26 @@
             <canvas id="drawer-canvas" width="720" height="420"></canvas>
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
           </div>
+          <p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p>
+          <div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>
           <div class="chart-timeframe-controls" aria-label="Chart timeframe">
             <span class="chart-control-label">Timeframe</span>
-            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">Day</button>
+            <button type="button" class="chart-timeframe" data-timeframe="60M">60m setup</button>
+            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">Daily context</button>
             <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
-            <button type="button" class="chart-timeframe" data-timeframe="60M">Hour</button>
           </div>
-          <div class="chart-controls" aria-label="Chart layers">
-            <button type="button" class="chart-toggle is-active" data-layer="candles">OHLC</button>
-            <button type="button" class="chart-toggle is-active" data-layer="volume">VOL</button>
-            <button type="button" class="chart-toggle is-active" data-layer="ma">MA</button>
-            <button type="button" class="chart-toggle is-active" data-layer="rsi">RSI</button>
-          </div>
-          <div class="drawer-indicator-legend" aria-label="Chart overlays">
-            <span>MA20 <em id="ind-ma20">–</em></span>
-            <span>MA50 <em id="ind-ma50">–</em></span>
-            <span>MA200 <em id="ind-ma200">–</em></span>
-            <span>MACD <em id="ind-macd">–</em></span>
-            <span>RSI <em id="ind-rsi">–</em></span>
-            <span>Trigger <em id="ind-trigger">–</em></span>
-            <span>Stop <em id="ind-stop">–</em></span>
-            <span>Target <em id="ind-target">–</em></span>
-          </div>
+          <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
+          <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">
+            <span>Wave evidence details are in the Method / Evidence Guide.</span>
+            <button id="drawer-method-link" class="btn btn--guide" type="button">Open guide</button>
+          </section>
 
           <dl class="drawer-fields">
-            <div class="drawer-field"><dt>Target</dt><dd id="drawer-target">–</dd></div>
+            <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>
+            <div class="drawer-field"><dt>Raw V1 state</dt><dd id="drawer-raw-state">–</dd></div>
             <div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>
             <div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div>
-            <div class="drawer-field"><dt>%Margin</dt><dd id="drawer-margin">–</dd></div>
+            <div class="drawer-field"><dt>Marginable</dt><dd id="drawer-margin">–</dd></div>
             <div class="drawer-field"><dt>52W High / Low</dt><dd id="drawer-52w">–</dd></div>
             <div class="drawer-field"><dt>ATH High / Low</dt><dd id="drawer-ath">–</dd></div>
             <div class="drawer-field"><dt>Provenance</dt><dd id="drawer-provenance">–</dd></div>
@@ -199,6 +191,8 @@
 
   </div>
 
+  <script src="request_cache.js"></script>
+  <script src="canonical-client.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

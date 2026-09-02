@@ -1,5 +1,6 @@
 """Integration contract: /scan snapshots the entire evaluated universe."""
 import os
+import datetime as dt
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -20,6 +21,7 @@ class RunScanHistoryIntegrationTests(unittest.TestCase):
         }
         groups = {"breakout_new": [ready], "retest_watch": [], "down_or_broken": [avoid]}
         pg = MagicMock()
+        pg.cursor.return_value.fetchone.return_value = (dt.date(2026, 8, 13),)
 
         with patch.object(app, "scan_universe", return_value=([ready, avoid], [])), \
              patch.object(app, "group_scan_results", return_value=groups), \
@@ -46,12 +48,14 @@ class RunScanHistoryIntegrationTests(unittest.TestCase):
         }
         parent_run_id = "00000000-0000-0000-0000-000000000001"
         groups = {"breakout_new": [ready], "retest_watch": []}
+        pg = MagicMock()
+        pg.cursor.return_value.fetchone.return_value = (dt.date(2026, 8, 13),)
 
         # Invoke the decorated /scan handler itself; all external seams are
         # mocked, so this test cannot contact the service database.
         with patch.object(app, "scan_universe", return_value=([ready], [])), \
              patch.object(app, "group_scan_results", return_value=groups), \
-             patch.object(app, "get_pg", return_value=MagicMock()), \
+             patch.object(app, "get_pg", return_value=pg), \
              patch.object(app, "_publish_screen"), \
              patch.object(app, "_write_scan_json"), \
              patch.object(app, "persist_daily_scan_snapshot") as persist, \

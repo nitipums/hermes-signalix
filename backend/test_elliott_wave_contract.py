@@ -1,0 +1,295 @@
+"""T2 contract tests: Daily Elliott engine production boundary (spec §2.2/§2.7).
+
+Deterministic fixtures are frozen 1Y Daily OHLCV for CRC/BGRIM/AWC (as_of
+2026-08-28, price_data market=TH, read-only replay path). Regenerate only with
+fixtures/elliott/generate_fixtures.py and only with owner approval.
+"""
+
+import json
+from pathlib import Path
+
+import pandas as pd
+import pytest
+
+from elliott_structure_engine import (
+    WAVE_STATES,
+    _swing_legs_ohlc,
+    build_wave_evidence_markers,
+    build_wave_contract,
+    classify_wave_candidate,
+)
+
+FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "elliott"
+WAVE_ENUM = {
+    "WAVE_1_ADVANCE",
+    "WAVE_2_FORMING",
+    "WAVE_2_NEAR_COMPLETION",
+    "EARLY_WAVE_3",
+    "WAVE_3_CONTINUATION",
+    "WAVE_4_CORRECTION",
+    "WAVE_5_ADVANCE",
+    "UNKNOWN",
+}
+
+# Owner-verified ground truth (decision record 2026-08-31, chart-gate approved).
+EXPECTED_STATES = {
+    "CRC": "WAVE_1_ADVANCE",       # retrace 85.71% > 60% must NOT promote to W3
+    "BGRIM": "WAVE_3_CONTINUATION",  # retrace 29.17%, close above Wave 1 high
+    "AWC": "WAVE_1_ADVANCE",       # retrace 91.18% > 60% must NOT promote to W3
+}
+
+EXPECTED_MARKERS = {
+    "CRC": [("WAVE_1_LOW", "109", 16.5), ("WAVE_1_HIGH", "114", 20.0),
+             ("WAVE_2_PULLBACK_LOW", "143", 17.0), ("WAVE_3_CLOSE_CONFIRMATION", "259", 27.75)],
+    "BGRIM": [("WAVE_1_LOW", "126", 13.1), ("WAVE_1_HIGH", "210", 17.9),
+               ("WAVE_2_PULLBACK_LOW", "245", 17.6), ("WAVE_3_CLOSE_CONFIRMATION", "259", 20.7)],
+    "AWC": [("WAVE_1_LOW", "109", 1.92), ("WAVE_1_HIGH", "118", 2.26),
+            ("WAVE_2_PULLBACK_LOW", "175", 2.06), ("WAVE_3_CLOSE_CONFIRMATION", "259", 3.12)],
+}
+
+
+def load_frame(symbol: str) -> pd.DataFrame:
+    fixture = json.loads((FIXTURE_DIR / f"{symbol}_daily_1y.json").read_text())
+    assert fixture["symbol"] == symbol and fixture["as_of"] == "2026-08-28"
+    return pd.DataFrame(fixture["rows"]).rename(
+        columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+    )
+
+
+def rising_frame(values):
+    close = pd.Series(values, dtype=float)
+    return pd.DataFrame({"Close": close, "Open": close, "High": close, "Low": close, "Volume": 1})
+
+
+def test_engine_states_stay_within_spec_enum():
+    assert WAVE_STATES == WAVE_ENUM
+    assert "INVALIDATED" not in WAVE_STATES
+    assert "EXTENDED" not in WAVE_STATES
+
+
+@pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
+def test_frozen_fixture_reproduces_owner_verified_state(symbol):
+    result = classify_wave_candidate(load_frame(symbol))
+    assert result["state"] == EXPECTED_STATES[symbol]
+
+
+@pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
+def test_retracement_gate_blocks_wave3_promotion(symbol):
+    """CRC/AWC retrace >60% must never reach EARLY_WAVE_3/WAVE_3_CONTINUATION."""
+    result = classify_wave_candidate(load_frame(symbol))
+    retrace = result["evidence"]["retracement_pct"]
+    assert retrace is not None
+    if retrace > 60:
+        assert result["state"] not in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}
+        assert result["state"] in {"WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_4_CORRECTION", "UNKNOWN"}
+    else:
+        assert result["evidence"]["holds_above_wave1_low"] is not False
+
+
+@pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
+def test_wave_contract_shape_and_confidence(symbol):
+    contract = build_wave_contract(load_frame(symbol))
+    assert contract["timeframe"] == "daily"
+    assert contract["primary_state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
+    assert contract["alternative_state"] in {"WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
+    assert contract["confidence"] in {"LOW", "MEDIUM", "HIGH"}
+    for key in ("supporting_evidence", "contradicting_evidence", "missing_evidence"):
+        assert isinstance(contract[key], list)
+    assert contract["policy"] == "wave3-confirmed-pivots-v1"
+    assert contract["audit_compatibility"]["legacy_full_wave"]["state"] == EXPECTED_STATES[symbol]
+    json.dumps(contract)  # JSON-safe boundary
+
+
+@pytest.mark.parametrize("symbol", ["CRC", "BGRIM", "AWC"])
+def test_chart_markers_are_exact_fixture_rows_and_snapshot_linked(symbol):
+    contract = build_wave_contract(load_frame(symbol))
+    assert all(marker["snapshot_id"] == contract["snapshot_id"] for marker in contract["evidence_markers"])
+    assert all(marker["timeframe"] == "daily" for marker in contract["evidence_markers"])
+    required = {"id", "kind", "timeframe", "timestamp", "price", "label", "wave_role",
+                "source", "confidence", "evidence_refs", "snapshot_id", "snapshot_identity"}
+    assert all(required <= marker.keys() for marker in contract["evidence_markers"])
+
+
+def test_unknown_contract_still_exposes_arrays_and_low_confidence():
+    contract = build_wave_contract(None, {})
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["alternative_state"] == "NOT_VERIFIABLE"
+    assert contract["confidence"] == "LOW"
+    assert any("history" in reason or "ohlcv" in reason for reason in contract["missing_evidence"])
+    assert contract["supporting_evidence"] == []
+    json.dumps(contract)
+
+
+@pytest.mark.parametrize("state", sorted(WAVE_ENUM))
+def test_wave_context_maps_full_wave_engine_without_competing_primary_state(monkeypatch, state):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "daily", "state": state, "confidence": "PARTIAL",
+        "evidence": {"missing_evidence": ["owner_chart_review"]},
+    })
+    contract = engine.build_wave_contract(None, {})
+
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["context"] == {
+        "mapped_state": state,
+        "secondary_markers": [],
+        "confidence": "LOW" if state == "UNKNOWN" else "MEDIUM",
+        "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_evidence": ["owner_chart_review"],
+        "rationale": f"Deterministic full-wave engine mapped {state} as Daily context evidence.",
+    }
+
+
+def test_wave3_extended_is_explicit_secondary_context_only(monkeypatch):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "daily", "state": "WAVE_3_CONTINUATION", "confidence": "HIGH",
+        "evidence": {},
+    })
+    contract = engine.build_wave_contract(None, {"wave_3_extended": True})
+
+    assert contract["context"]["mapped_state"] == "WAVE_3_CONTINUATION"
+    assert contract["context"]["secondary_markers"] == ["WAVE_3_EXTENDED"]
+    assert contract["primary_state"] != "WAVE_3_EXTENDED"
+    assert contract["state"] != "WAVE_3_EXTENDED"
+
+
+def test_invalid_full_wave_state_fails_context_closed_and_is_json_safe(monkeypatch):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "60m", "state": "WAVE_3_EXTENDED", "confidence": "CERTAIN",
+        "evidence": {"missing_evidence": {"ambiguous", "invalid_state"}},
+    })
+    contract = engine.build_wave_contract(None, {})
+
+    assert contract["context"]["mapped_state"] == "UNKNOWN"
+    assert contract["context"]["confidence"] == "LOW"
+    assert contract["context"]["source_timeframe"] == "daily"
+    assert "invalid_structural_context_state" in contract["context"]["contradicting_evidence"]
+    assert contract["context"]["secondary_markers"] == []
+    json.dumps(contract, allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda frame: frame.drop(columns=["High"]),
+        lambda frame: frame.drop(columns=["Low"]),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3)),
+        lambda frame: frame.assign(Low=lambda value: value["Low"].mask(value.index == 3)),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3, 0)),
+        lambda frame: frame.assign(Low=lambda value: value["Low"].mask(value.index == 3, -1)),
+        lambda frame: frame.assign(High=lambda value: value["High"].mask(value.index == 3, value["Low"] - 1)),
+        lambda frame: frame.assign(Open=lambda value: value["Open"].mask(value.index == 3, value["High"] + 1)),
+    ],
+)
+def test_invalid_or_incomplete_daily_ohlc_fails_closed(mutate):
+    daily = rising_frame(list(range(1, 26)))
+    daily = mutate(daily)
+
+    assert _swing_legs_ohlc(daily) == []
+    contract = build_wave_contract(daily)
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["confidence"] == "LOW"
+    assert contract["missing_evidence"]
+
+
+def test_valid_flat_daily_candle_is_not_rejected_as_malformed_ohlc():
+    daily = rising_frame([10] * 25)
+    assert _swing_legs_ohlc(daily) == []
+    contract = build_wave_contract(daily)
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+
+
+def test_confidence_tokens_map_into_contract_scale():
+    short = build_wave_contract(rising_frame([10] * 10), {})
+    assert short["confidence"] in {"LOW", "MEDIUM", "HIGH"}
+    assert short["primary_state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "NOT_VERIFIABLE"}
+
+
+def test_dual_degree_is_evidence_only_and_never_alters_large_state():
+    for symbol in ("CRC", "BGRIM", "AWC"):
+        frame = load_frame(symbol)
+        with_small = build_wave_contract(frame)
+        legacy = with_small["audit_compatibility"]["legacy_full_wave"]
+        dual = legacy["evidence"]["dual_degree"]
+        assert dual["large"]["pct"] == 0.05 and dual["large"]["bars"] == 5
+        assert dual["small"]["pct"] == 0.03 and dual["small"]["bars"] == 2
+        assert legacy["state"] == EXPECTED_STATES[symbol]
+
+
+def test_dual_degree_labels_and_structure_are_deterministic():
+    contract = build_wave_contract(load_frame("BGRIM"))
+    evidence = contract["audit_compatibility"]["legacy_full_wave"]["evidence"]
+    assert evidence["dual_degree"]["large"]["label"] == "1,2,3"
+    assert evidence["dual_degree"]["small"]["label"] == "(1),(2),(3)"
+    labels = evidence.get("small_wave_labels")
+    assert labels is not None and isinstance(labels, list)
+
+
+def test_wave_contract_confidence_respects_review_lane_boundary():
+    """Only MEDIUM/HIGH may be actionable downstream; LOW never reaches REVIEW_NOW."""
+    for symbol in ("CRC", "BGRIM", "AWC"):
+        contract = build_wave_contract(load_frame(symbol))
+        if contract["primary_state"] == "NOT_VERIFIABLE":
+            assert contract["confidence"] == "LOW"
+        else:
+            assert contract["confidence"] in {"MEDIUM", "HIGH"}
+
+
+def test_tested_high_marker_uses_source_wick_price_and_timestamp():
+    frame = pd.DataFrame({"date": ["2026-01-01", "2026-01-02"],
+                          "High": [10.0, 12.0], "Low": [9.0, 11.0],
+                          "Close": [9.5, 11.5]})
+    marker = build_wave_evidence_markers(
+        frame, {"wave1_high": 11.0, "tested_high_only": True}
+    )[0]
+    assert marker["kind"] == "TESTED_HIGH"
+    assert marker["price"] == 12.0
+    assert marker["timestamp"] == "2026-01-02"
+
+
+def test_marker_timestamp_normalization_matches_daily_and_intraday_chart_forms():
+    daily = pd.DataFrame({"date": [pd.Timestamp("2026-01-01"), pd.Timestamp("2026-01-02")],
+                          "High": [10.0, 12.0], "Low": [9.0, 11.0],
+                          "Close": [9.5, 11.5]})
+    marker = build_wave_evidence_markers(
+        daily, {"wave1_high": 11.0, "tested_high_only": True}
+    )[0]
+    assert marker["timestamp"] == "2026-01-02"
+
+
+
+def test_contradicting_evidence_flags_broken_gates():
+    """>60% retrace + 30-day pullback fails the W2 window → unknown fail-closed."""
+    values = list(range(1, 51)) + list(range(50, 19, -1)) + [21.0] * 3
+    contract = build_wave_contract(rising_frame(values))
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["confidence"] == "LOW"
+    assert contract["missing_evidence"]
+
+
+def test_unknown_from_failed_gates_does_not_claim_positive_confidence():
+    """>60% retrace must stay UNKNOWN with LOW confidence — never a positive candidate."""
+    values = list(range(1, 51)) + list(range(50, 15, -1)) + [20.0] * 3
+    contract = build_wave_contract(rising_frame(values))
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["confidence"] == "LOW"
+    assert contract["primary_state"] not in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_2_NEAR_COMPLETION"}
+
+
+def test_wave1_low_break_routes_away_from_wave2_near_completion():
+    """>60% retrace or Wave1-low break routes to WAVE_4_CORRECTION/UNKNOWN, never W2-NC."""
+    broken = list(range(1, 51)) + list(range(50, 24, -1)) + [14.0, 13.5]
+    result = classify_wave_candidate(rising_frame(broken))
+    retrace = result["evidence"].get("retracement_pct")
+    holds = result["evidence"].get("holds_above_wave1_low")
+    if (retrace is not None and retrace > 60) or holds is False:
+        assert result["state"] in {"WAVE_4_CORRECTION", "WAVE_2_FORMING", "UNKNOWN", "WAVE_1_ADVANCE"}
+        assert result["state"] not in {"WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION"}

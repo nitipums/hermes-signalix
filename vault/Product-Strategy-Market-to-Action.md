@@ -1,8 +1,8 @@
 # Signalix Product Strategy — Market View to Action
 
 > **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
-
-_Last updated: 2026-08-12; curated from product discussion with Arm._
+> **Current stock-setup surface (2026-09-01):** Trend + Daily Elliott candidate + 60m Trade Setup is primary. T1–T9 source is promoted; public 390px failure→Retry→recovery browser acceptance is PASS, with evaluator auto-caller and broader acceptance separate. VCP is bonus/compatibility evidence only.
+_Last updated: 2026-09-01; durable strategy retained below, with the current stock-setup replacement explicitly overriding older MVP surface sections._
 
 ## Product thesis
 
@@ -924,6 +924,8 @@ Dependent Action Queue, Outcome Log, and UI redesign cards MUST remain blocked u
 
 ## 11. 2026-08-23 — Owner-approved Daily Shortlist reset
 
+> **STATUS: SUPERSEDED 2026-08-26** — The historical Daily Shortlist reset remains preserved for audit, but VCP Finder · 60m is now the owner-approved MVP core. See section 12.
+
 Owner approved a product reset to a **Daily Shortlist** as Signalix's default decision surface and retained the existing stage-first dashboard as a secondary **All Stocks Explorer**. The approved design is `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`.
 
 - Daily Shortlist serves Thai Daily-chart swing trades held for several days to several weeks.
@@ -934,4 +936,10 @@ Owner approved a product reset to a **Daily Shortlist** as Signalix's default de
 - Strong price/volume moves that fail actionability remain visible in separate context lanes: `RISING MOVERS / WATCH ONLY` for S1/S2 evidence and `CAUTION / DO NOT CHASE` for S3/S4/topping/extended evidence. These lanes never receive shortlist rank or entry permission.
 - Explorer Stage/Search filters apply immediately. Detail charts use real stored-data `1D`, `1W`, and `60M` views; timeframe/layer controls stay below the plot.
 
-Implementation readiness for the owner-only MVP stable candidate is `PASS` at commit `595eb49`: full tests, served API, and desktop/mobile browser evidence are recorded in `vault/Execution-Pipeline.md` and `vault/Postmortems/Chart-and-60m-Stabilization-2026-08-25.md`. Future Action Queue/Outcome Log work remains separately deferred.
+## 12. 2026-09-01 — Current stock-setup replacement (authoritative)
+
+> **STATUS: CURRENT OVERRIDE** · This section reconciles the older strategy layers above with the owner-approved release direction.
+
+For Thai stock setup discovery, the current primary surface is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**, served by `/api/setup-candidates` and `/mvp`. T1–T9 source is promoted; public 390px failure→Retry→recovery acceptance is PASS, with Arm's manual Wave-identification review as the next validation loop. `marginable_long` is 237 eligible symbols, while 931 active ORD is audit/rollback coverage. VCP is bonus/compatibility evidence, not the primary candidate gate. Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain off. Evaluator auto-caller is a separate `PENDING / OWNER DECISION` for lifecycle evidence persistence only, not order execution.
+
+Sections describing Daily Shortlist, All Stocks Explorer, or VCP-first serving are preserved historical transition context and are superseded where they conflict with this override.

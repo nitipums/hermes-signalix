@@ -38,7 +38,11 @@ def test_movers_are_watch_only_and_not_ready():
 def test_s3_movers_are_caution_and_do_not_chase():
     ziga = _base("ZIGA", "S3_distributing", "topping", 7.02, 6.21, "intraday_emerging")
     ziga["setup_quality"]["reasons"].append("extended")
-    result = project_shortlist_response([ziga], snapshot_meta={"freshness": {}})
+    # This test isolates watch-lane semantics from the default Krungsri
+    # presentation filter; ZIGA is not in the current broker margin list.
+    result = project_shortlist_response(
+        [ziga], snapshot_meta={"freshness": {}}, marginable_filter="all"
+    )
     assert result["ready"] == []
     assert result["caution"][0]["symbol"] == "ZIGA"
     assert result["caution"][0]["action"] == "DO NOT CHASE"

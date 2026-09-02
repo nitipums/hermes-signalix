@@ -1,0 +1,2 @@
+[431855.8] GET http://91.98.72.120:3001/api/setup-candidates?page=1&page_size=50 (Fetch)
+[431855.10] GET http://91.98.72.120:3001/api/setup-candidates?page=1&page_size=50 (Fetch) 200

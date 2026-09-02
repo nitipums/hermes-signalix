@@ -12,6 +12,8 @@ Environment=POSTGRES_PASSWORD=signalix_pass
 Environment=POSTGRES_DB=signalix
 ExecCondition=/root/.venv_img/bin/python /root/signalix/backend/set_market_day_guard.py
 ExecStart=/root/.venv_img/bin/python /root/signalix/backend/eod_healthcheck.py
-StandardOutput=append:/root/signalix/eod_healthcheck_log.jsonl
-StandardError=append:/root/signalix/eod_healthcheck_log.jsonl
+StandardOutput=append:/var/log/signalix/eod_healthcheck.jsonl
+StandardError=append:/var/log/signalix/eod_healthcheck.jsonl
+LogsDirectory=signalix
+StateDirectory=signalix
 TimeoutStartSec=120

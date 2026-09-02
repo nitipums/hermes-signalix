@@ -174,9 +174,8 @@ def load_symbol(symbol, pg=None, lookback=None, market="TH", as_of_date=None):
 def load_symbol_intraday(symbol, pg=None, interval="60m", lookback=400, market="TH"):
     """Return an interval-scoped OHLCV DataFrame (timestamp-indexed), or None.
 
-    Used as a fallback when a symbol lacks enough DAILY bars (< 200) to compute
-    a 200-day MA: the 60m series still yields a valid trend structure, flagged
-    as a new listing via trend_source='intraday_60m'.
+    This loader is reserved for explicitly intraday paths. It must not be used
+    as a fallback for Daily/stage calculations.
     """
     own = pg is None
     if own:
@@ -198,6 +197,8 @@ def load_symbol_intraday(symbol, pg=None, interval="60m", lookback=400, market="
     df = pd.DataFrame(rows, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.set_index("Date").sort_index()
+    df.attrs["timeframe"] = interval
+    df.attrs["as_of"] = df.index[-1]
     return df
 
 
@@ -245,13 +246,28 @@ def _active_scan_symbols(pg, min_history=0, instrument_types=("ORD",),
     """
     excluded = excluded_symbols(pg, market=market)
     cur = pg.cursor()
-    cur.execute("""\
-        SELECT symbol
-        FROM price_data
-        WHERE market = %s AND instrument_type = ANY(%s)
-        GROUP BY symbol
-        ORDER BY symbol
-    """, (market.upper(), list(instrument_types),))
+    # symbol_master is the authoritative universe.  Keep the price_data query
+    # only as a compatibility fallback for databases predating the master;
+    # missing price rows must remain visible to scan_universe as insufficient
+    # Daily evidence rather than disappearing from coverage.
+    cur.execute("SELECT to_regclass('public.symbol_master')")
+    master_exists = bool(cur.fetchone()[0])
+    if master_exists:
+        cur.execute("""\
+            SELECT symbol
+            FROM symbol_master
+            WHERE instrument_type = ANY(%s)
+              AND (status IS NULL OR status = 'active')
+            ORDER BY symbol
+        """, (list(instrument_types),))
+    else:
+        cur.execute("""\
+            SELECT symbol
+            FROM price_data
+            WHERE market = %s AND instrument_type = ANY(%s)
+            GROUP BY symbol
+            ORDER BY symbol
+        """, (market.upper(), list(instrument_types),))
     rows = cur.fetchall()
     cur.close()
     return [r[0] for r in rows if r[0] not in excluded]
@@ -355,6 +371,50 @@ def insufficient_history_row(symbol, df, rs_rating=0.0):
             "stage_label": "Stage 1 · Basing", "phase_label": "Insufficient history",
             "setup_quality": {"pass": False, "reasons": ["insufficient_history"]},
             "setup_proximity": {"state": None, "pivot": None, "distance_pct": None, "zone": None},
+            "trend_source": "daily", "data_freshness": "unknown",
+        },
+    }
+
+
+def analysis_error_row(symbol, reason_code="analysis_exception"):
+    """Keep a failed Daily analysis visible without inventing evidence.
+
+    This is an observation of unavailable/invalid analysis, not a market
+    signal.  In particular, all price and indicator fields remain unknown.
+    """
+    return {
+        "symbol": symbol,
+        "analysis_status": "NOT_VERIFIED",
+        "reason_codes": [reason_code],
+        "reason": "Daily analysis failed; no actionable state was produced.",
+        "close": None,
+        "change": None,
+        "volume": 0.0,
+        "trade_value": None,
+        "last_date": None,
+        "trend_source": "daily",
+        "trend_template": {
+            "pass": False, "conditions_met": 0,
+            "reason": reason_code, "conditions": {},
+            "ma": {}, "rs_rating": 0.0,
+        },
+        "vcp": {"is_vcp": False, "contractions": [], "latest_contraction_pct": 0.0},
+        "buy_zone": {"50": None, "62": None},
+        "trade_readiness": {
+            "status": "NOT_VERIFIED",
+            "readiness_status": "NOT_VERIFIED",
+            "reason": "Daily analysis failed; no actionable state was produced.",
+            "buy_zones_90d": {}, "near_buy_zone": False,
+        },
+        "position_sizing": {},
+        "suggested_stop": None,
+        "daily_state": {
+            "stage": "S1_basing", "phase": "not_verified",
+            "primary_state": "not_verified",
+            "stage_label": "Stage 1 · Basing", "phase_label": "Not verified",
+            "setup_quality": {"pass": False, "reasons": [reason_code]},
+            "setup_proximity": {"state": None, "pivot": None,
+                                 "distance_pct": None, "zone": None},
             "trend_source": "daily", "data_freshness": "unknown",
         },
     }
@@ -494,11 +554,20 @@ def group_scan_results(results, events=None):
             state["primary_state"] = "base_forming"
             state["setup_quality"] = {"pass": False, "reasons": ["insufficient_history"]}
             state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
+        elif row.get("analysis_status") == "NOT_VERIFIED":
+            state["phase"] = "not_verified"
+            state["phase_label"] = "Not verified"
+            state["primary_state"] = "not_verified"
+            state["setup_quality"] = {"pass": False, "reasons": row.get("reason_codes", ["analysis_exception"])}
+            state["setup_proximity"] = {"state": None, "pivot": None, "distance_pct": None, "zone": None}
         # Two-layer actionable setup state (quality gate + proximity timing).
         # Attached at source so every serialization path (build/snapshot) inherits it.
-        _setup = compute_setup_state(state["stage"], evidence)
-        state["setup_quality"] = _setup["quality"]
-        state["setup_proximity"] = _setup["proximity"]
+        # Insufficient-history rows already have an explicit fail/null contract;
+        # never let the generic classifier overwrite it.
+        if row.get("analysis_status") not in ("INSUFFICIENT_HISTORY", "NOT_VERIFIED"):
+            _setup = compute_setup_state(state["stage"], evidence)
+            state["setup_quality"] = _setup["quality"]
+            state["setup_proximity"] = _setup["proximity"]
         if row.get("last_date") and evidence.get("latest_scan_date") and row["last_date"] != evidence["latest_scan_date"]:
             state["data_freshness"] = "stale"
         # New-listing flag: trend derived from 60m intraday, not daily history.
@@ -630,47 +699,54 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
         market_series = load_market(pg=pg, lookback=400, market=market,
                                     benchmark_symbol=benchmark_symbol, as_of_date=as_of_date)
         symbol_list = (list(symbols) if symbols is not None else
-                       _active_scan_symbols(pg, instrument_types=("ORD",)))
+                       _active_scan_symbols(pg, instrument_types=("ORD",), market=market))
         symbol_list = [s for s in symbol_list if s not in excluded]
         closes, rel_returns, trend_sources = {}, {}, {}
+        insufficient_daily = {}
+        daily_load_errors = {}
         m_ret = (market_series["Close"].iloc[-1] / market_series["Close"].iloc[-RS_LOOKBACK] - 1
                  if market_series is not None and len(market_series) >= RS_LOOKBACK else 0.0)
         for sym in symbol_list:
-            df = load_symbol(sym, pg=pg, lookback=SCAN_LOOKBACK, market=market,
-                             as_of_date=as_of_date)
-            trend_source = "daily"
-            # New listings / thin daily history: fall back to 60m intraday so the
-            # stage scan still runs. RS vs the daily benchmark is approximate.
-            if df is None or len(df) < MIN_DAYS:
-                idf = load_symbol_intraday(sym, pg=pg, interval="60m",
-                                           lookback=SCAN_LOOKBACK, market=market)
-                if idf is not None and len(idf) >= 50:
-                    df, trend_source = idf, "intraday_60m"
-            if df is None or len(df) < 1:
+            try:
+                df = load_symbol(sym, pg=pg, lookback=SCAN_LOOKBACK, market=market,
+                                 as_of_date=as_of_date)
+            except Exception:
+                # Preserve coverage even when the Daily loader fails for one
+                # symbol. No fallback timeframe is permitted here.
+                daily_load_errors[sym] = "daily_load_exception"
                 continue
+            if df is None or len(df) < MIN_DAYS:
+                # Daily/stage metrics must never be calculated from 60m bars.
+                # Keep the symbol visible as an explicit fail-closed observation.
+                insufficient_daily[sym] = df
+                continue
+            trend_source = "daily"
             c = df["Close"]
-            look = min(RS_LOOKBACK, len(c))
-            rel_returns[sym] = c.iloc[-1] / c.iloc[-look] - 1 - m_ret
+            rel_returns[sym] = c.iloc[-1] / c.iloc[-RS_LOOKBACK] - 1 - m_ret
             closes[sym] = df
             trend_sources[sym] = trend_source
         ranks = pd.Series(rel_returns).rank(pct=True) * 100
         results, all_results = [], []
-        for sym, df in closes.items():
+        for sym in symbol_list:
+            df = closes.get(sym)
             try:
-                row = analyze_symbol_db(sym, pg=pg, market_series=market_series,
-                                        rs_rating=ranks.get(sym, 0.0), df=df)
+                if sym in insufficient_daily:
+                    row = insufficient_history_row(sym, insufficient_daily[sym])
+                elif sym in daily_load_errors:
+                    row = analysis_error_row(sym, daily_load_errors[sym])
+                else:
+                    row = analyze_symbol_db(sym, pg=pg, market_series=market_series,
+                                            rs_rating=ranks.get(sym, 0.0), df=df)
             except Exception:
-                continue
+                row = analysis_error_row(sym)
             if row is None:
-                continue
+                row = analysis_error_row(sym, "analysis_unavailable")
             row["market"] = market
             row["benchmark_symbol"] = benchmark_symbol
             row["trend_source"] = trend_sources.get(sym, "daily")
             all_results.append(row)
             if row["trend_template"]["conditions_met"] >= min_conditions:
                 results.append(row)
-            if limit and len(results) >= limit:
-                break
         if annotate_ath:
             annotate_all_time_highs(pg, all_results, market=market)
     finally:
@@ -681,6 +757,30 @@ def scan_universe(min_conditions=8, limit=None, pg=None, market="TH",
     near_miss = [row for row in all_results if row["trend_template"]["conditions_met"] == 6]
     near_miss.sort(key=lambda row: row["trend_template"]["rs_rating"], reverse=True)
     return results, near_miss
+
+
+def load_evaluated_ord_rows(pg=None, *, market="TH", symbols=None,
+                            as_of_date=None, annotate_ath=False):
+    """Return every evaluated Thai ORD row, including fail-closed rows.
+
+    This bounded adapter reuses the existing full-universe scanner with a
+    permissive condition threshold.  It intentionally applies no VCP filter;
+    callers may project rows into the setup-candidate contract afterwards.
+    """
+    rows, _near_miss = scan_universe(
+        min_conditions=-1,
+        pg=pg,
+        market=market,
+        symbols=symbols,
+        as_of_date=as_of_date,
+        annotate_ath=annotate_ath,
+    )
+    return rows
+
+
+# Keep the adapter discoverable under the universe terminology used by the
+# setup-candidate pipeline.
+evaluate_ord_universe = load_evaluated_ord_rows
 
 
 if __name__ == "__main__":
@@ -971,6 +1071,18 @@ def universe_layer3(pg, symbols):
 
 def load_index_membership(pg):
     cur = pg.cursor()
+    # Prefer the normalized, historical table when present.  Keep the old
+    # table as a compatibility fallback for deployments before migration 006.
+    cur.execute("SELECT to_regclass('public.index_memberships')")
+    if cur.fetchone()[0]:
+        cur.execute("""SELECT DISTINCT symbol
+                       FROM index_memberships
+                       WHERE index_name = 'SET50'
+                         AND effective_from <= CURRENT_DATE
+                         AND (effective_to IS NULL OR effective_to >= CURRENT_DATE)""")
+        rows = {r[0] for r in cur.fetchall()}
+        cur.close()
+        return rows
     cur.execute("SELECT to_regclass('public.index_membership')")
     if not cur.fetchone()[0]:
         cur.close(); return set()

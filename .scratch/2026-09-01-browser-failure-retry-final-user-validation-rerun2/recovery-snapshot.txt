@@ -1,0 +1,644 @@
+- generic
+  - banner
+    - heading "Signalix" [level=1, ref=e1]
+    - generic
+      - StaticText "Freshness available"
+      - StaticText "Daily EOD: fresh · 19h ago"
+      - StaticText "60m: fresh · 3h ago"
+  - tablist "Surface"
+    - tab "Trend · Elliott · Trade Setup" [selected, ref=e2]
+    - tab "VCP Audit · Compatibility / Rollback" [ref=e3]
+  - tabpanel "Trend · Elliott · Trade Setup"
+    - generic
+      - paragraph
+        - StaticText "Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal."
+      - generic "Setup candidate controls"
+        - LabelText
+          - StaticText "Search"
+          - searchbox "Search setup candidates" [ref=e8]
+        - LabelText
+          - StaticText "Lane"
+          - combobox "Filter setup candidates by lane" [expanded=false, ref=e9]: All lanes
+            - MenuListPopup
+              - option "All lanes" [selected, ref=e61]
+              - option "Review now" [ref=e62]
+              - option "Setup forming" [ref=e63]
+              - option "Daily candidate" [ref=e64]
+              - option "Wait" [ref=e65]
+              - option "Avoid" [ref=e66]
+              - option "Data blocked" [ref=e67]
+        - button "Refresh" [ref=e5]
+        - StaticText "Updated 01 Sept 2026 00:00:00 ICT (Bangkok)"
+      - group
+        - DisclosureTriangle "Advanced filters" [expanded=false]
+          - StaticText "Advanced filters"
+      - StaticText "Marginable long · Daily EOD 01 Sept 2026 00:00:00 ICT (Bangkok) · 60m 01 Sept 2026 16:00:00 ICT (Bangkok) · source price_data+intraday_price_data · 50 shown / 237 evaluated · setup-candidates-v1"
+      - generic
+        - heading "DAILY_CANDIDATE 50 / 139" [level=2, ref=e10]
+          - StaticText "DAILY_CANDIDATE 50 / 139"
+        - article [ref=e11] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KCE"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e12] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BCP"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e13] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "RCL"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e14] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "IRPC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e15] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KSL"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e16] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BBGI"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e17] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PTT"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e18] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CENTEL"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e19] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BGRIM"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e20] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KKP"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e21] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "IMPACT"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e22] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CBG"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e23] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SFLEX"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e24] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DRT"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e25] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PLANB"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e26] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PSP"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e27] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TURBO"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e28] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TU"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e29] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SCB"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e30] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TFG"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e31] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "GUNKUL"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e32] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "RBF"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e33] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DIF"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e34] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e35] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "DMT"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e36] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "KCG"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e37] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PRM"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e38] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PM"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e39] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "ITC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e40] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "WHA"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e41] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SCGD"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e42] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CPI"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e43] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TOA"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e44] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "ONEE"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e45] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SVOA"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e46] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SGC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e47] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "STPI"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e48] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "APO"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e49] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "BANPU"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e50] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e51] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SPRC"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e52] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TEAM"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e53] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "WPH"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e54] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "TIPH"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e55] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PYLON"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e56] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "PROUD"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e57] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "III"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e58] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "SSP"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e59] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "CPF"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+        - article [ref=e60] clickable [cursor:pointer, tabindex]
+          - strong
+            - StaticText "EKH"
+          - StaticText "DAILY_CANDIDATE"
+          - StaticText "Trigger readiness"
+          - StaticText "FORMING · trigger unavailable"
+          - StaticText "R:R"
+          - StaticText "Unavailable"
+          - StaticText "Target 1"
+          - StaticText "Unavailable"
+          - StaticText "Stop"
+          - StaticText "Unavailable"
+      - navigation "Setup candidate pages" [ref=e4]
+        - button "Previous setup candidate page" [disabled, ref=e6]
+          - StaticText "← Prev"
+        - StaticText "Page 1 of 5"
+        - button "Next setup candidate page" [ref=e7]
+          - StaticText "Next →"

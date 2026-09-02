@@ -16,6 +16,8 @@ READY_QUEUES = {"fresh_breakout", "qualified_pullback", "retest_watch"}
 PRE_READY_QUEUES = {"pre_breakout"}
 MIN_AVG_DAILY_VALUE_20 = 10_000_000  # THB 10m 20-day average daily value
 POLICY_VERSION = "daily-shortlist-v1"
+RANKING_POLICY_ID = "signalix/daily-shortlist-ranking"
+RANKING_POLICY_VERSION = "daily-shortlist-ranking-v1"
 LANE_POLICY_VERSION = "daily-shortlist-v2-lanes"
 
 # Canonical lane order for the compact shortlist table.
@@ -118,31 +120,42 @@ def _entry_readiness(item: dict) -> float:
 
     if queue in _DAILY_ONLY_QUEUES:
         # READY queues (action/near-trigger confirmed) score high.
-        if state in ("action", "near_trigger"):
+        if state == "action":
             return 1.0
-        if state == "forming":
+        if state == "near_trigger":
             return 0.5
+        if state == "forming":
+            return 0.25
     # Default conservative.
-    return 0.5
+    return 0.25
 
 
 def _risk_reward(item: dict) -> float:
-    """20% — clear invalidation, risk distance, and available reward vs risk."""
-    close = _to_float(item.get("close"))
-    stop = _to_float(item.get("riskStop") or item.get("stop"))
-    breakout = _to_float(item.get("breakoutLevel"))
-    if not close or close <= 0:
+    """20% — use only an authoritative precomputed risk/reward ratio."""
+    rr = _to_float(item.get("risk_reward_ratio"))
+    if rr is None:
+        rr = _to_float((item.get("position_sizing") or {}).get("risk_reward_ratio"))
+    if rr is None or rr <= 0:
         return 0.0
-    if not stop or stop >= close:
-        # No valid risk boundary => cannot rank risk/reward.
-        return 0.0
-    risk = close - stop
-    if risk <= 0:
-        return 0.0
-    reward = abs(breakout - close) if breakout else risk
-    rr = reward / risk
-    # Saturating map: 1.0 RR => 0.25, 3.0+ RR => 1.0
     return round(min(1.0, max(0.0, (rr - 1.0) / 8.0 + 0.25)), 4)
+
+
+def _rank_components(item: dict) -> tuple[dict, list[str]]:
+    """Build the canonical Daily explanation from existing evidence only."""
+    components = {
+        "structure_quality": _structure_quality(item),
+        "entry_readiness": _entry_readiness(item),
+        "risk_reward": _risk_reward(item),
+        "liquidity": _liquidity_component(item),
+    }
+    missing = []
+    if not (item.get("setup_quality") or {}).get("pass"):
+        missing.append("structure_quality")
+    if not (item.get("setup_proximity") or {}).get("state"):
+        missing.append("entry_readiness")
+    if _to_float(item.get("risk_reward_ratio")) is None and _to_float((item.get("position_sizing") or {}).get("risk_reward_ratio")) is None:
+        missing.append("risk_reward")
+    return components, missing
 
 
 def _liquidity_component(item: dict) -> float:
@@ -154,13 +167,15 @@ def _liquidity_component(item: dict) -> float:
 
 
 def _trigger(item: dict) -> str | None:
-    """Explainable trigger label (entry condition)."""
-    phase = item.get("phase")
+    """Explainable trigger label (entry condition) — fail-closed.
+
+    Only emits a confirmed trigger description when quality passes, proximity
+    is 'action', and close is at/above the breakout level."""
+    if not _trigger_confirmed(item):
+        return None
     queue = item.get("action_queue")
-    if phase == "breakout_new" or queue == "fresh_breakout":
+    if queue == "fresh_breakout" or item.get("phase") == "breakout_new":
         return "Daily close >= breakout trigger with quality pass"
-    if queue == "pre_breakout":
-        return "Near trigger/pivot; confirm with close + volume"
     if queue == "qualified_pullback":
         return "Pullback holding support reference"
     if queue == "retest_watch":
@@ -238,13 +253,69 @@ def _ready_action_for_queue(queue: str | None) -> str:
     }.get(queue, "REVIEW FRESH BREAKOUT")
 
 
+def _breakout_confirmed(item: dict) -> bool:
+    """True only when trigger evidence supports a confirmed breakout claim.
+
+    Requires an explicit quality pass AND close >= breakoutLevel.
+    Missing/non-numeric levels or failed quality never claim confirmation.
+    """
+    quality_pass = bool((item.get("setup_quality") or {}).get("pass"))
+    if not quality_pass:
+        return False
+    close = _to_float(item.get("close"))
+    breakout_level = _to_float(item.get("breakoutLevel"))
+    if close is None or breakout_level is None or breakout_level <= 0:
+        return False
+    return close >= breakout_level
+
+
+def _trigger_confirmed(item: dict) -> bool:
+    """Fail-closed READY confirmation: quality pass + action proximity +
+    close at/above breakout level.
+
+    This is the canonical gate used by both publication-state assignment and
+    trigger/why-now wording so the frontend cannot receive a READY label
+    paired with unconfirmed evidence.
+    """
+    prox = item.get("setup_proximity") or {}
+    if prox.get("state") != "action":
+        return False
+    return _breakout_confirmed(item)
+
+
+def _lifecycle_state(item: dict) -> str:
+    """Canonical lifecycle state from the serialized card.
+
+    Accepts either lifecycle_state or lifecycleState source fields and falls
+    back to phase, eliminating drift between the two input contracts.
+    """
+    return (
+        item.get("lifecycle_state")
+        or item.get("lifecycleState")
+        or item.get("phase")
+        or "unclassified"
+    )
+
+
 def _why_now(item: dict, publication_state: str) -> str | None:
-    """Human-readable why-now: combines trigger and readiness state."""
+    """Human-readable why-now: combines trigger and readiness state.
+
+    READY text must NOT claim a confirmed breakout unless the item's evidence
+    (quality pass + close at/above breakout level) actually supports it.
+    PRE_READY wording is preserved as confirmation-oriented guidance.
+    """
     prox = item.get("setup_proximity") or {}
     state = prox.get("state")
     if publication_state == "READY":
         if state == "action":
-            return "Trigger confirmed — close at/above breakout level with quality pass"
+            queue = item.get("action_queue")
+            if queue == "qualified_pullback":
+                return "Support defense in action area; confirm support hold"
+            if queue == "retest_watch":
+                return "Retest in action area; confirm hold before entry"
+            if _breakout_confirmed(item):
+                return "Trigger confirmed — close at/above breakout level with quality pass"
+            return "Setup in action area; awaiting confirmation at trigger level with quality pass"
         if state == "near_trigger":
             return "Near trigger; setup ready for confirmation"
     if publication_state == "PRE_READY":
@@ -306,20 +377,21 @@ def classify_shortlist(item: dict) -> dict:
         return _ineligible(["DEVELOPING_BASE"], symbol, POLICY_VERSION)
 
     # --- Publication state ---
+    # A fresh-breakout queue is excluded when the breakout-level evidence does
+    # not support the claim. All READY queues additionally require action
+    # proximity + quality pass + close >= breakout; anything less becomes
+    # PRE_READY so the frontend cannot show false confirmed-trigger wording.
+    if queue == "fresh_breakout" and not _breakout_confirmed(item):
+        return _ineligible(["TRIGGER_NOT_CONFIRMED"], symbol, POLICY_VERSION)
     if queue in READY_QUEUES:
-        pub = "READY"
+        pub = "READY" if _trigger_confirmed(item) else "PRE_READY"
     elif queue in PRE_READY_QUEUES:
         pub = "PRE_READY"
     else:
         return _ineligible(["NON_DAILY_QUEUE"], symbol, POLICY_VERSION)
 
     # --- Ranking (explainable 40/30/20 + liquidity gate) ---
-    components = {
-        "structure_quality": _structure_quality(item),
-        "entry_readiness": _entry_readiness(item),
-        "risk_reward": _risk_reward(item),
-        "liquidity": _liquidity_component(item),
-    }
+    components, missing_components = _rank_components(item)
     total = round(
         0.4 * components["structure_quality"]
         + 0.3 * components["entry_readiness"]
@@ -330,8 +402,11 @@ def classify_shortlist(item: dict) -> dict:
         "publication_state": pub,
         "exclusion_reasons": [],
         "rank_components": components,
+        "missing_components": missing_components,
         "total_score": total,
         "policy_version": POLICY_VERSION,
+        "ranking_policy_id": RANKING_POLICY_ID,
+        "ranking_policy_version": RANKING_POLICY_VERSION,
     }
 
 
@@ -341,8 +416,11 @@ def _ineligible(reasons, symbol, policy_version):
         "publication_state": None,
         "exclusion_reasons": reasons,
         "rank_components": {},
+        "missing_components": [],
         "total_score": None,
         "policy_version": policy_version,
+        "ranking_policy_id": RANKING_POLICY_ID,
+        "ranking_policy_version": RANKING_POLICY_VERSION,
         "symbol": symbol,
     }
 
@@ -354,8 +432,7 @@ def project_shortlist(items: list[dict]) -> list[dict]:
     higher-liquidity names rank first and ties break by symbol (stable).
     """
     classified = []
-    for item in items or []:
-        result = classify_shortlist(item)
+    for item, result in rank_daily_shortlist(items):
         if result["eligible"]:
             components = result["rank_components"]
             pub = result["publication_state"]
@@ -365,11 +442,14 @@ def project_shortlist(items: list[dict]) -> list[dict]:
             classified.append({
                 "symbol": item.get("symbol"),
                 "publication_state": pub,
-                "lifecycle_state": item.get("lifecycle_state") or item.get("lifecycleState") or item.get("phase") or "unclassified",
+                "lifecycle_state": _lifecycle_state(item),
                 "action": normalized_action,
                 "source_action": source_action,
                 "rank_components": components,
+                "missing_components": result["missing_components"],
                 "policy_version": result["policy_version"],
+                "ranking_policy_id": result["ranking_policy_id"],
+                "ranking_policy_version": result["ranking_policy_version"],
                 "total_score": result["total_score"],
                 "trigger": _trigger(item),
                 "invalidation": _invalidation(item),
@@ -395,6 +475,28 @@ def project_shortlist(items: list[dict]) -> list[dict]:
         r["symbol"] or "",
     ))
     return classified
+
+
+def rank_daily_shortlist(items: list[dict]):
+    """Canonical Daily adapter: gate every item, then rank eligible items.
+
+    The adapter returns the source item alongside its classification so callers
+    can retain full-universe observations for audit/coverage purposes. It does
+    not mutate or discard the input collection; ``project_shortlist`` remains
+    the presentation projection that emits eligible candidates only.
+    """
+    classified = [(item, classify_shortlist(item)) for item in (items or [])]
+    eligible = [(item, result) for item, result in classified if result["eligible"]]
+    state_order = {"READY": 0, "PRE_READY": 1}
+    eligible.sort(key=lambda pair: (
+        state_order.get(pair[1]["publication_state"], 99),
+        -(pair[1]["total_score"] or 0.0),
+        -(_to_float(pair[0].get("avgDailyValue20")) or 0.0),
+        pair[0].get("symbol") or "",
+    ))
+    # Eligible rows are ranked; ineligible rows are retained after them for
+    # coverage/audit callers. The presentation projection filters explicitly.
+    return eligible + [(item, result) for item, result in classified if not result["eligible"]]
 
 
 # ---------------------------------------------------------------------------
@@ -504,6 +606,9 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
     Broken/invalidated/stale/illiquid/developing names enter NO lane.
     """
     ready_pre = project_shortlist(items or [])
+    # Cross-lane exclusivity: a symbol already assigned to REVIEW_NOW or PREPARE
+    # must never duplicate into LEADERSHIP_EXTENDED.
+    assigned_symbols = {r["symbol"] for r in ready_pre}
     lanes: dict[str, list[dict]] = {lane: [] for lane in LANE_ORDER}
     for r in ready_pre:
         lane = "REVIEW_NOW" if r["publication_state"] == "READY" else "PREPARE"
@@ -515,6 +620,8 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
 
     extended = []
     for item in items or []:
+        if item.get("symbol") in assigned_symbols:
+            continue
         result = classify_shortlist_extended(item)
         if not result["eligible"]:
             continue
@@ -523,7 +630,7 @@ def project_shortlist_lanes(items: list[dict]) -> dict[str, list[dict]]:
         extended.append({
             "symbol": item.get("symbol"),
             "publication_state": "EXTENDED",
-            "lifecycle_state": item.get("lifecycle_state") or item.get("lifecycleState") or item.get("phase") or "unclassified",
+            "lifecycle_state": _lifecycle_state(item),
             "action": action,
             "source_action": source_action,
             "rank_components": result["rank_components"],

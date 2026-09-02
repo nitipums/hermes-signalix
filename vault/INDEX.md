@@ -2,18 +2,21 @@
 
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
+> **Last reconciled:** 2026-09-02 · T1–T9 promoted; fetch-time/candle-time UI distinction verified; stale R4/R5 graph archived; evaluator auto-caller separate.
 > Governance: [[Documentation-Governance]]
-> Active work source: `Execution-Pipeline.md` + linked focused plans. Kanban is audit/archive only.
+> Product/acceptance authority: `Execution-Pipeline.md` + linked focused plans. Active named-worker execution state: Kanban board `signalix`; live card status is not mirrored into vault notes.
 
 ## 0. Governance gate
 
-อ่าน `Documentation-Governance.md` ก่อนเพิ่มหรือแก้ note ใดๆ ทุกครั้ง
+เริ่มจาก `../docs/START-HERE.md` แล้วอ่าน `Documentation-Governance.md` ก่อนเพิ่มหรือแก้ note ใดๆ ทุกครั้ง
+
+Cleanup matrix: `../docs/current/2026-09-02-documentation-authority-matrix.md`
 
 - Product direction → `Product-Strategy-Market-to-Action.md`
 - Atomic decisions → `Decisions.md`
 - Current architecture/ops → `Architecture.md`, `Components.md`, `Deployment.md`, `Execution-Pipeline.md`
 - Historical evidence → dated handoffs / `Postmortems/`
-- Work status → owner decision required; do not mirror into notes/facts
+- Product/acceptance scope → `Execution-Pipeline.md` + focused plans; active named-worker execution state → Kanban board `signalix`; do not mirror live card status into notes/facts
 
 ## 1. วิธีการใช้
 
@@ -27,16 +30,34 @@
 | ไฟล์ | เรื่อง | สถานะ | หมายเหตุ |
 |---|---|---|---|
 || `Documentation-Governance.md` | Authority map, status vocabulary, cleanup policy | ✅ current | Read before adding/editing notes |
-|| `Memory-Cleanup-Candidates.md` | Fact/memory cleanup candidates | ⚠️ review required | Candidate list only; no deletions |
-| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-08-25; stable MVP candidate `595eb49` |
-| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **MVP server, watch-only lanes, canonical chart timeframes reconciled 2026-08-25** |
+|| `Memory-Cleanup-Candidates.md` | Fact/memory cleanup record | ✅ current | Cleanup completed 2026-08-26; historical vault preserved |
+|| `README.md` | ภาพรวม project | ✅ current | Status reconciled 2026-09-01; T1–T9 release and 390px failure/recovery gate closed |
+|| `Canonical-Source-of-Truth-2026-08-25.md` | Current repo/worktree/runtime authority | ✅ current | Sole source authority after cutover |
+|| `Krungsri-Credit-Balance-Marginable-2026-08-25.md` | Owner-selected marginable list, rates, permissions, refresh policy | ✅ current | PDF effective 2026-08-25; dataset in `backend/marginable_securities.json` |
+|| `Architecture.md` | สถาปัตยกรรม/data flow/containers/webhook | ✅ active | **Elliott/Trend/Trade-Setup spine and 390px failure/recovery gate reconciled 2026-09-01** |
 | `Components.md` | รายละเอียด component | ✅ active | |
 | `Deployment.md` | Runbook/deploy | ✅ active | |
 | `Phases.md` | แผนระยะ | ✅ active | |
-| `Decisions.md` | การตัดสินใจ product/tech | ✅ active | |
+| `Decisions.md` | การตัดสินใจ product/tech | ✅ active | T1–T9 spine implementation + promotion decisions (latest: spine promoted to release) |
 | `Execution-Pipeline.md` | Pipeline สัญญาณ | ✅ active | |
-| `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | Mali เขียนได้ |
-| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ active | **single strategy file; Daily Shortlist default + Explorer + separate watch/caution context lanes** |
+| `Product-Feedback.md` | ฟีดแบ็กจาก tester | ✅ active | historical feedback retained; no retired-profile writes |
+| `Product-Strategy-Market-to-Action.md` | Canonical Signalix product strategy: Market View → Action + Decision-quality Setup Copilot | ✅ current | Elliott/Trend/Trade-Setup is the current stock-setup spine; older VCP/Daily sections are historical context |
+| `VCP-Finder-MVP.md` | VCP compatibility/audit contract and historical serving evidence | ⛔ superseded | New primary authority is `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` |
+| `2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Historical v2 VCP serving/replay closeout evidence | 🟡 historical | Superseded as primary surface by the Elliott/Trend/Trade-Setup spine |
+| `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
+| `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
+| `../docs/current/2026-09-02-documentation-authority-matrix.md` | Cleanup source-of-truth matrix and wave ledger | ✅ current | navigation/control record; not product authority |
+| `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by current closeouts; findings retained |
+|| `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
+|| `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | Arm manual Wave-identification review is next |
+|| `../.scratch/2026-09-02-signalix-session-close-handoff.md` | 2026-09-02 session closeout, fetch/candle display fix, Kanban archive, and data repair boundary | ✅ current handoff | temporary navigation record; canonical contract remains in Deployment/Execution-Pipeline |
+|| `../docs/current/2026-09-01-owner-wave-validation.md` | Owner-confirmed Wave fixture review, exact snapshot/as-of, disputes, and bounded follow-ups | ✅ current | CRC/AWC/BGRIM confirmed; TASCO examples remain unconfirmed feedback |
+|| `../docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md` | Owner-approved user-validation redesign: freshness, refresh, compact cards, and multi-timeframe Wave evidence | ✅ current design | T01–T04 engineering tickets; T05 owner confirmation |
+| `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline (**historical/audit**) | 20 daily snapshots, 18,620 rows, no-lookahead; VCP is bonus evidence not primary spine |
+| `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate (**historical/audit**) | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
+| `Scan-Evaluation-Logic-Map-2026-08-29.md` | ~~Current scan/evaluation architecture~~ **⛔ HISTORICAL/SUPERSEDED 2026-08-31** — retained for audit; current authority is Elliott/Trend spine | ⛔ historical | superseded by Elliott prototype |
+| `../docs/archive/superpowers/plans/2026-08-29-scan-evaluation-closeout.md` | Historical Scan/Evaluation closeout checklist | 🟡 historical/superseded | Replaced by Elliott/Trend/Trade-Setup implementation and promotion records |
+| `../docs/archive/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | Historical implementation plan and checklist evidence | 🟡 historical | T1–T9 promoted; focused spec is current authority |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |
@@ -44,8 +65,12 @@
 | `2026-08-20-Intraday-Master-Watchdog-Handoff.md` | Settrade master authority + 15m intraday/watchdog | ✅ current | |
 | `2026-08-20-Dashboard-Data-Policy-Update-Handoff.md` | Pull-all yfinance + COLOR exclude | ✅ current | ดู Decisions.md + Architecture.md |
 | `2026-08-21-Intraday-E2E-Reliability-Incident.md` | Intraday fetch → DB → dashboard E2E fix | ✅ current | dashboard refresh, watchdog tolerance, morning monitor |
+| `Postmortems/2026-08-28-Kanban-Terminal-Trigger-Gap.md` | Terminal card reporting and REVISE recovery invariant | ✅ current | active-chain trigger delivery, stale-card exclusion, bounded remediation |
+| `Lesson-Learned-2026-08-28-Loop-Retrospective.md` | Loop taxonomy + 7 prevention gates (เมื่อคืน 13 runs) | ✅ current | 13 runs 2026-08-27 23:05→08:11, refs in Execution-Pipeline.md |
+| `Lesson-Learned-Full-Board-260-Cards-2026-08-28.md` | **Full-board scan 260 cards / 355 runs / 154 logs** — ใครวนตรงไหนทั้งบอร์ด | ✅ current | 58 multi-run, 148 waste, 21 prep>150, crash clusters 08-19/21 |
+| `Card-Template-LOCKED-2026-08-28.md` | **Card template บังคับ 8 gates** — ตัวอย่าง body ที่ orchestrator ต้อง enforce | ✅ current | owner approved, files/tests/endpoints/deadline mandatory |
 | `2026-08-21-Intraday-Feed-Availability-Handoff.md` | 11 unavailable 60m feeds + COLOR boundary | ✅ current | feed-specific cooldown; Daily preserved |
-| `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | ✅ current | stable candidate `595eb49` |
+|| `Postmortems/Chart-and-60m-Stabilization-2026-08-25.md` | Chart latency/60m feed stabilization + MVP timeframe follow-up | 🟡 historical evidence | prior candidate; not source authority |
 
 ## 3. Catalog — Handoff ตามวัน (dated, historical)
 
@@ -58,17 +83,25 @@
 | `2026-08-17-Stage-First-Dashboard-Redesign-Handoff.md` | **Stage-first 1,143 ORD redesign** | 🟡 **HISTORICAL** — design/migration evidence; current UI contract verified from source/artifact/browser |
 | `Bee-Handoff-Browser-Infrastructure-2026-08-15.md` | Browser infra fix | 🟡 **HISTORICAL** — permanent fix อยู่ใน skill `signalix-browser-permanent-fix` |
 | `Roadmap-Kanban.md` | Archived Kanban mirror | 🟡 historical | Audit only; Markdown pipeline is active work source |
-| `Team-Operating-Model.md` | Team roles, providers, review loop | ✅ current | Bee final gate; provider allocation verified 2026-08-22 |
+| `Team-Operating-Model.md` | Current team roles, providers, review loop | ✅ current | Lite + Codex + Ploy; historical helper roster retained for audit |
 
 ## 4. สถานะซิงค์กับ fact_store
+
+- **2026-08-26:** Consolidated 26 overlapping/superseded Signalix skills into `signalix-production-delivery`, `signalix-dashboard`, and `signalix-screening-replay`; created Hermes umbrellas `hermes-operations` and `memory-documentation-governance`. Originals remain reversible under `_archived_consolidation_20260826`.
 
 - Stage-first / FULL ORD / LAYER1-LAYER2 ↔ fact 117, 121, 112; `MEMORY.md`
 - Intraday sequential 60m ↔ fact (Memory 2026-08-18) + `signalix-backfill-and-parity` skill
 - Test สถานะ ↔ fact 119 (126 unit + 6 integration)
 - A2A/Browser infra ↔ fact 71/122 + skills
 
-## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
+## 2026-08-29 — Codex standard team adoption
+Codex CLI (`gpt-5.6-luna`) became the default Signalix coding/review/implementation agent. Current active team is Lite, Codex, and Ploy; Khim and Nida are no longer default active members. Lite remains the sole orchestrator and final quality gate. See [[Codex-Standard-Workflow-2026-08-29]] and [[Team-Operating-Model]].
 
+## 2026-09-02 — Session closeout
+
+`2efed71` reconciled full-universe freshness aggregation and `cfc2c22` exposed intraday `fetch_completed_at` separately from the latest completed 60m candle. Kanban stale R4/R5 todo/blocked graph was archived without purge; active queue is empty. Three official Daily rows and one 60m row remain pending source-timer repair and are recorded in the current handoff, not hidden by documentation.
+
+## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~
 ~~2. **Mark handoff เก่า** — ทั้ง 5 ตัว mark HISTORICAL/SUPERSEDED เรียบร้อย ✅~~
 ~~3. **Coverage lineage 1,143/934/718** — `coverage_report.json` + runtime validator fixed ✅~~
@@ -78,10 +111,13 @@
 
 ## 6. Changelog
 
+- **2026-09-01 (release closeout):** T1–T9 Elliott/Trend/Trade-Setup source is promoted on `release/signalix-mvp-stable`; `/api/setup-candidates` is served from the live DB builder with honest fail-closed lanes. Public 390px failure→Retry→recovery browser gate is PASS; Arm manual Wave-identification review is next. VCP notes are compatibility/audit history, not primary authority. Alerts/automatic trading remain future features; evaluator auto-caller is pending owner decision.
+- **2026-08-25 (canonical source cutover):** `release/signalix-mvp-stable` at `3ec48f7` became current. `/root/signalix` is the canonical release worktree and production bind-mount source; later prototype/feature worktrees remain separate and must not be treated as release authority.
+
 - **2026-08-25 (stable MVP candidate `595eb49`)**: verified owner-only `/mvp` served from `signalix_dashboard`; added immediate Explorer filters, real `1D`/`1W`/`60M` chart controls, moved chart controls/indicator values below the plot, and reconciled current docs. Full suite: 246 passed; live 1D/1W/60M 200, retired 15M 400.
 - **2026-08-25 (MVP watch lanes `195a090`)**: added `RISING MOVERS / WATCH ONLY` and `CAUTION / DO NOT CHASE` without weakening READY/PRE_READY; sanitized legacy projection labels at the canonical artifact boundary.
 
-- **2026-08-23**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; canonical design: `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`. Implementation remains pending written-design review and focused plan approval.
+- **2026-08-23 (SUPERSEDED 2026-08-26)**: Owner approved `Daily Shortlist` as the default decision surface and retained the stage-first dashboard as secondary `All Stocks Explorer`; replaced by VCP Finder · 60m as the current MVP core. Historical design remains for audit.
 - **2026-08-22**: Added cross-team review resolution to `Product-Strategy-Market-to-Action.md` after independent Ploy, Prae, View, Mali, Nida, and Khim reviews; direction PASS, implementation readiness REVISE; added regime/state/ranking/lifecycle/acceptance clarifications.
 - **2026-08-22**: Added the approved **Decision-quality Setup Copilot** direction to the canonical `Product-Strategy-Market-to-Action.md`: experienced self-directed trader, setup-first, regime-aware queue, hard gates + quality ranking, immutable event-based outcomes, and explicit non-goals.
 - **2026-08-22**: Team/provider closeout: created Prae PM, revived View designer, verified local A2A/profile boundaries, and recorded the provider allocation in `Team-Operating-Model.md`.
@@ -103,3 +139,4 @@
 - **2026-08-21 (Intraday E2E)**: Fixed intraday-only path so every 60m fetch/evaluation rebuilds dashboard artifacts from the existing Daily scan; watchdog now tolerates expected partial-success, uses 90m candle / 30m evaluator thresholds, and morning no-agent monitor checks/self-heals served freshness. Commits `6ffb62e`, `d7b8a39`; 30 focused tests passed; live browser showed updated `Last Scanned`.
 
 - **2026-08-21 (Instrument authority)**: Added active-ORD `instruments.py`, migration 004, bounded SET factsheet refresh timer (20 symbols/cycle), and `/instruments` APIs. Verified factsheet run: 20/20 fetched and parsed; production `company_profiles` now has 20 `set_factsheet` rows. Yahoo remains fallback. Focused authority/scraper/dashboard tests pass.
+- **2026-08-29 (Scan/evaluation logic map — review required)**: Added `Scan-Evaluation-Logic-Map-2026-08-29.md`, a source-grounded map of the Daily stage pipeline, isolated 60m VCP Finder, intraday overlay, shadow policies, duplicate decision systems, and simplification recommendations. It is `REVIEW_REQUIRED` pending owner decision on one serving decision spine; no runtime/deploy claim is made.
