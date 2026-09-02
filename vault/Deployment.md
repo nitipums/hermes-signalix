@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-01 · Release branch T1–T9 promoted; containers healthy; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-02 · Release branch T1–T9 promoted; fetch-time/candle-time UI distinction verified; containers healthy; evaluator auto-caller separate.
 
 ## Stable release
 
@@ -14,7 +14,7 @@ legacy routes: quarantined/404
 
 ## Current runtime scope — 2026-09-01
 
-The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis are healthy at rebaseline; `/mvp` returns 200, `/api/setup-candidates` returns the live DB-built contract, `/health/readiness` is on backend `:8000`, and retired `/dashboard.html` returns 404. The public 390px failure→Retry→recovery journey is verified; broader desktop/drawer regression evidence remains separate. Alerts, auto-trading, and broker execution remain off.
+The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis are healthy at rebaseline; `/mvp` returns 200, `/api/setup-candidates` returns the live DB-built contract, `/health/readiness` is on backend `:8000`, and retired `/dashboard.html` returns 404. The public 390px failure→Retry→recovery journey is verified. The UI now shows `60m fetched` separately from `latest completed 60m candle`; session evidence was verified after runtime reload. Alerts, auto-trading, and broker execution remain off.
 
 `marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
@@ -26,7 +26,7 @@ The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `si
 
 The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
 
-`/root/signalix` is the only registered Signalix worktree and the canonical production bind mount. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`. Former release-candidate/feature worktrees and temporary cleanup copies were retired after stable push; no retired path is treated as current source.
+`/root/signalix` is the canonical production bind mount. Session closeout 2026-09-02 archived the stale R4/R5 Kanban graph; many historical/feature worktrees remain on disk and must be inspected before removal. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`; no retired path is treated as current source.
 
 
 ## Reload after edits (CRITICAL)
@@ -61,6 +61,7 @@ after the restart; a successful restart alone is not acceptance evidence.
 - `signalix-factsheet-refresh.timer` — bounded weekday SET factsheet refresh, active ORD only, 20 symbols per run, persisted JSONL progress, upserts `set_factsheet` fields without overwriting stronger existing evidence. It is the authoritative profile-source refresh; Yahoo remains fallback.
 - MVP chart contract — `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`; `1D` reads Daily OHLCV, `1W`/`1M` aggregate Daily bars, and `60M` reads stored intraday 60m bars. Unsupported `15M` returns HTTP 400.
 - MVP freshness contract — the header reports `Daily EOD` from the canonical Daily run and `60m updated` from the latest completed `intraday_ingestion_runs` row. A successful intraday fetch/evaluator must advance the latter without changing Daily decision provenance.
+- MVP timestamp display — the setup-candidate metadata line reports both `60m fetched` from `intraday_ingestion_runs.fetch_completed_at` and `latest completed 60m candle` from the per-item stored candle timestamp; these must not be conflated.
 - MVP chart safety — timeframe requests are abortable/generation-guarded; unavailable 60m feeds show an explicit `60m unavailable · Daily EOD remains the decision source` state. Mobile chart/filter controls are at least 44px.
 - `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
 

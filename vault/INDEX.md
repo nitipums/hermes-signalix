@@ -2,7 +2,7 @@
 
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
-> **Last reconciled:** 2026-09-01 · T1–T9 promoted; 390px failure→Retry→recovery browser gate PASS; evaluator auto-caller separate.
+> **Last reconciled:** 2026-09-02 · T1–T9 promoted; fetch-time/candle-time UI distinction verified; stale R4/R5 graph archived; evaluator auto-caller separate.
 > Governance: [[Documentation-Governance]]
 > Product/acceptance authority: `Execution-Pipeline.md` + linked focused plans. Active named-worker execution state: Kanban board `signalix`; live card status is not mirrored into vault notes.
 
@@ -47,6 +47,7 @@
 || `../docs/current/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by 2026-09-01 session closeout; findings retained |
 || `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
 || `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | Arm manual Wave-identification review is next |
+|| `../.scratch/2026-09-02-signalix-session-close-handoff.md` | 2026-09-02 session closeout, fetch/candle display fix, Kanban archive, and data repair boundary | ✅ current handoff | temporary navigation record; canonical contract remains in Deployment/Execution-Pipeline |
 || `../docs/current/2026-09-01-owner-wave-validation.md` | Owner-confirmed Wave fixture review, exact snapshot/as-of, disputes, and bounded follow-ups | ✅ current | CRC/AWC/BGRIM confirmed; TASCO examples remain unconfirmed feedback |
 || `../docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md` | Owner-approved user-validation redesign: freshness, refresh, compact cards, and multi-timeframe Wave evidence | ✅ current design | T01–T04 engineering tickets; T05 owner confirmation |
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline (**historical/audit**) | 20 daily snapshots, 18,620 rows, no-lookahead; VCP is bonus evidence not primary spine |
@@ -91,6 +92,10 @@
 
 ## 2026-08-29 — Codex standard team adoption
 Codex CLI (`gpt-5.6-luna`) became the default Signalix coding/review/implementation agent. Current active team is Lite, Codex, and Ploy; Khim and Nida are no longer default active members. Lite remains the sole orchestrator and final quality gate. See [[Codex-Standard-Workflow-2026-08-29]] and [[Team-Operating-Model]].
+
+## 2026-09-02 — Session closeout
+
+`2efed71` reconciled full-universe freshness aggregation and `cfc2c22` exposed intraday `fetch_completed_at` separately from the latest completed 60m candle. Kanban stale R4/R5 todo/blocked graph was archived without purge; active queue is empty. Three official Daily rows and one 60m row remain pending source-timer repair and are recorded in the current handoff, not hidden by documentation.
 
 ## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~

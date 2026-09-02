@@ -2,6 +2,12 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown is the product/acceptance authority; Kanban is the active durable execution state for the current gated run and is not mirrored into vault notes.
 
+## 2026-09-02 — Session closeout: timestamp semantics and Kanban reconciliation
+
+Decision: The Signalix UI must show intraday ingestion completion (`fetch_completed_at`) separately from the latest completed 60m candle timestamp. A fetch round may run at 16:45 while the newest completed candle is 16:00; both values are valid and must remain labeled distinctly.
+
+Evidence: commits `2efed71` and `cfc2c22`; public `/mvp` after runtime reload displayed `60m fetched 01 Sept 2026 16:47 ICT` and `latest completed 60m candle 01 Sept 2026 16:00 ICT`. Kanban stale R4/R5 todo/blocked graph was archived, not purged; active queue is empty. A bounded official Daily repair for `3BBIF,COM7,PR9` on `2026-09-01` returned zero Settrade rows, so source data remains pending timer retry and was not fabricated.
+
 ## 2026-09-01 — Session boundary before implementation
 
 Arm instructed: record the complete review/spec/ticket state, stop, switch to a fresh session, then implement. The old VCP todo/blocked cards were archived; no new Kanban cards were published or dispatched. Local ticket drafts are under `.scratch/2026-09-01-signalix-review/issues/`. Next session must re-read the handoff and re-check git/worktrees/runtime before publishing cards.

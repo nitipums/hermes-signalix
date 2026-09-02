@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-01 · T1–T9 promoted; public 390px failure→Retry→recovery gate PASS; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-02 · T1–T9 promoted; fetch-time/candle-time display verified; Kanban stale R4/R5 graph archived; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -35,6 +35,7 @@ The product must let a user answer, quickly and honestly:
 ## Current verified baseline — 2026-09-01
 
 - The primary product spine is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**.
+- Intraday UI evidence distinguishes `60m fetched` (`fetch_completed_at`) from `latest completed 60m candle`; a fetch round at 16:45 may correctly expose a 16:00 candle.
 - The canonical API is `/api/setup-candidates`; it preserves all 237 `marginable_long` rows and six fail-closed lanes: `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`.
 - T1–T9 source and release promotion are complete. Live `:3001` serves the new DB-built contract with honest blocked/avoid states; public 390px failure→Retry→recovery journey is `PASS` with direct DOM/screenshot evidence. Broader desktop/drawer regression evidence and evaluator auto-caller remain separate.
 - VCP, contraction, and breakout-volume are bonus/compatibility evidence. `/api/vcp-finder` and old VCP surfaces are audit/rollback only.
@@ -45,7 +46,15 @@ The product must let a user answer, quickly and honestly:
 
 The release is handed to Arm for manual use. Elliott Wave output remains machine-generated candidate/evidence, not unquestionable truth. Review/confirm Wave identification from the rendered chart first; do not tune semantics from assumptions. Any confirmed product issue becomes a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle.
 
-Lite preflight is `PASS` for the rendered usability journey (desktop/mobile load, tab/filter interaction, candidate→drawer, chart, Wave Evidence visibility after drawer scroll, TradingView link, and no overflow). Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
+- Lite preflight is `PASS` for the rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, Wave Evidence visibility after drawer scroll, TradingView link, and no overflow). Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
+
+## Session closeout — 2026-09-02
+
+- Code/runtime fix promoted and pushed: `2efed71` (full-universe freshness aggregation) and `cfc2c22` (separate intraday fetch time from completed-candle time).
+- Public verification: `/mvp` 200; setup API `237 evaluated / 50 returned`; `/dashboard.html` retired 404; UI showed `60m fetched 01 Sept 2026 16:47 ICT` and `latest completed 60m candle 01 Sept 2026 16:00 ICT`; TradingView href and mobile drawer scroll owner verified.
+- Data boundary remains explicit: `BKIH` latest stored 60m is 15:00 ICT pending the next guarded intraday run; `3BBIF`, `COM7`, `PR9` lack official Daily rows. A bounded Settrade Daily retry for `2026-09-01` returned zero rows, so no fabricated/fallback official EOD data was written. Next repair windows are intraday from 10:00 ICT and EOD from 18:30 ICT.
+- Kanban `signalix`: stale R4/R5 todo/blocked graph archived (not force-closed/purged); active todo/blocked/ready/running/review are zero; historical done count is 168.
+- Remaining owner-owned/untracked artifacts: `.scratch/2026-09-02-signalix-session-close-handoff.md` and `factsheets/factsheets.jsonl`; do not stage, reset, clean, or delete broadly.
 
 ## Historical baseline — VCP-first MVP (superseded 2026-09-01)
 
