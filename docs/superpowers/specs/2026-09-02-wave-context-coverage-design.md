@@ -13,7 +13,7 @@ Extend the candidate evidence and review surface so the owner can see the comple
 
 Wave 1, Wave 3, and Wave 5 are coverage candidates. Any of them may reach `REVIEW_NOW` only when the existing deterministic setup, risk, freshness, and completed-60m confirmation gates pass. Wave 2 and Wave 4 remain visible context but cannot create actionability. Context never overrides data blocking, structural invalidation, risk incoherence, or owner review.
 
-The review UI uses the owner-approved visual format: real Daily price chart, exact date/close markers, transition details, per-symbol selection, and explicit filter/lane status. It is evidence for Arm, not objective Elliott truth or an order instruction.
+The review UI uses the owner-approved visual format at a dedicated `/wave-context` surface: real Daily price chart, exact date/close markers, transition details, per-symbol selection, and explicit filter/lane status. The existing `/mvp` Classic Review surface remains the default workflow. Both surfaces consume the same canonical API/engine/decision lanes; the URL split is presentation isolation, not logic duplication. The context surface is evidence for Arm, not objective Elliott truth or an order instruction.
 
 ## User Stories
 

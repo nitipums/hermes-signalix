@@ -1,6 +1,6 @@
 # 04: Visual Wave context dashboard
 
-**What to build:** Make the canonical review surface show the complete Wave context in a readable chart-first experience: Daily price line/high-low, exact Wave markers, legend, context/secondary labels, transition detail, and review-lane status. Wave 1/3/5 actionability must visibly remain dependent on setup/risk/60m gates; Wave 2/4 remain non-filter context.
+**What to build:** Keep `/mvp` as the Classic Review surface and add a dedicated `/wave-context` chart-first surface using the same canonical API/engine/decision lanes. The new route shows the complete Wave context in a readable chart-first experience: Daily price line/high-low, exact Wave markers, legend, context/secondary labels, transition detail, and review-lane status. Wave 1/3/5 actionability must visibly remain dependent on setup/risk/60m gates; Wave 2/4 remain non-filter context.
 
 **Blocked by:** 02: Wave 1/3/5 review gating; 03: Full-universe replay + coverage parity
 
