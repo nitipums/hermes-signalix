@@ -41,6 +41,7 @@ from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
                                       build_setup_candidate, build_setup_candidate_diagnostic,
+                                      compact_setup_candidate_for_list,
                                       project_setup_candidate_list,
                                       sort_setup_candidates)
 from elliott_structure_engine import build_wave_contract
@@ -974,12 +975,11 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
     page = max(1, int(page)); page_size = max(1, min(int(page_size), 100))
     total = len(filtered); start = (page - 1) * page_size
     page_items = filtered[start:start + page_size]
-    compact_items = []
-    for item in page_items:
-        compact = dict(item)
-        compact["wave"] = {key: value for key, value in (item.get("wave") or {}).items()
-                           if key != "evidence"}
-        compact_items.append(compact)
+    # Compact only after the complete canonical set has been validated,
+    # filtered, sorted, and paginated.  The source ``candidates`` list is
+    # still used for counts/diagnostics, and symbol detail reads it from the
+    # canonical read model with full wave evidence intact.
+    compact_items = [compact_setup_candidate_for_list(item) for item in page_items]
     projection_provenance = {"policy_version": "setup-candidates-v1"}
     if snapshot_meta:
         stored_provenance = snapshot_meta.get("provenance") or {}

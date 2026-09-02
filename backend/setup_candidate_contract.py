@@ -519,6 +519,71 @@ def project_setup_candidate_list(
     }
 
 
+# This is intentionally a presentation projection, not a second candidate
+# contract.  The canonical read model remains complete; the symbol detail
+# route reads that model directly.  Keep this list small because it is sent
+# for every paginated card, while the drawer fetches full evidence by symbol.
+_LIST_ITEM_FIELDS = (
+    "symbol", "as_of", "data_status", "trend", "wave", "setup",
+    "context", "bonus_evidence", "decision_lane", "provenance",
+)
+_LIST_NESTED_FIELDS = {
+    "data_status": (
+        "sufficient", "freshness", "source", "daily_available",
+        "daily_final_session_available", "daily_final_session_status",
+        "daily_freshness", "intraday_60m_available",
+        "intraday_60m_freshness", "intraday_60m_status", "intraday_60m_as_of",
+        "reason_code", "reason_codes",
+    ),
+    "trend": (
+        "state", "rise_20d_pct", "rise_60d_pct", "relative_strength",
+        "near_52w_high", "is_52w_high_breakout", "is_ath_breakout",
+    ),
+    "wave": (
+        "timeframe", "primary_state", "state", "alternative_state", "confidence",
+    ),
+    "setup": (
+        "timeframe", "state", "status", "minor_structure", "trigger",
+        "entry_zone", "invalidation", "trade_stop", "thesis_invalidation",
+        "targets", "target_1", "rr", "reason", "reason_code",
+    ),
+    "context": (
+        "market_regime", "sector", "industry", "peer_symbols", "sector_trend",
+        "peer_trend_breadth", "peer_breakout_count", "sector_leader_or_laggard",
+        "relative_strength_vs_sector", "peer_data_status",
+    ),
+    "bonus_evidence": ("vcp", "breakout_volume", "contraction"),
+    "provenance": (
+        "policy_version", "source", "daily_source", "intraday_source", "as_of",
+        "intraday_as_of", "freshness", "universe_filter",
+        "marginable_schema_version", "marginable_source_document",
+        "marginable_effective_date", "source_version", "snapshot_id",
+    ),
+}
+
+
+def compact_setup_candidate_for_list(item: dict) -> dict:
+    """Return the bounded card projection of one fully evaluated candidate.
+
+    Filtering, sorting, counts, and pagination happen before this function is
+    called.  Unknown future fields are deliberately not copied into the list;
+    full canonical evidence remains available from symbol detail.
+    """
+    compact = {}
+    for field in _LIST_ITEM_FIELDS:
+        value = item.get(field)
+        if field not in _LIST_NESTED_FIELDS:
+            compact[field] = _json_value(value)
+            continue
+        source = value if isinstance(value, dict) else {}
+        compact[field] = {
+            nested: _json_value(source[nested])
+            for nested in _LIST_NESTED_FIELDS[field]
+            if nested in source
+        }
+    return compact
+
+
 def _diagnostic_bucket(count_symbols: list[str]) -> dict:
     symbols = sorted(set(count_symbols))
     return {"count": len(symbols), "symbols": symbols}

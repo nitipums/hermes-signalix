@@ -6,6 +6,7 @@ import pytest
 
 import mvp_routes
 from mvp_api import project_setup_candidates_response
+from setup_candidate_contract import sort_setup_candidates
 
 
 class Handler:
@@ -68,6 +69,14 @@ def test_canonical_symbol_route_reads_published_model_without_builder_or_postgre
     import mvp_api
 
     row = candidate("DRAWER")
+    row["wave"].update({
+        "supporting_evidence": ["daily breakout"],
+        "contradicting_evidence": ["countertrend"],
+        "missing_evidence": ["volume"],
+        "evidence": {"explanation": "full canonical evidence"},
+        "markers": [{"timestamp": "2026-08-30", "price": 12.0}],
+        "evidence_explanation": {"rule": "close above Wave 1 high"},
+    })
     model = {
         "items": [row], "universe": "marginable_long", "eligible_count": 1,
         "excluded_count": 0, "freshness": {"status": "stale", "in_flight": True},
@@ -96,6 +105,11 @@ def test_canonical_symbol_route_reads_published_model_without_builder_or_postgre
     assert payload["sector"] == "Technology"
     assert "action_queue" not in payload
     assert payload["provenance"] == row["provenance"]
+    assert payload["wave"]["supporting_evidence"] == ["daily breakout"]
+    assert payload["wave"]["contradicting_evidence"] == ["countertrend"]
+    assert payload["wave"]["missing_evidence"] == ["volume"]
+    assert payload["wave"]["markers"][0]["price"] == 12.0
+    assert payload["wave"]["evidence"]["explanation"] == "full canonical evidence"
 
     missing_handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/symbol/MISSING", missing_handler)
@@ -171,9 +185,32 @@ def test_setup_candidates_default_page_is_compact_and_preserves_full_metadata():
     assert result["total_items"] == 237
     assert result["total_pages"] == 5
     assert sum(result["counts"].values()) == 237
-    assert result["items"][0]["wave"]["supporting_evidence"]
-    assert result["items"][0]["wave"]["contradicting_evidence"]
+    assert "supporting_evidence" not in result["items"][0]["wave"]
+    assert "contradicting_evidence" not in result["items"][0]["wave"]
+    assert "missing_evidence" not in result["items"][0]["wave"]
     assert "evidence" not in result["items"][0]["wave"]
+    assert result["items"][0]["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert result["items"][0]["setup"]["rr"]["to_target_1"] == 3
+
+
+def test_setup_candidates_compact_projection_drops_heavy_nested_detail_only_fields():
+    row = candidate("COMPACT")
+    row["wave"].update({
+        "supporting_evidence": ["x" * 10000],
+        "contradicting_evidence": ["y" * 10000],
+        "missing_evidence": ["z" * 10000],
+        "markers": [{"timestamp": "2026-08-30", "price": 12}],
+        "evidence_markers": [{"timestamp": "2026-08-30", "price": 12}],
+        "evidence_explanation": {"rule": "large explanation"},
+        "evidence": {"supporting": "large evidence"},
+    })
+    result = project_setup_candidates_response([row])
+    listed_wave = result["items"][0]["wave"]
+    assert set(listed_wave) <= {"timeframe", "primary_state", "state", "alternative_state", "confidence"}
+    assert listed_wave["primary_state"] == "EARLY_WAVE_3"
+    assert "markers" not in result["items"][0]["setup"]
+    assert result["items"][0]["context"]["sector"] == "Technology"
+    assert result["items"][0]["provenance"]["source"] == "test"
 
 
 def test_setup_candidates_page_count_is_page_return_count_not_universe_count():
@@ -191,6 +228,28 @@ def test_setup_candidates_page_count_is_page_return_count_not_universe_count():
     assert result["total_items"] == 237
     assert result["total_pages"] == 3
     assert result["diagnostic"]["returned_count"] == 100
+
+
+def test_setup_candidates_compaction_preserves_full_evaluation_order_counts_and_freshness():
+    rows = [candidate(f"S{i:03d}", decision_lane=(
+        "DATA_BLOCKED" if i % 11 == 0 else "DAILY_CANDIDATE" if i % 3 == 0 else "WAIT"
+    )) for i in range(237)]
+    freshness = {"status": "fresh", "daily_status": "fresh", "intraday_status": "fresh",
+                 "data_fetched_at": "2026-09-01T16:47:00+07:00"}
+    result = project_setup_candidates_response(
+        rows, page=1, page_size=50,
+        snapshot_meta={"eligible_count": 237, "universe_filter": "marginable_long",
+                       "freshness": freshness},
+    )
+    expected = sort_setup_candidates(rows)
+    assert result["evaluated_count"] == 237
+    assert result["counts"] == {
+        "REVIEW_NOW": 0, "SETUP_FORMING": 0,
+        "DAILY_CANDIDATE": 71, "WAIT": 144, "AVOID": 0, "DATA_BLOCKED": 22,
+    }
+    assert [item["symbol"] for item in result["items"]] == [row["symbol"] for row in expected[:50]]
+    assert result["freshness"] == freshness
+    assert result["returned_count"] == 50
 
 
 def test_missing_benchmark_history_leaves_relative_strength_unknown(monkeypatch):
