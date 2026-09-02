@@ -366,6 +366,37 @@ def test_canonical_snapshot_requires_exact_envelope_and_complete_provenance():
         _setup_candidate_from_snapshot(incomplete)
 
 
+def test_canonical_snapshot_accepts_and_preserves_daily_metadata_without_extra_keys():
+    from mvp_api import (_setup_candidate_from_snapshot,
+                         project_setup_candidates_response)
+
+    row = candidate()
+    row.update({
+        "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
+        "index_membership": ["SET50"],
+        "index_membership_evidence": {"source": "set-index"},
+    })
+
+    result = _setup_candidate_from_snapshot(row)
+
+    assert result["high52"] == 72
+    assert result["low52"] == 41
+    assert result["ath_high"] == 89
+    assert result["ath_low"] == 12
+    assert result["index_membership"] == ["SET50"]
+    assert result["index_membership_evidence"] == {"source": "set-index"}
+
+    projected = project_setup_candidates_response([row])
+    projected_item = projected["items"][0]
+    assert projected_item["high52"] == 72
+    assert projected_item["index_membership"] == ["SET50"]
+    assert projected_item["index_membership_evidence"] == {"source": "set-index"}
+
+    row["unbounded_extra"] = True
+    with pytest.raises(ValueError, match="exact canonical envelope"):
+        _setup_candidate_from_snapshot(row)
+
+
 def test_canonical_snapshot_accepts_nested_aai_style_chart_evidence():
     from mvp_api import _setup_candidate_from_snapshot
 

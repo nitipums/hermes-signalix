@@ -18,6 +18,14 @@ DECISIONS = {"REVIEW", "WAIT", "AVOID", "DATA_BLOCKED"}
 DECISION_LANES = {
     "REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED",
 }
+# Optional top-level observations attached by the canonical Daily metadata
+# enrichment.  Keep this allowlist shared with the exact-envelope validator so
+# adding a bounded canonical field cannot make the builder and validator
+# disagree about the contract.
+CANONICAL_METADATA_FIELDS = (
+    "high52", "low52", "ath_high", "ath_low", "index_membership",
+    "index_membership_evidence",
+)
 _LANE_ORDER = {
     "REVIEW_NOW": 0, "SETUP_FORMING": 1, "DAILY_CANDIDATE": 2,
     "WAIT": 3, "AVOID": 4, "DATA_BLOCKED": 5,

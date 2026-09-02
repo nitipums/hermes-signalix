@@ -37,6 +37,26 @@ def test_candidate_contract_keeps_layers_separate():
     json.dumps(item)
 
 
+def test_builder_emits_bounded_canonical_daily_metadata():
+    inputs = sample_inputs()
+    inputs["canonical_metadata"] = {
+        "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
+        "index_membership": ["SET50"],
+        "index_membership_evidence": {"source": "set-index"},
+        "unexpected": "must not be copied",
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["high52"] == 72
+    assert item["low52"] == 41
+    assert item["ath_high"] == 89
+    assert item["ath_low"] == 12
+    assert item["index_membership"] == ["SET50"]
+    assert item["index_membership_evidence"] == {"source": "set-index"}
+    assert "unexpected" not in item
+
+
 def test_60m_marker_timestamp_uses_chart_datetime_form():
     markers = _setup_evidence_markers(
         {"trigger": 12.5, "trigger_timestamp": "2026-01-02 11:00:00"},

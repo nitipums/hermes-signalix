@@ -44,6 +44,27 @@ def test_build_preserves_complete_coverage_lanes_and_provenance():
     assert model["excluded_count"] == 694
 
 
+def test_read_model_preserves_canonical_daily_metadata_through_validation(tmp_path):
+    items, metadata = _build()
+    items[0].update({
+        "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
+        "index_membership": ["SET50"],
+        "index_membership_evidence": {"source": "set-index"},
+    })
+
+    model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    publish_read_model(model, tmp_path)
+    loaded = load_current_read_model(tmp_path)
+
+    item = next(row for row in loaded["items"] if row["symbol"] == "S000")
+    assert item["high52"] == 72
+    assert item["low52"] == 41
+    assert item["ath_high"] == 89
+    assert item["ath_low"] == 12
+    assert item["index_membership"] == ["SET50"]
+    assert item["index_membership_evidence"] == {"source": "set-index"}
+
+
 def test_partial_build_rejected_before_existing_pointer_changes(tmp_path):
     items, metadata = _build()
     model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")

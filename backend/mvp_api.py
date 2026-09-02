@@ -41,6 +41,7 @@ from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
                                       build_setup_candidate, build_setup_candidate_diagnostic,
+                                      CANONICAL_METADATA_FIELDS,
                                       compact_setup_candidate_for_list,
                                       project_setup_candidate_list,
                                       sort_setup_candidates)
@@ -445,7 +446,8 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
         raise ValueError(
             "canonical snapshot contains legacy decision aliases: " + ", ".join(present)
         )
-    if set(item) != set(required):
+    allowed = set(required) | set(CANONICAL_METADATA_FIELDS)
+    if set(item) - allowed or not set(required).issubset(item):
         raise ValueError("snapshot is not an exact canonical envelope")
     provenance = item.get("provenance") or {}
     provenance_required = {"policy_version", "source", "as_of", "freshness"}
