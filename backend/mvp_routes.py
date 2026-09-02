@@ -340,6 +340,32 @@ def _record_setup_candidate_response_observability(result, started):
     return result
 
 
+def _read_model_snapshot_meta(model):
+    """Adapt the published envelope to the existing presentation seam."""
+    provenance = dict(model.get("provenance") or {})
+    return {
+        "scan_time": provenance.get("as_of"),
+        "universe_filter": model.get("universe"),
+        "freshness": model.get("freshness") or provenance.get("freshness") or {},
+        "base_active_ord_count": model.get("base_active_ord_count"),
+        "eligible_count": model.get("eligible_count"),
+        "excluded_count": model.get("excluded_count"),
+        "excluded_reason": model.get("excluded_reason"),
+        "schema_version": (model.get("universe_metadata") or {}).get("schema_version"),
+        "source_document": (model.get("universe_metadata") or {}).get("source_document"),
+        "effective_date": (model.get("universe_metadata") or {}).get("effective_date"),
+        "provenance": provenance,
+        "source_version": model.get("source_version"),
+        "published_at": model.get("published_at"),
+        "read_model_status": {
+            "status": (model.get("freshness") or {}).get("status", "unknown"),
+            "source_version": model.get("source_version"),
+            "published_at": model.get("published_at"),
+            "in_flight": bool((model.get("freshness") or {}).get("in_flight", False)),
+        },
+    }
+
+
 def _not_found(handler, symbol):
     json_response(handler, {"error": "symbol not found", "symbol": symbol}, status=404)
 
@@ -395,8 +421,6 @@ def handle_mvp_api(path, handler) -> bool:
             json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
-        pg = None
-        release_pg = None
         try:
             page = int(qs.get("page", ["1"])[0])
             page_size = int(qs.get("page_size", ["50"])[0])
@@ -405,12 +429,10 @@ def handle_mvp_api(path, handler) -> bool:
             return True
         try:
             import mvp_api
-            # Canonical serving is always built from authoritative OHLCV. The
-            # legacy MVP artifact is neither a source nor a fallback here.
-            pg, release_pg = _acquire_setup_candidates_pg()
-            payload = _load_setup_candidates_cached(
-                mvp_api.build_setup_candidates_from_data, pg, market="TH"
-            )
+            from read_model_publisher import load_current_read_model
+            model = load_current_read_model()
+            payload = _read_model_snapshot_meta(model)
+            payload["items"] = model["items"]
             items = payload["items"]
             projection_started = time.monotonic()
             result = mvp_api.project_setup_candidates_response(
@@ -427,9 +449,6 @@ def handle_mvp_api(path, handler) -> bool:
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
         except Exception:
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
-        finally:
-            if release_pg is not None:
-                release_pg()
         return True
     if route.startswith("/api/symbol/"):
         symbol = route[len("/api/symbol/"):].strip().rstrip("/")

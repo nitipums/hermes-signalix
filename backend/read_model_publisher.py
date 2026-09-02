@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -22,6 +23,7 @@ CONTRACT_VERSION = "signalix.setup-candidates.read-model.v1"
 EXPECTED_UNIVERSE = "marginable_long"
 EXPECTED_COUNT = 237
 LANES = ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED")
+DEFAULT_ROOT = Path(__file__).resolve().parent / "read-model"
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -143,6 +145,50 @@ def publish_read_model(model: dict, root: str | Path) -> dict:
     pointer = {"contract_version": CONTRACT_VERSION, "source_version": source_version, "path": str(version_path.name)}
     atomic_write_json(root / "current.json", pointer)
     return {"source_version": source_version, "path": str(version_path), "count": len(items), "counts": counts}
+
+
+def load_current_read_model(root: str | Path | None = None) -> dict:
+    """Read and validate the atomically selected canonical model.
+
+    The pointer is the only mutable selection boundary.  This function never
+    writes, falls back to another artifact, or rebuilds a model.
+    """
+    root = Path(root or os.getenv("SIGNALIX_READ_MODEL_ROOT", DEFAULT_ROOT))
+    pointer_path = root / "current.json"
+    pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+    if (not isinstance(pointer, dict)
+            or pointer.get("contract_version") != CONTRACT_VERSION
+            or not isinstance(pointer.get("source_version"), str)
+            or not isinstance(pointer.get("path"), str)
+            or Path(pointer["path"]).name != pointer["path"]):
+        raise ValueError("invalid canonical read-model pointer")
+
+    version_path = root / "versions" / pointer["path"]
+    if version_path.parent != (root / "versions") or version_path.stem != pointer["source_version"]:
+        raise ValueError("canonical read-model pointer path does not match source version")
+    model = json.loads(version_path.read_text(encoding="utf-8"))
+    if not isinstance(model, dict) or model.get("contract_version") != CONTRACT_VERSION:
+        raise ValueError("invalid canonical read-model envelope")
+    provenance = model.get("provenance")
+    if not isinstance(provenance, dict):
+        raise ValueError("read-model provenance is required")
+    items, counts = _validate_build(
+        model.get("items"),
+        {
+            "universe_filter": model.get("universe"),
+            "eligible_count": model.get("eligible_count"),
+            "excluded_count": model.get("excluded_count"),
+        },
+        provenance.get("source_versions"),
+    )
+    if (model.get("source_version") != pointer["source_version"]
+            or model.get("source_version") != _source_version(provenance["source_versions"])
+            or model.get("items") != items
+            or model.get("counts") != counts
+            or model.get("count") != EXPECTED_COUNT
+            or model.get("evaluated_count") != EXPECTED_COUNT):
+        raise ValueError("canonical read-model contents are not valid")
+    return model
 
 
 def publish_builder_result(

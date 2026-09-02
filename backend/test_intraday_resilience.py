@@ -89,8 +89,25 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
             },
         }
         assert kwargs["market"] == "TH"
-        assert kwargs["root"] == "/var/lib/signalix/read-model"
+        from read_model_publisher import DEFAULT_ROOT
+        assert kwargs["root"] == str(DEFAULT_ROOT)
         pg.close.assert_called_once()
+
+    @patch.dict("os.environ", {"SIGNALIX_READ_MODEL_ROOT": "/tmp/signalix-test-read-model"})
+    @patch("read_model_publisher.publish_builder_result")
+    @patch("update_data.get_pg")
+    def test_read_model_publish_preserves_root_override(self, get_pg, publish):
+        daily_date = dt.date(2026, 9, 1)
+        daily_timestamp = dt.datetime(2026, 9, 1, 11, 0, tzinfo=UTC)
+        pg = get_pg.return_value
+        pg.cursor.return_value.fetchone.side_effect = [
+            ("daily-run-1", daily_date, daily_timestamp, {"source": "price_data"}),
+            ("60m-run-1", "full_success", "2026-09-02T09:00:00+00:00"),
+        ]
+
+        update_data.publish_canonical_read_model()
+
+        assert publish.call_args.kwargs["root"] == "/tmp/signalix-test-read-model"
 
     @patch("read_model_publisher.publish_builder_result")
     @patch("update_data.get_pg")

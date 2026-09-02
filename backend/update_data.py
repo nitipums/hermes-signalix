@@ -1163,7 +1163,9 @@ def _canonical_read_model_source_versions(pg):
 
 def publish_canonical_read_model():
     """Build and publish only a complete canonical 237-row result."""
-    root = os.getenv("SIGNALIX_READ_MODEL_ROOT", "/var/lib/signalix/read-model")
+    from read_model_publisher import DEFAULT_ROOT, publish_builder_result
+
+    root = os.getenv("SIGNALIX_READ_MODEL_ROOT", str(DEFAULT_ROOT))
     pg = get_pg()
     try:
         source_versions = _canonical_read_model_source_versions(pg)
@@ -1171,7 +1173,6 @@ def publish_canonical_read_model():
             print("READ_MODEL_SKIP " + json.dumps({"reason": "source_lineage_incomplete"}))
             return None
         import mvp_api
-        from read_model_publisher import publish_builder_result
         result = publish_builder_result(
             mvp_api.build_setup_candidates_from_data,
             pg,

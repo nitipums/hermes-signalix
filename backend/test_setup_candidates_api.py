@@ -37,13 +37,16 @@ def candidate(symbol="ABC", *, decision_lane="REVIEW_NOW", sector="Technology"):
 
 
 def test_setup_candidates_route_returns_canonical_items(monkeypatch):
-    class PG:
-        def close(self): pass
-    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": [{"stage": "legacy"}]})
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    row = candidate()
+    model = {"items": [row], "universe": "marginable_long", "eligible_count": 1,
+             "excluded_count": 0, "freshness": {"status": "fresh"},
+             "provenance": {"as_of": "2026-08-30", "source_versions": {},
+                            "policy_version": "setup-candidates-v1"},
+             "source_version": "test-version", "published_at": "2026-09-02T00:00:00Z"}
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
     monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
-                        lambda pg, market="TH": ([candidate()], {
-                            "scan_time": "2026-08-30", "freshness": {"status": "fresh"}}))
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical route rebuilt the read model")))
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
     assert handler.status == 200
@@ -131,22 +134,21 @@ def test_setup_candidates_route_does_not_classify_builder_type_error_as_bad_requ
 
 
 def test_route_never_uses_snapshot_as_canonical_source(monkeypatch):
-    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {
-        "items": [candidate()], "scan_time": "2026-08-30",
-        "freshness": {"status": "fresh"},
-    })
-    class PG:
-        def close(self): pass
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
-    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: ("v1",))
+    model = {"items": [candidate("READ_MODEL")], "universe": "marginable_long",
+             "eligible_count": 1, "excluded_count": 0,
+             "freshness": {"status": "fresh"},
+             "provenance": {"as_of": "2026-08-30", "source_versions": {},
+                            "policy_version": "setup-candidates-v1"},
+             "source_version": "test-version", "published_at": "t1"}
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
     monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
-                        lambda pg, market="TH": ([candidate("DATABASE")], {
-                            "scan_time": "2026-08-30", "freshness": {"status": "fresh"}}))
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical route called builder")))
     mvp_routes.clear_setup_candidates_cache()
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
     assert handler.status == 200
-    assert json.loads(handler.body)["items"][0]["symbol"] == "DATABASE"
+    assert json.loads(handler.body)["items"][0]["symbol"] == "READ_MODEL"
     mvp_routes.clear_setup_candidates_cache()
 
 
@@ -713,19 +715,51 @@ def test_setup_candidate_response_keeps_page_totals_lanes_and_observability_cons
 
 
 def test_route_uses_data_source_when_snapshot_is_legacy(monkeypatch):
-    row = candidate("REAL_SOURCE")
+    row = candidate("READ_MODEL_SOURCE")
     calls = []
-    class PG:
-        def close(self):
-            pass
-    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": [{"symbol": "OLD", "stage": "S2_uptrend"}]})
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    model = {"items": [row], "universe": "marginable_long", "eligible_count": 1,
+             "excluded_count": 0, "freshness": {"status": "fresh"},
+             "provenance": {"as_of": "2026-08-30", "source_versions": {},
+                            "policy_version": "setup-candidates-v1"},
+             "source_version": "test-version", "published_at": "t1"}
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
     monkeypatch.setattr(mvp_routes, "json_response", lambda handler, data, status=200: calls.append((status, data)))
-    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data", lambda pg, market="TH": ([row], {"scan_time": "2026-08-30", "freshness": {}}))
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("builder called")))
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
     assert calls[0][0] == 200
-    assert calls[0][1]["items"][0]["symbol"] == "REAL_SOURCE"
+    assert calls[0][1]["items"][0]["symbol"] == "READ_MODEL_SOURCE"
+
+
+def test_canonical_route_returns_unavailable_without_valid_read_model(monkeypatch):
+    monkeypatch.setattr("read_model_publisher.load_current_read_model",
+                        lambda: (_ for _ in ()).throw(FileNotFoundError("no pointer")))
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical route rebuilt without a model")))
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 503
+    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
+
+
+def test_canonical_route_exposes_stale_in_flight_read_model_metadata(monkeypatch):
+    model = {"items": [candidate("STALE")], "universe": "marginable_long",
+             "eligible_count": 1, "excluded_count": 0,
+             "freshness": {"status": "stale", "in_flight": True},
+             "provenance": {"as_of": "2026-08-30", "source_versions": {},
+                            "policy_version": "setup-candidates-v1"},
+             "source_version": "stale-version", "published_at": "t1"}
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
+    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical route rebuilt stale model")))
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 200
+    payload = json.loads(handler.body)
+    assert payload["freshness"] == {"status": "stale", "in_flight": True}
+    assert payload["read_model_status"]["in_flight"] is True
 
 
 def test_missing_final_daily_session_is_blocked(monkeypatch):

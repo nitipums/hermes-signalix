@@ -980,10 +980,15 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         compact["wave"] = {key: value for key, value in (item.get("wave") or {}).items()
                            if key != "evidence"}
         compact_items.append(compact)
+    projection_provenance = {"policy_version": "setup-candidates-v1"}
+    if snapshot_meta:
+        stored_provenance = snapshot_meta.get("provenance") or {}
+        if isinstance(stored_provenance, dict):
+            projection_provenance.update(stored_provenance)
     projected = project_setup_candidate_list(
         compact_items,
         as_of=(snapshot_meta or {}).get("scan_time"),
-        provenance={"policy_version": "setup-candidates-v1"},
+        provenance=projection_provenance,
         universe=(snapshot_meta or {}).get("universe_filter") or "marginable_long",
     )
     projected.update({
@@ -1005,6 +1010,9 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         "marginable_effective_date": (snapshot_meta or {}).get("effective_date"),
         "build_observability": (snapshot_meta or {}).get("build_observability"),
         "cache_status": (snapshot_meta or {}).get("cache_status"),
+        "source_version": (snapshot_meta or {}).get("source_version"),
+        "published_at": (snapshot_meta or {}).get("published_at"),
+        "read_model_status": (snapshot_meta or {}).get("read_model_status"),
     })
     projected["diagnostic"] = build_setup_candidate_diagnostic(
         candidates,

@@ -40,18 +40,21 @@ def test_vcp_route_response_is_explicitly_audit_only(monkeypatch):
 
 
 def test_setup_candidates_never_falls_back_to_legacy_snapshot(monkeypatch):
-    class Conn:
-        def close(self): pass
-
     def fail_snapshot():
         raise AssertionError("canonical route called the legacy snapshot")
 
     monkeypatch.setattr(mvp_routes, "load_payload", fail_snapshot)
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
-    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: None)
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: {
+        "items": [], "universe": "marginable_long", "eligible_count": 0,
+        "excluded_count": 0, "freshness": {"status": "fresh"},
+        "provenance": {"as_of": None, "source_versions": {},
+                        "policy_version": "setup-candidates-v1"},
+        "source_version": "test-version", "published_at": "t1",
+    })
     monkeypatch.setattr(
         "mvp_api.build_setup_candidates_from_data",
-        lambda pg, market="TH": ([], {"scan_time": None, "freshness": {}}),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("canonical route called the builder")),
     )
     mvp_routes.clear_setup_candidates_cache()
     handler = type("Handler", (), {

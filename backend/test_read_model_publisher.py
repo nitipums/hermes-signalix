@@ -1,8 +1,15 @@
 import json
+from pathlib import Path
 
 import pytest
 
-from read_model_publisher import build_read_model, publish_builder_result, publish_read_model
+from read_model_publisher import (build_read_model, load_current_read_model,
+                                  publish_builder_result, publish_read_model,
+                                  DEFAULT_ROOT)
+
+
+def test_default_root_is_shared_backend_read_model_path():
+    assert DEFAULT_ROOT == Path(__file__).resolve().parent / "read-model"
 
 
 def _item(symbol, lane="WAIT"):
@@ -66,3 +73,21 @@ def test_publish_is_deterministic_and_pointer_selects_complete_version(tmp_path)
     stored = json.loads((tmp_path / "versions" / pointer["path"]).read_text())
     assert result["source_version"] == stored["source_version"]
     assert [item["symbol"] for item in stored["items"]] == [item["symbol"] for item in model["items"]]
+
+
+def test_load_current_read_model_rejects_missing_or_malformed_pointer(tmp_path):
+    with pytest.raises((FileNotFoundError, json.JSONDecodeError)):
+        load_current_read_model(tmp_path)
+    (tmp_path / "current.json").write_text(json.dumps({"path": "../escape.json"}), encoding="utf-8")
+    with pytest.raises(ValueError, match="pointer"):
+        load_current_read_model(tmp_path)
+
+
+def test_load_current_read_model_preserves_stale_and_in_flight_metadata(tmp_path):
+    items, metadata = _build()
+    metadata["freshness"] = {"status": "stale", "in_flight": True, "reason": "refresh_running"}
+    model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    publish_read_model(model, tmp_path)
+    loaded = load_current_read_model(tmp_path)
+    assert loaded["freshness"] == metadata["freshness"]
+    assert loaded["provenance"]["source_versions"] == VERSIONS
