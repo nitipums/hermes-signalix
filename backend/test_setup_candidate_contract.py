@@ -113,6 +113,80 @@ def test_non_unknown_wave_always_has_three_evidence_arrays():
     assert wave["missing_evidence"] == []
 
 
+def test_wave_context_normalization_preserves_valid_nested_evidence():
+    inputs = sample_inputs()
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_5_ADVANCE", "secondary_markers": [],
+        "confidence": "HIGH", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": ["ordered_prior_structure"],
+        "contradicting_evidence": [], "missing_evidence": ["owner_chart_review"],
+        "rationale": "Ordered prior structure supports late-cycle context.",
+    }
+
+    context = build_setup_candidate(**inputs)["wave"]["context"]
+
+    assert context["mapped_state"] == "WAVE_5_ADVANCE"
+    assert context["supporting_evidence"] == ["ordered_prior_structure"]
+
+
+def test_invalid_or_ambiguous_wave_context_fails_closed_without_relabelling_primary():
+    inputs = sample_inputs()
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_3_EXTENDED", "secondary_markers": ["WAVE_5_ADVANCE", "NOPE"],
+        "confidence": "CERTAIN", "source_timeframe": "60m",
+        "supporting_evidence": "ambiguous", "missing_evidence": None,
+    }
+
+    wave = build_setup_candidate(**inputs)["wave"]
+
+    assert wave["primary_state"] == "WAVE_2_NEAR_COMPLETION"
+    assert wave["context"]["mapped_state"] == "UNKNOWN"
+    assert wave["context"]["secondary_markers"] == []
+    assert wave["context"]["confidence"] == "LOW"
+    assert wave["context"]["source_timeframe"] == "daily"
+    assert "invalid_structural_context_state" in wave["context"]["contradicting_evidence"]
+
+
+def test_compact_projection_preserves_nested_wave_context():
+    item = build_setup_candidate(**sample_inputs())
+    item["wave"]["context"] = {
+        "mapped_state": "WAVE_1_ADVANCE", "secondary_markers": [],
+        "confidence": "MEDIUM", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": [],
+        "contradicting_evidence": [], "missing_evidence": [], "rationale": "context",
+    }
+
+    from setup_candidate_contract import compact_setup_candidate_for_list
+    compact = compact_setup_candidate_for_list(item)
+
+    assert compact["wave"]["context"] == item["wave"]["context"]
+
+
+def test_canonical_validator_accepts_exact_context_and_rejects_competing_context_label():
+    from canonical_setup_projection import _validate_canonical_setup_candidate
+
+    inputs = sample_inputs()
+    inputs["provenance"] = {
+        "policy_version": "setup-candidates-v1", "source": "test",
+        "as_of": inputs["as_of"], "freshness": "fresh",
+    }
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_4_CORRECTION", "secondary_markers": [],
+        "confidence": "MEDIUM", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": ["ordered_structure"],
+        "contradicting_evidence": [], "missing_evidence": [], "rationale": "context",
+    }
+    item = build_setup_candidate(**inputs)
+    assert _validate_canonical_setup_candidate(item) is item
+
+    invalid = dict(item)
+    invalid["wave"] = dict(item["wave"])
+    invalid["wave"]["context"] = dict(item["wave"]["context"], primary_state="WAVE_4_CORRECTION")
+    import pytest
+    with pytest.raises(ValueError, match="exact envelope"):
+        _validate_canonical_setup_candidate(invalid)
+
+
 def test_peer_context_derives_breadth_breakouts_and_leadership():
     context = build_peer_context("ABC", {
         "sector": "Technology", "industry": "Components",

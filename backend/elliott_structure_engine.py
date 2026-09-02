@@ -1108,6 +1108,56 @@ _NEXT_PLAUSIBLE = {
 }
 
 _CONFIDENCE_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
+_WAVE_CONTEXT_RULE_VERSION = "elliott-full-wave-context-v1"
+_WAVE_CONTEXT_SECONDARY_MARKERS = {"WAVE_3_EXTENDED"}
+
+
+def _evidence_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple, set)):
+        return sorted({str(item) for item in value if item is not None})
+    return [str(value)]
+
+
+def _build_wave_context(legacy_raw: dict, swing_evidence: dict | None) -> dict:
+    """Project the reachable full-wave result as evidence, never authority."""
+    raw = legacy_raw if isinstance(legacy_raw, dict) else {}
+    evidence = raw.get("evidence") if isinstance(raw.get("evidence"), dict) else {}
+    raw_state = raw.get("state")
+    valid_state = raw_state in _WAVE_CONTRACT_STATES
+    state = raw_state if valid_state else "UNKNOWN"
+    raw_confidence = str(raw.get("confidence") or "").upper()
+    confidence = {"PARTIAL": "MEDIUM", "INSUFFICIENT": "LOW"}.get(
+        raw_confidence, raw_confidence
+    )
+    if confidence not in _CONFIDENCE_ORDER or state == "UNKNOWN":
+        confidence = "LOW"
+    supporting = _supporting_evidence(evidence, state)
+    contradicting = _contradicting_evidence(evidence, state)
+    missing = _evidence_list(evidence.get("missing_evidence"))
+    if not valid_state:
+        contradicting.append("invalid_structural_context_state")
+    if raw.get("timeframe", "daily") != "daily":
+        contradicting.append("invalid_context_source_timeframe")
+    secondary = []
+    if (state == "WAVE_3_CONTINUATION"
+            and isinstance(swing_evidence, dict)
+            and swing_evidence.get("wave_3_extended") is True):
+        secondary.append("WAVE_3_EXTENDED")
+    return {
+        "mapped_state": state,
+        "secondary_markers": secondary,
+        "confidence": confidence,
+        "rule_version": _WAVE_CONTEXT_RULE_VERSION,
+        "source_timeframe": "daily",
+        "supporting_evidence": sorted(set(supporting)),
+        "contradicting_evidence": sorted(set(contradicting)),
+        "missing_evidence": missing,
+        "rationale": (
+            f"Deterministic full-wave engine mapped {state} as Daily context evidence."
+        ),
+    }
 
 
 def _contradicting_evidence(evidence: dict, state: str) -> list[str]:
@@ -1115,7 +1165,7 @@ def _contradicting_evidence(evidence: dict, state: str) -> list[str]:
     out: list[str] = []
     retrace = evidence.get("retracement_pct")
     if state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}:
-        if not evidence.get("close_above_wave1_high"):
+        if evidence.get("close_above_wave1_high") is False:
             out.append("daily_close_not_above_wave1_high")
         if retrace is not None and retrace > 60:
             out.append("wave2_retracement_above_60pct")
@@ -1150,7 +1200,7 @@ def _supporting_evidence(evidence: dict, state: str) -> list[str]:
             out.append("holds_above_wave1_low")
         if evidence.get("fib_zone"):
             out.append("fib_retracement_zone")
-    if state == "WAVE_1_ADVANCE" and evidence.get("holds_above_wave1_low") is not False:
+    if state == "WAVE_1_ADVANCE" and evidence.get("holds_above_wave1_low") is True:
         out.append("structure_holds_above_wave1_low")
     return out
 
@@ -1377,6 +1427,7 @@ def build_wave_contract(daily_df, swing_evidence: dict | None = None, *, snapsho
         "missing_evidence": missing,
         "evidence": evidence,
         "policy": "wave3-confirmed-pivots-v1",
+        "context": _build_wave_context(legacy_raw, swing_evidence),
         "audit_compatibility": {
             "legacy_full_wave": _json_value(legacy_raw),
             "raw_candidate_state": candidate.get("raw_state"),

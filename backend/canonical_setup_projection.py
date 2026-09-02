@@ -13,6 +13,9 @@ from datetime import datetime, timedelta, timezone
 from provenance_contract import compute_freshness
 from setup_candidate_contract import (
     CANONICAL_METADATA_FIELDS,
+    WAVE_CONTEXT_FIELDS,
+    WAVE_CONTEXT_SECONDARY_MARKERS,
+    WAVE_CONTEXT_STATES,
     build_setup_candidate_diagnostic,
     compact_setup_candidate_for_list,
     project_setup_candidate_list,
@@ -41,6 +44,32 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
     provenance_required = {"policy_version", "source", "as_of", "freshness"}
     if not provenance_required.issubset(provenance):
         raise ValueError("canonical snapshot provenance is incomplete")
+    wave_context = (item.get("wave") or {}).get("context")
+    if wave_context is not None:
+        if not isinstance(wave_context, dict):
+            raise ValueError("canonical wave context is invalid")
+        if set(wave_context) != WAVE_CONTEXT_FIELDS:
+            raise ValueError("canonical wave context is not an exact envelope")
+        if wave_context.get("mapped_state") not in WAVE_CONTEXT_STATES:
+            raise ValueError("canonical wave context state is invalid")
+        if wave_context.get("confidence") not in {"LOW", "MEDIUM", "HIGH"}:
+            raise ValueError("canonical wave context confidence is invalid")
+        if not isinstance(wave_context.get("rule_version"), str):
+            raise ValueError("canonical wave context rule version is invalid")
+        if not isinstance(wave_context.get("rationale"), str):
+            raise ValueError("canonical wave context rationale is invalid")
+        if wave_context.get("source_timeframe") != "daily":
+            raise ValueError("canonical wave context timeframe is invalid")
+        for evidence_field in (
+            "supporting_evidence", "contradicting_evidence", "missing_evidence"
+        ):
+            if not isinstance(wave_context.get(evidence_field), list):
+                raise ValueError("canonical wave context evidence is invalid")
+        secondary = wave_context.get("secondary_markers")
+        if (not isinstance(secondary, list)
+                or any(marker not in WAVE_CONTEXT_SECONDARY_MARKERS for marker in secondary)
+                or (secondary and wave_context.get("mapped_state") != "WAVE_3_CONTINUATION")):
+            raise ValueError("canonical wave context secondary marker is invalid")
     data_status = item.get("data_status") or {}
     freshness = str(data_status.get("freshness", "")).lower()
     if (data_status.get("sufficient") is False

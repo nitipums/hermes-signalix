@@ -120,6 +120,62 @@ def test_unknown_contract_still_exposes_arrays_and_low_confidence():
     json.dumps(contract)
 
 
+@pytest.mark.parametrize("state", sorted(WAVE_ENUM))
+def test_wave_context_maps_full_wave_engine_without_competing_primary_state(monkeypatch, state):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "daily", "state": state, "confidence": "PARTIAL",
+        "evidence": {"missing_evidence": ["owner_chart_review"]},
+    })
+    contract = engine.build_wave_contract(None, {})
+
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+    assert contract["context"] == {
+        "mapped_state": state,
+        "secondary_markers": [],
+        "confidence": "LOW" if state == "UNKNOWN" else "MEDIUM",
+        "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily",
+        "supporting_evidence": [],
+        "contradicting_evidence": [],
+        "missing_evidence": ["owner_chart_review"],
+        "rationale": f"Deterministic full-wave engine mapped {state} as Daily context evidence.",
+    }
+
+
+def test_wave3_extended_is_explicit_secondary_context_only(monkeypatch):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "daily", "state": "WAVE_3_CONTINUATION", "confidence": "HIGH",
+        "evidence": {},
+    })
+    contract = engine.build_wave_contract(None, {"wave_3_extended": True})
+
+    assert contract["context"]["mapped_state"] == "WAVE_3_CONTINUATION"
+    assert contract["context"]["secondary_markers"] == ["WAVE_3_EXTENDED"]
+    assert contract["primary_state"] != "WAVE_3_EXTENDED"
+    assert contract["state"] != "WAVE_3_EXTENDED"
+
+
+def test_invalid_full_wave_state_fails_context_closed_and_is_json_safe(monkeypatch):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_args, **_kwargs: {
+        "timeframe": "60m", "state": "WAVE_3_EXTENDED", "confidence": "CERTAIN",
+        "evidence": {"missing_evidence": {"ambiguous", "invalid_state"}},
+    })
+    contract = engine.build_wave_contract(None, {})
+
+    assert contract["context"]["mapped_state"] == "UNKNOWN"
+    assert contract["context"]["confidence"] == "LOW"
+    assert contract["context"]["source_timeframe"] == "daily"
+    assert "invalid_structural_context_state" in contract["context"]["contradicting_evidence"]
+    assert contract["context"]["secondary_markers"] == []
+    json.dumps(contract, allow_nan=False)
+
+
 @pytest.mark.parametrize(
     "mutate",
     [

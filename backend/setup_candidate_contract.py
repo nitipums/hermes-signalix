@@ -31,6 +31,17 @@ _LANE_ORDER = {
     "WAIT": 3, "AVOID": 4, "DATA_BLOCKED": 5,
 }
 _CONFIDENCE_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+WAVE_CONTEXT_STATES = {
+    "WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
+    "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION",
+    "WAVE_5_ADVANCE", "UNKNOWN",
+}
+WAVE_CONTEXT_SECONDARY_MARKERS = {"WAVE_3_EXTENDED"}
+WAVE_CONTEXT_FIELDS = {
+    "mapped_state", "secondary_markers", "confidence", "rule_version",
+    "source_timeframe", "supporting_evidence", "contradicting_evidence",
+    "missing_evidence", "rationale",
+}
 
 
 def _json_value(value: Any):
@@ -269,9 +280,57 @@ def _normalize_wave_evidence(wave: dict) -> dict:
     # state explicit so downstream consumers do not infer it from evidence.
     if result.get("primary_state") is None and result.get("state") is not None:
         result["primary_state"] = result["state"]
+    if "context" in result:
+        result["context"] = _normalize_wave_context(result.get("context"))
     if state != "UNKNOWN":
         return result
     return result
+
+
+def _normalize_wave_context(value: Any) -> dict:
+    """Fail malformed context closed without changing the primary wave label."""
+    source = value if isinstance(value, dict) else {}
+    raw_state = source.get("mapped_state")
+    state = raw_state if raw_state in WAVE_CONTEXT_STATES else "UNKNOWN"
+    confidence = _status_token(source.get("confidence"))
+    if confidence not in {"LOW", "MEDIUM", "HIGH"} or state == "UNKNOWN":
+        confidence = "LOW"
+    timeframe = source.get("source_timeframe")
+    invalid_timeframe = timeframe not in {None, "daily"}
+    markers = source.get("secondary_markers")
+    if not isinstance(markers, (list, tuple, set)):
+        markers = []
+    markers = sorted({marker for marker in markers
+                      if marker in WAVE_CONTEXT_SECONDARY_MARKERS})
+    if state != "WAVE_3_CONTINUATION":
+        markers = []
+
+    def evidence_array(field: str) -> list:
+        raw = source.get(field)
+        if raw is None:
+            return []
+        if isinstance(raw, (list, tuple, set)):
+            return [_json_value(item) for item in raw]
+        return [_json_value(raw)]
+
+    contradicting = evidence_array("contradicting_evidence")
+    if raw_state not in WAVE_CONTEXT_STATES:
+        contradicting.append("invalid_structural_context_state")
+    if invalid_timeframe:
+        contradicting.append("invalid_context_source_timeframe")
+    return {
+        "mapped_state": state,
+        "secondary_markers": markers,
+        "confidence": confidence,
+        "rule_version": source.get("rule_version") or "elliott-full-wave-context-v1",
+        "source_timeframe": "daily",
+        "supporting_evidence": evidence_array("supporting_evidence"),
+        "contradicting_evidence": list(dict.fromkeys(contradicting)),
+        "missing_evidence": evidence_array("missing_evidence"),
+        "rationale": source.get("rationale") or (
+            f"Wave context failed closed to {state}."
+        ),
+    }
 
 
 def _has_plan(setup: dict) -> bool:
@@ -557,6 +616,7 @@ _LIST_NESTED_FIELDS = {
     ),
     "wave": (
         "timeframe", "primary_state", "state", "alternative_state", "confidence",
+        "context",
     ),
     "setup": (
         "timeframe", "state", "status", "minor_structure", "trigger",
