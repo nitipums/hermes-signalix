@@ -357,6 +357,7 @@ def build_setup_candidate(
     context: dict,
     bonus_evidence: dict,
     provenance: dict,
+    canonical_metadata: dict | None = None,
 ) -> dict:
     """Build one canonical, JSON-safe setup-candidate item."""
     wave_out = _normalize_wave_evidence(wave)
@@ -408,6 +409,11 @@ def build_setup_candidate(
         "decision_lane": lane,
         "provenance": provenance_out,
     }
+    if isinstance(canonical_metadata, dict):
+        for field in ("high52", "low52", "ath_high", "ath_low", "index_membership",
+                      "index_membership_evidence"):
+            if field in canonical_metadata:
+                item[field] = _json_value(canonical_metadata[field])
     return _json_value(item)
 
 
@@ -526,6 +532,8 @@ def project_setup_candidate_list(
 _LIST_ITEM_FIELDS = (
     "symbol", "as_of", "data_status", "trend", "wave", "setup",
     "context", "bonus_evidence", "decision_lane", "provenance",
+    "high52", "low52", "ath_high", "ath_low", "index_membership",
+    "index_membership_evidence",
 )
 _LIST_NESTED_FIELDS = {
     "data_status": (

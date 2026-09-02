@@ -95,7 +95,10 @@ def _resolve_market_cap(item: dict) -> float | None:
 
 
 def _resolve_index_membership(item: dict) -> list[str]:
-    """Index membership: is_set50 flag → SET50/SET100."""
+    """Prefer normalized as-of membership; retain the legacy flag fallback."""
+    normalized = item.get("index_membership")
+    if isinstance(normalized, (list, tuple)):
+        return [str(value) for value in normalized if value]
     ind = item.get("independence") or {}
     result = []
     if bool(ind.get("is_set50")):
@@ -573,6 +576,70 @@ def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
     return daily, intraday, 2
 
 
+def _load_daily_canonical_metadata(pg, symbols, as_of_by_symbol, *, market="TH"):
+    """Load point-in-time Daily high/low and normalized index evidence.
+
+    The 52W window is the latest 252 Daily rows at each candidate as-of date;
+    ATH is the observed Daily high/low over all rows through that date.  Both
+    queries are read-only and fail closed when a compatibility test seam does
+    not provide a PostgreSQL-shaped cursor.
+    """
+    if not symbols:
+        return {}
+    dates = [str(as_of_by_symbol.get(symbol) or "")[:10] or None for symbol in symbols]
+    metadata = {symbol: {} for symbol in symbols}
+    cur = pg.cursor()
+    try:
+        cur.execute("""WITH requested(symbol, as_of) AS (
+                         SELECT * FROM unnest(%s::text[], %s::date[])
+                       )
+                       SELECT requested.symbol, w.high52, w.low52, ath.ath_high, ath.ath_low
+                       FROM requested
+                       LEFT JOIN LATERAL (
+                         SELECT MAX(high) AS high52, MIN(low) AS low52
+                         FROM (SELECT high, low FROM price_data
+                               WHERE market=%s AND symbol=requested.symbol AND date <= requested.as_of
+                               ORDER BY date DESC LIMIT 252) windowed
+                       ) w ON TRUE
+                       LEFT JOIN LATERAL (
+                         SELECT MAX(high) AS ath_high, MIN(low) AS ath_low
+                         FROM price_data
+                         WHERE market=%s AND symbol=requested.symbol AND date <= requested.as_of
+                       ) ath ON TRUE""", (list(symbols), dates, market.upper(), market.upper()))
+        for row in cur.fetchall():
+            symbol, high52, low52, ath_high, ath_low = row
+            metadata.setdefault(str(symbol), {}).update({
+                "high52": _number(high52), "low52": _number(low52),
+                "ath_high": _number(ath_high), "ath_low": _number(ath_low),
+                "index_membership_evidence": {"source": "price_data", "as_of": dates[symbols.index(str(symbol))]},
+            })
+    finally:
+        cur.close()
+
+    cur = pg.cursor()
+    try:
+        cur.execute("""WITH requested(symbol, as_of) AS (
+                         SELECT * FROM unnest(%s::text[], %s::date[])
+                       )
+                       SELECT m.symbol, m.index_name, m.effective_from, m.effective_to, m.source,
+                              requested.as_of
+                       FROM index_memberships m
+                       JOIN requested ON requested.symbol = m.symbol
+                       WHERE m.effective_from <= requested.as_of
+                         AND (m.effective_to IS NULL OR m.effective_to >= requested.as_of)
+                       ORDER BY m.symbol, m.index_name""", (list(symbols), dates))
+        for symbol, index_name, effective_from, effective_to, source, as_of in cur.fetchall():
+            entry = {"index_name": str(index_name), "effective_from": str(effective_from),
+                     "effective_to": str(effective_to) if effective_to else None,
+                     "source": str(source), "as_of": str(as_of)}
+            row = metadata.setdefault(str(symbol), {})
+            row.setdefault("index_membership", []).append(str(index_name))
+            row.setdefault("index_membership_evidence", {}).setdefault("memberships", []).append(entry)
+    finally:
+        cur.close()
+    return metadata
+
+
 def _relative_strength_ranks(daily_frames, market_df):
     import pandas as pd
     lookback = 252
@@ -769,6 +836,17 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             intraday_available, intraday_current, intraday_freshness, intraday_as_of,
         )
 
+    as_of_by_symbol = {
+        symbol: (frame.index[-1].date().isoformat() if frame is not None and len(frame) else None)
+        for symbol, (frame, *_rest) in evaluation_inputs.items()
+    }
+    try:
+        canonical_metadata = _load_daily_canonical_metadata(
+            pg, symbols, as_of_by_symbol, market=market
+        ) if daily_frames is not None else {}
+    except (AttributeError, TypeError, ValueError, IndexError):
+        canonical_metadata = {}
+
     # Daily Elliott and 60m setup calculations are independent per symbol but
     # are CPU-bound Python/pandas work. Threads do not bypass the GIL here and
     # made the cold full-universe build slower; processes provide actual CPU
@@ -903,6 +981,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
              "marginable_schema_version": universe_manifest.get("schema_version"),
              "marginable_source_document": universe_manifest.get("source_document"),
              "marginable_effective_date": universe_manifest.get("effective_date")},
+            canonical_metadata.get(symbol),
         ))
     overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")

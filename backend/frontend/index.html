@@ -33,6 +33,13 @@
       <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
       <section id="daily-vcp-content" class="state--hidden">
         <p class="explorer-note">Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal.</p>
+        <details id="method-guide" class="method-guide">
+          <summary>Method / Evidence Guide</summary>
+          <div id="method-guide-content" class="method-guide__content">
+            <p>Daily establishes trend and the primary Elliott candidate. 60m confirms structure and entry timing.</p>
+            <p>Supporting evidence, contradicting evidence, missing evidence, alternative state, and Snapshot identity appear here when available.</p>
+          </div>
+        </details>
         <div id="daily-setup-toolbar" class="setup-toolbar" aria-label="Setup candidate controls">
           <label class="setup-toolbar__search">Search
             <input id="daily-setup-search" type="search" placeholder="Symbol / name" aria-label="Search setup candidates">
@@ -157,13 +164,8 @@
           </div>
           <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
           <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">
-            <strong>How this wave was identified</strong>
-            <div>Rule: Unavailable</div>
-            <div>Supporting evidence: Unavailable</div>
-            <div>Contradicting evidence: Unavailable</div>
-            <div>Missing evidence: Unavailable</div>
-            <div>Alternative state: Unavailable · Policy: Unavailable</div>
-            <div>Snapshot identity: Unavailable</div>
+            <span>Wave evidence details are in the Method / Evidence Guide.</span>
+            <button id="drawer-method-link" class="btn btn--guide" type="button">Open guide</button>
           </section>
 
           <dl class="drawer-fields">

@@ -837,6 +837,26 @@ def test_setup_candidate_review_uses_explicit_compact_toolbar_and_collapsed_adva
     assert 'setInterval(function()' not in js
 
 
+def test_mobile_review_surface_uses_fullscreen_drawer_guide_and_state_aware_copy():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert 'id="method-guide"' in html
+    assert 'id="drawer-method-link"' in html
+    assert "@media (max-width: 600px)" in css
+    assert ".drawer-panel { max-width:none; max-height:none; height:100dvh;" in css
+    assert "methodGuideContent" in js and "drawerMethodLink" in js
+    assert "Awaiting 60m structure" in js and "Setup forming" in js
+    helper = _extract_function(js, "setupReadinessLabel")
+    result = _run_node(
+        [helper],
+        "[setupReadinessLabel({decision_lane:'DAILY_CANDIDATE'}, {status:'FORMING'}), "
+        "setupReadinessLabel({decision_lane:'SETUP_FORMING'}, {status:'FORMING', minor_structure:true}), "
+        "setupReadinessLabel({decision_lane:'DATA_BLOCKED'}, {status:'DATA_BLOCKED'})]"
+    )
+    assert result == ["Setup forming", "Awaiting 60m structure", "Data blocked"]
+
+
 def test_setup_candidate_refresh_is_the_update_boundary_and_idle_is_not_live_by_default():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")

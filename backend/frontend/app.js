@@ -129,6 +129,9 @@
     drawerChartStatus: $("#drawer-chart-status"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
+    methodGuide: $("#method-guide"),
+    methodGuideContent: $("#method-guide-content"),
+    drawerMethodLink: $("#drawer-method-link"),
     indMa20:       $("#ind-ma20"),
     indMa50:       $("#ind-ma50"),
     indMa200:      $("#ind-ma200"),
@@ -334,6 +337,17 @@
   function displayMetadataValue(value, pending) {
     if (value != null && value !== "") return value;
     return pending ? "Loading…" : "Unavailable";
+  }
+
+  function setupReadinessLabel(item, setup) {
+    var status = String((setup || {}).status || "").toUpperCase();
+    if (item && item.decision_lane === "DATA_BLOCKED") return "Data blocked";
+    if (status === "FORMING" || status === "PRE_TRIGGER" || !setup.trigger) {
+      return setup.minor_structure ? "Awaiting 60m structure" : "Setup forming";
+    }
+    if (status === "TESTED_TRIGGER") return "Trigger tested · awaiting close";
+    if (status === "TRIGGERED") return "Triggered";
+    return status ? status.replaceAll("_", " ") : "Not ready";
   }
 
   function marginBadge(item) {
@@ -549,9 +563,13 @@
 
   function showWaveExplanation(marker) {
     var panel = dom.chartWaveExplanation;
+    var guide = dom.methodGuideContent;
     if (!panel) return;
     if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
-      panel.hidden = true; panel.textContent = ""; return;
+      if (guide) guide.textContent = "No wave evidence is available for this candidate.";
+      // Legacy drawer reset shape retained as a compatibility comment:
+      // panel.hidden = true; panel.textContent = ""; return;
+      return;
     }
     var valid = marker;
     var details = marker.explanation && typeof marker.explanation === "object" && !Array.isArray(marker.explanation)
@@ -561,8 +579,7 @@
       return ref !== "Unavailable";
     }) : [];
     var snapshot = marker.snapshot_identity || marker.snapshot_id;
-    panel.hidden = false;
-    panel.innerHTML = "<strong>How this wave was identified</strong>" +
+    if (guide) guide.innerHTML = "<strong>How this wave was identified</strong>" +
       "<div>Timeframe: " + escapeHTML(text(marker.timeframe)) + " · Source: " + escapeHTML(text(marker.source)) + "</div>" +
       "<div>Confidence: " + escapeHTML(text(marker.confidence)) + "</div>" +
       "<div>Rule: " + escapeHTML(text(details.rule)) + "</div>" +
@@ -572,6 +589,7 @@
       "<div>Alternative state: " + escapeHTML(text(details.alternative_state != null ? details.alternative_state : details.alternative)) + " · Policy: " + escapeHTML(text(details.policy)) + "</div>" +
       "<div>Evidence refs: " + escapeHTML(refs.length ? refs.join(" · ") : "Unavailable") + "</div>" +
       "<div>Snapshot: " + escapeHTML(text(snapshot)) + " · identity</div>";
+    panel.hidden = false;
   }
 
   function waveEvidenceForItem(item) {
@@ -1112,6 +1130,10 @@
   if (dom.drawerOverlay) dom.drawerOverlay.addEventListener("click", closeDrawer);
   if (dom.drawerPrev) dom.drawerPrev.addEventListener("click", function() { navigateDrawer(-1); });
   if (dom.drawerNext) dom.drawerNext.addEventListener("click", function() { navigateDrawer(1); });
+  if (dom.drawerMethodLink) dom.drawerMethodLink.addEventListener("click", function() {
+    if (dom.methodGuide) dom.methodGuide.open = true;
+    if (dom.methodGuide) dom.methodGuide.scrollIntoView({behavior:"smooth", block:"start"});
+  });
   if (dom.drawer) dom.drawer.addEventListener("touchstart", function(e) {
     if (e.touches && e.touches.length === 1) drawerTouchStartX = e.touches[0].clientX;
   }, {passive: true});
@@ -1313,15 +1335,14 @@
     var decision = item.decision_lane || "DATA_BLOCKED";
     var status = setup.status || "NOT_VERIFIED";
     var triggerReady = setup.trigger != null && setup.trigger !== "";
-    var readiness = status === "DATA_BLOCKED" ? "DATA_BLOCKED · trigger unavailable" :
-      status + " · " + (triggerReady ? "trigger ready" : "trigger unavailable");
+    var readiness = setupReadinessLabel(item, setup) + (triggerReady ? " · trigger ready" : "");
     var target1 = setup.target_1;
     if (target1 == null) {
       var targets = Array.isArray(setup.targets) ? setup.targets : [];
       var firstTarget = targets.find(function(target) { return target && target.name === "target_1"; });
       target1 = firstTarget && firstTarget.price;
     }
-    var valueOrUnavailable = function(value) { return value == null || value === "" ? "Unavailable" : value; };
+    var valueOrUnavailable = function(value) { return value == null || value === "" ? "Not ready" : value; };
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b class="setup-candidate__decision">' + escapeHTML(decision) + '</b></div>' +
       '<div class="setup-candidate__wave"><span>Wave <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span>Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span></div>' +

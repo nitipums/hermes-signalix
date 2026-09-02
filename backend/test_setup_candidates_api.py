@@ -669,6 +669,68 @@ def test_bulk_candidate_frames_uses_two_indexed_full_universe_queries():
     assert intraday["AAA"].attrs["timeframe"] == "60m"
 
 
+def test_daily_canonical_metadata_is_point_in_time_and_keeps_centel_membership():
+    import mvp_api
+
+    class Cursor:
+        def __init__(self, owner):
+            self.owner = owner
+            self.sql = ""
+
+        def execute(self, sql, params):
+            self.sql = sql
+            self.owner.calls.append((sql, params))
+
+        def fetchall(self):
+            if "MAX(high) AS high52" in self.sql:
+                return [("CENTEL", 72, 41, 89, 12)]
+            return [("CENTEL", "SET50", "2026-07-01", "2026-12-31", "set-index", "2026-08-29"),
+                    ("CENTEL", "SET100", "2026-07-01", "2026-12-31", "set-index", "2026-08-29")]
+
+        def close(self):
+            pass
+
+    class PG:
+        def __init__(self):
+            self.calls = []
+
+        def cursor(self):
+            return Cursor(self)
+
+    pg = PG()
+    metadata = mvp_api._load_daily_canonical_metadata(
+        pg, ["CENTEL"], {"CENTEL": "2026-08-29T00:00:00"}, market="TH"
+    )
+
+    assert metadata["CENTEL"]["high52"] == 72.0
+    assert metadata["CENTEL"]["low52"] == 41.0
+    assert metadata["CENTEL"]["ath_high"] == 89.0
+    assert metadata["CENTEL"]["ath_low"] == 12.0
+    assert metadata["CENTEL"]["index_membership"] == ["SET50", "SET100"]
+    evidence = metadata["CENTEL"]["index_membership_evidence"]["memberships"]
+    assert all(row["as_of"] == "2026-08-29" and row["source"] == "set-index" for row in evidence)
+    assert "effective_from <= requested.as_of" in pg.calls[1][0]
+
+
+def test_canonical_detail_preserves_normalized_index_membership_and_daily_metadata():
+    import mvp_api
+
+    item = {
+        "symbol": "CENTEL", "as_of": "2026-08-29",
+        "data_status": {"sufficient": True, "freshness": "fresh"},
+        "trend": {}, "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "MEDIUM"},
+        "setup": {"timeframe": "60m", "status": "FORMING"},
+        "context": {}, "bonus_evidence": {}, "decision_lane": "SETUP_FORMING",
+        "provenance": {"scan_time": "2026-08-29"},
+        "index_membership": ["SET50", "SET100"],
+        "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
+    }
+    detail = mvp_api.project_canonical_symbol_detail([item], "CENTEL")
+    assert detail["index_membership"] == ["SET50", "SET100"]
+    assert detail["high52"] == 72
+    assert detail["ath_low"] == 12
+
+
 def test_build_exposes_stage_timing_and_bounded_bulk_query_count(monkeypatch):
     import mvp_api
     import screening
