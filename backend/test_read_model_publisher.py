@@ -8,7 +8,7 @@ import pytest
 from read_model_publisher import (build_read_model, load_current_read_model,
                                   load_intraday_metadata, publish_builder_result,
                                   publish_intraday_metadata, publish_read_model,
-                                  DEFAULT_ROOT)
+                                  DEFAULT_ROOT, UniverseIdentity)
 
 
 def test_default_root_is_shared_backend_read_model_path():
@@ -50,8 +50,17 @@ def _item(symbol, lane="WAIT"):
 
 def _build(count=237):
     items = [_item(f"S{n:03d}") for n in range(count)]
-    return items, {"universe_filter": "marginable_long", "eligible_count": 237, "excluded_count": 694,
+    return items, {"universe_filter": "marginable_long", "base_active_ord_count": count + 694,
+                   "eligible_count": count, "excluded_count": 694,
                    "scan_time": "2026-09-01", "freshness": {"status": "fresh"}}
+
+
+def test_build_rejects_missing_canonical_universe_identity():
+    items, metadata = _build()
+    for field in ("base_active_ord_count", "eligible_count", "excluded_count"):
+        incomplete = {key: value for key, value in metadata.items() if key != field}
+        with pytest.raises(ValueError, match="required"):
+            build_read_model(items, incomplete, source_versions=VERSIONS, published_at="t1")
 
 
 VERSIONS = {"daily": {"run_id": "daily-1", "as_of": "2026-09-01"},
@@ -67,6 +76,47 @@ def test_build_preserves_complete_coverage_lanes_and_provenance():
     assert set(model["counts"]) == {"REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"}
     assert model["provenance"]["source_versions"] == VERSIONS
     assert model["excluded_count"] == 694
+
+
+def test_explicit_small_universe_scope_validates_without_runtime_count_constant(tmp_path):
+    items, metadata = _build(3)
+    metadata.update({
+        "base_active_ord_count": 5,
+        "excluded_count": 2,
+        "schema_version": "test-universe-v1",
+        "source_document": "test-manifest.json",
+        "effective_date": "2026-09-02",
+    })
+    model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    assert model["universe"] == "marginable_long"
+    assert model["count"] == model["evaluated_count"] == model["eligible_count"] == 3
+    assert model["base_active_ord_count"] == 5
+    assert model["universe_metadata"] == {
+        "schema_version": "test-universe-v1",
+        "source_document": "test-manifest.json",
+        "effective_date": "2026-09-02",
+    }
+    publish_read_model(model, tmp_path)
+    loaded = load_current_read_model(tmp_path)
+    assert loaded["evaluated_count"] == 3
+
+
+def test_universe_identity_is_immutable_and_scope_count_mismatch_fails_closed():
+    scope = UniverseIdentity("marginable_long", 2, 2, 3, 1, "v1", "source", "2026-09-02")
+    with pytest.raises((AttributeError, TypeError)):
+        scope.evaluated_count = 3
+    items, metadata = _build(2)
+    metadata["eligible_count"] = 3
+    metadata["base_active_ord_count"] = 697
+    with pytest.raises(ValueError, match="exactly 3"):
+        build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+
+
+def test_active_ord_read_model_is_rejected_at_canonical_publication_seam():
+    items, metadata = _build(2)
+    metadata["universe_filter"] = "active_ord"
+    with pytest.raises(ValueError, match="marginable_long"):
+        build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
 
 
 def test_read_model_preserves_canonical_daily_metadata_through_validation(tmp_path):
@@ -97,6 +147,8 @@ def test_partial_build_rejected_before_existing_pointer_changes(tmp_path):
     before = (tmp_path / "current.json").read_text()
     with pytest.raises(ValueError, match="exactly 237"):
         partial, partial_meta = _build(236)
+        partial_meta["eligible_count"] = 237
+        partial_meta["base_active_ord_count"] = 931
         publish_read_model(build_read_model(partial, partial_meta, source_versions={**VERSIONS, "daily": {"run_id": "daily-2"}}, published_at="t2"), tmp_path)
     assert (tmp_path / "current.json").read_text() == before
 

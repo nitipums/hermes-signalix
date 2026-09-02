@@ -34,7 +34,8 @@ def _extract_function(source, name):
 
 
 def _run_node(functions, expression):
-    script = "\n".join(functions) + "\nconsole.log(JSON.stringify(" + expression + "));"
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    script = "var window = globalThis;\n" + client + "\n" + "\n".join(functions) + "\nconsole.log(JSON.stringify(" + expression + "));"
     result = subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
     return json.loads(result.stdout)
 
@@ -855,11 +856,27 @@ def test_daily_trade_value_filter_callback_fails_without_return_value():
 def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";' in js
+    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in js
     assert "function renderSetupCandidates(data)" in js
     assert "setupCandidateCard" in js
     assert "setupCandidateCard" in js
     assert "Trigger readiness" in js and "Target 1" in js and "Stop" in js
+
+
+def test_shared_canonical_client_is_loaded_by_both_surfaces_and_owns_policy():
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    classic = (ROOT / "index.html").read_text(encoding="utf-8")
+    wave = (ROOT / "wave-context.html").read_text(encoding="utf-8")
+    assert 'window.SignalixCanonicalClient' in client
+    assert 'fetchSetupCandidatesPage' in client and 'fetchAllCandidates' in client and 'dailyMarkers' in client
+    assert 'setupCandidatesRequestKey' in client
+    assert '<script src="canonical-client.js"></script>' in classic
+    assert '<script src="canonical-client.js"></script>' in wave
+    assert classic.index('canonical-client.js') < classic.index('app.js')
+    assert wave.index('canonical-client.js') < wave.index('wave-context.js')
+    assert 'var fetchAllCandidates=window.SignalixCanonicalClient.fetchAllCandidates;' in (ROOT / "wave-context.js").read_text(encoding="utf-8")
+    assert 'window.SignalixCanonicalClient.markers(item)' in (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in (ROOT / "app.js").read_text(encoding="utf-8")
 
 
 def test_t03_compact_card_keeps_decision_hierarchy_and_moves_evidence_to_drawer():

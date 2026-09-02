@@ -89,6 +89,7 @@ def test_price_band_filter_is_presentation_only():
 def test_frontend_has_both_filters_and_drawer_permissions():
     html = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
     js = (ROOT / "frontend/app.js").read_text(encoding="utf-8")
+    client = (ROOT / "frontend/canonical-client.js").read_text(encoding="utf-8")
     assert 'id="shortlist-marginable"' not in html
     assert 'id="explorer-marginable"' not in html
     assert 'id="vcp-price-band"' not in html
@@ -108,4 +109,8 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert 'visibleDrawerSymbols' in js
     assert 'touchstart' in js
     assert 'ArrowLeft' in js
-    assert '"/api/setup-candidates?page="' in js
+    assert '<script src="canonical-client.js"></script>' in html
+    assert "SignalixCanonicalClient.fetchSetupCandidatesPage(dailySetupPage, 50, signal, requestOptions)" in js
+    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in js
+    assert 'params.set("universe", (options && options.universe) || DEFAULT_UNIVERSE);' in client
+    assert 'params.set("page", String(page)); params.set("page_size", String(pageSize));' in client

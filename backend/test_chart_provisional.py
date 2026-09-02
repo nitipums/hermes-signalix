@@ -7,6 +7,7 @@ import app
 import mvp_chart_db
 import mvp_routes
 from app import fetch_chart_rows
+from canonical_chart_read import ChartReadResult, read_chart_result
 
 
 class _Cursor:
@@ -162,12 +163,94 @@ def test_chart_db_route_preserves_legacy_fields_and_falls_back_to_daily_eod(monk
     assert {"candles", "ma20", "ma50", "ma200", "macd", "rsi", "wave_evidence", "source", "as_of", "latest_time", "provenance"}.issubset(payload)
 
 
+def test_chart_db_route_does_not_require_legacy_snapshot(monkeypatch):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    monkeypatch.setattr(mvp_chart_db, "_release_db_connection", lambda pg: None)
+    monkeypatch.setattr(mvp_routes, "load_payload", lambda: (_ for _ in ()).throw(
+        ValueError("malformed legacy snapshot")
+    ))
+    handler = type("Handler", (), {
+        "wfile": type("Writer", (), {"write": lambda self, data: setattr(self, "body", data)})(),
+        "send_response": lambda self, status: setattr(self, "status", status),
+        "send_header": lambda self, *args: None,
+        "end_headers": lambda self: None,
+    })()
+
+    assert mvp_routes.handle_mvp_api("/api/chart-db/SIS?timeframe=1D", handler)
+    assert handler.status == 200
+    assert __import__("json").loads(handler.wfile.body)["candles"]
+
+
+def test_chart_db_prefers_canonical_daily_wave_evidence(monkeypatch):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    canonical = {"symbol": "SIS", "wave": {"evidence_markers": [
+        {"timestamp": "2026-08-27", "price": 12, "source": "canonical"}
+    ]}, "provenance": {"snapshot_id": "daily:canonical"}}
+    response = mvp_chart_db.project_chart_db_response("sis", canonical_item=canonical)
+    assert response["wave_evidence"]["markers"] == canonical["wave"]["evidence_markers"]
+    assert response["wave_evidence"]["snapshot_id"] == "daily:canonical"
+
+
+def test_chart_db_uses_named_legacy_wave_fallback_when_canonical_evidence_unavailable(monkeypatch):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    monkeypatch.setattr("mvp_chart_db.build_legacy_chart_wave_evidence",
+                        lambda candles, timeframe, as_of: {"mapping": {"daily": "legacy_fallback"}, "markers": []})
+    response = mvp_chart_db.project_chart_db_response("sis")
+    assert response["wave_evidence"]["mapping"]["daily"] == "legacy_fallback"
+
+
 class _Connection:
     def __init__(self, daily, intraday):
         self.cursor_value = _DailyAndIntradayCursor(daily, intraday)
 
     def cursor(self):
         return self.cursor_value
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1W", "60M", "1M"])
+def test_canonical_chart_read_result_normalizes_each_supported_timeframe(timeframe):
+    if timeframe == "60M":
+        cursor = _Cursor([
+            (datetime(2026, 8, 27, 6, 0, tzinfo=timezone.utc), 10.5, 12, 10, 11.5, 200, True),
+            (datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc), 10, 11, 9, 10.5, 100, False),
+        ])
+    else:
+        cursor = _DailyAndIntradayCursor([
+            (datetime(2026, 8, 27), 10, 11, 9, 10.5, 100, False),
+            (datetime(2026, 8, 26), 9, 10, 8, 9.5, 90, False),
+        ], [])
+
+    result = read_chart_result(cursor, "SIS", timeframe, 30)
+
+    assert isinstance(result, ChartReadResult)
+    assert result.source_timeframe == timeframe
+    assert [c["date"] for c in result.candles] == sorted(c["date"] for c in result.candles)
+    assert result.as_of == result.candles[-1]["date"]
+    assert result.latest_time == ("2026-08-27T06:00:00+00:00" if timeframe == "60M" else "2026-08-27")
+    assert result.provisional is (timeframe == "60M")
+    assert result.candles[-1]["provisional"] is (timeframe == "60M")
+
+
+def test_chart_db_wave_evidence_keeps_legacy_marker_shape_while_read_is_separate(monkeypatch):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+
+    response = mvp_chart_db.project_chart_db_response("sis", timeframe="1D")
+
+    assert set((response or {})["wave_evidence"]) >= {"timeframe", "markers", "mapping"}
+    assert response["wave_evidence"]["timeframe"] == "daily"
+    assert isinstance(response["wave_evidence"]["markers"], list)
 
 
 @pytest.mark.parametrize("timeframe", ["1D", "1W"])

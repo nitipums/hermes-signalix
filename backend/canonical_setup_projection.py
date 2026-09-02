@@ -8,9 +8,9 @@ Legacy shortlist, explorer, and symbol projections intentionally remain in
 from __future__ import annotations
 
 import math
-from datetime import datetime, timedelta, timezone
 
-from provenance_contract import compute_freshness
+from freshness_assessment import (assess_projection_freshness as _resolve_freshness,
+                                  daily_eod_status as _daily_eod_status)
 from setup_candidate_contract import (
     CANONICAL_METADATA_FIELDS,
     WAVE_CONTEXT_FIELDS,
@@ -78,44 +78,6 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
         if item.get("decision_lane") != "DATA_BLOCKED":
             raise ValueError("canonical snapshot violates fail-closed data contract")
     return item
-
-
-def _daily_eod_status(as_of: str | None) -> str | None:
-    if not as_of:
-        return None
-    now = datetime.now(timezone(timedelta(hours=7)))
-    if str(as_of)[:10] == now.date().isoformat():
-        return "market_closed"
-    return None
-
-
-def _resolve_freshness(items: list[dict]) -> dict:
-    """Build the response freshness block from canonical item timestamps."""
-    latest_as_of = None
-    latest_source = None
-    for item in items:
-        daily = item.get("daily_eod_freshness") or {}
-        as_of = daily.get("as_of") or item.get("daily_as_of") or item.get("date")
-        if as_of and (latest_as_of is None or str(as_of) > str(latest_as_of)):
-            latest_as_of = str(as_of)
-            latest_source = daily.get("source") or item.get("priceSource") or "Daily EOD"
-
-    status = "unknown"
-    if latest_as_of:
-        try:
-            datetime.fromisoformat(latest_as_of.replace("Z", "+00:00"))
-            status = compute_freshness(latest_as_of)
-            status = _daily_eod_status(latest_as_of) or status
-            if status == "unknown":
-                status = "fresh"
-        except (ValueError, TypeError):
-            status = "fresh"
-    return {
-        "status": status,
-        "source": latest_source or "Daily EOD",
-        "as_of": latest_as_of,
-        "data_fetched_at": latest_as_of,
-    }
 
 
 def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,

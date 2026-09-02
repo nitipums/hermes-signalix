@@ -39,7 +39,7 @@ def candidate(symbol="ABC", *, decision_lane="REVIEW_NOW", sector="Technology"):
 
 def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     row = candidate()
-    model = {"items": [row], "universe": "marginable_long", "eligible_count": 1,
+    model = {"items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,
              "excluded_count": 0, "freshness": {"status": "fresh"},
              "provenance": {"as_of": "2026-08-30", "source_versions": {},
                             "policy_version": "setup-candidates-v1"},
@@ -65,6 +65,44 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["build_observability"]["serialized_bytes"] == len(handler.body)
 
 
+@pytest.mark.parametrize("universe", ["active_ord", "unknown"])
+def test_setup_candidates_route_rejects_unsupported_universe_before_loading_model(monkeypatch, universe):
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: (_ for _ in ()).throw(
+        AssertionError("unsupported universe loaded the marginable read model")
+    ))
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api(f"/api/setup-candidates?universe={universe}", handler)
+    assert handler.status == 400
+    assert json.loads(handler.body) == {
+        "error": "invalid_request", "reason": "unsupported_universe", "universe": universe,
+    }
+
+
+def test_setup_candidates_route_rejects_active_ord_published_model_before_response(monkeypatch):
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: {
+        "universe": "active_ord", "items": [], "eligible_count": 0,
+        "excluded_count": 0, "base_active_ord_count": 0,
+    })
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 503
+    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
+
+
+@pytest.mark.parametrize("missing_field", ["base_active_ord_count", "eligible_count", "excluded_count"])
+def test_setup_candidates_route_rejects_missing_universe_identity_before_response(monkeypatch, missing_field):
+    model = {
+        "items": [], "universe": "marginable_long", "base_active_ord_count": 0,
+        "eligible_count": 0, "excluded_count": 0,
+    }
+    model.pop(missing_field)
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
+    assert handler.status == 503
+    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
+
+
 def test_canonical_symbol_route_reads_published_model_without_builder_or_postgres(monkeypatch):
     import mvp_api
 
@@ -78,7 +116,7 @@ def test_canonical_symbol_route_reads_published_model_without_builder_or_postgre
         "evidence_explanation": {"rule": "close above Wave 1 high"},
     })
     model = {
-        "items": [row], "universe": "marginable_long", "eligible_count": 1,
+        "items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,
         "excluded_count": 0, "freshness": {"status": "stale", "in_flight": True},
         "provenance": {"as_of": "2026-08-30", "source_versions": {},
                        "policy_version": "setup-candidates-v1"},
@@ -139,7 +177,7 @@ def test_setup_candidates_route_returns_503_for_unavailable_read_model_without_b
 
 def test_route_never_uses_snapshot_as_canonical_source(monkeypatch):
     model = {"items": [candidate("READ_MODEL")], "universe": "marginable_long",
-             "eligible_count": 1, "excluded_count": 0,
+             "base_active_ord_count": 1, "eligible_count": 1, "excluded_count": 0,
              "freshness": {"status": "fresh"},
              "provenance": {"as_of": "2026-08-30", "source_versions": {},
                             "policy_version": "setup-candidates-v1"},
@@ -859,7 +897,7 @@ def test_setup_candidate_response_keeps_page_totals_lanes_and_observability_cons
 def test_route_uses_data_source_when_snapshot_is_legacy(monkeypatch):
     row = candidate("READ_MODEL_SOURCE")
     calls = []
-    model = {"items": [row], "universe": "marginable_long", "eligible_count": 1,
+    model = {"items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,
              "excluded_count": 0, "freshness": {"status": "fresh"},
              "provenance": {"as_of": "2026-08-30", "source_versions": {},
                             "policy_version": "setup-candidates-v1"},
@@ -887,7 +925,7 @@ def test_canonical_route_returns_unavailable_without_valid_read_model(monkeypatc
 
 def test_canonical_route_exposes_stale_in_flight_read_model_metadata(monkeypatch):
     model = {"items": [candidate("STALE")], "universe": "marginable_long",
-             "eligible_count": 1, "excluded_count": 0,
+             "base_active_ord_count": 1, "eligible_count": 1, "excluded_count": 0,
              "freshness": {"status": "stale", "in_flight": True},
              "provenance": {"as_of": "2026-08-30", "source_versions": {},
                             "policy_version": "setup-candidates-v1"},
@@ -1117,6 +1155,10 @@ def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     assert item["provenance"]["freshness"] == "fresh"
     assert item["provenance"]["source"] == "price_data+intraday_price_data"
     assert item["provenance"]["as_of"].startswith("2026-08-28")
+    assert item["provenance"]["universe_filter"] == "marginable_long"
+    assert item["provenance"]["marginable_schema_version"] == "test"
+    assert item["provenance"]["marginable_source_document"] == "test"
+    assert item["provenance"]["marginable_effective_date"] == "2026-08-25"
 
 
 def test_pending_daily_eod_preserves_latest_official_wave_with_current_60m(monkeypatch):

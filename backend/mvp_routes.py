@@ -33,6 +33,7 @@ _setup_candidates_pg_pool = None
 _setup_candidates_pg_pool_lock = threading.Lock()
 _SETUP_CANDIDATES_PG_POOL_MIN = 1
 _SETUP_CANDIDATES_PG_POOL_MAX = 4
+_CANONICAL_UNIVERSE = "marginable_long"
 
 
 class SetupCandidatesBuilderContractError(RuntimeError):
@@ -366,6 +367,22 @@ def _read_model_snapshot_meta(model):
     }
 
 
+def _validate_canonical_serving_model(model):
+    """Keep the public canonical seam fail-closed even for injected loaders."""
+    if not isinstance(model, dict) or model.get("universe") != _CANONICAL_UNIVERSE:
+        raise ValueError("canonical read-model universe is not marginable_long")
+    base = model.get("base_active_ord_count")
+    eligible = model.get("eligible_count")
+    excluded = model.get("excluded_count")
+    if (type(base) is not int or base < 0
+            or type(eligible) is not int or eligible < 0
+            or type(excluded) is not int or excluded < 0):
+        raise ValueError("canonical read-model universe counts are incomplete")
+    if base != eligible + excluded:
+        raise ValueError("canonical read-model universe counts are inconsistent")
+    return model
+
+
 def _overlay_latest_intraday_metadata(payload):
     """Compatibility adapter for the canonical freshness-lineage seam."""
     from canonical_freshness_lineage import overlay_latest_intraday_metadata
@@ -379,6 +396,14 @@ def _not_found(handler, symbol):
 def _handle_canonical_routes(route, qs, handler) -> bool:
     """Handle canonical setup-candidate and symbol routes."""
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
+        universe = (qs.get("universe", [_CANONICAL_UNIVERSE])[0] or _CANONICAL_UNIVERSE).strip().lower()
+        if universe != _CANONICAL_UNIVERSE:
+            json_response(handler, {
+                "error": "invalid_request",
+                "reason": "unsupported_universe",
+                "universe": universe,
+            }, status=400)
+            return True
         try:
             page = int(qs.get("page", ["1"])[0])
             page_size = int(qs.get("page_size", ["50"])[0])
@@ -388,7 +413,7 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
         try:
             import mvp_api
             from read_model_publisher import load_current_read_model
-            model = load_current_read_model()
+            model = _validate_canonical_serving_model(load_current_read_model())
             payload = _read_model_snapshot_meta(model)
             payload = _overlay_latest_intraday_metadata(payload)
             payload["items"] = model["items"]
@@ -416,7 +441,7 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
         try:
             import mvp_api
             from read_model_publisher import load_current_read_model
-            model = load_current_read_model()
+            model = _validate_canonical_serving_model(load_current_read_model())
             payload = _read_model_snapshot_meta(model)
             payload = _overlay_latest_intraday_metadata(payload)
             payload["items"] = model["items"]
@@ -479,6 +504,35 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
         except Exception as exc:
             json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
+    if route.startswith("/api/chart-db/"):
+        symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
+        if not symbol:
+            json_response(handler, {"error": "symbol required"}, status=400); return True
+        import mvp_chart_db
+        timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
+        canonical_item = None
+        try:
+            from read_model_publisher import load_current_read_model
+            model = _validate_canonical_serving_model(load_current_read_model())
+            canonical_item = next(
+                (item for item in model.get("items", [])
+                 if str(item.get("symbol", "")).upper() == symbol.upper()),
+                None,
+            )
+        except Exception:
+            # Chart DB remains independently readable when the published model
+            # is unavailable; its wave field then uses the named compatibility adapter.
+            canonical_item = None
+        try:
+            result = mvp_chart_db.project_chart_db_response(
+                symbol, timeframe=timeframe, canonical_item=canonical_item
+            )
+        except ValueError as exc:
+            json_response(handler, {"error": "invalid_request"}, status=400); return True
+        if result is None: _not_found(handler, symbol)
+        else: json_response(handler, _legacy_response(result))
+        return True
+
     try:
         payload = load_payload()
         items = payload["items"]
@@ -512,19 +566,6 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
             price_band=qs.get("price_band", ["all"])[0],
         )
         json_response(handler, _legacy_response(result)); return True
-    if route.startswith("/api/chart-db/"):
-        symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
-        if not symbol:
-            json_response(handler, {"error": "symbol required"}, status=400); return True
-        import mvp_chart_db
-        timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
-        try:
-            result = mvp_chart_db.project_chart_db_response(symbol, timeframe=timeframe)
-        except ValueError as exc:
-            json_response(handler, {"error": "invalid_request"}, status=400); return True
-        if result is None: _not_found(handler, symbol)
-        else: json_response(handler, _legacy_response(result))
-        return True
     if route.startswith("/api/chart/"):
         symbol = route[len("/api/chart/"):].strip().rstrip("/")
         if not symbol:

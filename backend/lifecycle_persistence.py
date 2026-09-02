@@ -322,24 +322,20 @@ def persist_review(cur, review_record: dict) -> dict | None:
 
 
 def read_candidate(cur, candidate_id: str):
-    cur.execute("SELECT candidate_id, symbol, thesis_as_of, policy_version, payload, created_at FROM lifecycle_candidates WHERE candidate_id = %s", (candidate_id,))
-    return cur.fetchone()
+    """Compatibility wrapper for callers that still pass a cursor."""
+    from lifecycle_repository import PostgresLifecycleRepository
+    return PostgresLifecycleRepository(cur).read_candidate(candidate_id)
 
 
 def read_snapshot(cur, snapshot_id: str):
-    cur.execute("SELECT snapshot_id, candidate_id, setup_id, observation_as_of, policy_version, source, setup_plan, machine_payload, lifecycle_status, expiry_reasons, created_at FROM lifecycle_snapshots WHERE snapshot_id = %s", (snapshot_id,))
-    return cur.fetchone()
+    """Compatibility wrapper for callers that still pass a cursor."""
+    from lifecycle_repository import PostgresLifecycleRepository
+    return PostgresLifecycleRepository(cur).read_snapshot(snapshot_id)
 
 
 def read_reviews(cur, candidate_id=None, setup_id=None, snapshot_id=None):
-    clauses, params = [], []
-    for key, value in (("candidate_id", candidate_id), ("setup_id", setup_id), ("snapshot_id", snapshot_id)):
-        if value is not None:
-            clauses.append(f"{key} = %s")
-            params.append(value)
-    sql = "SELECT event_id, candidate_id, setup_id, snapshot_id, event, reviewer, note, idempotency_key, created_at FROM lifecycle_review_events"
-    if clauses:
-        sql += " WHERE " + " AND ".join(clauses)
-    sql += " ORDER BY created_at ASC, event_id ASC"
-    cur.execute(sql, tuple(params))
-    return cur.fetchall()
+    """Compatibility wrapper for callers that still pass a cursor."""
+    from lifecycle_repository import PostgresLifecycleRepository
+    return PostgresLifecycleRepository(cur).read_reviews(
+        candidate_id=candidate_id, setup_id=setup_id, snapshot_id=snapshot_id,
+    )

@@ -45,7 +45,7 @@ def test_setup_candidates_never_falls_back_to_legacy_snapshot(monkeypatch):
 
     monkeypatch.setattr(mvp_routes, "load_payload", fail_snapshot)
     monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: {
-        "items": [], "universe": "marginable_long", "eligible_count": 0,
+        "items": [], "universe": "marginable_long", "base_active_ord_count": 0, "eligible_count": 0,
         "excluded_count": 0, "freshness": {"status": "fresh"},
         "provenance": {"as_of": None, "source_versions": {},
                         "policy_version": "setup-candidates-v1"},

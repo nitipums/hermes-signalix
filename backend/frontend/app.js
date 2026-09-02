@@ -658,7 +658,7 @@
       missing_evidence: context.missing_evidence || wave.missing_evidence, alternative_state: wave.alternative_state,
       snapshot_identity: wave.snapshot_identity || wave.snapshot_id || provenance.snapshot_identity || provenance.snapshot_id,
       evidence_refs: explanation.evidence_refs,
-      markers: Array.isArray(wave.markers) ? wave.markers : Array.isArray(wave.evidence_markers) ? wave.evidence_markers : []
+      markers: window.SignalixCanonicalClient.markers(item)
     };
   }
 
@@ -1592,10 +1592,11 @@
     // Legacy DOM/function names remain for compatibility; primary requests use
     // the canonical setup-candidates contract.
     if (page != null) dailySetupPage = Math.max(1, Number(page) || 1);
-    var endpoint = "/api/setup-candidates?page=" + dailySetupPage + "&page_size=50";
-    if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) endpoint += "&sector=" + encodeURIComponent(dom.dailySetupSector.value.trim());
+    var requestOptions = {};
+    if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) requestOptions.sector = dom.dailySetupSector.value.trim();
+    var endpoint = SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions);
     var request = dailyVcpRequests.load(endpoint, function(signal) {
-      return fetch(endpoint, {signal: signal}).then(function(res){ if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); });
+      return SignalixCanonicalClient.fetchSetupCandidatesPage(dailySetupPage, 50, signal, requestOptions);
     }, !!force);
     if (request.cached) {
       var cachedRequestSeq = ++dailyVcpRequestSeq;

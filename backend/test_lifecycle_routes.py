@@ -83,6 +83,52 @@ class Request:
         return self.payload
 
 
+class ReadRepository:
+    """Route-level fake proving GETs depend on the read seam, not SQL."""
+
+    def __init__(self, _cur):
+        self.calls = []
+        self.candidate = {"candidate_id": CID, "symbol": "ABC", "thesis_as_of": "2026-08-31",
+                          "policy_version": "p1", "payload": {"symbol": "ABC"},
+                          "created_at": "2026-08-31T00:00:00Z"}
+        self.snapshots = [
+            {"snapshot_id": "snapshot_0", "candidate_id": CID, "setup_id": SID,
+             "observation_as_of": "2026-08-31T09:00:00+07:00", "policy_version": "p1",
+             "source": "test", "setup_plan": {"trigger": 10}, "machine_payload": {"n": 0},
+             "lifecycle_status": "EXPIRED", "expiry_reasons": ["DATA_NOT_CURRENT"],
+             "created_at": "2026-08-31T09:00:00Z"},
+            {"snapshot_id": SNAP, "candidate_id": CID, "setup_id": SID,
+             "observation_as_of": "2026-08-31T10:00:00+07:00", "policy_version": "p1",
+             "source": "test", "setup_plan": {"trigger": 11}, "machine_payload": {"n": 1},
+             "lifecycle_status": "ACTIVE", "expiry_reasons": [],
+             "created_at": "2026-08-31T10:00:00Z"},
+        ]
+        self.reviews = [{"event_id": "event_1", "candidate_id": CID, "setup_id": SID,
+                         "snapshot_id": SNAP, "event": "NOTE", "reviewer": "arm",
+                         "note": "historical", "idempotency_key": "key-1",
+                         "created_at": "2026-08-31T10:01:00Z"}]
+
+    def read_candidate(self, candidate_id):
+        self.calls.append(("candidate", candidate_id))
+        return self.candidate if candidate_id == CID else None
+
+    def read_snapshot(self, snapshot_id):
+        self.calls.append(("snapshot", snapshot_id))
+        return next((row for row in self.snapshots if row["snapshot_id"] == snapshot_id), None)
+
+    def read_candidate_snapshots(self, candidate_id):
+        self.calls.append(("candidate_snapshots", candidate_id))
+        return [row for row in self.snapshots if row["candidate_id"] == candidate_id]
+
+    def read_reviews(self, *, candidate_id=None, setup_id=None, snapshot_id=None):
+        self.calls.append(("reviews", candidate_id, setup_id, snapshot_id))
+        return [row for row in self.reviews if (
+            (candidate_id is None or row["candidate_id"] == candidate_id)
+            and (setup_id is None or row["setup_id"] == setup_id)
+            and (snapshot_id is None or row["snapshot_id"] == snapshot_id)
+        )]
+
+
 def endpoints(pg):
     router = create_lifecycle_router(lambda: pg)
     return { (route.methods.pop(), route.path): route.endpoint for route in router.routes }
@@ -113,6 +159,35 @@ def test_get_auth_envelope_references_and_read_only_queries(monkeypatch):
         "missing", x_authenticated_user="arm", x_portfolio_token="owner-token"), 404)
     raises_status(lambda: ep[("GET", "/api/lifecycle/snapshots/{snapshot_id}")](
         "missing", x_authenticated_user="arm", x_portfolio_token="owner-token"), 404)
+
+
+def test_get_routes_use_repository_and_preserve_lossless_history(monkeypatch):
+    monkeypatch.setenv("PORTFOLIO_OWNER_TOKEN", "owner-token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "arm")
+    pg = PG()
+    repositories = []
+
+    def factory(cur):
+        repository = ReadRepository(cur)
+        repositories.append(repository)
+        return repository
+
+    ep = endpoints_with_factory(pg, factory)
+    result = ep[("GET", "/api/lifecycle/candidates/{candidate_id}")](
+        CID, x_authenticated_user="arm", x_portfolio_token="owner-token")
+    assert set(result) == {"candidate", "snapshots", "reviews", "provenance"}
+    assert result["snapshots"][0]["snapshot_id"] == "snapshot_0"
+    assert result["snapshots"][1]["machine_payload"] == {"n": 1}
+    assert result["reviews"][0]["note"] == "historical"
+    assert result["provenance"] == {"source": "postgresql", "read_only": True}
+    assert repositories[0].calls == [("candidate", CID), ("candidate_snapshots", CID),
+                                      ("reviews", CID, None, None)]
+    assert pg.cur.sql == []
+
+
+def endpoints_with_factory(pg, factory):
+    router = create_lifecycle_router(lambda: pg, repository_factory=factory)
+    return {(route.methods.pop(), route.path): route.endpoint for route in router.routes}
 
 
 def test_post_auth_payload_reference_validation_and_all_events(monkeypatch):

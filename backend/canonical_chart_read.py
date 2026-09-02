@@ -9,6 +9,76 @@ oldest-first where required.
 from __future__ import annotations
 
 import datetime as dt
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass(frozen=True)
+class ChartReadResult:
+    """Normalized, read-only chart data at the chart retrieval seam.
+
+    This is intentionally a chart result, not a wave/evidence contract.  The
+    public API adapter remains responsible for indicators and compatibility
+    fields; callers receive one ordered candle representation from here.
+    """
+
+    candles: list[dict[str, Any]]
+    source_timeframe: str
+    provisional: bool
+    as_of: str | None
+    latest_time: str | None
+    source: str
+    label: str
+
+
+def _chart_timestamp(value: Any, timeframe: str) -> str | None:
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    if timeframe != "60M":
+        return raw[:10] if len(raw) >= 10 else raw
+    if len(raw) > 10 and raw[10] == " ":
+        raw = raw[:10] + "T" + raw[11:]
+    return raw
+
+
+def read_chart_result(cur, symbol, timeframe, limit, market="TH") -> ChartReadResult:
+    """Retrieve, normalize, and order one chart result for any supported timeframe."""
+    timeframe = (timeframe or "1D").upper()
+    if timeframe not in {"1D", "1W", "60M", "1M"}:
+        raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
+    rows, label, metadata = fetch_chart_rows_with_metadata(
+        cur, symbol, timeframe, limit, market=market
+    )
+    candles = [{
+        "date": _chart_timestamp(row[0], timeframe),
+        "open": float(row[1]) if row[1] is not None else None,
+        "high": float(row[2]) if row[2] is not None else None,
+        "low": float(row[3]) if row[3] is not None else None,
+        "close": float(row[4]) if row[4] is not None else None,
+        "volume": float(row[5]) if row[5] is not None else None,
+        "provisional": bool(row[6]) if len(row) > 6 else False,
+    } for row in rows]
+    # Row retrieval is newest-first; chart consumers are oldest-first.
+    candles.reverse()
+    as_of = candles[-1]["date"] if candles else None
+    latest_time = (
+        _chart_timestamp(metadata.get("latest_intraday_time"), "60M")
+        or _chart_timestamp(metadata.get("latest_confirmed_time"), "1D")
+        or as_of
+    )
+    return ChartReadResult(
+        candles=candles,
+        source_timeframe=timeframe,
+        provisional=any(candle["provisional"] for candle in candles),
+        as_of=as_of,
+        latest_time=latest_time,
+        source="intraday_price_data" if timeframe == "60M" else "price_data",
+        label=label,
+    )
 
 
 def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):

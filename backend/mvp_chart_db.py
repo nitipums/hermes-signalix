@@ -24,10 +24,9 @@ import datetime as dt
 from typing import Any, Optional
 from threading import Lock
 
-import pandas as pd
-
-from elliott_structure_engine import build_wave_contract
-from chart_rows import fetch_chart_rows, fetch_chart_rows_with_metadata
+from canonical_chart_read import ChartReadResult, read_chart_result
+from chart_wave_evidence import (build_legacy_chart_wave_evidence,
+                                 canonical_chart_wave_evidence)
 
 
 _POOL = None
@@ -75,46 +74,15 @@ def _release_db_connection(pg: Any, *, close: bool = False) -> None:
 def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
                    timeframe: str = "1D") -> list[dict]:
     """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
-    timeframe = (timeframe or "1D").upper()
-    rows, _ = fetch_chart_rows(cur, symbol, timeframe, limit, market=market)
-    if timeframe not in {"1D", "60M"}:
-        rows = list(reversed(rows))
-    candles: list[dict] = []
-    for row in rows:
-        candles.append({
-            "date": _chart_timestamp(row[0], timeframe),
-            "open": float(row[1]) if row[1] is not None else None,
-            "high": float(row[2]) if row[2] is not None else None,
-            "low": float(row[3]) if row[3] is not None else None,
-            "close": float(row[4]) if row[4] is not None else None,
-            "volume": float(row[5]) if row[5] is not None else None,
-            "provisional": bool(row[6]) if len(row) > 6 else False,
-        })
-    if timeframe in {"1D", "60M"}:
-        candles.reverse()
-    return candles
+    return read_chart_result(cur, symbol, timeframe, limit, market=market).candles
 
 
 def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
                                  timeframe: str = "1D") -> tuple[list[dict], dict]:
     """Fetch candles and preserve the latest stored intraday source timestamp."""
-    timeframe = (timeframe or "1D").upper()
-    rows, _, metadata = fetch_chart_rows_with_metadata(
-        cur, symbol, timeframe, limit, market=market
-    )
-    candles = [{
-        "date": _chart_timestamp(row[0], timeframe),
-        "open": float(row[1]) if row[1] is not None else None,
-        "high": float(row[2]) if row[2] is not None else None,
-        "low": float(row[3]) if row[3] is not None else None,
-        "close": float(row[4]) if row[4] is not None else None,
-        "volume": float(row[5]) if row[5] is not None else None,
-        "provisional": bool(row[6]) if len(row) > 6 else False,
-    } for row in rows]
-    # The row adapter returns every timeframe newest-first.  The public chart
-    # contract is oldest-to-newest, so the final candle is always the latest.
-    candles.reverse()
-    return candles, metadata
+    result: ChartReadResult = read_chart_result(cur, symbol, timeframe, limit, market=market)
+    return result.candles, {"latest_time": result.latest_time, "as_of": result.as_of,
+                            "provisional": result.provisional}
 
 
 def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
@@ -251,7 +219,7 @@ def _chart_source(timeframe: str) -> str:
     return "intraday_price_data" if str(timeframe).upper() == "60M" else "price_data"
 
 
-def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[dict]:
+def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
     Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
@@ -348,7 +316,8 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
     latest_time = (
-        _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")
+        chart_metadata.get("latest_time")
+        or _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")
         or _chart_timestamp(chart_metadata.get("latest_confirmed_time"), "1D")
         or as_of
     )
@@ -379,20 +348,10 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     note = (provisional_note + (", ".join(notes) if notes else
             f"Computed from {chart_source} (SELECT only). All indicators available."))
 
-    wave_evidence = {"timeframe": timeframe.lower(), "markers": [],
-                     "mapping": {"daily": "not_projected", "60m": "setup_only"}}
-    if timeframe == "1D":
-        daily = pd.DataFrame(candles)
-        if not daily.empty:
-            daily = daily.rename(columns={"open": "Open", "high": "High", "low": "Low",
-                                          "close": "Close", "volume": "Volume"})
-            wave = build_wave_contract(daily, {}, snapshot_id="daily:" + str(as_of))
-            wave_evidence = {"timeframe": "daily", "markers": wave.get("evidence_markers", []),
-                             "explanation": wave.get("evidence_explanation"),
-                             "snapshot_id": wave.get("snapshot_id"),
-                             "mapping": {"daily": "authoritative", "60m": "not_projected"}}
-    elif timeframe == "60M":
-        wave_evidence["missing"] = ["daily_markers_not_projected"]
+    wave_evidence = (canonical_chart_wave_evidence(canonical_item)
+                     if timeframe == "1D" else None)
+    if wave_evidence is None:
+        wave_evidence = build_legacy_chart_wave_evidence(candles, timeframe, as_of)
     return {
         "symbol": symbol.upper(),
         "timeframe": timeframe,

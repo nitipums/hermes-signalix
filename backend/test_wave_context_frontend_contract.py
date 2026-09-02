@@ -18,16 +18,19 @@ def test_wave_context_route_is_explicit_and_classic_mvp_mapping_is_preserved():
 
 
 def test_surface_uses_shared_canonical_contract_and_aggregates_every_page():
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
     js = (ROOT / "wave-context.js").read_text(encoding="utf-8")
-    assert "/api/setup-candidates?universe=marginable_long&page=" in js
-    assert 'page_size=100' in js
-    assert "while(page<=totalPages)" in js
-    assert 'all.length!==first.total_items' in js
-    assert 'data.universe_filter!=="marginable_long"' in js
+    assert "fetchAllCandidates" in client
+    assert "while (page <= totalPages)" in client
+    assert "all.length !== first.total_items" in client
+    assert 'data.universe_filter !== DEFAULT_UNIVERSE' in client
+    assert "window.SignalixCanonicalClient.fetchAllCandidates" in js
+    assert "window.SignalixCanonicalClient.dailyMarkers" in js
     assert "classifier" not in js.lower()
 
 
 def test_context_labels_actionability_and_timeframes_are_source_bounded():
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
     html = (ROOT / "wave-context.html").read_text(encoding="utf-8")
     js = (ROOT / "wave-context.js").read_text(encoding="utf-8")
     for value in ("WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
@@ -36,8 +39,8 @@ def test_context_labels_actionability_and_timeframes_are_source_bounded():
         assert value in js or value in html
     assert 'lane==="REVIEW_NOW"' in js
     assert "Non-actionable context · backend lane" in js
-    assert 'm.timeframe==="daily"' in js
-    assert 'm.timestamp!=null&&m.price!=null' in js
+    assert 'marker.timeframe === "daily"' in client
+    assert 'marker.timestamp != null' in client
     assert 'fetch("/api/symbol/"+encodeURIComponent(item.symbol))' in js
     assert '/api/chart-db/"+encodeURIComponent(item.symbol)+"?timeframe=1D' in js
     assert "no 60m marker is plotted on this Daily chart" in html

@@ -8,10 +8,8 @@ import psycopg2.extras
 
 from fastapi import APIRouter, Header, HTTPException, Request
 
-from lifecycle_persistence import (
-    IdempotencyConflict, build_review_event_id, persist_review, read_candidate,
-    read_reviews, read_snapshot,
-)
+from lifecycle_persistence import IdempotencyConflict, build_review_event_id, persist_review
+from lifecycle_repository import LifecycleRepository, PostgresLifecycleRepository
 
 
 def _row(value):
@@ -38,8 +36,9 @@ def _owner(identity: str | None, token: str | None) -> str:
     return identity.strip()
 
 
-def create_lifecycle_router(get_pg):
+def create_lifecycle_router(get_pg, repository_factory=None):
     router = APIRouter(prefix="/api/lifecycle", tags=["lifecycle"])
+    repository_factory = repository_factory or PostgresLifecycleRepository
 
     @router.get("/candidates/{candidate_id}")
     def lifecycle_candidate(
@@ -50,13 +49,13 @@ def create_lifecycle_router(get_pg):
         _owner(x_authenticated_user, x_portfolio_token)
         pg = get_pg()
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        repository: LifecycleRepository = repository_factory(cur)
         try:
-            candidate = _row(read_candidate(cur, candidate_id))
+            candidate = _row(repository.read_candidate(candidate_id))
             if candidate is None:
                 raise HTTPException(status_code=404, detail="candidate not found")
-            cur.execute("SELECT snapshot_id, candidate_id, setup_id, observation_as_of, policy_version, source, setup_plan, machine_payload, lifecycle_status, expiry_reasons, created_at FROM lifecycle_snapshots WHERE candidate_id = %s ORDER BY observation_as_of ASC, snapshot_id ASC", (candidate_id,))
-            snapshots = [_row(row) for row in cur.fetchall()]
-            reviews = [_row(row) for row in read_reviews(cur, candidate_id=candidate_id)]
+            snapshots = [_row(row) for row in repository.read_candidate_snapshots(candidate_id)]
+            reviews = [_row(row) for row in repository.read_reviews(candidate_id=candidate_id)]
             return {"candidate": candidate, "snapshots": snapshots, "reviews": reviews,
                     "provenance": {"source": "postgresql", "read_only": True}}
         finally:
@@ -71,14 +70,15 @@ def create_lifecycle_router(get_pg):
         _owner(x_authenticated_user, x_portfolio_token)
         pg = get_pg()
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        repository: LifecycleRepository = repository_factory(cur)
         try:
-            snapshot = _row(read_snapshot(cur, snapshot_id))
+            snapshot = _row(repository.read_snapshot(snapshot_id))
             if snapshot is None:
                 raise HTTPException(status_code=404, detail="snapshot not found")
-            candidate = _row(read_candidate(cur, snapshot["candidate_id"]))
+            candidate = _row(repository.read_candidate(snapshot["candidate_id"]))
             if candidate is None:
                 raise HTTPException(status_code=404, detail="candidate not found")
-            reviews = [_row(row) for row in read_reviews(cur, snapshot_id=snapshot_id)]
+            reviews = [_row(row) for row in repository.read_reviews(snapshot_id=snapshot_id)]
             return {"candidate": candidate, "snapshots": [snapshot], "reviews": reviews,
                     "provenance": {"source": "postgresql", "read_only": True}}
         finally:
@@ -109,8 +109,9 @@ def create_lifecycle_router(get_pg):
             raise HTTPException(status_code=422, detail="reviewer must come from trusted identity")
         pg = get_pg()
         cur = pg.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        repository: LifecycleRepository = repository_factory(cur)
         try:
-            snapshot = _row(read_snapshot(cur, payload["snapshot_id"]))
+            snapshot = _row(repository.read_snapshot(payload["snapshot_id"]))
             if snapshot is None or snapshot.get("candidate_id") != payload["candidate_id"] or snapshot.get("setup_id") != payload["setup_id"]:
                 raise HTTPException(status_code=404, detail="candidate/setup/snapshot reference not found")
             record = {"event_id": build_review_event_id(x_idempotency_key), "candidate_id": payload["candidate_id"],

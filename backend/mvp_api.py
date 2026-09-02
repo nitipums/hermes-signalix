@@ -27,7 +27,6 @@ from provenance_contract import (
     DECISION_STATE_OFFICIAL_DAILY,
     DECISION_STATE_PROVISIONAL,
     resolve_decision_state,
-    compute_freshness,
 )
 from marginable import (
     eligible_symbols,
@@ -40,11 +39,15 @@ from marginable import (
 import instruments
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
+from freshness_assessment import (assess_projection_freshness as _resolve_freshness,
+                                  daily_eod_status as _daily_eod_status)
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
                                       build_setup_candidate)
 from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
+from candidate_row_evidence import (assemble_candidate_data_status,
+                                    assemble_candidate_provenance)
 from canonical_setup_projection import (
     _validate_canonical_setup_candidate,
     project_setup_candidates_response,
@@ -344,60 +347,6 @@ def _watch_lane_projection(items: list[dict], *, excluded_symbols: set[str],
     rising.sort(key=lambda x: (-float(x.get("watch_change_pct") or 0), str(x.get("symbol"))))
     caution.sort(key=lambda x: (-float(x.get("watch_change_pct") or 0), str(x.get("symbol"))))
     return rising, caution
-
-
-def _daily_eod_status(as_of: str | None, now: datetime | None = None) -> str | None:
-    """Classify today's Daily EOD as market-closed, not stale intraday data."""
-    if not as_of:
-        return None
-    now = now or datetime.now(timezone(timedelta(hours=7)))
-    if str(as_of)[:10] == now.astimezone(timezone(timedelta(hours=7))).date().isoformat():
-        return "market_closed"
-    return None
-
-
-def _resolve_freshness(items: list[dict]) -> dict:
-    """Build freshness block from items' timestamps.
-
-    Returns {status, source, as_of, data_fetched_at}.
-    Uses the latest daily_as_of across items as the authoritative as_of.
-    """
-    latest_as_of = None
-    latest_source = None
-    for item in items:
-        daily = item.get("daily_eod_freshness") or {}
-        as_of = daily.get("as_of") or item.get("daily_as_of") or item.get("date")
-        if as_of:
-            if latest_as_of is None or str(as_of) > str(latest_as_of):
-                latest_as_of = str(as_of)
-                latest_source = daily.get("source") or item.get("priceSource") or "Daily EOD"
-
-    status = "unknown"
-    if latest_as_of:
-        try:
-            dt_obj = datetime.fromisoformat(latest_as_of.replace("Z", "+00:00")
-                                            if isinstance(latest_as_of, str) else
-                                            latest_as_of)
-            # Try to parse date-only vs datetime
-            found_ts = dt_obj if dt_obj.tzinfo else dt_obj
-            # For date-only, treat as end of day in Bangkok
-            if len(str(latest_as_of)) <= 10:  # date only
-                found_ts = dt_obj.replace(
-                    hour=16, minute=30, tzinfo=timezone(timedelta(hours=7))
-                )
-            status = compute_freshness(latest_as_of)
-            status = _daily_eod_status(latest_as_of) or status
-            if status == "unknown":
-                status = "fresh"  # have data, treat optimistically
-        except (ValueError, TypeError):
-            status = "fresh"  # have a string, treat as having data
-
-    return {
-        "status": status,
-        "source": latest_source or "Daily EOD",
-        "as_of": latest_as_of,
-        "data_fetched_at": latest_as_of,
-    }
 
 
 def _find_item_by_symbol(items: list[dict], symbol: str) -> dict | None:
@@ -829,52 +778,19 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
     if peer_symbols is not None:
         peer_data["peer_symbols"] = peer_symbols
     peer_context = build_peer_context(symbol, peer_data)
-    daily_ok = daily_df is not None and len(daily_df) > 0
-    intraday_ok = intraday_current
-    if daily_evidence_usable and intraday_current:
-        candidate_freshness = "fresh"
-    elif "stale" in {daily_freshness, intraday_freshness}:
-        candidate_freshness = "stale"
-    else:
-        candidate_freshness = "unknown"
-    data_status = {
-        "sufficient": bool(daily_evidence_usable and intraday_current),
-        "freshness": candidate_freshness,
-        "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
-        "daily_available": daily_ok,
-        "daily_final_session_available": daily_current,
-        "daily_final_session_status": daily_final_status,
-        "daily_freshness": daily_freshness,
-        "intraday_60m_available": intraday_available,
-        "intraday_60m_freshness": intraday_freshness,
-        "intraday_60m_status": ("provisional" if intraday_current else intraday_freshness),
-        "intraday_60m_as_of": intraday_as_of,
-    }
-    engine_data_reason = setup.pop("data_reason_code", None)
-    data_reason_codes = []
-    if not daily_ok:
-        data_reason_codes.append("NO_DAILY_DATA")
-    elif not daily_evidence_valid:
-        data_reason_codes.append("INVALID_DAILY_OHLCV")
-    elif daily_freshness == "stale":
-        data_reason_codes.append("STALE_DAILY_DATA")
-    if engine_data_reason:
-        data_reason_codes.append(engine_data_reason)
-    elif not intraday_available:
-        data_reason_codes.append("NO_60M_DATA")
-    elif intraday_freshness == "stale":
-        data_reason_codes.append("STALE_60M_DATA")
-    if data_reason_codes:
-        data_status["reason_code"] = data_reason_codes[0]
-        data_status["reason_codes"] = list(dict.fromkeys(data_reason_codes))
-    if str(data_status.get("reason_code", "")).startswith("INVALID_"):
-        data_status["sufficient"] = False
-        data_status["freshness"] = "invalid"
-        setup["status"] = "DATA_BLOCKED"
-        candidate_freshness = "invalid"
-    if "INVALID_60M_OHLCV" in data_reason_codes:
-        data_status["intraday_60m_freshness"] = "invalid"
-        data_status["intraday_60m_status"] = "invalid"
+    data_status, setup, candidate_freshness = assemble_candidate_data_status(
+        daily_df=daily_df,
+        daily_evidence_valid=daily_evidence_valid,
+        daily_evidence_usable=daily_evidence_usable,
+        daily_current=daily_current,
+        daily_freshness=daily_freshness,
+        daily_final_status=daily_final_status,
+        intraday_available=intraday_available,
+        intraday_current=intraday_current,
+        intraday_freshness=intraday_freshness,
+        intraday_as_of=intraday_as_of,
+        setup=setup,
+    )
     bonus_evidence = {}
     attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
         "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
@@ -882,17 +798,16 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
     # Keep the compatibility provenance on the legacy audit placeholder;
     # attach_bonus_vcp has already enforced its non-positive shape.
     bonus_evidence["vcp"]["source"] = "legacy_audit_only"
+    provenance = assemble_candidate_provenance(
+        as_of=as_of,
+        intraday_as_of=intraday_as_of,
+        candidate_freshness=candidate_freshness,
+        universe_manifest=universe_manifest,
+    )
     row = build_setup_candidate(
         symbol, as_of, data_status, trend, wave, setup, peer_context,
         bonus_evidence,
-        {"policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
-         "daily_source": "price_data", "intraday_source": "intraday_price_data",
-         "as_of": as_of, "intraday_as_of": intraday_as_of,
-         "freshness": candidate_freshness,
-         "universe_filter": universe_manifest["universe_filter"],
-         "marginable_schema_version": universe_manifest.get("schema_version"),
-         "marginable_source_document": universe_manifest.get("source_document"),
-         "marginable_effective_date": universe_manifest.get("effective_date")},
+        provenance,
         canonical_metadata,
     )
     return _CandidateRowResult(
