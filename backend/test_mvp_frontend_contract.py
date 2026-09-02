@@ -49,7 +49,7 @@ def test_v2_serving_contract_has_explicit_marginable_long_requests_and_metadata(
         "margin_effective_date", "selected",
     ):
         assert marker in js
-    assert "Marginable-long operational universe" in html
+    assert "Marginable long universe" in html
     assert 'id="daily-vcp-retry"' in html
 
 
@@ -172,8 +172,8 @@ def test_stage_colors_and_rising_lane_are_declared():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'id="shortlist-rising"' in html
-    assert 'id="explorer-stage"' in html
+    assert 'id="shortlist-rising"' not in html
+    assert 'id="explorer-stage"' not in html
     for token in ("--s1", "--s2", "--s3", "--s4", "stage--s1", "stage--s2", "stage--s3", "stage--s4"):
         assert token in css
     assert "function isRising" in js
@@ -307,10 +307,10 @@ def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
 def test_vcp_type_filter_and_badges_are_presentation_only():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'id="daily-vcp-type"' in html
-    assert 'id="vcp-type"' in html
-    assert 'value="low_cheat_vcp">Low-Cheat' in html
-    assert 'value="standard_vcp">VCP' in html
+    assert 'id="daily-vcp-type"' not in html
+    assert 'id="vcp-type"' not in html
+    assert 'value="low_cheat_vcp">Low-Cheat' not in html
+    assert 'value="standard_vcp">VCP' not in html
     assert 'return base === "low_cheat_vcp" ? "Low-Cheat"' in js
     assert "vcpTypeMatches" in js
     assert '"STANDARD"' not in js
@@ -323,8 +323,8 @@ def test_vcp_type_filter_and_badges_are_presentation_only():
 def test_vcp_defaults_to_all_states_and_keeps_focused_query_explicit():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert '<option value="ALL" selected>All states</option>' in html
-    assert '<option value="actionable">Focused review · actionable + watch</option>' in html
+    assert 'id="panel-vcp"' not in html
+    assert 'id="tab-vcp"' not in html
     assert 'var selected = dom.vcpState.value || "ALL";' in js
     assert 'if (selected === "actionable") endpoint += "&focused=true";' in js
 
@@ -720,9 +720,10 @@ def test_daily_watchlist_consolidates_duplicate_primary_status_sections():
 def test_canonical_vcp_controls_exist_on_both_surfaces_and_filter_client_side():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for prefix in ("daily-vcp", "vcp"):
-        for field in ("decision-state", "decision", "quality"):
-            assert f'id="{prefix}-{field}"' in html
+    for field in ("decision-state", "decision", "quality"):
+        assert f'id="daily-vcp-{field}"' in html
+    for field in ("decision-state", "decision", "quality"):
+        assert f'id="vcp-{field}"' not in html
     for value in ("ALL", "FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED", "REVIEW", "WAIT", "AVOID", "PASS", "PARTIAL", "FAIL", "UNKNOWN"):
         assert f'value="{value}"' in html
     assert "function canonicalFilterMatches(result" in js
@@ -850,13 +851,13 @@ def test_setup_candidate_refresh_is_the_update_boundary_and_idle_is_not_live_by_
 def test_vcp_is_not_primary_navigation_and_api_is_marked_audit_only():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'id="tab-vcp"' in html
-    assert "VCP Audit · Compatibility / Rollback" in html
-    assert "Audit / compatibility / rollback only" in html
+    assert 'id="tab-vcp"' not in html
+    assert "VCP Audit · Compatibility / Rollback" not in html
+    assert "Audit / compatibility / rollback only" not in html
     assert 'id="tab-daily-vcp"' in html
     assert 'if (dom.tabVcp) dom.tabVcp.addEventListener' in js
     assert 'id="daily-setup-sector"' in html
-    assert "Audit / compatibility / rollback" in html
+    assert 'var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";' in js
 
 
 def test_setup_candidate_payload_validation_fails_closed_and_checks_lane_totals():

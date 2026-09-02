@@ -1598,20 +1598,24 @@
     }
     dom.panelDailyVcp.classList.toggle("panel--active", tab === "daily-vcp");
     dom.panelDailyVcp.classList.toggle("panel--hidden", tab !== "daily-vcp");
-    dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
-    dom.panelVcp.classList.toggle("panel--hidden", tab !== "vcp");
+    if (dom.panelVcp) {
+      dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
+      dom.panelVcp.classList.toggle("panel--hidden", tab !== "vcp");
+    }
     if (tab === "daily-vcp") loadDailyVcp();
     if (tab === "vcp") loadVcp();
   }
 
   dom.tabDailyVcp.addEventListener("click", function() { switchTab("daily-vcp"); });
   if (dom.tabVcp) dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
-  dom.vcpState.addEventListener("change", loadVcp);
-  dom.vcpType.addEventListener("change", loadVcp);
-  [dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality].forEach(function(input) {
-    if (input) input.addEventListener("change", loadVcp);
-  });
-  dom.vcpRetry.addEventListener("click", function() { loadVcp(true); });
+  if (dom.vcpState) {
+    dom.vcpState.addEventListener("change", loadVcp);
+    if (dom.vcpType) dom.vcpType.addEventListener("change", loadVcp);
+    [dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality].forEach(function(input) {
+      if (input) input.addEventListener("change", loadVcp);
+    });
+    if (dom.vcpRetry) dom.vcpRetry.addEventListener("click", function() { loadVcp(true); });
+  }
   if (dom.dailyVcpRetry) dom.dailyVcpRetry.addEventListener("click", function() { loadDailyVcp(true); });
 
   function marginRateQuery() {
@@ -1760,10 +1764,10 @@
   }
 
   /* ── pagination controls ── */
-  dom.exPrev.addEventListener("click", function() {
+  if (dom.exPrev) dom.exPrev.addEventListener("click", function() {
     if (explorerPage > 1) loadExplorer(explorerPage - 1);
   });
-  dom.exNext.addEventListener("click", function() {
+  if (dom.exNext) dom.exNext.addEventListener("click", function() {
     if (explorerPage < explorerTotalPages) loadExplorer(explorerPage + 1);
   });
   function updateMarginRates(surface, apply) {
@@ -1803,22 +1807,22 @@
   [dom.slPriceBand, dom.exPriceBand, dom.vcpPriceBand].forEach(function(select) {
     if (select) select.addEventListener("change", function() { updatePriceBand(Array.from(select.selectedOptions).map(function(option){ return option.value; })); });
   });
-  dom.slMarginable.addEventListener("change", function() {
+  if (dom.slMarginable) dom.slMarginable.addEventListener("change", function() {
     marginableFilter = dom.slMarginable.value || "krungsri";
-    dom.exMarginable.value = marginableFilter;
+    if (dom.exMarginable) dom.exMarginable.value = marginableFilter;
     loadShortlist();
   });
-  dom.exMarginable.addEventListener("change", function() {
+  if (dom.exMarginable) dom.exMarginable.addEventListener("change", function() {
     marginableFilter = dom.exMarginable.value || "krungsri";
-    dom.slMarginable.value = marginableFilter;
+    if (dom.slMarginable) dom.slMarginable.value = marginableFilter;
     loadExplorer(1);
   });
-  dom.exStage.addEventListener("change", function() {
+  if (dom.exStage) dom.exStage.addEventListener("change", function() {
     explorerStage = dom.exStage.value;
     loadExplorer(1);
   });
   var explorerSearchTimer = null;
-  dom.exSearch.addEventListener("input", function() {
+  if (dom.exSearch) dom.exSearch.addEventListener("input", function() {
     clearTimeout(explorerSearchTimer);
     explorerSearch = dom.exSearch.value.trim();
     explorerSearchTimer = setTimeout(function() { loadExplorer(1); }, 250);
@@ -1835,9 +1839,9 @@
   });
 
   /* ── retry buttons ── */
-  dom.slRetry.addEventListener("click", loadShortlist);
-  dom.slStaleRetry.addEventListener("click", loadShortlist);
-  dom.exRetry.addEventListener("click", function() { loadExplorer(explorerPage); });
+  if (dom.slRetry) dom.slRetry.addEventListener("click", loadShortlist);
+  if (dom.slStaleRetry) dom.slStaleRetry.addEventListener("click", loadShortlist);
+  if (dom.exRetry) dom.exRetry.addEventListener("click", function() { loadExplorer(explorerPage); });
   dom.dailySetupPrev.addEventListener("click", function() {
     if (dailySetupPage > 1) loadDailyVcp(false, dailySetupPage - 1);
   });

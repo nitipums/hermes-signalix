@@ -89,13 +89,10 @@ def test_price_band_filter_is_presentation_only():
 def test_frontend_has_both_filters_and_drawer_permissions():
     html = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
     js = (ROOT / "frontend/app.js").read_text(encoding="utf-8")
-    assert 'id="shortlist-marginable"' in html
-    assert 'id="explorer-marginable"' in html
-    assert 'id="shortlist-price-band"' in html
-    assert 'id="explorer-price-band"' in html
-    assert 'id="vcp-price-band"' in html
-    assert 'data-surface="vcp"' in html
-    assert 'class="margin-rate-toggle"' in html
+    assert 'id="shortlist-marginable"' not in html
+    assert 'id="explorer-marginable"' not in html
+    assert 'id="vcp-price-band"' not in html
+    assert 'data-surface="vcp"' not in html
     assert '<dt>Marginable</dt>' in html
     # Decision levels live as dashed chart overlays; duplicate metric boxes
     # below the chart were intentionally removed from the MVP drawer.
@@ -111,6 +108,4 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert 'visibleDrawerSymbols' in js
     assert 'touchstart' in js
     assert 'ArrowLeft' in js
-    assert 'marginable=' in js
-    assert "margin_rates=" in js
-    assert "%Margin " in js
+    assert '"/api/setup-candidates?page="' in js
