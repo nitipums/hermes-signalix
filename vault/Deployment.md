@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-02 12:50 ICT · release `5bf3d9a` promoted and pushed; intraday unit parity and public provisional Day/Week chart verified; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-02 13:08 ICT · release `1573d5c` promoted; intraday metadata sidecar/schema follow-ups verified; evaluator auto-caller separate.
 
 ## Stable release
 
