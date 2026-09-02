@@ -104,6 +104,8 @@ def test_chart_db_adapter_replaces_same_day_daily_row(monkeypatch, timeframe):
     assert response["candles"][-1]["close"] == 11.0
     assert response["candles"][-1]["volume"] == 100.0
     assert response["candles"][-1]["provisional"] is True
+    assert response["latest_time"] == "2026-08-27T05:00:00+00:00"
+    assert response["as_of"] == ("2026-08-27" if timeframe == "1D" else "2026-08-24")
     assert response["provenance"]["source"] == "price_data"
     assert "provisional 60m aggregation" in response["provenance"]["note"]
 
@@ -129,7 +131,8 @@ def test_chart_db_route_preserves_legacy_fields_and_falls_back_to_daily_eod(monk
     assert payload["timeframe"] == timeframe
     assert payload["candles"][-1]["close"] == 9.5
     assert payload["candles"][-1]["provisional"] is False
-    assert {"candles", "ma20", "ma50", "ma200", "macd", "rsi", "wave_evidence", "source", "as_of", "provenance"}.issubset(payload)
+    assert payload["latest_time"] == "2026-08-27"
+    assert {"candles", "ma20", "ma50", "ma200", "macd", "rsi", "wave_evidence", "source", "as_of", "latest_time", "provenance"}.issubset(payload)
 
 
 class _Connection:

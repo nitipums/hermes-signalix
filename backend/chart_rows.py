@@ -7,14 +7,23 @@ import datetime as dt
 
 def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
     """Return stored bars, rolling the latest current-session 60m data into Day/Week/Month."""
+    rows, _label, _metadata = fetch_chart_rows_with_metadata(
+        cur, symbol, timeframe, limit, market=market
+    )
+    return rows, _label
+
+
+def fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market="TH"):
+    """Return chart rows plus source timestamps needed by metadata consumers."""
     if timeframe == "60M":
         if market.upper() != "TH":
-            return [], "60-minute data is not configured for this market"
+            return [], "60-minute data is not configured for this market", {}
         cur.execute("""SELECT ts, open, high, low, close, volume,
                               (ROW_NUMBER() OVER (ORDER BY ts DESC) = 1) AS provisional
                        FROM intraday_price_data WHERE symbol=%s AND interval='60m'
                        ORDER BY ts DESC LIMIT %s""", (symbol, limit))
-        return cur.fetchall(), "60-minute (latest candle may be in progress)"
+        rows = cur.fetchall()
+        return rows, "60-minute (latest candle may be in progress)", {}
 
     daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
     cur.execute("""SELECT date::timestamp, open, high, low, close, volume, false AS provisional
@@ -23,6 +32,7 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
     daily = cur.fetchall()
     # Keep the adapter tolerant of older tuple-shaped test/read-model cursors.
     daily = [row if len(row) > 6 else (*row, False) for row in daily]
+    latest_confirmed_time = daily[0][0] if daily else None
     cur.execute("""SELECT ts, open, high, low, close, volume FROM intraday_price_data
                    WHERE symbol=%s AND interval='60m' AND (ts AT TIME ZONE 'Asia/Bangkok')::date = (NOW() AT TIME ZONE 'Asia/Bangkok')::date
                    ORDER BY ts ASC""", (symbol,))
@@ -37,11 +47,16 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
         daily.append(provisional)
 
     has_provisional = bool(intra)
+    metadata = {}
+    if latest_confirmed_time is not None:
+        metadata["latest_confirmed_time"] = latest_confirmed_time
     daily.sort(key=lambda r: r[0], reverse=True)
     if timeframe == "1D":
         label = ("Daily EOD + provisional current session (60m as-is)"
                  if has_provisional else "Daily EOD (no current-session 60m data)")
-        return daily[:limit], label
+        if has_provisional and isinstance(intra[-1][0], dt.datetime) and intra[-1][0].tzinfo is not None:
+            metadata["latest_intraday_time"] = intra[-1][0]
+        return daily[:limit], label, metadata
 
     periods = {}
     for stamp, open_, high, low, close, volume, provisional in reversed(daily):
@@ -61,4 +76,6 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
     label = (("Weekly" if timeframe == "1W" else "Monthly") +
              (" + provisional current session (60m as-is)" if has_provisional
               else " Daily EOD (no current-session 60m data)"))
-    return rows, label
+    if has_provisional and isinstance(intra[-1][0], dt.datetime) and intra[-1][0].tzinfo is not None:
+        metadata["latest_intraday_time"] = intra[-1][0]
+    return rows, label, metadata

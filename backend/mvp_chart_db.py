@@ -5,7 +5,7 @@ indicators (MA20/50/200, MACD, RSI) when the database is available.
 Never writes, never mutates.
 
   GET /api/chart-db/{symbol} → {symbol, candles, ma20, ma50, ma200,
-                                 macd, rsi, source, as_of, provenance}
+                                 macd, rsi, source, as_of, latest_time, provenance}
 
 All fields are null (None) when no authoritative data exists.
 NOT_VERIFIED when computed values are unavailable due to insufficient data.
@@ -27,7 +27,7 @@ from threading import Lock
 import pandas as pd
 
 from elliott_structure_engine import build_wave_contract
-from chart_rows import fetch_chart_rows
+from chart_rows import fetch_chart_rows, fetch_chart_rows_with_metadata
 
 
 _POOL = None
@@ -93,6 +93,27 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
     if timeframe in {"1D", "60M"}:
         candles.reverse()
     return candles
+
+
+def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+                                 timeframe: str = "1D") -> tuple[list[dict], dict]:
+    """Fetch candles and preserve the latest stored intraday source timestamp."""
+    timeframe = (timeframe or "1D").upper()
+    rows, _, metadata = fetch_chart_rows_with_metadata(
+        cur, symbol, timeframe, limit, market=market
+    )
+    candles = [{
+        "date": _chart_timestamp(row[0], timeframe),
+        "open": float(row[1]) if row[1] is not None else None,
+        "high": float(row[2]) if row[2] is not None else None,
+        "low": float(row[3]) if row[3] is not None else None,
+        "close": float(row[4]) if row[4] is not None else None,
+        "volume": float(row[5]) if row[5] is not None else None,
+        "provisional": bool(row[6]) if len(row) > 6 else False,
+    } for row in rows]
+    if timeframe in {"1D", "60M"}:
+        candles.reverse()
+    return candles, metadata
 
 
 def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
@@ -252,6 +273,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                               "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
                 "source": None,
                 "as_of": None,
@@ -261,7 +283,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     try:
         cur = pg.cursor()
-        candles = _fetch_candles(cur, symbol, timeframe=timeframe)
+        candles, chart_metadata = _fetch_candles_with_metadata(cur, symbol, timeframe=timeframe)
         cur.close()
     except Exception as e:
         # Fail-graceful: return NOT_VERIFIED
@@ -283,6 +305,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                               "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
                 "source": chart_source,
                 "as_of": None,
@@ -311,6 +334,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                                   "missing": ["daily_markers_not_projected"]},
                 "source": None,
                 "as_of": None,
+                "latest_time": None,
                 "availability": "unavailable",
                 "provenance": {
                     "source": None,
@@ -322,6 +346,11 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
+    latest_time = (
+        _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")
+        or _chart_timestamp(chart_metadata.get("latest_confirmed_time"), "1D")
+        or as_of
+    )
 
     # Build NOT_VERIFIED notes
     notes: list[str] = []
@@ -375,6 +404,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
         "wave_evidence": wave_evidence,
         "source": chart_source,
         "as_of": as_of,
+        "latest_time": latest_time,
         "provenance": {
             "source": chart_source,
             "as_of": as_of,
