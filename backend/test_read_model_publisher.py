@@ -6,12 +6,37 @@ from pathlib import Path
 import pytest
 
 from read_model_publisher import (build_read_model, load_current_read_model,
-                                  publish_builder_result, publish_read_model,
+                                  load_intraday_metadata, publish_builder_result,
+                                  publish_intraday_metadata, publish_read_model,
                                   DEFAULT_ROOT)
 
 
 def test_default_root_is_shared_backend_read_model_path():
     assert DEFAULT_ROOT == Path(__file__).resolve().parent / "read-model"
+
+
+def test_intraday_metadata_sidecar_is_atomic_and_round_trips_product_identity(tmp_path):
+    metadata = publish_intraday_metadata({
+        "run_id": "run-1", "status": "full_success",
+        "fetch_completed_at": "2026-09-02T09:00:00+00:00",
+        "universe": "marginable_long", "published_at": "pub-1",
+    }, tmp_path)
+    assert metadata["path"].endswith("intraday-latest.json")
+    assert load_intraday_metadata(tmp_path) == {
+        "schema_version": "signalix.intraday-metadata.v1", "run_id": "run-1",
+        "status": "full_success", "fetch_completed_at": "2026-09-02T09:00:00+00:00",
+        "universe": "marginable_long", "published_at": "pub-1",
+    }
+
+
+def test_intraday_metadata_sidecar_rejects_audit_or_legacy_identity(tmp_path):
+    with pytest.raises(ValueError, match="only marginable_long"):
+        publish_intraday_metadata({"run_id": "audit", "status": "full_success",
+                                   "fetch_completed_at": "t", "universe": "active_ord"}, tmp_path)
+    (tmp_path / "intraday-latest.json").write_text(
+        json.dumps({"run_id": "legacy", "status": "full_success",
+                    "fetch_completed_at": "t", "universe": None}), encoding="utf-8")
+    assert load_intraday_metadata(tmp_path) is None
 
 
 def _item(symbol, lane="WAIT"):

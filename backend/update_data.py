@@ -214,9 +214,11 @@ def ensure_intraday_table(pg):
             fetch_completed_at TIMESTAMPTZ NOT NULL,
             db_upsert_result JSONB NOT NULL,
             failed_symbols JSONB NOT NULL,
-            batch_metrics JSONB NOT NULL
+            batch_metrics JSONB NOT NULL,
+            fetch_universe TEXT
         )
     """)
+    cur.execute("ALTER TABLE intraday_ingestion_runs ADD COLUMN IF NOT EXISTS fetch_universe TEXT")
     pg.commit()
     cur.close()
 
@@ -270,8 +272,8 @@ def record_intraday_run_summary(pg, summary):
         """INSERT INTO intraday_ingestion_runs(
                run_id,status,symbols_attempted,symbols_succeeded,symbols_failed,
                retry_count,fetch_started_at,fetch_completed_at,db_upsert_result,
-               failed_symbols,batch_metrics)
-           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb)
+               failed_symbols,batch_metrics,fetch_universe)
+           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s::jsonb,%s)
            ON CONFLICT(run_id) DO UPDATE SET
                status=EXCLUDED.status,
                symbols_attempted=EXCLUDED.symbols_attempted,
@@ -282,7 +284,8 @@ def record_intraday_run_summary(pg, summary):
                fetch_completed_at=EXCLUDED.fetch_completed_at,
                db_upsert_result=EXCLUDED.db_upsert_result,
                failed_symbols=EXCLUDED.failed_symbols,
-               batch_metrics=EXCLUDED.batch_metrics""",
+               batch_metrics=EXCLUDED.batch_metrics,
+               fetch_universe=EXCLUDED.fetch_universe""",
         (
             summary["run_id"], summary["status"], summary["symbols_attempted"],
             summary["symbols_succeeded"], summary["symbols_failed"],
@@ -290,6 +293,7 @@ def record_intraday_run_summary(pg, summary):
             summary["fetch_completed_at"],
             json.dumps({"rows_offered": summary["rows_offered"]}),
             json.dumps(summary["failed_symbols"]), json.dumps(summary["batches"]),
+            summary.get("fetch_universe"),
         ),
     )
     pg.commit()
@@ -603,6 +607,7 @@ def _utc_now_iso():
 
 def ingest_intraday(
         pg, stats, *, symbols=None, limit=10, mode="full", interval="60m",
+        universe="marginable_long",
         batch_size=SETTRADE_BATCH_SIZE,
         batch_delay=SETTRADE_BATCH_DELAY_SECONDS,
         batch_jitter=SETTRADE_BATCH_JITTER_SECONDS,
@@ -624,7 +629,9 @@ def ingest_intraday(
     if session_retries < 0 or retry_backoff < 0:
         raise ValueError("intraday retry settings must not be negative")
 
-    symbols = list(_intraday_universe(pg) if symbols is None else symbols)
+    if universe not in {"marginable_long", "active_ord"}:
+        raise ValueError("intraday universe must be marginable_long or active_ord")
+    symbols = list(_intraday_universe(pg, universe) if symbols is None else symbols)
     run_id = uuid.uuid4().hex
     summary = {
         "run_id": run_id, "status": "failure",
@@ -634,6 +641,7 @@ def ingest_intraday(
         "fetch_started_at": _utc_now_iso(), "fetch_completed_at": None,
         "rows_offered": 0, "rows_inserted": 0, "rows_updated": 0,
         "batches": [],
+        "fetch_universe": universe,
     }
     stats["intraday_symbols"] = len(symbols)
     stats.setdefault("intraday_failed", 0)
@@ -1121,10 +1129,11 @@ def _canonical_read_model_source_versions(pg):
         """)
         daily = cur.fetchone()
         cur.execute("""
-            SELECT run_id, status, fetch_completed_at
+            SELECT run_id, status, fetch_completed_at, fetch_universe
             FROM intraday_ingestion_runs
             WHERE status IN ('full_success', 'partial_success')
               AND fetch_completed_at IS NOT NULL
+              AND fetch_universe = 'marginable_long'
             ORDER BY fetch_completed_at DESC, run_id DESC
             LIMIT 1
         """)
@@ -1134,10 +1143,11 @@ def _canonical_read_model_source_versions(pg):
     if not daily or not intraday:
         return None
     daily_run_id, daily_scan_date, daily_run_timestamp, daily_lineage = daily
-    intraday_run_id, intraday_status, intraday_completed_at = intraday
+    intraday_run_id, intraday_status, intraday_completed_at, intraday_universe = intraday
     if (not daily_run_id or not daily_scan_date or not daily_run_timestamp
             or not isinstance(daily_lineage, dict)
-            or not intraday_run_id or not intraday_status or not intraday_completed_at):
+            or not intraday_run_id or not intraday_status or not intraday_completed_at
+            or intraday_universe != "marginable_long"):
         return None
     return {
         "daily": {
@@ -1181,6 +1191,29 @@ def publish_canonical_read_model():
         return None
     finally:
         pg.close()
+
+
+def publish_intraday_metadata_after_commit(summary):
+    """Publish product freshness only after the run summary commit succeeds."""
+    if (summary.get("fetch_universe") != "marginable_long"
+            or summary.get("status") not in {"full_success", "partial_success"}):
+        return None
+    from read_model_publisher import publish_intraday_metadata
+    try:
+        result = publish_intraday_metadata({
+            "run_id": summary.get("run_id"),
+            "status": summary.get("status"),
+            "fetch_completed_at": summary.get("fetch_completed_at"),
+            "universe": summary.get("fetch_universe"),
+            "published_at": _utc_now_iso(),
+        })
+        print("INTRADAY_METADATA_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except (OSError, TypeError, ValueError) as exc:
+        # The committed DB run remains authoritative for the next refresh;
+        # never turn a sidecar publication failure into fabricated freshness.
+        print("INTRADAY_METADATA_SKIP " + json.dumps({"reason": repr(exc)[:240]}))
+        return None
 
 
 def run_vcp_after_ingestion(pg, summary):
@@ -1262,7 +1295,7 @@ def run(args):
             ensure_intraday_table(pg)
             summary = ingest_intraday(
                 pg, stats, symbols=symbols, limit=args.intraday_limit,
-                mode=mode, interval=interval,
+                mode=mode, interval=interval, universe=universe,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
@@ -1272,6 +1305,7 @@ def run(args):
             )
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
+            publish_intraday_metadata_after_commit(summary)
             run_vcp_after_ingestion(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
             print(format_intraday_run_log(
@@ -1405,6 +1439,7 @@ def run(args):
             summary = ingest_intraday(
                 pg, stats, symbols=symbols, limit=args.intraday_limit,
                 interval=args.intraday_interval,
+                universe=getattr(args, "intraday_universe", "marginable_long"),
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
@@ -1414,6 +1449,7 @@ def run(args):
             )
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
+            publish_intraday_metadata_after_commit(summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
         finally:
             pg.close()

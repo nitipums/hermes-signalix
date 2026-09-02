@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 import atexit
+import datetime as dt
 from urllib.parse import parse_qs, urlsplit
 
 from mvp_snapshot import load_mvp_artifact
@@ -367,27 +368,26 @@ def _read_model_snapshot_meta(model):
 
 
 def _overlay_latest_intraday_metadata(payload):
-    """Attach latest completed fetch lineage without rebuilding Daily items."""
+    """Attach published fetch lineage without acquiring/querying PostgreSQL."""
     provenance = payload.get("provenance") or {}
     versions = provenance.get("source_versions") or {}
     if not isinstance(versions.get("intraday"), dict):
         return payload
-    connection, release = _acquire_setup_candidates_pg()
-    try:
-        cur = connection.cursor()
-        cur.execute("""SELECT run_id, status, fetch_completed_at
-                       FROM intraday_ingestion_runs
-                       WHERE status IN ('full_success','partial_success')
-                         AND fetch_completed_at IS NOT NULL
-                       ORDER BY fetch_completed_at DESC, run_id DESC LIMIT 1""")
-        row = cur.fetchone()
-        cur.close()
-    finally:
-        release()
-    if not row:
+    from read_model_publisher import load_intraday_metadata
+    metadata = load_intraday_metadata()
+    if not metadata:
         return payload
-    run_id, status, completed = row
-    completed = completed.isoformat() if hasattr(completed, "isoformat") else str(completed)
+    completed = str(metadata["fetch_completed_at"])
+    embedded = versions["intraday"].get("as_of")
+    try:
+        sidecar_time = dt.datetime.fromisoformat(completed.replace("Z", "+00:00"))
+        embedded_time = dt.datetime.fromisoformat(str(embedded).replace("Z", "+00:00")) if embedded else None
+        if embedded_time and sidecar_time < embedded_time:
+            return payload
+    except (TypeError, ValueError):
+        return payload
+    run_id = str(metadata["run_id"])
+    status = metadata["status"]
     freshness = dict(payload.get("freshness") or {})
     freshness.update({"intraday_fetched_at": completed,
                       "intraday_source": "settrade_intraday_60m",
@@ -399,14 +399,14 @@ def _overlay_latest_intraday_metadata(payload):
     updated_versions = dict(versions)
     updated_versions["intraday"] = {
         **versions["intraday"],
-        "run_id": str(run_id),
+        "run_id": run_id,
         "status": status,
         "as_of": completed,
     }
     updated_provenance["source_versions"] = updated_versions
     updated_provenance["intraday_as_of"] = completed
     updated["provenance"] = updated_provenance
-    updated["intraday_latest_run"] = {"run_id": str(run_id), "status": status,
+    updated["intraday_latest_run"] = {"run_id": run_id, "status": status,
                                        "fetch_completed_at": completed}
     return updated
 

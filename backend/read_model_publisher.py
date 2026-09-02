@@ -26,6 +26,7 @@ EXPECTED_UNIVERSE = "marginable_long"
 EXPECTED_COUNT = 237
 LANES = ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED")
 DEFAULT_ROOT = Path(__file__).resolve().parent / "read-model"
+INTRADAY_METADATA_FILENAME = "intraday-latest.json"
 _READ_MODEL_CACHE_LIMIT = 2
 _READ_MODEL_CACHE_LOCK = threading.RLock()
 _READ_MODEL_CACHE: OrderedDict[tuple[str, str, str, str], dict] = OrderedDict()
@@ -177,6 +178,52 @@ def publish_read_model(model: dict, root: str | Path) -> dict:
     pointer = {"contract_version": CONTRACT_VERSION, "source_version": source_version, "path": str(version_path.name)}
     atomic_write_json(root / "current.json", pointer)
     return {"source_version": source_version, "path": str(version_path), "count": len(items), "counts": counts}
+
+
+def _intraday_metadata_path(root: str | Path | None = None) -> Path:
+    configured = os.getenv("SIGNALIX_INTRADAY_METADATA_PATH")
+    if configured:
+        return Path(configured)
+    return Path(root or os.getenv("SIGNALIX_READ_MODEL_ROOT", DEFAULT_ROOT)) / INTRADAY_METADATA_FILENAME
+
+
+def publish_intraday_metadata(metadata: dict, root: str | Path | None = None) -> dict:
+    """Atomically publish the small product-scope intraday freshness seam."""
+    if not isinstance(metadata, dict):
+        raise ValueError("intraday metadata must be an object")
+    required = ("run_id", "status", "fetch_completed_at", "universe")
+    if any(not metadata.get(key) for key in required):
+        raise ValueError("intraday metadata identity is incomplete")
+    if metadata["universe"] != EXPECTED_UNIVERSE:
+        raise ValueError("only marginable_long intraday metadata is publishable")
+    if metadata["status"] not in {"full_success", "partial_success"}:
+        raise ValueError("intraday metadata status is not product-eligible")
+    payload = {
+        "schema_version": "signalix.intraday-metadata.v1",
+        "run_id": str(metadata["run_id"]),
+        "status": str(metadata["status"]),
+        "fetch_completed_at": str(metadata["fetch_completed_at"]),
+        "universe": EXPECTED_UNIVERSE,
+        "published_at": str(metadata.get("published_at") or ""),
+    }
+    path = _intraday_metadata_path(root)
+    atomic_write_json(path, payload)
+    return {"path": str(path), **payload}
+
+
+def load_intraday_metadata(root: str | Path | None = None) -> dict | None:
+    """Read the bounded sidecar; malformed or absent metadata is unavailable."""
+    try:
+        payload = json.loads(_intraday_metadata_path(root).read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError, TypeError):
+        return None
+    if (not isinstance(payload, dict)
+            or payload.get("schema_version") != "signalix.intraday-metadata.v1"
+            or payload.get("universe") != EXPECTED_UNIVERSE
+            or payload.get("status") not in {"full_success", "partial_success"}
+            or not payload.get("run_id") or not payload.get("fetch_completed_at")):
+        return None
+    return payload
 
 
 def load_current_read_model(root: str | Path | None = None) -> dict:
