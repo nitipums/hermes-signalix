@@ -76,9 +76,9 @@ logs in the non-TTY container).
 - `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher; canonical and legacy/audit route handlers are explicit; `/api/setup-candidates` is primary and VCP routes are audit-only
 - `backend/canonical_setup_projection.py` — deep read-only interface for canonical setup-candidate validation, ordering, filters, pagination, lane counts, freshness, and provenance
 - `backend/mvp_api.py` — candidate builders plus compatibility projections; re-exports the canonical projection interface for existing callers
-- `backend/mvp_chart_db.py` — SELECT-only `1D`/`1W`/`60M`/`1M` OHLCV + indicators
-- `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
-- `docker-compose.yml` — 4 services
+- `backend/canonical_chart_read.py` — deep read-only chart row retrieval/aggregation seam for SQL shape, provisional current-session data, chronological conversion inputs, labels, and timestamp metadata
+- `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
+- `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
 ## Current MVP surface contract — 2026-09-01
 

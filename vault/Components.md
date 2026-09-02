@@ -1,7 +1,7 @@
 # Components
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
-> **Reconciled:** 2026-09-01 · Elliott/Trend/Trade-Setup is primary; VCP modules are compatibility/audit.
+> **Reconciled:** 2026-09-02 · Elliott/Trend/Trade-Setup is primary; VCP modules are compatibility/audit; canonical chart-read seam extracted with public contract preserved.
 
 Every backend module, what it does, and its hard rules.
 
@@ -64,7 +64,10 @@ owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
 `mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
-`mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:
+`canonical_chart_read.py` owns the shared SELECT-only chart row retrieval and
+aggregation rules. `chart_rows.py` is a compatibility adapter for that seam;
+`mvp_chart_db.py` and `app.py` retain their existing public imports. The chart
+layer serves real timeframe contracts:
 `1D` Daily with a current-session provisional 60m replacement when available,
 `1W`/`1M` aggregate those Day bars, and `60M` stored intraday bars. The
 frontend renders candlestick OHLC, volume, MA, and RSI; timeframe/layer controls

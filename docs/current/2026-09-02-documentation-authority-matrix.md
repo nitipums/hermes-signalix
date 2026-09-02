@@ -16,7 +16,7 @@ This matrix makes the minimum reading path explicit. It separates current author
 | Setup-candidate contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | `backend/setup_candidate_contract.py`, API/frontend tests | implementation plan after closeout | Mark plan as historical implementation evidence after reference scan |
 | Lifecycle persistence/API | `docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` (`LIFECYCLE-T9`) | `backend/lifecycle_*`, lifecycle tests | old T9 references | Use qualified identifier `LIFECYCLE-T9` |
 | User-validation/browser contract | `docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md` and navigation/filter spec | frontend source, browser harness/evidence | completed handoffs | Use qualified identifiers `UI-T06`–`UI-T09`; separate design target from served proof |
-| Architecture/data flow | `vault/Architecture.md` | `vault/Components.md`, source tree | old flow sections/postmortems | Retired dashboard/snapshot flow is labelled compatibility/history; current canonical dispatcher/projection seams are explicit |
+| Architecture/data flow | `vault/Architecture.md` | `vault/Components.md`, source tree | old flow sections/postmortems | Retired dashboard/snapshot flow is labelled compatibility/history; canonical dispatcher, projection, and chart-read seams are explicit |
 | Runtime/deployment/timers | `vault/Deployment.md` | compose/systemd/source + live probes | terminal logs, handoffs | Keep runtime claims dated and evidence-backed |
 | Acceptance/evidence | `vault/Execution-Pipeline.md` | focused tests, browser evidence, current handoffs | archived review packets | Reconcile narrow 390px PASS vs broader acceptance boundaries |
 | Browser/freshness procedure | `vault/Browser-and-Freshness-Verification.md` | public `/mvp`, API probes | old screenshots/logs | Keep procedure; link current evidence, do not duplicate claims |
@@ -42,7 +42,7 @@ This matrix makes the minimum reading path explicit. It separates current author
 - No Kanban cards are created.
 - No runtime, database, deployment, or generated artifact is changed.
 - Archive candidates require a reference scan and explicit status/replacement link before moving.
-- Runtime refactor is complete for the route dispatcher and canonical projection seam; further legacy deletion remains a separate bounded decision.
+- Runtime refactor is complete for the route dispatcher, canonical projection, and chart-read seam; further legacy deletion remains a separate bounded decision.
 
 ## Wave exit criteria
 
