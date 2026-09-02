@@ -1420,7 +1420,8 @@
     vcpResultsBySymbol = {};
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     var freshness = data.freshness || {};
-    var intradayFetchedAt = freshness.intraday_fetched_at || items.reduce(function(latest, item) {
+    var intradayFetchedAt = freshness.intraday_fetched_at || null;
+    var intradayLatestBarAt = items.reduce(function(latest, item) {
       var status = item && item.data_status || {}, provenance = item && item.provenance || {};
       var candidate = status.intraday_60m_as_of || provenance.intraday_as_of;
       return candidate && (!latest || String(candidate) > String(latest)) ? candidate : latest;
@@ -1432,7 +1433,7 @@
     setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
     var provenanceSource = freshness.source || (items[0] && items[0].provenance && items[0].provenance.source) || "price_data+intraday_price_data";
-    dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m fetched " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · latest completed 60m candle " + (intradayLatestBarAt ? formatProvenance(intradayLatestBarAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
     dailySetupPage = data.page || 1;
     dailySetupTotalPages = totalPages;
     dom.dailySetupPageInfo.textContent = dailySetupTotalPages ? "Page " + dailySetupPage + " of " + dailySetupTotalPages : "Page 0 of 0";

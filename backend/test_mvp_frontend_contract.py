@@ -358,6 +358,8 @@ def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     assert 'id="freshness-60m"' in html
     assert "Daily EOD" in js
     assert "intraday_60m_as_of" in js
+    assert "latest completed 60m candle" in js
+    assert "freshness.intraday_fetched_at" in js
     assert 'scan_time: vm.fetch_completed_at || vm.as_of' in js
     assert "60m " in js
 

@@ -133,6 +133,15 @@ def _load_setup_candidates_cached(builder, pg, *, market="TH"):
             )
         items, source_meta = built
         payload = {"items": items, **source_meta}
+        freshness = dict(payload.get("freshness") or {})
+        if (isinstance(source_version, tuple) and len(source_version) > 1
+                and source_version[1] is not None):
+            fetched_at = source_version[1]
+            freshness["intraday_fetched_at"] = (
+                fetched_at.isoformat() if hasattr(fetched_at, "isoformat") else str(fetched_at)
+            )
+            freshness["intraday_source"] = "settrade_intraday_60m"
+        payload["freshness"] = freshness
         build_observability = dict(payload.get("build_observability") or {})
         build_observability.setdefault(
             "duration_ms", round((time.monotonic() - build_started) * 1000, 3)
