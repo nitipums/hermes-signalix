@@ -64,23 +64,28 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["build_observability"]["serialized_bytes"] == len(handler.body)
 
 
-def test_canonical_symbol_route_does_not_run_legacy_shortlist_projection(monkeypatch):
+def test_canonical_symbol_route_reads_published_model_without_builder_or_postgres(monkeypatch):
     import mvp_api
 
-    class PG:
-        def close(self): pass
-
     row = candidate("DRAWER")
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    model = {
+        "items": [row], "universe": "marginable_long", "eligible_count": 1,
+        "excluded_count": 0, "freshness": {"status": "stale", "in_flight": True},
+        "provenance": {"as_of": "2026-08-30", "source_versions": {},
+                       "policy_version": "setup-candidates-v1"},
+        "source_version": "published-version", "published_at": "2026-09-02T00:00:00Z",
+    }
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
+    monkeypatch.setattr(mvp_routes, "_vcp_pg",
+                        lambda: (_ for _ in ()).throw(AssertionError("PostgreSQL accessed")))
     monkeypatch.setattr(mvp_routes, "load_payload",
                         lambda: (_ for _ in ()).throw(AssertionError("legacy snapshot loaded")))
     monkeypatch.setattr(mvp_api, "project_shortlist_response",
                         lambda *args, **kwargs: (_ for _ in ()).throw(
                             AssertionError("legacy shortlist projection invoked")))
     monkeypatch.setattr(mvp_api, "build_setup_candidates_from_data",
-                        lambda pg, market="TH": ([row], {
-                            "scan_time": "2026-08-30", "freshness": {}}))
-    mvp_routes.clear_setup_candidates_cache()
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical symbol route invoked builder")))
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/symbol/DRAWER", handler)
     assert handler.status == 200
@@ -90,47 +95,32 @@ def test_canonical_symbol_route_does_not_run_legacy_shortlist_projection(monkeyp
     assert payload["setup"]["trigger"] == 12
     assert payload["sector"] == "Technology"
     assert "action_queue" not in payload
-    mvp_routes.clear_setup_candidates_cache()
+    assert payload["provenance"] == row["provenance"]
+
+    missing_handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/symbol/MISSING", missing_handler)
+    assert missing_handler.status == 404
+    assert json.loads(missing_handler.body) == {"error": "symbol not found", "symbol": "MISSING"}
 
 
-@pytest.mark.parametrize("builder_result", [
-    [candidate()],
-    (candidate(), {"scan_time": "2026-08-30"}),
-    ([candidate()], {"items": [candidate("OVERRIDE")] }),
+@pytest.mark.parametrize("load_error", [
+    FileNotFoundError("missing current read-model pointer"),
+    json.JSONDecodeError("malformed read-model JSON", "{", 1),
+    ValueError("invalid read-model pointer"),
+    KeyError("invalid read-model envelope"),
 ])
-def test_setup_candidates_route_rejects_malformed_builder_result(monkeypatch, builder_result):
-    class PG:
-        def close(self): pass
-
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
-    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: None)
+def test_setup_candidates_route_returns_503_for_unavailable_read_model_without_builder(
+    monkeypatch, load_error
+):
+    monkeypatch.setattr("read_model_publisher.load_current_read_model",
+                        lambda: (_ for _ in ()).throw(load_error))
     monkeypatch.setattr("mvp_api.build_setup_candidates_from_data",
-                        lambda pg, market="TH": builder_result)
-    mvp_routes.clear_setup_candidates_cache()
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("canonical route invoked builder")))
     handler = Handler()
     assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
     assert handler.status == 503
     assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
-    mvp_routes.clear_setup_candidates_cache()
-
-
-def test_setup_candidates_route_does_not_classify_builder_type_error_as_bad_request(monkeypatch):
-    class PG:
-        def close(self): pass
-
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
-    monkeypatch.setattr(mvp_routes, "_setup_candidates_source_version", lambda pg: None)
-
-    def builder(pg, market="TH"):
-        raise TypeError("programmer failure")
-
-    monkeypatch.setattr("mvp_api.build_setup_candidates_from_data", builder)
-    mvp_routes.clear_setup_candidates_cache()
-    handler = Handler()
-    assert mvp_routes.handle_mvp_api("/api/setup-candidates", handler)
-    assert handler.status == 503
-    assert json.loads(handler.body) == {"error": "setup_candidates_unavailable"}
-    mvp_routes.clear_setup_candidates_cache()
 
 
 def test_route_never_uses_snapshot_as_canonical_source(monkeypatch):

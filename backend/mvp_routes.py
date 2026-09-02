@@ -454,13 +454,12 @@ def handle_mvp_api(path, handler) -> bool:
         symbol = route[len("/api/symbol/"):].strip().rstrip("/")
         if not symbol:
             json_response(handler, {"error": "symbol required"}, status=400); return True
-        release_pg = None
         try:
             import mvp_api
-            pg, release_pg = _acquire_setup_candidates_pg()
-            payload = _load_setup_candidates_cached(
-                mvp_api.build_setup_candidates_from_data, pg, market="TH"
-            )
+            from read_model_publisher import load_current_read_model
+            model = load_current_read_model()
+            payload = _read_model_snapshot_meta(model)
+            payload["items"] = model["items"]
             result = mvp_api.project_canonical_symbol_detail(
                 payload["items"], symbol, snapshot_meta=payload
             )
@@ -470,9 +469,6 @@ def handle_mvp_api(path, handler) -> bool:
                 json_response(handler, result)
         except Exception:
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
-        finally:
-            if release_pg is not None:
-                release_pg()
         return True
     try:
         payload = load_payload()
