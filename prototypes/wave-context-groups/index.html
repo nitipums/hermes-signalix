@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Signalix · Wave context groups (throwaway)</title>
+  <style>
+    :root{color-scheme:dark;--ink:#e9edf2;--muted:#8d99a7;--line:#28313b;--panel:#121920;--soft:#19222b;--mint:#62d9b5;--amber:#f5bd67;--rose:#f07e87;--blue:#77a9ff}*{box-sizing:border-box}body{margin:0;background:#0a0f14;color:var(--ink);font:14px/1.5 ui-sans-serif,system-ui,sans-serif}button,select,input{font:inherit}button,select{color:var(--ink);background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 10px}button{cursor:pointer}button:hover,button.active{border-color:var(--blue);background:#202d3b}.shell{max-width:1240px;margin:auto;padding:22px}.banner{border:1px solid #604b25;background:#211b10;color:#f7d492;border-radius:10px;padding:10px 13px}.top{display:flex;justify-content:space-between;gap:20px;align-items:end;margin:22px 0}h1{font-size:clamp(25px,4vw,42px);line-height:1.06;margin:4px 0}h2{font-size:18px;margin:0 0 12px}h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 9px}.eyebrow,.mono{font-family:ui-monospace,SFMono-Regular,monospace}.eyebrow{color:var(--mint);font-size:12px}.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,.75fr);gap:14px}.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px}.statebar{display:flex;justify-content:space-between;gap:14px;align-items:start}.badge,.tag{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:4px 8px;margin:2px 4px 2px 0;font:12px ui-monospace,SFMono-Regular,monospace}.badge.yes,.tag.good{color:var(--mint);border-color:#285c50}.badge.no,.tag.bad{color:var(--rose);border-color:#65383d}.tag.warn{color:var(--amber);border-color:#604b25}.layers{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.layer{background:#0d141a;border:1px solid var(--line);border-radius:10px;padding:13px}.value{font:700 15px ui-monospace,SFMono-Regular,monospace;overflow-wrap:anywhere}.context-track{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin:14px 0}.context-track div{border-top:3px solid var(--line);padding-top:7px;color:var(--muted);font-size:11px}.context-track .current{border-color:var(--mint);color:var(--ink)}.evidence{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.evidence ul{margin:0;padding-left:18px}.evidence li{margin:4px 0}.controls{display:flex;flex-wrap:wrap;gap:7px}.guided button{width:100%;text-align:left;margin:4px 0}.field{margin:12px 0}.field label{display:block;color:var(--muted);margin-bottom:5px}.field select{width:100%}.checks label{display:block;margin:7px 0}.raw{white-space:pre-wrap;overflow:auto;max-height:330px;background:#090e12;border-radius:8px;padding:12px;color:#b9c5d1;font:12px/1.45 ui-monospace,SFMono-Regular,monospace}.note{border-left:3px solid var(--amber);padding-left:10px}.why{margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}@media(max-width:800px){.layout,.layers,.evidence{grid-template-columns:1fr}.top{display:block}.context-track{grid-template-columns:1fr}.context-track div{border-top:0;border-left:3px solid var(--line);padding:4px 8px}.context-track .current{border-left-color:var(--mint)}}
+  </style>
+</head>
+<body><main class="shell">
+  <div class="banner"><strong>THROWAWAY LOGIC PROTOTYPE · SYNTHETIC DATA ONLY</strong> — no production filter, enum, API, database, or trading behavior is connected.</div>
+  <header class="top"><div><div class="eyebrow">SIGNALIX / EXPLORATORY ELLIOTT CONTEXT</div><h1>Where is the rise?</h1><div class="muted">A legible context map for rising stocks outside the current Wave-3 filter.</div></div><div class="mono muted">policy: prototype-wave-context-v0</div></header>
+  <div class="layout"><section>
+    <div class="card" id="snapshot" aria-live="polite"></div>
+    <div class="card"><h2>Full evidence</h2><div class="evidence" id="evidence"></div></div>
+    <div class="card"><h2>Derived snapshot</h2><div class="raw" id="raw"></div></div>
+  </section><aside>
+    <div class="card guided"><h2>Guided scenarios</h2><div id="guided"></div></div>
+    <div class="card"><h2>Free play</h2>
+      <div class="field"><label for="structural">Structural state (canonical vocabulary)</label><select id="structural"></select></div>
+      <div class="field"><label for="context">Secondary context marker</label><select id="context"></select></div>
+      <div class="checks"><label><input id="sufficient" type="checkbox" checked> sufficient Daily evidence</label><label><input id="ordered" type="checkbox" checked> ordered structure / anchors</label><label><input id="closeConfirm" type="checkbox"> Daily close confirmation</label><label><input id="ambiguous" type="checkbox"> material ambiguity (fail closed)</label></div>
+      <div class="controls"><button id="apply">Apply controls</button><button id="reset">Reset</button></div>
+    </div>
+    <div class="card note"><strong>Interpretation boundary</strong><p>This is a conservative machine-generated candidate context. It is neither objective Elliott truth nor an executable order. Wave-3 filter membership does not override setup, risk, freshness, or Arm review.</p></div>
+  </aside></div>
+</main>
+<script>
+(function(root){
+  'use strict';
+  const STRUCTURAL_STATES=['WAVE_1_ADVANCE','WAVE_2_FORMING','WAVE_2_NEAR_COMPLETION','EARLY_WAVE_3','WAVE_3_CONTINUATION','WAVE_4_CORRECTION','WAVE_5_ADVANCE','UNKNOWN'];
+  const CONTEXT_MARKERS=['WAVE_1_RISING','WAVE_2_PULLBACK','WAVE_3_EARLY','WAVE_3_CONTINUING','WAVE_3_EXTENDED','WAVE_4_SIDEWAYS','WAVE_4_CORRECTION','WAVE_5_RISING','NONE'];
+  const scenarios={
+    wave1:{title:'Wave 1 rising',structural_state:'WAVE_1_ADVANCE',upward_context:'WAVE_1_RISING',confidence:'MEDIUM',supporting:['measurable Daily advance','emerging uptrend','price holds above observed swing low'],contradicting:['Wave 2 pullback not observed yet'],missing:['confirmed corrective sequence'],sufficient:true,ordered:true,close_confirmation:false},
+    wave2:{title:'Wave 2 pullback',structural_state:'WAVE_2_NEAR_COMPLETION',upward_context:'WAVE_2_PULLBACK',confidence:'MEDIUM',supporting:['prior advance observed','pullback holds above Wave 1 low','retracement is plausible'],contradicting:['current leg is falling, not rising'],missing:['Daily reclaim / Wave 3 confirmation'],sufficient:true,ordered:true,close_confirmation:false},
+    wave3early:{title:'Wave 3 early',structural_state:'EARLY_WAVE_3',upward_context:'WAVE_3_EARLY',confidence:'MEDIUM',supporting:['ordered Wave 1 / Wave 2 anchors','price approaches or tests Wave 1 high'],contradicting:['sustained follow-through not observed'],missing:['Daily close follow-through'],sufficient:true,ordered:true,close_confirmation:false},
+    wave3:{title:'Wave 3 continuation',structural_state:'WAVE_3_CONTINUATION',upward_context:'WAVE_3_CONTINUING',confidence:'HIGH',supporting:['ordered Wave 1 / Wave 2 anchors','Daily close above Wave 1 high','Daily close follow-through'],contradicting:[],missing:[],sufficient:true,ordered:true,close_confirmation:true},
+    wave3extended:{title:'Wave 3 extended · exploratory marker',structural_state:'WAVE_3_CONTINUATION',upward_context:'WAVE_3_EXTENDED',confidence:'MEDIUM',supporting:['Wave 3 continuation structure remains observable','advance is far from the reference'],contradicting:['extension may reduce entry quality; do-not-chase must be checked separately'],missing:['fresh setup/risk evaluation'],sufficient:true,ordered:true,close_confirmation:true},
+    wave4sideways:{title:'Wave 4 sideways',structural_state:'WAVE_4_CORRECTION',upward_context:'WAVE_4_SIDEWAYS',confidence:'LOW',supporting:['prior impulse exists','range compression / sideways overlap'],contradicting:['correction is not a Wave 3 continuation'],missing:['confirmed Wave 4 completion','Wave 5 breakout evidence'],sufficient:true,ordered:true,close_confirmation:false},
+    wave4correction:{title:'Wave 4 correction',structural_state:'WAVE_4_CORRECTION',upward_context:'WAVE_4_CORRECTION',confidence:'MEDIUM',supporting:['post-impulse corrective leg','prior advance remains visible'],contradicting:['current correction excludes Wave 3 filter membership'],missing:['reversal and Wave 5 confirmation'],sufficient:true,ordered:true,close_confirmation:false},
+    wave5:{title:'Wave 5 rising',structural_state:'WAVE_5_ADVANCE',upward_context:'WAVE_5_RISING',confidence:'MEDIUM',supporting:['prior Wave 4 context','renewed Daily rise'],contradicting:['late-cycle interpretation can be confused with continued Wave 3'],missing:['divergence / completion evidence'],sufficient:true,ordered:true,close_confirmation:false},
+    unknown:{title:'Insufficient / unknown',structural_state:'UNKNOWN',upward_context:'NONE',confidence:'LOW',supporting:[],contradicting:['structure cannot be discriminated conservatively'],missing:['sufficient Daily history','ordered confirmed anchors','unambiguous structural evidence'],sufficient:false,ordered:false,close_confirmation:false}
+  };
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  function derive(input){
+    const s=clone(input);
+    if(!s.sufficient||!s.ordered||s.ambiguous){
+      s.structural_state='UNKNOWN';s.upward_context='NONE';s.confidence='LOW';
+      if(!s.sufficient&&!s.missing.includes('sufficient Daily history'))s.missing.push('sufficient Daily history');
+      if(!s.ordered&&!s.missing.includes('ordered confirmed anchors'))s.missing.push('ordered confirmed anchors');
+      if(s.ambiguous&&!s.contradicting.includes('material ambiguity prevents a conservative classification'))s.contradicting.push('material ambiguity prevents a conservative classification');
+    }
+    if(!STRUCTURAL_STATES.includes(s.structural_state))throw Error('Non-canonical structural state rejected: '+s.structural_state);
+    if(!CONTEXT_MARKERS.includes(s.upward_context))throw Error('Unknown context marker rejected: '+s.upward_context);
+    const wave3=['EARLY_WAVE_3','WAVE_3_CONTINUATION'].includes(s.structural_state);
+    s.filter_eligible=Boolean(wave3&&s.sufficient&&s.ordered&&!s.ambiguous);
+    s.filter_rule='structural_state in [EARLY_WAVE_3, WAVE_3_CONTINUATION] AND evidence sufficient AND ordered anchors AND not ambiguous';
+    s.context_role=['WAVE_2_PULLBACK','WAVE_4_SIDEWAYS','WAVE_4_CORRECTION'].includes(s.upward_context)?'NON_FILTER_CONTEXT':s.upward_context==='NONE'?'UNCLASSIFIED_CONTEXT':'UPWARD_CONTEXT';
+    s.extended_is_secondary_marker=s.upward_context==='WAVE_3_EXTENDED';
+    s.production_enum_unchanged=true;
+    s.disclaimer='Exploratory candidate evidence; not objective Elliott truth or an order.';
+    return s;
+  }
+  function renderSnapshot(s,escapeHtml){
+    const esc=escapeHtml||String;const stages=['WAVE_1_RISING','WAVE_2_PULLBACK','WAVE_3_CONTINUING','WAVE_4_CORRECTION','WAVE_5_RISING'];
+    return '<div class="statebar"><div><div class="eyebrow">'+esc(s.title)+'</div><h2>Candidate context snapshot</h2></div><span class="badge '+(s.filter_eligible?'yes':'no')+'">FILTER ELIGIBLE: '+String(s.filter_eligible).toUpperCase()+'</span></div>'+
+      '<div class="layers"><div class="layer"><h3>Layer 1 · structural state</h3><div class="value">'+esc(s.structural_state)+'</div><p class="muted">Canonical structural vocabulary · confidence '+esc(s.confidence)+'</p></div><div class="layer"><h3>Layer 2 · context marker</h3><div class="value">upward_context: '+esc(s.upward_context)+'</div><p class="muted">Exploratory display-only marker · '+esc(s.context_role)+'</p></div></div>'+
+      '<div class="context-track">'+stages.map(x=>'<div class="'+(s.upward_context.startsWith(x.replace(/_(RISING|CONTINUING|CORRECTION)$/,''))?'current':'')+'">'+esc(x.replaceAll('_',' '))+'</div>').join('')+'</div>'+
+      '<div class="why"><strong>Filter boundary:</strong> '+esc(s.filter_rule)+'<br><span class="muted">Wave 1, Wave 2, Wave 4, Wave 5, and UNKNOWN remain visible context but are false. Extended is a secondary marker over WAVE_3_CONTINUATION, never a structural enum value.</span></div>';
+  }
+  root.WaveContextPrototype={STRUCTURAL_STATES,CONTEXT_MARKERS,scenarios,derive,renderSnapshot,clone};
+})(typeof window!=='undefined'?window:globalThis);
+
+(function(){
+  'use strict';
+  const M=window.WaveContextPrototype;let state=M.derive(M.clone(M.scenarios.wave1));
+  const esc=x=>String(x??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const list=(items,klass)=>'<div class="'+klass+'">'+(items.length?'<ul>'+items.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'<span class="muted">None recorded</span>')+'</div>';
+  function render(){
+    const s=state;document.getElementById('snapshot').innerHTML=M.renderSnapshot(s,esc);
+    document.getElementById('evidence').innerHTML='<div><h3>Supporting</h3>'+list(s.supporting,'supporting')+'</div><div><h3>Contradicting</h3>'+list(s.contradicting,'contradicting')+'</div><div><h3>Missing</h3>'+list(s.missing,'missing')+'</div>';
+    document.getElementById('raw').textContent=JSON.stringify(s,null,2);
+  }
+  function load(key){state=M.derive(M.clone(M.scenarios[key]));sync();render()}
+  function sync(){document.getElementById('structural').value=state.structural_state;document.getElementById('context').value=state.upward_context;document.getElementById('sufficient').checked=state.sufficient;document.getElementById('ordered').checked=state.ordered;document.getElementById('closeConfirm').checked=state.close_confirmation;document.getElementById('ambiguous').checked=Boolean(state.ambiguous)}
+  function init(){
+    const labels={wave1:'Wave 1 rising',wave2:'Wave 2 pullback',wave3early:'Wave 3 early',wave3:'Wave 3 continuation',wave3extended:'Wave 3 extended marker',wave4sideways:'Wave 4 sideways',wave4correction:'Wave 4 correction',wave5:'Wave 5 rising',unknown:'Insufficient / unknown'};
+    document.getElementById('guided').innerHTML=Object.entries(labels).map(([k,v])=>'<button data-scenario="'+k+'">'+v+'</button>').join('');
+    document.getElementById('structural').innerHTML=M.STRUCTURAL_STATES.map(x=>'<option>'+x+'</option>').join('');document.getElementById('context').innerHTML=M.CONTEXT_MARKERS.map(x=>'<option>'+x+'</option>').join('');
+    document.getElementById('guided').addEventListener('click',e=>{const b=e.target.closest('[data-scenario]');if(b)load(b.dataset.scenario)});
+    document.getElementById('apply').addEventListener('click',()=>{const base=M.clone(state);base.title='Free-play result';base.structural_state=document.getElementById('structural').value;base.upward_context=document.getElementById('context').value;base.sufficient=document.getElementById('sufficient').checked;base.ordered=document.getElementById('ordered').checked;base.close_confirmation=document.getElementById('closeConfirm').checked;base.ambiguous=document.getElementById('ambiguous').checked;base.supporting=['synthetic free-play inputs applied'].concat(base.ordered?['ordered structure selected']:[],base.close_confirmation?['Daily close confirmation selected']:[]);base.contradicting=base.ambiguous?['competing interpretations selected']:[];base.missing=base.sufficient?[]:['sufficient Daily history'];state=M.derive(base);sync();render()});
+    document.getElementById('reset').addEventListener('click',()=>load('wave1'));sync();render();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script></body></html>
