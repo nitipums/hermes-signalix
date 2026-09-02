@@ -1,7 +1,7 @@
 # Architecture
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
-> **Reconciled:** 2026-09-01 · T1–T9 source promoted; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-02 · T1–T9 source promoted; canonical route/projection/chart/freshness seams extracted; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller remains separate.
 
 ## Current primary serving flow — 2026-09-01
 
@@ -79,6 +79,9 @@ logs in the non-TTY container).
 - `backend/canonical_freshness_lineage.py` — deep read-only sidecar lineage adapter; compares published intraday fetch time with embedded lineage and preserves Daily/read-model identity
 - `backend/mvp_routes.py` — canonical/legacy dispatcher plus compatibility wrapper for freshness overlay
 - `backend/read_model_publisher.py` — validates/publishes canonical read-model and intraday sidecar
+- `backend/canonical_chart_read.py` — deep read-only chart row retrieval/aggregation seam for SQL shape, provisional current-session data, chronological conversion inputs, labels, and timestamp metadata
+- `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
+- `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
 ## Current MVP surface contract — 2026-09-01
 
