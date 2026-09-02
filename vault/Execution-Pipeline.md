@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-02 · T1–T9 promoted; fetch-time/candle-time display verified; Kanban stale R4/R5 graph archived; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-02 12:50 ICT · release `5bf3d9a` promoted; intraday scope/metadata and provisional Day/Week chart display verified; Kanban stale R4/R5 graph archived; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -32,7 +32,7 @@ The product must let a user answer, quickly and honestly:
 - The overview must be usable before detail/chart data load; unknown compact-card data must never cause all symbols to disappear.
 - Drawer metadata and decision evidence are separate contracts: genuine missing/insufficient VCP evidence remains `NOT_VERIFIED`; optional canonical metadata shows `Loading…` while `/api/symbol/{symbol}` is pending and `Unavailable` when that request fails. Chart unavailability is reported separately.
 
-## Current verified baseline — 2026-09-01
+## Current verified baseline — 2026-09-02
 
 - The primary product spine is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**.
 - Intraday UI evidence distinguishes `60m fetched` (`fetch_completed_at`) from `latest completed 60m candle`; a fetch round at 16:45 may correctly expose a 16:00 candle.
@@ -41,6 +41,9 @@ The product must let a user answer, quickly and honestly:
 - VCP, contraction, and breakout-volume are bonus/compatibility evidence. `/api/vcp-finder` and old VCP surfaces are audit/rollback only.
 - 931 active ORD remains explicit audit/rollback coverage; `marginable_long` = 237 eligible symbols. Alerts, auto-trading, and broker execution remain off.
 - Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain OFF. The evaluator auto-caller is a separate `PENDING / OWNER DECISION` for automatic lifecycle-evidence persistence only; it is not order execution.
+- Intraday service defaults to canonical `marginable_long`, runs 60m fetch/evaluation with `--no-scan`, and retains `active_ord` only as explicit audit/rollback scope. Daily scan remains the after-close operation to avoid overlapping 30-minute rounds.
+- `/api/setup-candidates` overlays the latest completed intraday run while preserving immutable read-model identity and Daily lineage. Current runtime evidence: `237 evaluated`, latest run `fb01ef8fbe70408e82ad3f78b2700fe8`, `full_success`.
+- `/api/chart-db/{symbol}` uses current-session 60m data as a provisional Day/Week aggregate before EOD; `as_of` is the period key and `latest_time` is the actual latest stored candle timestamp. Browser status was verified with `2026-09-02T05:00:00+00:00`.
 
 ## Current user-validation loop — 2026-09-01
 
@@ -48,7 +51,15 @@ The release is handed to Arm for manual use. Elliott Wave output remains machine
 
 - Lite preflight is `PASS` for the rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, Wave Evidence visibility after drawer scroll, TradingView link, and no overflow). Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
 
-## Session closeout — 2026-09-02
+## Current session closeout — 2026-09-02 12:50 ICT
+
+- Code review found and remediated chart route scope, `/api/chart-db` bypass, and weekly reverse-order defects before final promotion. Focused and full backend tests passed; `compileall`, `git diff --check`, and `systemd-analyze verify` passed.
+- Promoted commits: `2d43a59`, `31ed535`, `211a30e`, `3a9b113`, `1da2e00`, `5bf3d9a`; remote `release/signalix-mvp-stable` matches `5bf3d9a`.
+- Runtime: installed intraday unit/timer byte-identical to source; timer active; backend/dashboard recreated; readiness `ok`; public `/mvp`, setup API, and chart API returned HTTP 200.
+- Remaining review follow-up is `REVISE`: request-time intraday metadata overlay should later use a bounded cache/published metadata seam, and audit-run universe identity should be explicit so `active_ord` cannot contaminate `marginable_long` metadata. This is a follow-up, not silently marked complete.
+- Handoff: `.scratch/2026-09-02-1250-intraday-chart-runtime-close-handoff.md`.
+
+## Prior session closeout — 2026-09-02
 
 - Code/runtime fix promoted and pushed: `2efed71` (full-universe freshness aggregation) and `cfc2c22` (separate intraday fetch time from completed-candle time).
 - Public verification: `/mvp` 200; setup API `237 evaluated / 50 returned`; `/dashboard.html` retired 404; UI showed `60m fetched 01 Sept 2026 16:47 ICT` and `latest completed 60m candle 01 Sept 2026 16:00 ICT`; TradingView href and mobile drawer scroll owner verified.

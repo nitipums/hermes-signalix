@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-02 · Release branch T1–T9 promoted; fetch-time/candle-time UI distinction verified; containers healthy; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-02 12:50 ICT · release `5bf3d9a` promoted and pushed; intraday unit parity and public provisional Day/Week chart verified; evaluator auto-caller separate.
 
 ## Stable release
 
@@ -12,11 +12,19 @@ MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-## Current runtime scope — 2026-09-01
+## Current runtime scope — 2026-09-02
 
 The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis are healthy at rebaseline; `/mvp` returns 200, `/api/setup-candidates` returns the live DB-built contract, `/health/readiness` is on backend `:8000`, and retired `/dashboard.html` returns 404. The public 390px failure→Retry→recovery journey is verified. The UI now shows `60m fetched` separately from `latest completed 60m candle`; session evidence was verified after runtime reload. Alerts, auto-trading, and broker execution remain off.
 
 `marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
+
+### 2026-09-02 promotion evidence
+
+- Source/release: `/root/signalix`, branch `release/signalix-mvp-stable`, local and remote SHA `5bf3d9ac3e77b9f139ce2f84e0d6e27546a95fa4`.
+- Promotion: installed `backend/signalix-intraday.service` and `.timer` into `/etc/systemd/system/`, ran `systemctl daemon-reload`, restarted the timer, and verified byte parity plus `systemd-analyze verify`.
+- Runtime reload: `docker compose up -d --force-recreate backend dashboard`; `signalix_backend` and `signalix_dashboard` healthy; `/health/readiness` returned DB/Redis `ok`.
+- Public read-back: `/mvp`, `/api/setup-candidates`, and `/api/chart-db/BBL?timeframe=1D|1W` returned HTTP 200. Day last candle was provisional `2026-09-02`; Week candles were ascending with `latest_time=2026-09-02T05:00:00+00:00`.
+- Review boundary: code/tests/runtime/browser are PASS for this slice. Remaining `REVISE` follow-up: bound request-time intraday metadata overlay and persist explicit fetch-universe identity for audit runs.
 
 ### Deferred features — 2026-09-01
 
