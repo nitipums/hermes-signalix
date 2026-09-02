@@ -8,7 +8,7 @@
 
 - Repo: `/root/signalix`
 - Branch: `release/signalix-mvp-stable`
-- Latest pushed HEAD/origin: `cfc2c227f85c3ec9a529b5b7b74588952735e762` (`fix: show intraday fetch time separately`).
+- Latest pushed HEAD/origin: `038799fe6b0286d43522fe02b7d35bd87a9d369a` (`docs: close Signalix session handoff`).
 - Previous session commits: `2efed71` (full-universe freshness aggregation), `cfc2c22` (fetch timestamp display).
 - Tracked worktree is clean; preserve untouched untracked owner artifacts `factsheets/factsheets.jsonl` and this handoff. Do not reset, clean, stash, or broad-stage them.
 - `factsheets/factsheets.jsonl` remains owner-owned and untracked.
