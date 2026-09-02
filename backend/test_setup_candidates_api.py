@@ -57,6 +57,8 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["total_pages"] == 1
     assert payload["counts"]["REVIEW_NOW"] == 1
     assert payload["universe_filter"] == "marginable_long"
+    assert payload["build_observability"]["projection_ms"] >= 0
+    assert payload["build_observability"]["serialized_bytes"] == len(handler.body)
 
 
 def test_canonical_symbol_route_does_not_run_legacy_shortlist_projection(monkeypatch):
@@ -631,6 +633,24 @@ def test_build_exposes_stage_timing_and_bounded_bulk_query_count(monkeypatch):
     assert observed["ohlcv_query_count"] == 0
     assert observed["candidate_evaluation_workers"] == 1
     assert observed["candidate_evaluation_parallel"] is False
+
+
+def test_setup_candidate_builder_requests_only_rs_lookback_for_market(monkeypatch):
+    import mvp_api
+    import screening
+
+    observed = {}
+    monkeypatch.setattr(mvp_api, "resolve_universe", lambda pg, universe: ([], {
+        "universe_filter": "marginable_long", "eligible_count": 0}))
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr(screening, "load_market",
+                        lambda *a, **kwargs: observed.update(kwargs) or None)
+
+    rows, meta = mvp_api.build_setup_candidates_from_data(object())
+
+    assert rows == []
+    assert observed["lookback"] == 252
+    assert meta["build_observability"]["evaluated_row_count"] == 0
 
 
 def test_setup_candidate_concurrent_build_is_single_flight():

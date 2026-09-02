@@ -709,11 +709,15 @@ def _intraday_60m_status(intraday_df, expected_interval_start):
 def build_setup_candidates_from_data(pg, *, market="TH"):
     """Build the canonical source from the authoritative read-only data path."""
     import screening
+    # RS ranking only reads the latest and 252nd benchmark closes. Keep the
+    # market query bounded to that actual dependency; candidate Daily/60m
+    # history remains the full 400-row evidence window below.
+    rs_lookback = 252
     build_started = time.monotonic()
     stage_started = build_started
     symbols, universe_manifest = resolve_universe(pg, "marginable_long")
     profiles = instruments.profile_taxonomy(pg, symbols=symbols)
-    market_df = screening.load_market(pg, lookback=400, market=market)
+    market_df = screening.load_market(pg, lookback=rs_lookback, market=market)
     source_ms = round((time.monotonic() - stage_started) * 1000, 3)
     stage_started = time.monotonic()
     try:
@@ -924,6 +928,11 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                             "stages_ms": {"source_context": source_ms, "ohlcv_load": load_ms,
                                           "candidate_evaluation": evaluate_ms},
                             "ohlcv_query_count": ohlcv_query_count,
+                            "ohlcv_row_count": (
+                                sum(len(frame) for frame in daily_frames.values())
+                                + sum(len(frame) for frame in intraday_frames.values())
+                            ) if daily_frames is not None and intraday_frames is not None else None,
+                            "evaluated_row_count": len(candidates),
                             "candidate_evaluation_workers": evaluation_workers,
                             "candidate_evaluation_parallel": evaluation_workers > 1,
                         },

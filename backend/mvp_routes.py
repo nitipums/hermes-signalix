@@ -321,6 +321,25 @@ def json_response(handler, data, status=200):
     handler.wfile.write(body)
 
 
+def _record_setup_candidate_response_observability(result, started):
+    """Attach request-boundary timing/size without changing candidate data."""
+    observability = dict(result.get("build_observability") or {})
+    observability["projection_ms"] = round((time.monotonic() - started) * 1000, 3)
+    # The size field is part of the body, so converge once on the final byte
+    # length rather than reporting the pre-field size.
+    serialized_bytes = observability.get("serialized_bytes")
+    for _ in range(4):
+        observability["serialized_bytes"] = serialized_bytes
+        result["build_observability"] = observability
+        measured = len(json.dumps(result, ensure_ascii=False, default=str).encode("utf-8"))
+        if measured == serialized_bytes:
+            break
+        serialized_bytes = measured
+    observability["serialized_bytes"] = serialized_bytes
+    result["build_observability"] = observability
+    return result
+
+
 def _not_found(handler, symbol):
     json_response(handler, {"error": "symbol not found", "symbol": symbol}, status=404)
 
@@ -393,6 +412,7 @@ def handle_mvp_api(path, handler) -> bool:
                 mvp_api.build_setup_candidates_from_data, pg, market="TH"
             )
             items = payload["items"]
+            projection_started = time.monotonic()
             result = mvp_api.project_setup_candidates_response(
                 items, snapshot_meta=payload,
                 lifecycle=(qs.get("lifecycle", [None])[0] or None),
@@ -401,6 +421,7 @@ def handle_mvp_api(path, handler) -> bool:
                 search=(qs.get("search", [None])[0] or None),
                 page=page, page_size=page_size,
             )
+            result = _record_setup_candidate_response_observability(result, projection_started)
             json_response(handler, result)
         except (FileNotFoundError, json.JSONDecodeError, ImportError, KeyError, RuntimeError, ConnectionError):
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
