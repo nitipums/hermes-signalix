@@ -111,8 +111,9 @@ def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH", limi
         "volume": float(row[5]) if row[5] is not None else None,
         "provisional": bool(row[6]) if len(row) > 6 else False,
     } for row in rows]
-    if timeframe in {"1D", "60M"}:
-        candles.reverse()
+    # The row adapter returns every timeframe newest-first.  The public chart
+    # contract is oldest-to-newest, so the final candle is always the latest.
+    candles.reverse()
     return candles, metadata
 
 

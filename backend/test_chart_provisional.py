@@ -110,6 +110,33 @@ def test_chart_db_adapter_replaces_same_day_daily_row(monkeypatch, timeframe):
     assert "provisional 60m aggregation" in response["provenance"]["note"]
 
 
+def test_chart_db_weekly_candles_are_ascending_with_latest_provisional_period(monkeypatch):
+    daily = [
+        (datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False),
+        (datetime(2026, 8, 24), 8, 9, 7, 8.5, 800, False),
+        (datetime(2026, 8, 14), 7, 8, 6, 7.5, 700, False),
+        (datetime(2026, 8, 10), 6, 7, 5, 6.5, 600, False),
+        (datetime(2026, 8, 3), 5, 6, 4, 5.5, 500, False),
+    ]
+    intraday = [
+        (datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100),
+    ]
+    monkeypatch.setattr(
+        mvp_chart_db,
+        "_get_db_connection",
+        lambda: _Connection(daily, intraday),
+    )
+
+    response = mvp_chart_db.project_chart_db_response("sis", timeframe="1W")
+
+    assert [c["date"] for c in response["candles"]] == [
+        "2026-08-03", "2026-08-10", "2026-08-24",
+    ]
+    assert response["candles"][-1]["provisional"] is True
+    assert response["as_of"] == "2026-08-24"
+    assert response["latest_time"] == "2026-08-27T05:00:00+00:00"
+
+
 @pytest.mark.parametrize("timeframe", ["1D", "1W"])
 def test_chart_db_route_preserves_legacy_fields_and_falls_back_to_daily_eod(monkeypatch, timeframe):
     connection = _Connection(
