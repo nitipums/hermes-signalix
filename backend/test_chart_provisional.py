@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import pytest
 
 import app
+import mvp_chart_db
+import mvp_routes
 from app import fetch_chart_rows
 
 
@@ -86,6 +88,48 @@ def test_day_without_current_session_data_keeps_daily_eod_provenance():
         [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []), "SIS", "1D", 30)
     assert rows[-1][-1] is False
     assert "no current-session 60m data" in label
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1W"])
+def test_chart_db_adapter_replaces_same_day_daily_row(monkeypatch, timeframe):
+    daily = [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)]
+    intraday = [(datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100)]
+    cursor = _DailyAndIntradayCursor(daily, intraday)
+    connection = _Connection(daily, intraday)
+    connection.cursor_value = cursor
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+
+    response = mvp_chart_db.project_chart_db_response("sis", timeframe=timeframe)
+
+    assert response["candles"][-1]["close"] == 11.0
+    assert response["candles"][-1]["volume"] == 100.0
+    assert response["candles"][-1]["provisional"] is True
+    assert response["provenance"]["source"] == "price_data"
+    assert "provisional 60m aggregation" in response["provenance"]["note"]
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1W"])
+def test_chart_db_route_preserves_legacy_fields_and_falls_back_to_daily_eod(monkeypatch, timeframe):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    monkeypatch.setattr(mvp_chart_db, "_release_db_connection", lambda pg: None)
+    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": []})
+    handler = type("Handler", (), {
+        "wfile": type("Writer", (), {"write": lambda self, data: setattr(self, "body", data)})(),
+        "send_response": lambda self, status: setattr(self, "status", status),
+        "send_header": lambda self, *args: None,
+        "end_headers": lambda self: None,
+    })()
+
+    assert mvp_routes.handle_mvp_api(f"/api/chart-db/SIS?timeframe={timeframe}", handler)
+    payload = __import__("json").loads(handler.wfile.body)
+    assert handler.status == 200
+    assert payload["timeframe"] == timeframe
+    assert payload["candles"][-1]["close"] == 9.5
+    assert payload["candles"][-1]["provisional"] is False
+    assert {"candles", "ma20", "ma50", "ma200", "macd", "rsi", "wave_evidence", "source", "as_of", "provenance"}.issubset(payload)
 
 
 class _Connection:

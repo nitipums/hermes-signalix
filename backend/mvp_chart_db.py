@@ -27,6 +27,7 @@ from threading import Lock
 import pandas as pd
 
 from elliott_structure_engine import build_wave_contract
+from chart_rows import fetch_chart_rows
 
 
 _POOL = None
@@ -75,38 +76,9 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
                    timeframe: str = "1D") -> list[dict]:
     """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
     timeframe = (timeframe or "1D").upper()
-    if timeframe == "60M":
-        cur.execute("""
-            SELECT ts, open, high, low, close, volume,
-                   (ROW_NUMBER() OVER (ORDER BY ts DESC) = 1) AS provisional
-            FROM intraday_price_data
-            WHERE UPPER(symbol) = UPPER(%s) AND interval = '60m'
-            ORDER BY ts DESC LIMIT %s
-        """, (symbol, limit))
-        rows = cur.fetchall()
-    else:
-        daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
-        cur.execute("""
-            SELECT date, open, high, low, close, volume
-            FROM price_data
-            WHERE market = %s AND UPPER(symbol) = UPPER(%s) AND instrument_type = 'ORD'
-            ORDER BY date DESC LIMIT %s
-        """, (market, symbol, daily_limit))
-        rows = cur.fetchall()
-        if timeframe in {"1W", "1M"}:
-            periods = {}
-            for stamp, open_, high, low, close, volume in reversed(rows):
-                day = stamp if isinstance(stamp, dt.date) else stamp.date()
-                key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
-                if key not in periods:
-                    periods[key] = [key, open_, high, low, close, float(volume or 0)]
-                else:
-                    p = periods[key]
-                    p[2] = max(p[2], high)
-                    p[3] = min(p[3], low)
-                    p[4] = close
-                    p[5] += float(volume or 0)
-            rows = sorted(periods.values(), key=lambda r: r[0])[-limit:]
+    rows, _ = fetch_chart_rows(cur, symbol, timeframe, limit, market=market)
+    if timeframe not in {"1D", "60M"}:
+        rows = list(reversed(rows))
     candles: list[dict] = []
     for row in rows:
         candles.append({
@@ -116,7 +88,7 @@ def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
             "low": float(row[3]) if row[3] is not None else None,
             "close": float(row[4]) if row[4] is not None else None,
             "volume": float(row[5]) if row[5] is not None else None,
-            "provisional": bool(row[6]) if timeframe == "60M" and len(row) > 6 else False,
+            "provisional": bool(row[6]) if len(row) > 6 else False,
         })
     if timeframe in {"1D", "60M"}:
         candles.reverse()
@@ -371,8 +343,11 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     macd = _compute_macd(closes) if len(closes) >= 35 else None
     rsi = _compute_rsi(closes, 14) if len(closes) >= 15 else None
 
-    note = (", ".join(notes) if notes else
-            f"Computed from {chart_source} (SELECT only). All indicators available.")
+    provisional_note = ("Current session is represented by provisional 60m aggregation; "
+                        "Daily EOD decision data is unchanged. "
+                        if any(c.get("provisional") for c in candles) else "")
+    note = (provisional_note + (", ".join(notes) if notes else
+            f"Computed from {chart_source} (SELECT only). All indicators available."))
 
     wave_evidence = {"timeframe": timeframe.lower(), "markers": [],
                      "mapping": {"daily": "not_projected", "60m": "setup_only"}}

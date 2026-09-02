@@ -1046,68 +1046,7 @@ def intraday_events(confidence: str | None = None):
         pg.close()
 
 
-def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
-    """Return stored bars, rolling the latest 60m price into Day/Week/Month.
-
-    The current-session Daily candle is provisional. Week and Month are derived
-    strictly by aggregating those stored Daily bars—no additional market fetch.
-    """
-    if timeframe == "60M":
-        if market.upper() != "TH":
-            return [], "60-minute data is not configured for this market"
-        cur.execute("""SELECT ts, open, high, low, close, volume,
-                              (ROW_NUMBER() OVER (ORDER BY ts DESC) = 1) AS provisional
-                       FROM intraday_price_data WHERE symbol=%s AND interval='60m'
-                       ORDER BY ts DESC LIMIT %s""", (symbol, limit))
-        return cur.fetchall(), "60-minute (latest candle may be in progress)"
-    daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
-    cur.execute("""SELECT date::timestamp, open, high, low, close, volume, false AS provisional
-                   FROM price_data WHERE market=%s AND symbol=%s ORDER BY date DESC LIMIT %s""",
-                (market.upper(), symbol, daily_limit))
-    daily = cur.fetchall()
-    cur.execute("""SELECT ts, open, high, low, close, volume FROM intraday_price_data
-                   WHERE symbol=%s AND interval='60m' AND (ts AT TIME ZONE 'Asia/Bangkok')::date = (NOW() AT TIME ZONE 'Asia/Bangkok')::date
-                   ORDER BY ts ASC""", (symbol,))
-    intra = cur.fetchall()
-    if intra:
-        stamp = intra[-1][0]
-        today = stamp.astimezone(dt.timezone(dt.timedelta(hours=7))).date()
-        # The stored Daily row for today may be stale or official. Replace it
-        # for chart display with the latest current-session 60m aggregate; this
-        # does not alter price_data or any Daily decision provenance.
-        provisional = (dt.datetime.combine(today, dt.time()), intra[0][1], max(r[2] for r in intra),
-                       min(r[3] for r in intra), intra[-1][4], sum(float(r[5] or 0) for r in intra), True)
-        daily = [row for row in daily if row[0].date() != today]
-        daily.append(provisional)
-    has_provisional = bool(intra)
-    daily.sort(key=lambda r: r[0], reverse=True)
-    if timeframe == "1D":
-        label = ("Daily EOD + provisional current session (60m as-is)"
-                 if has_provisional else "Daily EOD (no current-session 60m data)")
-        return daily[:limit], label
-    # Aggregate Daily OHLCV into a higher period.  The first daily open and
-    # latest daily close are retained; high/low/volume span the period.
-    periods = {}
-    for stamp, open_, high, low, close, volume, provisional in reversed(daily):
-        day = stamp.date()
-        key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
-        if key not in periods:
-            periods[key] = [dt.datetime.combine(key, dt.time()), open_, high, low, close, float(volume or 0), bool(provisional)]
-        else:
-            p = periods[key]
-            p[2] = max(p[2], high)
-            p[3] = min(p[3], low)
-            p[4] = close
-            p[5] += float(volume or 0)
-            p[6] = p[6] or bool(provisional)
-    rows = list(reversed(sorted(periods.values(), key=lambda r: r[0])))[:limit]
-    if timeframe == "1W":
-        label = ("Weekly + provisional current session (60m as-is)"
-                 if has_provisional else "Weekly Daily EOD (no current-session 60m data)")
-    else:
-        label = ("Monthly + provisional current session (60m as-is)"
-                 if has_provisional else "Monthly Daily EOD (no current-session 60m data)")
-    return rows, label
+from chart_rows import fetch_chart_rows
 
 
 @app.get("/chart/{symbol}")
