@@ -17,6 +17,7 @@ from __future__ import annotations
 import math
 import time
 from concurrent.futures import ProcessPoolExecutor
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -745,6 +746,163 @@ def _intraday_60m_status(intraday_df, expected_interval_start):
     return True, current, "fresh" if current else "stale", as_of
 
 
+@dataclass(frozen=True)
+class _CandidateRowContext:
+    """Inputs owned by the builder stages that finalize one candidate row."""
+
+    symbol: str
+    daily_df: Any
+    daily_evidence_valid: bool
+    daily_evidence_usable: bool
+    daily_current: bool
+    daily_freshness: str
+    daily_final_status: str
+    intraday_available: bool
+    intraday_current: bool
+    intraday_freshness: str
+    intraday_as_of: str | None
+    rs_rank: float | None
+    profile: dict[str, Any]
+    universe_manifest: dict[str, Any]
+    wave: dict[str, Any]
+    setup: dict[str, Any]
+    canonical_metadata: dict[str, Any] | None
+
+
+@dataclass(frozen=True)
+class _CandidateRowResult:
+    """Named outputs needed to aggregate the finalized candidate rows."""
+
+    row: dict[str, Any]
+    candidate_freshness: str
+    daily_freshness: str
+    intraday_freshness: str
+
+
+def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResult:
+    """Finalize one evaluated symbol into the canonical candidate contract."""
+    symbol = context.symbol
+    daily_df = context.daily_df
+    daily_evidence_valid = context.daily_evidence_valid
+    daily_evidence_usable = context.daily_evidence_usable
+    daily_current = context.daily_current
+    daily_freshness = context.daily_freshness
+    daily_final_status = context.daily_final_status
+    intraday_available = context.intraday_available
+    intraday_current = context.intraday_current
+    intraday_freshness = context.intraday_freshness
+    intraday_as_of = context.intraday_as_of
+    rs_rank = context.rs_rank
+    profile = context.profile
+    universe_manifest = context.universe_manifest
+    wave = context.wave
+    setup = dict(context.setup)
+    canonical_metadata = context.canonical_metadata
+    as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
+    prior_ath = None
+    if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
+        prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
+        prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
+    trend = compute_trend_strength(
+        daily_df if daily_evidence_valid else None,
+        relative_strength=rs_rank, prior_ath=prior_ath
+    )
+    if not daily_evidence_usable:
+        wave = {
+            **wave,
+            "primary_state": "NOT_VERIFIABLE",
+            "alternative_state": "NOT_VERIFIABLE",
+            "confidence": "LOW",
+            "supporting_evidence": [],
+            "contradicting_evidence": [],
+            "missing_evidence": sorted(set(
+                list(wave.get("missing_evidence") or []) + ["usable_official_daily"]
+            )),
+        }
+    if not intraday_current:
+        setup = {**setup, "status": "DATA_BLOCKED"}
+    peer_data = {
+        "sector": profile.get("sector"), "industry": profile.get("industry"),
+        "peer_data_status": "UNKNOWN",
+    }
+    peer_symbols = profile.get("peer_symbols") or profile.get("peers")
+    if peer_symbols is not None:
+        peer_data["peer_symbols"] = peer_symbols
+    peer_context = build_peer_context(symbol, peer_data)
+    daily_ok = daily_df is not None and len(daily_df) > 0
+    intraday_ok = intraday_current
+    if daily_evidence_usable and intraday_current:
+        candidate_freshness = "fresh"
+    elif "stale" in {daily_freshness, intraday_freshness}:
+        candidate_freshness = "stale"
+    else:
+        candidate_freshness = "unknown"
+    data_status = {
+        "sufficient": bool(daily_evidence_usable and intraday_current),
+        "freshness": candidate_freshness,
+        "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
+        "daily_available": daily_ok,
+        "daily_final_session_available": daily_current,
+        "daily_final_session_status": daily_final_status,
+        "daily_freshness": daily_freshness,
+        "intraday_60m_available": intraday_available,
+        "intraday_60m_freshness": intraday_freshness,
+        "intraday_60m_status": ("provisional" if intraday_current else intraday_freshness),
+        "intraday_60m_as_of": intraday_as_of,
+    }
+    engine_data_reason = setup.pop("data_reason_code", None)
+    data_reason_codes = []
+    if not daily_ok:
+        data_reason_codes.append("NO_DAILY_DATA")
+    elif not daily_evidence_valid:
+        data_reason_codes.append("INVALID_DAILY_OHLCV")
+    elif daily_freshness == "stale":
+        data_reason_codes.append("STALE_DAILY_DATA")
+    if engine_data_reason:
+        data_reason_codes.append(engine_data_reason)
+    elif not intraday_available:
+        data_reason_codes.append("NO_60M_DATA")
+    elif intraday_freshness == "stale":
+        data_reason_codes.append("STALE_60M_DATA")
+    if data_reason_codes:
+        data_status["reason_code"] = data_reason_codes[0]
+        data_status["reason_codes"] = list(dict.fromkeys(data_reason_codes))
+    if str(data_status.get("reason_code", "")).startswith("INVALID_"):
+        data_status["sufficient"] = False
+        data_status["freshness"] = "invalid"
+        setup["status"] = "DATA_BLOCKED"
+        candidate_freshness = "invalid"
+    if "INVALID_60M_OHLCV" in data_reason_codes:
+        data_status["intraday_60m_freshness"] = "invalid"
+        data_status["intraday_60m_status"] = "invalid"
+    bonus_evidence = {}
+    attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
+        "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
+    })
+    # Keep the compatibility provenance on the legacy audit placeholder;
+    # attach_bonus_vcp has already enforced its non-positive shape.
+    bonus_evidence["vcp"]["source"] = "legacy_audit_only"
+    row = build_setup_candidate(
+        symbol, as_of, data_status, trend, wave, setup, peer_context,
+        bonus_evidence,
+        {"policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
+         "daily_source": "price_data", "intraday_source": "intraday_price_data",
+         "as_of": as_of, "intraday_as_of": intraday_as_of,
+         "freshness": candidate_freshness,
+         "universe_filter": universe_manifest["universe_filter"],
+         "marginable_schema_version": universe_manifest.get("schema_version"),
+         "marginable_source_document": universe_manifest.get("source_document"),
+         "marginable_effective_date": universe_manifest.get("effective_date")},
+        canonical_metadata,
+    )
+    return _CandidateRowResult(
+        row=row,
+        candidate_freshness=candidate_freshness,
+        daily_freshness=daily_freshness,
+        intraday_freshness=intraday_freshness,
+    )
+
+
 def build_setup_candidates_from_data(pg, *, market="TH"):
     """Build the canonical source from the authoritative read-only data path."""
     import screening
@@ -805,6 +963,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             daily_df, intraday_df, daily_usable, daily_current, daily_freshness,
             daily_final_status,
             intraday_available, intraday_current, intraday_freshness, intraday_as_of,
+            daily_evidence_valid,
         )
 
     as_of_by_symbol = {
@@ -841,119 +1000,43 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     for symbol in symbols:
         (daily_df, intraday_df, daily_evidence_usable, daily_current, daily_freshness,
          daily_final_status,
-         intraday_available, intraday_current, intraday_freshness, intraday_as_of) = (
+         intraday_available, intraday_current, intraday_freshness, intraday_as_of,
+         daily_evidence_valid) = (
             evaluation_inputs[symbol]
         )
-        daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
         as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
         if as_of and (latest_daily is None or as_of > latest_daily):
             latest_daily = as_of
-        prior_ath = None
-        if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
-            prior_highs = daily_df["High"].iloc[:-1].astype(float).dropna()
-            prior_ath = float(prior_highs.max()) if not prior_highs.empty else None
-        trend = compute_trend_strength(
-            daily_df if daily_evidence_valid else None,
-            relative_strength=rs_ranks.get(symbol), prior_ath=prior_ath
-        )
         if engine_results:
             wave, setup = engine_results[symbol]
         else:
             wave, setup = _evaluate_candidate_engines(
                 daily_df, intraday_df, daily_evidence_usable
             )
-        if not daily_evidence_usable:
-            wave = {
-                **wave,
-                "primary_state": "NOT_VERIFIABLE",
-                "alternative_state": "NOT_VERIFIABLE",
-                "confidence": "LOW",
-                "supporting_evidence": [],
-                "contradicting_evidence": [],
-                "missing_evidence": sorted(set(
-                    list(wave.get("missing_evidence") or []) + ["usable_official_daily"]
-                )),
-            }
-        if not intraday_current:
-            setup = {**setup, "status": "DATA_BLOCKED"}
         profile = profiles.get(symbol) or {}
-        peer_data = {
-            "sector": profile.get("sector"), "industry": profile.get("industry"),
-            "peer_data_status": "UNKNOWN",
-        }
-        peer_symbols = profile.get("peer_symbols") or profile.get("peers")
-        if peer_symbols is not None:
-            peer_data["peer_symbols"] = peer_symbols
-        context = build_peer_context(symbol, peer_data)
-        daily_ok = daily_df is not None and len(daily_df) > 0
-        intraday_ok = intraday_current
-        if daily_evidence_usable and intraday_current:
-            candidate_freshness = "fresh"
-        elif "stale" in {daily_freshness, intraday_freshness}:
-            candidate_freshness = "stale"
-        else:
-            candidate_freshness = "unknown"
-        data_status = {
-            "sufficient": bool(daily_evidence_usable and intraday_current),
-            "freshness": candidate_freshness,
-            "source": "price_data+intraday_price_data" if daily_ok and intraday_ok else "price_data/intraday_price_data",
-            "daily_available": daily_ok,
-            "daily_final_session_available": daily_current,
-            "daily_final_session_status": daily_final_status,
-            "daily_freshness": daily_freshness,
-            "intraday_60m_available": intraday_available,
-            "intraday_60m_freshness": intraday_freshness,
-            "intraday_60m_status": ("provisional" if intraday_current else intraday_freshness),
-            "intraday_60m_as_of": intraday_as_of,
-        }
-        engine_data_reason = setup.pop("data_reason_code", None)
-        data_reason_codes = []
-        if not daily_ok:
-            data_reason_codes.append("NO_DAILY_DATA")
-        elif not daily_evidence_valid:
-            data_reason_codes.append("INVALID_DAILY_OHLCV")
-        elif daily_freshness == "stale":
-            data_reason_codes.append("STALE_DAILY_DATA")
-        if engine_data_reason:
-            data_reason_codes.append(engine_data_reason)
-        elif not intraday_available:
-            data_reason_codes.append("NO_60M_DATA")
-        elif intraday_freshness == "stale":
-            data_reason_codes.append("STALE_60M_DATA")
-        if data_reason_codes:
-            data_status["reason_code"] = data_reason_codes[0]
-            data_status["reason_codes"] = list(dict.fromkeys(data_reason_codes))
-        if str(data_status.get("reason_code", "")).startswith("INVALID_"):
-            data_status["sufficient"] = False
-            data_status["freshness"] = "invalid"
-            setup["status"] = "DATA_BLOCKED"
-            candidate_freshness = "invalid"
-        if "INVALID_60M_OHLCV" in data_reason_codes:
-            data_status["intraday_60m_freshness"] = "invalid"
-            data_status["intraday_60m_status"] = "invalid"
-        freshness_statuses.append(candidate_freshness)
-        daily_freshness_statuses.append(daily_freshness)
-        intraday_freshness_statuses.append(intraday_freshness)
-        bonus_evidence = {}
-        attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
-            "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
-        })
-        # Keep the compatibility provenance on the legacy audit placeholder;
-        # attach_bonus_vcp has already enforced its non-positive shape.
-        bonus_evidence["vcp"]["source"] = "legacy_audit_only"
-        candidates.append(build_setup_candidate(
-            symbol, as_of, data_status, trend, wave, setup, context,
-            bonus_evidence,
-            {"policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
-             "daily_source": "price_data", "intraday_source": "intraday_price_data",
-             "as_of": as_of, "intraday_as_of": intraday_as_of,
-             "freshness": candidate_freshness,
-             "universe_filter": universe_manifest["universe_filter"],
-             "marginable_schema_version": universe_manifest.get("schema_version"),
-             "marginable_source_document": universe_manifest.get("source_document"),
-             "marginable_effective_date": universe_manifest.get("effective_date")},
-            canonical_metadata.get(symbol),
+        result = _build_candidate_row(context=_CandidateRowContext(
+            symbol=symbol,
+            daily_df=daily_df,
+            daily_evidence_valid=daily_evidence_valid,
+            daily_evidence_usable=daily_evidence_usable,
+            daily_current=daily_current,
+            daily_freshness=daily_freshness,
+            daily_final_status=daily_final_status,
+            intraday_available=intraday_available,
+            intraday_current=intraday_current,
+            intraday_freshness=intraday_freshness,
+            intraday_as_of=intraday_as_of,
+            rs_rank=rs_ranks.get(symbol),
+            profile=profile,
+            universe_manifest=universe_manifest,
+            wave=wave,
+            setup=setup,
+            canonical_metadata=canonical_metadata.get(symbol),
         ))
+        freshness_statuses.append(result.candidate_freshness)
+        daily_freshness_statuses.append(result.daily_freshness)
+        intraday_freshness_statuses.append(result.intraday_freshness)
+        candidates.append(result.row)
     overall_freshness = ("fresh" if freshness_statuses and all(value == "fresh" for value in freshness_statuses)
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
     evaluate_ms = round((time.monotonic() - stage_started) * 1000, 3)
