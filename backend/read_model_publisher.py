@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from artifact_writer import atomic_write_json
-from mvp_api import _validate_canonical_setup_candidate
+from canonical_setup_projection import _validate_canonical_setup_candidate
 from setup_candidate_contract import sort_setup_candidates
 
 

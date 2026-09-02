@@ -40,14 +40,14 @@ import instruments
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
-                                      build_setup_candidate, build_setup_candidate_diagnostic,
-                                      CANONICAL_METADATA_FIELDS,
-                                      compact_setup_candidate_for_list,
-                                      project_setup_candidate_list,
-                                      sort_setup_candidates)
+                                      build_setup_candidate)
 from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
+from canonical_setup_projection import (
+    _validate_canonical_setup_candidate,
+    project_setup_candidates_response,
+)
 
 
 def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=None):
@@ -430,37 +430,6 @@ def filter_price_band(items: list[dict], price_band: str | None) -> list[dict]:
         elif band == "above_10" and price > 10:
             result.append(item)
     return result
-
-
-def _validate_canonical_setup_candidate(item: dict) -> dict:
-    """Validate a canonical source item without adapting legacy data."""
-    required = ("symbol", "as_of", "data_status", "trend", "wave", "setup",
-                "context", "bonus_evidence", "decision_lane", "provenance")
-    if not all(key in item for key in required):
-        raise ValueError("snapshot is not a canonical setup-candidate artifact")
-    legacy_aliases = {
-        "decision", "group", "action", "status", "primary_state", "primaryState",
-    }
-    present = sorted(legacy_aliases.intersection(item))
-    if present:
-        raise ValueError(
-            "canonical snapshot contains legacy decision aliases: " + ", ".join(present)
-        )
-    allowed = set(required) | set(CANONICAL_METADATA_FIELDS)
-    if set(item) - allowed or not set(required).issubset(item):
-        raise ValueError("snapshot is not an exact canonical envelope")
-    provenance = item.get("provenance") or {}
-    provenance_required = {"policy_version", "source", "as_of", "freshness"}
-    if not provenance_required.issubset(provenance):
-        raise ValueError("canonical snapshot provenance is incomplete")
-    data_status = item.get("data_status") or {}
-    freshness = str(data_status.get("freshness", "")).lower()
-    if (data_status.get("sufficient") is False
-            or freshness in {"stale", "unknown", "invalid", "unavailable"}
-            or data_status.get("intraday_60m_freshness") in {"stale", "unknown"}):
-        if item.get("decision_lane") != "DATA_BLOCKED":
-            raise ValueError("canonical snapshot violates fail-closed data contract")
-    return item
 
 
 def _setup_candidate_from_snapshot(item: dict, snapshot_meta: dict | None = None) -> dict:
@@ -1029,79 +998,6 @@ def persist_setup_candidate_lifecycle(cur, candidate: dict, **kwargs) -> dict:
     """
     from lifecycle_persistence import persist_completed_60m_candidate
     return persist_completed_60m_candidate(cur, candidate, **kwargs)
-
-
-def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,
-                                      lifecycle: str | None = None, state: str | None = None,
-                                      sector: str | None = None, search: str | None = None,
-                                      page: int = 1, page_size: int = 50) -> dict:
-    """Serve the complete canonical candidate list with presentation filters only."""
-    candidates = sort_setup_candidates([_validate_canonical_setup_candidate(item) for item in items])
-    filtered = candidates
-    if lifecycle:
-        token = lifecycle.upper()
-        filtered = [x for x in filtered if str((x.get("setup") or {}).get("status", "")).upper() == token
-                    or str(x.get("decision_lane", "")).upper() == token]
-    if state:
-        token = state.upper()
-        filtered = [x for x in filtered if str((x.get("wave") or {}).get("state", "")).upper() == token
-                    or str((x.get("setup") or {}).get("state", "")).upper() == token]
-    if sector:
-        token = sector.strip().casefold()
-        filtered = [x for x in filtered if token in str((x.get("context") or {}).get("sector", "")).casefold()]
-    if search:
-        token = search.strip().casefold()
-        filtered = [x for x in filtered if token in str(x.get("symbol", "")).casefold()
-                    or token in str((x.get("context") or {}).get("sector", "")).casefold()]
-    page = max(1, int(page)); page_size = max(1, min(int(page_size), 100))
-    total = len(filtered); start = (page - 1) * page_size
-    page_items = filtered[start:start + page_size]
-    # Compact only after the complete canonical set has been validated,
-    # filtered, sorted, and paginated.  The source ``candidates`` list is
-    # still used for counts/diagnostics, and symbol detail reads it from the
-    # canonical read model with full wave evidence intact.
-    compact_items = [compact_setup_candidate_for_list(item) for item in page_items]
-    projection_provenance = {"policy_version": "setup-candidates-v1"}
-    if snapshot_meta:
-        stored_provenance = snapshot_meta.get("provenance") or {}
-        if isinstance(stored_provenance, dict):
-            projection_provenance.update(stored_provenance)
-    projected = project_setup_candidate_list(
-        compact_items,
-        as_of=(snapshot_meta or {}).get("scan_time"),
-        provenance=projection_provenance,
-        universe=(snapshot_meta or {}).get("universe_filter") or "marginable_long",
-    )
-    projected.update({
-        "page": page, "page_size": page_size, "total_items": total,
-        "total_pages": math.ceil(total / page_size) if total else 0,
-        "evaluated_count": len(candidates),
-        "returned_count": len(page_items),
-        "counts": {decision: sum(x.get("decision_lane") == decision for x in candidates)
-                   for decision in ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE",
-                                    "WAIT", "AVOID", "DATA_BLOCKED")},
-        "freshness": (snapshot_meta or {}).get("freshness") or _resolve_freshness(items),
-        "universe_filter": (snapshot_meta or {}).get("universe_filter") or "marginable_long",
-        "base_active_ord_count": (snapshot_meta or {}).get("base_active_ord_count"),
-        "eligible_count": (snapshot_meta or {}).get("eligible_count", len(candidates)),
-        "excluded_count": (snapshot_meta or {}).get("excluded_count"),
-        "excluded_reason": (snapshot_meta or {}).get("excluded_reason"),
-        "marginable_schema_version": (snapshot_meta or {}).get("schema_version"),
-        "marginable_source_document": (snapshot_meta or {}).get("source_document"),
-        "marginable_effective_date": (snapshot_meta or {}).get("effective_date"),
-        "build_observability": (snapshot_meta or {}).get("build_observability"),
-        "cache_status": (snapshot_meta or {}).get("cache_status"),
-        "source_version": (snapshot_meta or {}).get("source_version"),
-        "published_at": (snapshot_meta or {}).get("published_at"),
-        "read_model_status": (snapshot_meta or {}).get("read_model_status"),
-    })
-    projected["diagnostic"] = build_setup_candidate_diagnostic(
-        candidates,
-        as_of=projected.get("as_of"),
-        universe=projected["universe"],
-        returned_count=len(page_items),
-    )
-    return projected
 
 
 def project_shortlist_response(items: list[dict], snapshot_meta: dict | None = None,

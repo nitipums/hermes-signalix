@@ -6,7 +6,7 @@ import pytest
 
 import mvp_routes
 from mvp_api import project_setup_candidates_response
-from setup_candidate_contract import sort_setup_candidates
+from setup_candidate_contract import build_setup_candidate_diagnostic, sort_setup_candidates
 
 
 class Handler:
@@ -984,7 +984,7 @@ def test_builder_diagnostic_keeps_simultaneous_daily_and_60m_missing_observable(
     monkeypatch.setattr(mvp_api, "_load_intraday_for_symbol", lambda *a, **k: None)
 
     rows, _ = mvp_api.build_setup_candidates_from_data(object())
-    diagnostic = mvp_api.build_setup_candidate_diagnostic(
+    diagnostic = build_setup_candidate_diagnostic(
         rows, as_of=None, universe="marginable_long", returned_count=1
     )
 

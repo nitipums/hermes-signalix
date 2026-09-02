@@ -415,56 +415,8 @@ def _not_found(handler, symbol):
     json_response(handler, {"error": "symbol not found", "symbol": symbol}, status=404)
 
 
-def handle_mvp_api(path, handler) -> bool:
-    """Handle MVP /api routes. Return False only for unknown API paths."""
-    parsed = urlsplit(path)
-    route = parsed.path
-    qs = parse_qs(parsed.query or "")
-
-    if route in ("/api/vcp-finder", "/api/vcp-finder/"):
-        interval = (qs.get("interval", ["60m"])[0] or "60m").lower()
-        market = (qs.get("market", ["TH"])[0] or "TH").upper()
-        if interval != "60m" or market != "TH":
-            json_response(handler, {"error": "vcp_finder_60m supports interval=60m and market=TH only"}, status=400)
-            return True
-        daily_watchlist = (qs.get("daily_watchlist", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-        try:
-            from vcp_finder_db import load_latest_vcp_run
-            universe = (qs.get("universe", ["marginable_long"])[0] or "marginable_long").strip().lower()
-            if universe not in {"marginable_long", "active_ord"}:
-                raise ValueError("unknown universe")
-            symbol = (qs.get("symbol", [""])[0] or "").upper() or None
-            state = (qs.get("state", [""])[0] or "").upper() or None
-            limit = int(qs["limit"][0]) if qs.get("limit") else None
-            actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            params = {"market": market, "daily_watchlist": daily_watchlist, "state": state,
-                      "symbol": symbol, "limit": limit, "actionable": actionable,
-                      "focused": focused, "review": review, "universe": universe}
-            if daily_watchlist:
-                payload = _load_daily_watchlist_cached(load_latest_vcp_run, params)
-            else:
-                pg = _vcp_pg()
-                try:
-                    payload = load_latest_vcp_run(pg, **params)
-                finally:
-                    pg.close()
-            if payload is None:
-                json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
-                return True
-            payload = {**payload, "audit_only": True,
-                       "deprecation": dict(VCP_AUDIT_DEPRECATION)}
-            if daily_watchlist:
-                # The watchlist consumes only capped lanes. Preserve full-universe
-                # counts/coverage metadata, but do not serialize audit results.
-                payload = {**payload, "results": []}
-            json_response(handler, payload)
-        except (ValueError, TypeError) as exc:
-            json_response(handler, {"error": "invalid_request"}, status=400)
-        except Exception as exc:
-            json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
-        return True
+def _handle_canonical_routes(route, qs, handler) -> bool:
+    """Handle canonical setup-candidate and symbol routes."""
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
         try:
             page = int(qs.get("page", ["1"])[0])
@@ -516,6 +468,55 @@ def handle_mvp_api(path, handler) -> bool:
                 json_response(handler, result)
         except Exception:
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        return True
+    return False
+
+
+def _handle_legacy_routes(route, qs, handler) -> bool:
+    """Handle legacy and audit-only projection routes."""
+    if route in ("/api/vcp-finder", "/api/vcp-finder/"):
+        interval = (qs.get("interval", ["60m"])[0] or "60m").lower()
+        market = (qs.get("market", ["TH"])[0] or "TH").upper()
+        if interval != "60m" or market != "TH":
+            json_response(handler, {"error": "vcp_finder_60m supports interval=60m and market=TH only"}, status=400)
+            return True
+        daily_watchlist = (qs.get("daily_watchlist", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+        try:
+            from vcp_finder_db import load_latest_vcp_run
+            universe = (qs.get("universe", ["marginable_long"])[0] or "marginable_long").strip().lower()
+            if universe not in {"marginable_long", "active_ord"}:
+                raise ValueError("unknown universe")
+            symbol = (qs.get("symbol", [""])[0] or "").upper() or None
+            state = (qs.get("state", [""])[0] or "").upper() or None
+            limit = int(qs["limit"][0]) if qs.get("limit") else None
+            actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
+            params = {"market": market, "daily_watchlist": daily_watchlist, "state": state,
+                      "symbol": symbol, "limit": limit, "actionable": actionable,
+                      "focused": focused, "review": review, "universe": universe}
+            if daily_watchlist:
+                payload = _load_daily_watchlist_cached(load_latest_vcp_run, params)
+            else:
+                pg = _vcp_pg()
+                try:
+                    payload = load_latest_vcp_run(pg, **params)
+                finally:
+                    pg.close()
+            if payload is None:
+                json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
+                return True
+            payload = {**payload, "audit_only": True,
+                       "deprecation": dict(VCP_AUDIT_DEPRECATION)}
+            if daily_watchlist:
+                # The watchlist consumes only capped lanes. Preserve full-universe
+                # counts/coverage metadata, but do not serialize audit results.
+                payload = {**payload, "results": []}
+            json_response(handler, payload)
+        except (ValueError, TypeError) as exc:
+            json_response(handler, {"error": "invalid_request"}, status=400)
+        except Exception as exc:
+            json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
         return True
     try:
         payload = load_payload()
@@ -580,3 +581,13 @@ def handle_mvp_api(path, handler) -> bool:
         else: json_response(handler, _legacy_response(result))
         return True
     return False
+
+
+def handle_mvp_api(path, handler) -> bool:
+    """Handle MVP /api routes. Return False only for unknown API paths."""
+    parsed = urlsplit(path)
+    route = parsed.path
+    qs = parse_qs(parsed.query or "")
+    if _handle_canonical_routes(route, qs, handler):
+        return True
+    return _handle_legacy_routes(route, qs, handler)
