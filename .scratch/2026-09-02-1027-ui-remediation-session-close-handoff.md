@@ -1,6 +1,6 @@
 # Signalix UI/data remediation — session close handoff
 
-> STATUS: CLOSED AFTER CODEX + LITE REVIEW · 2026-09-02 10:27 ICT
+> STATUS: CLOSED AFTER CODEX + LITE REVIEW · 2026-09-02 11:15 ICT
 > Owner: Arm · Final gate: Lite
 > Supersedes only the UI/data-remediation resume note for this session. Prior owner artifacts remain untouched.
 
@@ -15,7 +15,7 @@ All timestamps are Asia/Bangkok (ICT).
 - `2026-09-02 10:26` — Canonical read model rebuilt successfully and backend/dashboard reloaded.
 - `2026-09-02 10:27` — Public API/UI happy path and 390px drawer gate passed; browser error-state gate remained `NOT VERIFIED` because retained browser cache hid the blocked response.
 - `2026-09-02 follow-up` — Fresh CDP-controlled mobile run forced the same-origin setup-candidates request to fail, verified visible error + hidden cards + actionable Retry, restored networking, clicked Retry, and verified real cards recovered; error-state gate closed `PASS`.
-- `2026-09-02 10:30` — Release and handoff pushed; timestamped filename convention applied.
+- `2026-09-02 11:15` — Performance-read-model scratch artifacts removed per owner instruction; regenerated runtime data retained and added to `.gitignore`; worktree clean and release SHA verified.
 
 ## Scope
 
@@ -101,13 +101,14 @@ The failure-state caveat is now closed as `PASS`; no network blocking remains.
 ## Git/release
 
 - Branch: `release/signalix-mvp-stable`
-- Local HEAD: `9b0bd2d8e48934c66eee1e5eb8548bf7778ed621`
-- Remote branch SHA: `9b0bd2d8e48934c66eee1e5eb8548bf7778ed621`
-- Tracked worktree clean; untouched untracked owner/runtime artifacts remain:
+- Local HEAD: `8110f9731f53ddfb22b0da5cb255323a585ba16c`
+- Remote branch SHA: `8110f9731f53ddfb22b0da5cb255323a585ba16c`
+- Worktree clean; regenerated runtime data is retained but ignored:
   - `factsheets/`
   - `backend/read-model/`
-  - `.scratch/2026-09-02-performance-read-model*`
-  - `.scratch/codex-ui-remediation/`
+- Removed owner-approved scratch artifacts:
+  - `.scratch/2026-09-02-performance-read-model-spec.md`
+  - `.scratch/2026-09-02-performance-read-model/`
 
 ## Product/operational boundary
 
