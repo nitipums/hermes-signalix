@@ -14,6 +14,7 @@ All timestamps are Asia/Bangkok (ICT).
 - `2026-09-02 10:22–10:25` — Codex follow-up aligned the strict canonical metadata allowlist; focused tests passed.
 - `2026-09-02 10:26` — Canonical read model rebuilt successfully and backend/dashboard reloaded.
 - `2026-09-02 10:27` — Public API/UI happy path and 390px drawer gate passed; browser error-state gate remained `NOT VERIFIED` because retained browser cache hid the blocked response.
+- `2026-09-02 follow-up` — Fresh CDP-controlled mobile run forced the same-origin setup-candidates request to fail, verified visible error + hidden cards + actionable Retry, restored networking, clicked Retry, and verified real cards recovered; error-state gate closed `PASS`.
 - `2026-09-02 10:30` — Release and handoff pushed; timestamped filename convention applied.
 
 ## Scope
@@ -84,9 +85,18 @@ At 390px target:
 - `Open guide` moved long wave explanation out of drawer; guide opened and populated with actual evidence.
 - no browser console/page errors observed during happy-path checks.
 
-### Error/failure UI — NOT VERIFIED
+### Error/failure UI — PASS
 
-CDP API blocking was restored immediately. Browser retained cached rows after reload and did not expose the recoverable error state, so this gate is explicitly NOT VERIFIED rather than inferred PASS. Network conditions are normal again.
+Fresh mobile browser verification at `390×844` used a deterministic same-origin request failure for `/api/setup-candidates`:
+- visible `Unable to load setup candidates: Failed to fetch (E2E simulated outage)` panel;
+- actionable `Retry` button visible and enabled;
+- setup cards absent from the rendered failure surface;
+- network/fetch restored immediately;
+- real `Retry` click recovered the API-backed cards, including BBL;
+- error panel and visible Retry button were gone after recovery;
+- final mobile width remained `390px` with document `scrollWidth=375`.
+
+The failure-state caveat is now closed as `PASS`; no network blocking remains.
 
 ## Git/release
 
@@ -110,4 +120,4 @@ CDP API blocking was restored immediately. Browser retained cached rows after re
 
 `manual use → Arm feedback → grill-with-docs → to-spec → to-tickets → TDD/Codex → Lite independent source/test/runtime/UI gate`.
 
-The only carried acceptance caveat is the browser recoverable-error journey, which should be re-tested with cache/service-worker bypass or a fresh browser context before claiming full UI acceptance.
+The browser recoverable-error journey is closed `PASS` after the fresh deterministic mobile verification above. Remaining product work is manual owner validation and any new bounded feedback/spec cycle; no alerts, auto-trading, broker execution, or evaluator auto-caller was enabled.
