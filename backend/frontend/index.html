@@ -58,8 +58,13 @@
           <label>Wave
             <select id="daily-setup-wave" aria-label="Filter Daily candidates by wave">
               <option value="ALL" selected>All waves</option>
+              <option value="WAVE_1_ADVANCE">Wave 1 advance</option>
+              <option value="WAVE_2_FORMING">Wave 2 forming</option>
+              <option value="WAVE_2_NEAR_COMPLETION">Wave 2 near completion</option>
               <option value="EARLY_WAVE_3">Early Wave 3</option>
               <option value="WAVE_3_CONTINUATION">Wave 3 continuation</option>
+              <option value="WAVE_4_CORRECTION">Wave 4 correction</option>
+              <option value="WAVE_5_ADVANCE">Wave 5 advance</option>
               <option value="UNKNOWN">Unknown / Not verified</option>
             </select>
           </label>
@@ -144,10 +149,11 @@
             <strong id="drawer-action" class="drawer-action">–</strong>
           </div>
           <div class="drawer-wave-summary" aria-label="Daily structural wave">
-            <span>Wave <strong id="drawer-wave">Unavailable</strong></span>
+            <span>Daily context <strong id="drawer-wave">Unavailable</strong></span>
             <span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span>
-            <span id="drawer-wave-source">Daily structural</span>
+            <span id="drawer-wave-source">Daily structural · source unavailable</span>
           </div>
+          <section id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></section>
           <p id="drawer-description" class="drawer-description">–</p>
 
           <!-- chart area: overlays are supplied by the real API contract -->
@@ -156,10 +162,11 @@
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
           </div>
           <p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p>
+          <div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>
           <div class="chart-timeframe-controls" aria-label="Chart timeframe">
             <span class="chart-control-label">Timeframe</span>
-            <button type="button" class="chart-timeframe is-active" data-timeframe="60M">60m</button>
-            <button type="button" class="chart-timeframe" data-timeframe="1D">Day</button>
+            <button type="button" class="chart-timeframe" data-timeframe="60M">60m setup</button>
+            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">Daily context</button>
             <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
           </div>
           <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>

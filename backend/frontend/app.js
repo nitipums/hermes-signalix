@@ -118,6 +118,7 @@
     drawerWave:     $("#drawer-wave"),
     drawerWaveConfidence: $("#drawer-wave-confidence"),
     drawerWaveSource: $("#drawer-wave-source"),
+    drawerWaveContext: $("#drawer-wave-context"),
     drawerSector:   $("#drawer-sector"),
     drawerIndustry: $("#drawer-industry"),
     drawerMarketCap: $("#drawer-market-cap"),
@@ -127,6 +128,7 @@
     drawerCanvas:  $("#drawer-canvas"),
     drawerChartPH: $("#drawer-chart-placeholder"),
     drawerChartStatus: $("#drawer-chart-status"),
+    drawerChartLegend: $("#drawer-chart-legend"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
     methodGuide: $("#method-guide"),
@@ -166,7 +168,7 @@
   let vcpResultsBySymbol = {};
   let vcpRunMeta = {};
   const chartLayers = { candles: true, volume: true, ma: true, rsi: true, waveEvidence: true };
-  let chartTimeframe = "60M";
+  let chartTimeframe = "1D";
   let chartSymbol = null;
   let drawerSymbols = [];
   let drawerItems = [];
@@ -525,6 +527,11 @@
       var bucket = timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null;
       if (bucket) chart.wave_evidence = bucket;
     }
+    if (timeframe === "1D" && item && item.decision_lane) {
+      // Canonical Daily markers live under wave.evidence_markers. Use those
+      // exact source coordinates; never derive marker points from chart bars.
+      chart.wave_evidence = waveEvidenceForItem(item);
+    }
     return chart;
   }
 
@@ -540,25 +547,69 @@
     return String(value);
   }
 
-  function canonicalWaveState(item) {
+  var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION",
+    "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];
+
+  function waveContextForItem(item) {
     var wave = item && item.wave;
-    var state = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.primary_state : null;
+    var context = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.context : null;
+    return context && typeof context === "object" && !Array.isArray(context) ? context : null;
+  }
+
+  function canonicalWaveState(item) {
+    var context = waveContextForItem(item);
+    var state = context && context.mapped_state;
     return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "Unknown / Not verified";
   }
 
-  var canonicalDailyWaveStates = ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"];
-
   function setupCandidateWaveBucket(item) {
-    var wave = item && item.wave;
-    var state = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.primary_state : null;
+    var context = waveContextForItem(item);
+    var state = context && context.mapped_state;
     return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "UNKNOWN";
   }
 
   function compactWaveConfidence(item) {
-    var wave = item && item.wave;
-    var confidence = wave && typeof wave === "object" && !Array.isArray(wave) ? wave.confidence : null;
+    var context = waveContextForItem(item);
+    var confidence = context && context.confidence;
     confidence = confidence == null ? "" : String(confidence).toUpperCase();
     return ["LOW", "MEDIUM", "HIGH"].indexOf(confidence) >= 0 ? confidence : "NOT_VERIFIED";
+  }
+
+  function waveContextPresentation(item) {
+    var context = waveContextForItem(item);
+    var state = canonicalWaveState(item);
+    var secondary = context && Array.isArray(context.secondary_markers)
+      ? context.secondary_markers.filter(function(value) { return value === "WAVE_3_EXTENDED"; }) : [];
+    var nonActionable = ["WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION", "Unknown / Not verified"].indexOf(state) >= 0;
+    return {
+      state: state, secondary: secondary, confidence: compactWaveConfidence(item),
+      rule: context && context.rule_version,
+      source: context && context.source_timeframe === "daily" ? "Daily structural · daily" : "Daily structural · source unavailable",
+      supporting: context && context.supporting_evidence, contradicting: context && context.contradicting_evidence,
+      missing: context && context.missing_evidence, rationale: context && context.rationale,
+      firstDate: context && context.first_context_date, lastDate: context && context.last_context_date,
+      transitions: context && Array.isArray(context.transitions) ? context.transitions : [],
+      actionability: item && item.decision_lane === "REVIEW_NOW" ? "Review eligible · backend REVIEW_NOW" :
+        nonActionable ? "Non-actionable context · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED") :
+        "Not review eligible · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED")
+    };
+  }
+
+  function renderWaveContextDetail(item) {
+    if (!dom.drawerWaveContext) return;
+    var view = waveContextPresentation(item);
+    var evidenceRow = function(label, value) {
+      return '<div><dt>' + label + '</dt><dd>' + escapeHTML(waveEvidenceText(value)) + '</dd></div>';
+    };
+    var transitions = view.transitions.length ? view.transitions.map(function(entry) {
+      return '<li>' + escapeHTML(waveEvidenceText(entry)) + '</li>';
+    }).join("") : '<li>Unavailable · no source-linked transition history</li>';
+    dom.drawerWaveContext.innerHTML = '<strong class="wave-context-detail__status">' + escapeHTML(view.actionability) + '</strong>' +
+      '<dl>' + evidenceRow("Secondary", view.secondary) + evidenceRow("Rule", view.rule) +
+      evidenceRow("First / last context", view.firstDate && view.lastDate ? view.firstDate + " / " + view.lastDate : null) +
+      evidenceRow("Supporting", view.supporting) + evidenceRow("Contradicting", view.contradicting) +
+      evidenceRow("Missing", view.missing) + evidenceRow("Rationale", view.rationale) + '</dl>' +
+      '<div class="wave-context-transitions"><span>Source transitions</span><ul>' + transitions + '</ul></div>';
   }
 
   function showWaveExplanation(marker) {
@@ -595,14 +646,16 @@
   function waveEvidenceForItem(item) {
     var wave = item && item.wave;
     if (!wave || typeof wave !== "object" || Array.isArray(wave)) return {};
+    var context = wave.context && typeof wave.context === "object" && !Array.isArray(wave.context) ? wave.context : {};
     var provenance = item.provenance && typeof item.provenance === "object" && !Array.isArray(item.provenance) ? item.provenance : {};
     var explanation = wave.evidence_explanation && typeof wave.evidence_explanation === "object" && !Array.isArray(wave.evidence_explanation)
       ? wave.evidence_explanation : wave.explanation && typeof wave.explanation === "object" && !Array.isArray(wave.explanation) ? wave.explanation : {};
     return {
-      timeframe: "1D", source: provenance.daily_source || "price_data", confidence: wave.confidence,
-      rule: explanation.rule, evidence: explanation.evidence, policy: explanation.policy,
-      supporting_evidence: wave.supporting_evidence, contradicting_evidence: wave.contradicting_evidence,
-      missing_evidence: wave.missing_evidence, alternative_state: wave.alternative_state,
+      timeframe: "1D", source: provenance.daily_source || "price_data", confidence: context.confidence || wave.confidence,
+      rule: context.rule_version || explanation.rule, evidence: explanation.evidence, policy: explanation.policy,
+      supporting_evidence: context.supporting_evidence || wave.supporting_evidence,
+      contradicting_evidence: context.contradicting_evidence || wave.contradicting_evidence,
+      missing_evidence: context.missing_evidence || wave.missing_evidence, alternative_state: wave.alternative_state,
       snapshot_identity: wave.snapshot_identity || wave.snapshot_id || provenance.snapshot_identity || provenance.snapshot_id,
       evidence_refs: explanation.evidence_refs,
       markers: Array.isArray(wave.markers) ? wave.markers : Array.isArray(wave.evidence_markers) ? wave.evidence_markers : []
@@ -637,7 +690,8 @@
     dom.drawerAction.textContent = item.vcp_result ? item.action : shortAction(item.action || item.phase);
     if (dom.drawerWave) dom.drawerWave.textContent = canonicalWaveState(item);
     if (dom.drawerWaveConfidence) dom.drawerWaveConfidence.textContent = compactWaveConfidence(item);
-    if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = item && item.wave ? "Daily structural" : "Unavailable · no Daily wave";
+    if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = waveContextPresentation(item).source;
+    renderWaveContextDetail(item);
     if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
     if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
     dom.drawerSector.textContent = item.sector || "Sector –";
@@ -689,9 +743,23 @@
     dom.drawerChartStatus.classList.toggle("chart-status--provisional", provisional);
   }
 
+  function renderChartLegend(chart) {
+    if (!dom.drawerChartLegend) return;
+    var isDaily = (chart && chart.timeframe || chartTimeframe) === "1D";
+    var markers = chart && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers) ? chart.wave_evidence.markers : [];
+    var dailyMarkerCount = markers.filter(function(marker) {
+      return marker && marker.timeframe === "daily" && marker.timestamp != null && Number.isFinite(Number(marker.price));
+    }).length;
+    var markerState = isDaily ? (dailyMarkerCount ? dailyMarkerCount + " exact Daily source marker(s)" : "Daily markers unavailable") : "Daily markers shown on Day only";
+    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>Daily OHLC</span>' +
+      '<span><i class="legend-dot legend-dot--wave"></i>' + escapeHTML(markerState) + '</span>' +
+      '<span><i class="legend-line legend-line--setup"></i>60m trigger / stop / target</span>';
+  }
+
   function renderDrawerChart(chart) {
     window.__signalixLastChart = chart;
     renderChartStatus(chart);
+    renderChartLegend(chart);
     if (chart.candles && chart.candles.length > 0) {
       // A real OHLCV series is present — draw it (basic canvas line render).
       dom.drawerChartPH.style.display = "none";
@@ -784,15 +852,18 @@
       decisionLabelYs.push(labelY);
       ctx.fillText(label + " " + value.toFixed(2), left + 4, labelY);
     }
-    decisionLine(chart.trigger, "#f4c95d", "Required close");
-    decisionLine(chart.stop, "#ef7777", "Stop");
-    decisionLine(chart.target, "#6ee7b7", "Target");
-    if (chartLayers.waveEvidence && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
+    if (chart.timeframe === "60M") {
+      decisionLine(chart.trigger, "#f4c95d", "Required close");
+      decisionLine(chart.stop, "#ef7777", "Stop");
+      decisionLine(chart.target, "#6ee7b7", "Target");
+    }
+    if (chartLayers.waveEvidence && chart.timeframe === "1D" && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
       var markerColors = {WAVE_1_LOW: "#a78bfa", WAVE_1_HIGH: "#a78bfa", WAVE_2_PULLBACK_LOW: "#60a5fa",
         WAVE_3_CLOSE_CONFIRMATION: "#26a69a", TESTED_HIGH: "#ffa726", STRUCTURE_BREAK: "#ef5350",
         THESIS_INVALIDATION: "#ef5350", TRIGGER: "#f4c95d", TRADE_STOP: "#ef7777"};
       chart.wave_evidence.markers.forEach(function(marker) {
         if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;
+        if (marker.timeframe !== "daily" || marker.timestamp == null || marker.price == null) return;
         var sourceIndex = chart.candles.findIndex(function(c) { return chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp); });
         if (sourceIndex < start || sourceIndex >= start + candles.length || sourceIndex < 0) return;
         var price = Number(marker.price); if (!Number.isFinite(price)) return;
@@ -907,7 +978,7 @@
     fillNestedFields(compactWave, detailWave, [
       "evidence_explanation", "evidence", "supporting_evidence",
       "contradicting_evidence", "missing_evidence", "alternative_state",
-      "markers", "evidence_markers", "snapshot_identity", "snapshot_id"
+      "markers", "evidence_markers", "snapshot_identity", "snapshot_id", "context"
     ]);
     if (Object.keys(compactWave).length) merged.wave = compactWave;
 
@@ -1345,7 +1416,9 @@
     var valueOrUnavailable = function(value) { return value == null || value === "" ? "Not ready" : value; };
     return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b class="setup-candidate__decision">' + escapeHTML(decision) + '</b></div>' +
-      '<div class="setup-candidate__wave"><span>Wave <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span>Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span></div>' +
+      '<div class="setup-candidate__wave"><span>Daily context <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span>Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span>' +
+      '<span>Secondary <b>' + escapeHTML(waveEvidenceText(waveContextPresentation(item).secondary)) + '</b></span></div>' +
+      '<p class="setup-candidate__context-status">' + escapeHTML(waveContextPresentation(item).actionability) + '</p>' +
       '<p class="setup-candidate__readiness"><span>Trigger readiness</span><b>' + escapeHTML(readiness) + '</b></p>' +
       '<div class="setup-candidate__plan"><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span>' +
       '<span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span>' +
