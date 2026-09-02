@@ -41,6 +41,10 @@ Use one of these banners at the top of project notes:
 
 ## Current canonical set
 
+**First read:** `../docs/START-HERE.md`
+
+**Cleanup matrix:** `../docs/current/2026-09-02-documentation-authority-matrix.md`
+
 1. `Product-Strategy-Market-to-Action.md`
 2. `Decisions.md`
 3. `Architecture.md`
@@ -56,7 +60,7 @@ Use one of these banners at the top of project notes:
 13. `Memory-Cleanup-Candidates.md`
 14. `../docs/current/2026-08-31-elliott-grill-decision-record.md`
 15. `../docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
-16. `../docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md`
+16. `../docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` (`LIFECYCLE-T9`)
 
 ## Historical set
 
@@ -64,7 +68,7 @@ Dated handoffs and postmortems remain valuable as evidence.
 
 ## Known conflict — resolved 2026-08-23
 
-Arm chose Markdown `Execution-Pipeline.md` and linked focused plans as the product-scope/acceptance authority. Kanban is the active durable execution/orchestration state for the current gated run (named workers, dependencies, heartbeats, retries, and evidence handoffs); live card status must not be copied into vault notes.
+Arm chose Markdown `Execution-Pipeline.md` and linked focused plans/specs as the product-scope/acceptance authority. Kanban owns active named-worker execution state only when a bounded run exists; the 2026-09-02 board was empty. Live card status must not be copied into vault notes.
 
 ## Cleanup policy
 

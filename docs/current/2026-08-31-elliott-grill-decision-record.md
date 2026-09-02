@@ -110,10 +110,10 @@ Treat these as unverified AI advisory, not owner decisions:
 | Concern | Read/update first | Status |
 |---|---|---|
 | Owner grill decisions and evidence index | This record | CURRENT |
-| Prototype/replay/chart-review phase | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` + throwaway worktree | HISTORICAL evidence; T1–T9 later promoted; 390px failure/recovery gate passed |
+| Prototype/replay/chart-review phase | `docs/archive/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` + throwaway worktree | HISTORICAL evidence; T1–T9 later promoted; 390px failure/recovery gate passed |
 | Domain terminology | `CONTEXT.md` | CURRENT working glossary |
 | Executable Elliott product contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | CURRENT; source implemented/promoted; 390px failure/recovery gate passed |
-| Implementation plan | `docs/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | CURRENT closeout; checklists historical evidence |
+| Implementation plan | `docs/archive/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | CURRENT closeout; checklists historical evidence |
 | Product thesis/roadmap | `vault/Product-Strategy-Market-to-Action.md` | CURRENT authority; current override at section 12 |
 | Atomic decisions | `vault/Decisions.md` | CURRENT ledger; team review added 2026-09-01 |
 | Acceptance/evidence | `vault/Execution-Pipeline.md` | CURRENT authority; team review is next gate |

@@ -22,10 +22,10 @@ Expose a compact Wave/confidence label on every card and in the drawer, add prev
 
 ## Vertical tickets
 
-1. T06 Wave/confidence display
-2. T07 Drawer previous/next navigation, blocked by T06
-3. T08 Daily Candidate group/filter, blocked by T07
-4. T09 final public browser/mobile and owner-semantic acceptance, blocked by T08
+1. UI-T06 Wave/confidence display
+2. UI-T07 Drawer previous/next navigation, blocked by UI-T06
+3. UI-T08 Daily Candidate group/filter, blocked by UI-T07
+4. UI-T09 final public browser/mobile and owner-semantic acceptance, blocked by UI-T08
 
 ## Testing Decisions
 

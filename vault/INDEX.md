@@ -8,7 +8,9 @@
 
 ## 0. Governance gate
 
-อ่าน `Documentation-Governance.md` ก่อนเพิ่มหรือแก้ note ใดๆ ทุกครั้ง
+เริ่มจาก `../docs/START-HERE.md` แล้วอ่าน `Documentation-Governance.md` ก่อนเพิ่มหรือแก้ note ใดๆ ทุกครั้ง
+
+Cleanup matrix: `../docs/current/2026-09-02-documentation-authority-matrix.md`
 
 - Product direction → `Product-Strategy-Market-to-Action.md`
 - Atomic decisions → `Decisions.md`
@@ -44,7 +46,8 @@
 | `2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Historical v2 VCP serving/replay closeout evidence | 🟡 historical | Superseded as primary surface by the Elliott/Trend/Trade-Setup spine |
 | `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
 | `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
-|| `../docs/current/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by 2026-09-01 session closeout; findings retained |
+| `../docs/current/2026-09-02-documentation-authority-matrix.md` | Cleanup source-of-truth matrix and wave ledger | ✅ current | navigation/control record; not product authority |
+| `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by current closeouts; findings retained |
 || `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
 || `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | Arm manual Wave-identification review is next |
 || `../.scratch/2026-09-02-signalix-session-close-handoff.md` | 2026-09-02 session closeout, fetch/candle display fix, Kanban archive, and data repair boundary | ✅ current handoff | temporary navigation record; canonical contract remains in Deployment/Execution-Pipeline |
@@ -53,7 +56,8 @@
 | `VCP-Replay-1M-2026-08-26.md` | One-month point-in-time VCP replay baseline | ✅ current baseline (**historical/audit**) | 20 daily snapshots, 18,620 rows, no-lookahead; VCP is bonus evidence not primary spine |
 | `VCP-Decision-Shadow-v2-Multi-Day-Replay-2026-08-28.md` | VCP shadow-v2 every-60m replay evidence | ⚠️ REVISE gate (**historical/audit**) | 38 snapshots, 35,378 rows; lane integrity PASS, v1 sequence/Low-Cheat promotion blocked |
 | `Scan-Evaluation-Logic-Map-2026-08-29.md` | ~~Current scan/evaluation architecture~~ **⛔ HISTORICAL/SUPERSEDED 2026-08-31** — retained for audit; current authority is Elliott/Trend spine | ⛔ historical | superseded by Elliott prototype |
-| `docs/superpowers/plans/2026-08-29-scan-evaluation-closeout.md` | Historical Scan/Evaluation closeout checklist | 🟡 historical/superseded | Replaced by Elliott/Trend/Trade-Setup implementation and promotion records |
+| `../docs/archive/superpowers/plans/2026-08-29-scan-evaluation-closeout.md` | Historical Scan/Evaluation closeout checklist | 🟡 historical/superseded | Replaced by Elliott/Trend/Trade-Setup implementation and promotion records |
+| `../docs/archive/superpowers/plans/2026-08-30-elliott-trend-trade-setup.md` | Historical implementation plan and checklist evidence | 🟡 historical | T1–T9 promoted; focused spec is current authority |
 | `Testing-and-Architecture.md` | Testing setup + UI asserts + architecture + 2026-08-19 acceptance evidence | ✅ active | coverage lineage + overview/cards API + browser evidence |
 | `Browser-and-Freshness-Verification.md` | การ verify browser/freshness | ✅ active | |
 | `Postmortems/README.md` | Postmortem registry | ✅ active | |

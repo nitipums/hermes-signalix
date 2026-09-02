@@ -116,23 +116,15 @@ _Avoid_: Candidate thesis, mutable setup
 An append-only owner judgement attached to the exact machine snapshot, such as Agree, Watch, Disagree Wave, Reject Setup, Missed Candidate, or Note. It never overwrites the machine interpretation.
 _Avoid_: Machine correction, historical override
 
-## 2026-09-01 Owner-approved review decisions
+## Current authority pointers
 
-- `DATA_BLOCKED` means required evidence is unavailable, stale, invalid, or incoherent; valid Daily evidence with an unfinished 60m setup belongs in `DAILY_CANDIDATE` or `SETUP_FORMING`, not generic blocked.
-- Dashboard release performance targets are warm API ≤1s and cold API ≤15s, with 237/237 coverage and single-flight; strict cold ≤3s, first meaningful UI ≤2s, and compact list payload roughly ≤200–300KB remain future optimization targets; heavy wave evidence loads on detail/drawer.
-- Wave explainability must expose chart-linked Daily markers for Wave 1 low/high, Wave 2 pullback low, Wave 3 close confirmation, tested-high/structure-break, trigger, trade stop, and thesis invalidation, with a linked evidence explanation. Daily and 60m markers remain separate unless explicitly mapped.
-- Legacy retirement uses staged migration: primary UI/API migration → audit-only quarantine → deprecation window → removal/410 after usage and rollback sign-off. Raw VCP/replay evidence remains immutable.
-- Q5–Q8 refinement: distinguish `NO_DAILY_DATA` from `NO_60M_DATA`; valid Daily plus no qualifying 60m anchors is `NO_SETUP_DETECTED`/setup-forming rather than generic `DATA_BLOCKED`; invalid Fib/risk is `RISK_INVALID`; no legacy fallback is allowed; legacy deprecation window is 1 day, followed by code/import reuse audit and owner-approved removal/410.
-- Q9 workflow: Matt grill → owner decision/CONTEXT/ledger → to-spec → to-tickets → Kanban dependency chain → Codex bounded implementation/TDD → Lite diff/test/runtime/UI gate → Ploy trader challenge where relevant → terminal report and controlled unblock. Codex remains implementation/review input, never final authority.
-- Q10–Q11 technical boundary: Arm sets product intent; Lite and Codex choose the concrete field/enum mapping and independently review it. Keep data reason separate from setup reason; valid Daily + valid 60m without anchors is `NO_SETUP_DETECTED`, while actual unavailable/stale/invalid evidence remains explicitly blocked.
-- Q12–Q13 execution boundary: hide the VCP tab immediately, prohibit canonical fallback, use a 1-day audit-only deprecation window, then audit code/import reuse. Lite manages Kanban, dispatches Codex per bounded task, receives artifacts, and performs final review; Codex does not manage Kanban.
-- Q15 technical seam decision: Arm does not need to choose internal module seams. Lite + Codex select the smallest safe seams: candidate contract for reason/lane/payload, chart evidence contract for markers/explanations, and migration boundary for no-fallback/reuse audit/removal.
-- 2026-09-01 release closeout: public 390px failure→Retry→recovery browser journey passed; Arm will manually try `/mvp` and review/confirm Wave identification before any semantic tuning. Alerts, automatic trading, and broker execution are pending/future and OFF. Evaluator auto-caller is a separate pending owner decision for lifecycle-evidence persistence only, not order execution.
+This file is a **working glossary**, not a second decision ledger. Current product decisions, performance targets, Wave-marker contract, legacy-retirement policy, user-validation contract, and owner-review workflow live in:
 
-## 2026-09-01 User-validation decisions
+- `docs/START-HERE.md` — first-read routing and current baseline
+- `vault/Decisions.md` — owner-approved atomic decisions
+- `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` — executable setup-candidate contract
+- `docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` — `LIFECYCLE-T9` contract
+- `docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md` — user-validation contract
+- `vault/Execution-Pipeline.md` — acceptance/evidence sequence
 
-- **Overview controls:** no silent auto-refresh; use a compact toolbar with Search/Lane/Refresh, with detailed filters behind an Advanced filters collapse. A refresh must be explicit and show the update boundary.
-- **Card decision essentials:** show Symbol, price/% change, lane/action, Wave + confidence, trigger/stop/target/R:R when available, RS to two digits, compact 52W/ATH/breakout evidence, and explicit freshness/data status. Keep Sector/Peer/VCP/full evidence in the drawer, but render a value or explicit `Not available` rather than an unexplained dash.
-- **Data authority:** the latest official Daily snapshot remains the structural Wave authority. Current 60m data may be provisional and controls setup/entry evidence. Missing current-session official Daily EOD must not by itself turn otherwise usable Daily + 60m evidence into generic `DATA_BLOCKED`; distinguish unavailable/stale/invalid data from a setup that is not yet detected.
-- **Wave markers:** Daily markers may be shown as context on Week/60m when useful, but must carry an explicit `Daily source · not 60m wave` label. 60m setup markers remain separate; no timeframe may imply a marker was generated from a different source timeframe.
-- **Owner validation:** machine-generated Wave identification remains candidate/evidence for Arm's chart review. A disagreement starts a new bounded grill/spec/ticket cycle; never silently tune thresholds from one subjective example.
+Keep this glossary aligned when terminology changes, but do not copy full rationale, ticket progress, runtime claims, or historical review text here.

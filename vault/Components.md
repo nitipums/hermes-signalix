@@ -61,13 +61,7 @@ rather than relabelling an old Daily value as 60m.
 ## MVP owner-only surface — current
 `mvp_server.py` serves `/mvp` from the bind-mounted release tree. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
-`mvp_api.py` serves the canonical `/api/setup-candidates` envelope with six
-fail-closed decision lanes (`REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`,
-`WAIT`, `AVOID`, `DATA_BLOCKED`). Daily `primary_state`/confidence and 60m
-setup status/trigger/invalidation/R:R remain separate. T1–T9 source contracts
-and release promotion are complete; public 390px failure→Retry→recovery browser
-acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage
-labels are compatibility/audit only.
+`mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
 `mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:

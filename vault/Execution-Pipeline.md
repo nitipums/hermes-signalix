@@ -6,7 +6,7 @@
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
-> Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused implementation plans under `/root/signalix/.hermes/plans/` for executable detail, and the Kanban board for named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
+> Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused current specs under `../docs/superpowers/specs/` for contracts, and the Kanban board only for active named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
 
 ## Product contract
 
@@ -78,9 +78,9 @@ The intraday E2E path is now explicit and verified: full active ORD 60m fetch �
 This closes the previous “DB updated but dashboard stale” gap. Unexpected source/credential/network/code failures still alert for operator action; the system does not silently modify source code.
 
 
-## Current team-review gate — 2026-09-01
+## Historical team-review inputs — 2026-09-01
 
-Before any implementation change, use `docs/current/2026-09-01-signalix-independent-review.md` as the review packet. Lite, Codex, and Ploy agree on four `REVISE` areas: DATA_BLOCKED semantics/reason codes, cold-path latency and pagination, chart-ready Elliott evidence markers, and staged legacy quarantine. AskMatt must settle the product decisions and card boundaries first; then use Kanban for one bounded card at a time with independent acceptance.
+`../docs/archive/reviews/2026-09-01-signalix-independent-review.md` is a historical review packet, not a mandatory current preflight. It remains useful evidence for DATA_BLOCKED semantics, latency/pagination, chart markers, and staged legacy quarantine. New work starts from `docs/START-HERE.md`, the relevant current spec/decision, and a fresh source/runtime baseline.
 
 Only pull one tightly scoped implementation item at a time. Lite is the final evidence gate; worker completion is not final approval. Every active-chain card terminal outcome (`PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED`) requires a delivered report to the owner; `REVISE`/`FAIL` requires bounded remediation or an explicit blocker.
 

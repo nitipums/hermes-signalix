@@ -1,7 +1,9 @@
 # Signalix Documentation Map
 
 > **STATUS: CURRENT** · File-system organization map, not product authority.
-> **Last organized:** 2026-08-31
+> **Last organized:** 2026-09-02
+> **First read:** [`START-HERE.md`](START-HERE.md)
+> **Cleanup matrix:** [`current/2026-09-02-documentation-authority-matrix.md`](current/2026-09-02-documentation-authority-matrix.md)
 
 ## Layout
 
@@ -14,17 +16,15 @@ docs/
 ├── superpowers/
 │   ├── specs/
 │   │   └── 2026-08-30-elliott-trend-trade-setup-design.md  ← active design
-│   └── plans/
-│       └── 2026-08-30-elliott-trend-trade-setup.md         ← active implementation plan
-└── archive/superpowers/
-    ├── specs/   ← prior designs; preserved, not current authority
-    ├── plans/   ← prior implementation plans; preserved, not current authority
-    └── sdd/     ← reserved for historical SDD evidence when tracked
+│   └── plans/        ← historical implementation evidence; not current task state
+└── archive/
+    ├── reviews/     ← historical review packets
+    └── superpowers/ ← superseded plans/specs
 ```
 
 ## Current decision record
 
-The consolidated grill, prototype/replay evidence, open gates, and AiPASS/Opus routing caveat are recorded in `current/2026-08-31-elliott-grill-decision-record.md`. This is the durable handoff/index; executable product semantics remain in the focused design spec.
+The historical review packet is now under `archive/reviews/2026-09-01-signalix-independent-review.md`. It is evidence only; new work starts from `START-HERE.md` and the relevant current authority.
 
 ## Authority routing
 

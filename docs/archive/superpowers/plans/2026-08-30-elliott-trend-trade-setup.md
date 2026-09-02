@@ -1,7 +1,7 @@
 # Elliott/Trend/Trade-Setup Decision Spine Implementation Plan
 
-> **STATUS: CURRENT — IMPLEMENTATION COMPLETE / SERVED ACCEPTANCE PENDING** · Reconciled 2026-09-01
-> T1–T9 source is implemented and promoted to `release/signalix-mvp-stable`. `/api/setup-candidates` serves the live DB-built contract with honest lanes. Remaining gate: public desktop/390px/error journey. This file's task checklists are historical implementation evidence; do not infer current task state from unchecked boxes.
+> **STATUS: HISTORICAL IMPLEMENTATION EVIDENCE** · Reconciled 2026-09-02
+> T1–T9 source is implemented and promoted to `release/signalix-mvp-stable`. The task checklists below record the implementation path; do not infer current task state or acceptance from unchecked boxes. Current contract authority is the focused design spec and current acceptance is `vault/Execution-Pipeline.md`.
 > **Plan method:** Matt Pocock flow — grill/domain decisions → prototype one hard question → replay + chart review → Standards-vs-Spec review → owner approval → bounded implementation → runtime/UI gate.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

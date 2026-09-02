@@ -1,7 +1,7 @@
 # Signalix Elliott/Trend/Trade-Setup Decision Spine
 
-> **STATUS: OWNER-APPROVED DESIGN — T1–T9 SOURCE IMPLEMENTED + PROMOTED; SERVED ACCEPTANCE PENDING**
-> **Reconciled:** 2026-09-01 · Runtime currently serves the DB-built API partially; public desktop/mobile/error journey remains NOT VERIFIED.
+> **STATUS: OWNER-APPROVED DESIGN — T1–T9 SOURCE IMPLEMENTED + PROMOTED; ACCEPTANCE SPLIT**
+> **Reconciled:** 2026-09-02 · `/api/setup-candidates` and `/mvp` are the canonical promoted surface; the narrow public 390px failure→Retry→recovery journey is PASS. Broader desktop/drawer/chart semantic acceptance and evaluator auto-caller remain separate/not verified.
 > **Date:** 2026-08-30 · **Implementation:** 2026-08-31 (T1–T9 source) · **Promotion:** 2026-08-31 (release branch)
 > **Scope:** `marginable_long` stock setup discovery and preparation — active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true` (currently 237 symbols)
 > **Product role:** Signalix finds and prepares candidate trade setups; Arm reviews the chart and makes the final trade decision.
