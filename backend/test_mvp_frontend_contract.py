@@ -898,25 +898,14 @@ def test_setup_candidate_compact_items_and_canonical_detail_merge_are_safe():
     assert result["name"] == "Alpha"
 
 
-def test_canonical_detail_merge_preserves_nested_evidence_aliases_and_only_fills_metadata():
+def test_canonical_detail_merge_enriches_compact_nested_evidence_without_overwrite():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     merge = _extract_function(js, "mergeCanonicalSetupDetail")
     item = {
         "symbol": "AAA",
         "decision_lane": "REVIEW_NOW",
-        "wave": {
-            "primary_state": "EARLY_WAVE_3",
-            "confidence": "HIGH",
-            "supporting_evidence": ["daily breakout"],
-            "contradicting_evidence": [],
-            "missing_evidence": ["volume"],
-            "evidence_explanation": "canonical explanation",
-            "markers": [{"timestamp": "2026-08-31", "snapshot_id": "snap-canonical"}],
-            "evidence_markers": [{"timestamp": "2026-08-31", "snapshot_id": "snap-canonical"}],
-            "snapshot_id": "snap-canonical",
-        },
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
         "setup": {"trigger": 12, "trade_stop": 10, "target_1": 20},
-        "chart_evidence": {"60m": {"markers": ["canonical-marker"]}},
         "provenance": {"snapshot_id": "snap-canonical", "source": "setup-candidates"},
         "name": "Canonical name",
     }
@@ -924,8 +913,7 @@ def test_canonical_detail_merge_preserves_nested_evidence_aliases_and_only_fills
         "name": "Legacy name",
         "sector": "Technology",
         "wave": {"primary_state": "WAVE_1_ADVANCE", "snapshot_id": "snap-legacy"},
-        "setup": {"trigger": 99},
-        "chart_evidence": {"60m": {"markers": ["legacy-marker"]}},
+        "setup": {"trigger": 99, "chart_evidence": {"daily": {"markers": ["detail-marker"]}}},
         "provenance": {"snapshot_id": "snap-legacy"},
         "decision_lane": "AVOID",
         "unexpected_legacy_field": "must not enter canonical item",
@@ -933,12 +921,49 @@ def test_canonical_detail_merge_preserves_nested_evidence_aliases_and_only_fills
     result = _run_node([merge], "mergeCanonicalSetupDetail(" + json.dumps(item) + ", " + json.dumps(detail) + ")")
     assert result["name"] == "Canonical name"
     assert result["sector"] == "Technology"
-    assert result["wave"] == item["wave"]
-    assert result["setup"] == item["setup"]
-    assert result["chart_evidence"] == item["chart_evidence"]
+    assert result["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert result["wave"]["snapshot_id"] == "snap-legacy"
+    assert result["setup"]["trigger"] == 12
+    assert result["setup"]["chart_evidence"] == detail["setup"]["chart_evidence"]
     assert result["provenance"] == item["provenance"]
     assert result["decision_lane"] == "REVIEW_NOW"
     assert "unexpected_legacy_field" not in result
+
+
+def test_compact_item_plus_canonical_detail_provides_full_drawer_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    wave_evidence = _extract_function(js, "waveEvidenceForItem")
+    compact = {
+        "symbol": "AAA", "decision_lane": "REVIEW_NOW",
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
+        "setup": {"trigger": 12, "trade_stop": 10},
+        "provenance": {"source": "setup-candidates"},
+    }
+    detail = {
+        "wave": {
+            "primary_state": "WAVE_1_ADVANCE",
+            "evidence_explanation": {"rule": "Daily close above Wave 1 high", "policy": "elliott-v1"},
+            "supporting_evidence": ["prior advance"],
+            "contradicting_evidence": ["weak volume"],
+            "missing_evidence": ["60m confirmation"],
+            "markers": [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}],
+            "evidence_markers": [{"kind": "WAVE_1_HIGH"}],
+            "snapshot_identity": "daily:2026-08-31",
+            "snapshot_id": "daily:2026-08-31",
+        },
+        "setup": {"chart_evidence": {"daily": {"markers": ["daily-marker"]}, "60m": {"markers": ["60m-marker"]}}},
+        "provenance": {"policy_version": "setup-candidates-v1", "snapshot_identity": "daily:2026-08-31"},
+    }
+    result = _run_node([merge, wave_evidence], "(function(){var item = mergeCanonicalSetupDetail(" + json.dumps(compact) + ", " + json.dumps(detail) + "); return {item:item, evidence:waveEvidenceForItem(item)};})()")
+    assert result["item"]["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert result["evidence"]["rule"] == "Daily close above Wave 1 high"
+    assert result["evidence"]["supporting_evidence"] == ["prior advance"]
+    assert result["evidence"]["contradicting_evidence"] == ["weak volume"]
+    assert result["evidence"]["missing_evidence"] == ["60m confirmation"]
+    assert result["evidence"]["markers"] == [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}]
+    assert result["evidence"]["snapshot_identity"] == "daily:2026-08-31"
+    assert result["item"]["setup"]["chart_evidence"]["60m"]["markers"] == ["60m-marker"]
 
 
 def test_canonical_chart_failure_never_uses_snapshot_fallback():

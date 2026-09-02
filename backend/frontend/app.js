@@ -503,7 +503,10 @@
       if (overlay[field] != null) chart[field] = overlay[field];
     });
     var timeframe = chart.timeframe || chartTimeframe;
-    var evidence = item && item.chart_evidence;
+    var evidence = item && item.setup && item.setup.chart_evidence;
+    // Keep the compatibility surface readable for older VCP drawer items;
+    // canonical setup candidates use setup.chart_evidence above.
+    if (!evidence && item) evidence = item.chart_evidence;
     if (evidence) {
       var bucket = timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null;
       if (bucket) chart.wave_evidence = bucket;
@@ -859,10 +862,11 @@
   }
 
   function mergeCanonicalSetupDetail(item, detail) {
-    // /api/setup-candidates is authoritative. /api/symbol is an audit/detail
-    // lookup and may fill presentation metadata only; never spread its
-    // response over canonical evidence. This also preserves both marker
-    // aliases and wave snapshot identity as opaque nested evidence.
+    // /api/setup-candidates is authoritative for the compact item. The
+    // symbol detail response is the same canonical candidate with heavy
+    // evidence restored; fill only fields omitted by the list projection.
+    // Never spread the response over canonical fields or accept legacy
+    // top-level aliases as a competing contract.
     var merged = Object.assign({}, item || {});
     var metadataFields = ["name", "sector", "industry", "market_cap", "description",
       "close", "change_pct", "change_amount", "trade_value", "avgDailyValue20",
@@ -871,6 +875,39 @@
     metadataFields.forEach(function(field) {
       if (merged[field] == null && detail && detail[field] != null) merged[field] = detail[field];
     });
+
+    function fillNestedFields(parent, source, fields) {
+      if (!source || typeof source !== "object" || Array.isArray(source)) return;
+      fields.forEach(function(field) {
+        if (parent[field] == null && source[field] != null) parent[field] = source[field];
+      });
+    }
+
+    var compactWave = merged.wave && typeof merged.wave === "object" && !Array.isArray(merged.wave)
+      ? Object.assign({}, merged.wave) : {};
+    var detailWave = detail && detail.wave;
+    fillNestedFields(compactWave, detailWave, [
+      "evidence_explanation", "evidence", "supporting_evidence",
+      "contradicting_evidence", "missing_evidence", "alternative_state",
+      "markers", "evidence_markers", "snapshot_identity", "snapshot_id"
+    ]);
+    if (Object.keys(compactWave).length) merged.wave = compactWave;
+
+    var compactSetup = merged.setup && typeof merged.setup === "object" && !Array.isArray(merged.setup)
+      ? Object.assign({}, merged.setup) : {};
+    var detailSetup = detail && detail.setup;
+    // Chart evidence is canonical only under setup; do not import a legacy
+    // top-level detail.chart_evidence field.
+    fillNestedFields(compactSetup, detailSetup, ["chart_evidence"]);
+    if (Object.keys(compactSetup).length) merged.setup = compactSetup;
+
+    // The compact projection retains provenance scalars, but detail may carry
+    // the canonical identity/policy when those fields were absent.
+    var compactProvenance = merged.provenance && typeof merged.provenance === "object" && !Array.isArray(merged.provenance)
+      ? Object.assign({}, merged.provenance) : {};
+    fillNestedFields(compactProvenance, detail && detail.provenance,
+      ["policy_version", "snapshot_id", "snapshot_identity"]);
+    if (Object.keys(compactProvenance).length) merged.provenance = compactProvenance;
     merged._canonicalMetadataPending = false;
     return merged;
   }
