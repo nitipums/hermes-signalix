@@ -1113,6 +1113,82 @@ def refresh_dashboard_from_existing_scan():
     return result
 
 
+def _canonical_read_model_source_versions(pg):
+    """Read both source identities from persisted canonical ingestion lineage."""
+    cur = pg.cursor()
+    try:
+        cur.execute("""
+            SELECT r.id, r.scan_date, r.run_timestamp, r.source_lineage
+            FROM daily_scan_runs r
+            WHERE r.scanner_version = 'signalix/daily-state-v2'
+              AND r.source_lineage->>'source' = 'price_data'
+              AND COALESCE(r.source_lineage->>'mode', '') <> 'historical_backfill'
+            ORDER BY r.run_timestamp DESC, r.id DESC
+            LIMIT 1
+        """)
+        daily = cur.fetchone()
+        cur.execute("""
+            SELECT run_id, status, fetch_completed_at
+            FROM intraday_ingestion_runs
+            WHERE status IN ('full_success', 'partial_success')
+              AND fetch_completed_at IS NOT NULL
+            ORDER BY fetch_completed_at DESC, run_id DESC
+            LIMIT 1
+        """)
+        intraday = cur.fetchone()
+    finally:
+        cur.close()
+    if not daily or not intraday:
+        return None
+    daily_run_id, daily_scan_date, daily_run_timestamp, daily_lineage = daily
+    intraday_run_id, intraday_status, intraday_completed_at = intraday
+    if (not daily_run_id or not daily_scan_date or not daily_run_timestamp
+            or not isinstance(daily_lineage, dict)
+            or not intraday_run_id or not intraday_status or not intraday_completed_at):
+        return None
+    return {
+        "daily": {
+            "run_id": str(daily_run_id),
+            "as_of": daily_scan_date.isoformat() if hasattr(daily_scan_date, "isoformat") else str(daily_scan_date),
+            "run_timestamp": daily_run_timestamp.isoformat() if hasattr(daily_run_timestamp, "isoformat") else str(daily_run_timestamp),
+            "source_lineage": daily_lineage,
+        },
+        "intraday": {
+            "run_id": str(intraday_run_id),
+            "status": intraday_status,
+            "as_of": intraday_completed_at.isoformat() if hasattr(intraday_completed_at, "isoformat") else str(intraday_completed_at),
+        },
+    }
+
+
+def publish_canonical_read_model():
+    """Build and publish only a complete canonical 237-row result."""
+    root = os.getenv("SIGNALIX_READ_MODEL_ROOT", "/var/lib/signalix/read-model")
+    pg = get_pg()
+    try:
+        source_versions = _canonical_read_model_source_versions(pg)
+        if source_versions is None:
+            print("READ_MODEL_SKIP " + json.dumps({"reason": "source_lineage_incomplete"}))
+            return None
+        import mvp_api
+        from read_model_publisher import publish_builder_result
+        result = publish_builder_result(
+            mvp_api.build_setup_candidates_from_data,
+            pg,
+            root=root,
+            source_versions=source_versions,
+            published_at=_utc_now_iso(),
+            market="TH",
+        )
+        print("READ_MODEL_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except Exception as exc:
+        print("READ_MODEL_SKIP " + json.dumps({"reason": "canonical_build_or_publish_failed", "detail": repr(exc)[:240]}))
+        return None
+    finally:
+        pg.close()
+
+
 def run_vcp_after_ingestion(pg, summary):
     """Evaluate/persist VCP only after a committed successful ingestion."""
     if summary.get("status") not in {"full_success", "partial_success"}:
@@ -1158,6 +1234,14 @@ def run_vcp_after_ingestion(pg, summary):
         cur.execute("SELECT pg_advisory_unlock(hashtext('signalix:vcp-finder-60m'))")
         pg.commit()
         cur.close()
+
+
+def _finish_successful_run(args):
+    """Publish once, after the complete daily/intraday canonical build."""
+    full_intraday = getattr(args, "intraday_full_universe", getattr(args, "intraday_shortlist", False))
+    if (args.scan or full_intraday) and not args.dry_run:
+        publish_canonical_read_model()
+    return 0
 
 
 # ---------- main ----------
@@ -1208,7 +1292,9 @@ def run(args):
             pg.close()
         # Partial coverage is recorded in the run summary and is operationally
         # successful: one bad/empty symbol must not mark the whole timer failed.
-        return 0 if summary["status"] in ("full_success", "partial_success") else 1
+        if summary["status"] not in ("full_success", "partial_success"):
+            return 1
+        return _finish_successful_run(args)
 
     pg = get_pg()
     until = dt.date.fromisoformat(args.until) if args.until else None
@@ -1337,7 +1423,7 @@ def run(args):
         # successful: one bad/empty symbol must not mark the whole timer failed.
         if summary["status"] not in ("full_success", "partial_success"):
             return 1
-    return 0
+    return _finish_successful_run(args)
 
 
 def main():
