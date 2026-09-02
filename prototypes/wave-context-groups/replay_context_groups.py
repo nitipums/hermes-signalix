@@ -29,6 +29,16 @@ WINDOW_START = dt.date(2025, 8, 28)
 WINDOW_END = dt.date(2026, 8, 28)
 RULE_NAME = "canonical-context-evidence-map"
 RULE_VERSION = "1.0.0"
+CANONICAL_STRUCTURAL_STATES = frozenset({
+    "WAVE_1_ADVANCE",
+    "WAVE_2_FORMING",
+    "WAVE_2_NEAR_COMPLETION",
+    "EARLY_WAVE_3",
+    "WAVE_3_CONTINUATION",
+    "WAVE_4_CORRECTION",
+    "WAVE_5_ADVANCE",
+    "UNKNOWN",
+})
 
 try:
     import pandas as pd  # type: ignore
@@ -72,7 +82,20 @@ def map_context(wave: dict[str, Any]) -> dict[str, Any]:
     CORRECTION only with emitted measurable_pullback or <=-3% 20-session change.
     Otherwise the context is UNKNOWN.
     """
-    state = str(wave.get("state") or "UNKNOWN")
+    input_state = str(wave.get("state") or "UNKNOWN")
+    if input_state not in CANONICAL_STRUCTURAL_STATES:
+        return {
+            "structural_state": "UNKNOWN",
+            "context_marker": "NONE/UNKNOWN",
+            "secondary_marker": "NOT_EXPOSED",
+            "ambiguous": True,
+            "missing_evidence": [],
+            "rationale": [f"invalid canonical structural state: {input_state}"],
+            "rule_name": RULE_NAME,
+            "rule_version": RULE_VERSION,
+        }
+
+    state = input_state
     evidence = wave.get("evidence") if isinstance(wave.get("evidence"), dict) else {}
     marker = {
         "WAVE_1_ADVANCE": "WAVE_1_RISING",
@@ -253,6 +276,12 @@ def synthetic_smoke() -> int:
     wave["evidence"]["volume_above_avg"] = False
     assert map_context(wave)["secondary_marker"] == "NOT_EXPOSED"
     assert map_context({"state": "UNKNOWN", "evidence": {}})["context_marker"] == "NONE/UNKNOWN"
+    for invalid_state in ("BOGUS_STATE", "WAVE_3_EXTENDED"):
+        invalid = map_context({"state": invalid_state, "evidence": {}})
+        assert invalid["structural_state"] == "UNKNOWN"
+        assert invalid["context_marker"] == "NONE/UNKNOWN"
+        assert invalid["secondary_marker"] == "NOT_EXPOSED"
+        assert invalid["rationale"] == [f"invalid canonical structural state: {invalid_state}"]
     print("synthetic smoke: PASS")
     return 0
 
