@@ -14,7 +14,11 @@ def evidence(**overrides):
 
 def wave(confidence="MEDIUM", state="EARLY_WAVE_3", **overrides):
     result = {"timeframe": "daily", "state": state, "confidence": confidence,
-              "evidence": evidence()}
+              "evidence": evidence(),
+              "context": {
+                  "mapped_state": state, "confidence": confidence,
+                  "source_timeframe": "daily", "secondary_markers": [],
+              }}
     result.update(overrides)
     return result
 
@@ -35,6 +39,55 @@ def test_full_review_now_accepts_legacy_and_canonical_medium_confidence():
     assert project_decision_lane(fresh(), wave("MEDIUM"), setup()) == "REVIEW_NOW"
     assert project_decision_lane(fresh(), wave("HIGH"), setup("TRIGGERED")) == "REVIEW_NOW"
     assert project_decision_lane(fresh(), wave("PARTIAL"), setup()) == "REVIEW_NOW"
+
+
+def test_wave_1_3_and_5_context_can_reach_review_now_through_same_gates():
+    for state in ("WAVE_1_ADVANCE", "EARLY_WAVE_3", "WAVE_3_CONTINUATION",
+                  "WAVE_5_ADVANCE"):
+        assert project_decision_lane(fresh(), wave(state=state), setup()) == "REVIEW_NOW"
+
+
+def test_wave_2_and_4_context_remain_daily_candidates_with_complete_plan():
+    for state in ("WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION"):
+        assert project_decision_lane(fresh(), wave(state=state), setup()) == "DAILY_CANDIDATE"
+
+
+def test_missing_invalid_unknown_or_low_context_cannot_reach_review_now():
+    missing = wave()
+    missing.pop("context")
+    assert project_decision_lane(fresh(), missing, setup()) == "DAILY_CANDIDATE"
+
+    for context in (
+        {"mapped_state": "WAVE_3_EXTENDED", "confidence": "HIGH",
+         "source_timeframe": "daily"},
+        {"mapped_state": "UNKNOWN", "confidence": "HIGH", "source_timeframe": "daily"},
+        {"mapped_state": "EARLY_WAVE_3", "confidence": "LOW", "source_timeframe": "daily"},
+        {"mapped_state": "EARLY_WAVE_3", "confidence": "INSUFFICIENT",
+         "source_timeframe": "daily"},
+    ):
+        candidate = wave(context=context)
+        assert project_decision_lane(fresh(), candidate, setup()) != "REVIEW_NOW"
+
+
+def test_extended_marker_does_not_bypass_do_not_chase_or_risk_gates():
+    extended = wave(state="WAVE_3_CONTINUATION")
+    extended["context"]["secondary_markers"] = ["WAVE_3_EXTENDED"]
+    assert project_decision_lane(fresh(), extended, setup("EXTENDED")) == "AVOID"
+    assert project_decision_lane(
+        fresh(), extended, setup(risk_acceptable=False)
+    ) == "AVOID"
+    assert project_decision_lane(
+        fresh(), extended, setup(risk_status="INVALID")
+    ) == "AVOID"
+
+
+def test_incoherent_numeric_risk_plan_fails_closed():
+    assert project_decision_lane(
+        fresh(), wave(state="WAVE_1_ADVANCE"), setup(invalidation=101)
+    ) == "AVOID"
+    assert project_decision_lane(
+        fresh(), wave(state="WAVE_5_ADVANCE"), setup(targets=[99])
+    ) == "AVOID"
 
 
 def test_low_confidence_cannot_reach_review_now():

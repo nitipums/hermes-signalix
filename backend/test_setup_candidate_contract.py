@@ -147,6 +147,26 @@ def test_invalid_or_ambiguous_wave_context_fails_closed_without_relabelling_prim
     assert "invalid_structural_context_state" in wave["context"]["contradicting_evidence"]
 
 
+def test_invalid_context_timeframe_cannot_reach_review_now_after_normalization():
+    inputs = sample_inputs()
+    inputs["wave"] = {
+        "state": "EARLY_WAVE_3", "confidence": "HIGH", "evidence": {},
+        "context": {
+            "mapped_state": "EARLY_WAVE_3", "confidence": "HIGH",
+            "source_timeframe": "60m", "secondary_markers": [],
+        },
+    }
+    inputs["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 100,
+        "invalidation": 90, "targets": [120], "rr": {"to_target_1": 2.0},
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["wave"]["context"]["mapped_state"] == "UNKNOWN"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
+
+
 def test_compact_projection_preserves_nested_wave_context():
     item = build_setup_candidate(**sample_inputs())
     item["wave"]["context"] = {
@@ -236,6 +256,10 @@ def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
 def test_lane_plan_requires_ordered_target_1_and_never_uses_target_2_only():
     base = sample_inputs()
     base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    base["wave"]["context"] = {
+        "mapped_state": "EARLY_WAVE_3", "confidence": "HIGH",
+        "source_timeframe": "daily", "secondary_markers": [],
+    }
     base["setup"] = {
         "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 12.5,
         "invalidation": 10.0, "rr": {"to_target_1": 3.0},
@@ -259,6 +283,10 @@ def test_lane_plan_requires_ordered_target_1_and_never_uses_target_2_only():
 def test_legacy_scalar_targets_remain_compatible_without_downgrading_mixed_targets():
     base = sample_inputs()
     base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    base["wave"]["context"] = {
+        "mapped_state": "WAVE_3_CONTINUATION", "confidence": "HIGH",
+        "source_timeframe": "daily", "secondary_markers": [],
+    }
     legacy_setup = {
         "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 100,
         "invalidation": 90, "targets": [120], "rr": {"to_target_1": 2.0},

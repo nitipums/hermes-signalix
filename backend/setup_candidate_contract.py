@@ -37,6 +37,9 @@ WAVE_CONTEXT_STATES = {
     "WAVE_5_ADVANCE", "UNKNOWN",
 }
 WAVE_CONTEXT_SECONDARY_MARKERS = {"WAVE_3_EXTENDED"}
+REVIEWABLE_WAVE_CONTEXT_STATES = {
+    "WAVE_1_ADVANCE", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_5_ADVANCE",
+}
 WAVE_CONTEXT_FIELDS = {
     "mapped_state", "secondary_markers", "confidence", "rule_version",
     "source_timeframe", "supporting_evidence", "contradicting_evidence",
@@ -297,6 +300,9 @@ def _normalize_wave_context(value: Any) -> dict:
         confidence = "LOW"
     timeframe = source.get("source_timeframe")
     invalid_timeframe = timeframe not in {None, "daily"}
+    if invalid_timeframe:
+        state = "UNKNOWN"
+        confidence = "LOW"
     markers = source.get("secondary_markers")
     if not isinstance(markers, (list, tuple, set)):
         markers = []
@@ -369,6 +375,35 @@ def _has_plan(setup: dict) -> bool:
             and _number(first_target) == target_1)
 
 
+def _has_coherent_risk(setup: dict) -> bool:
+    """Reject numeric plans whose stop/trigger/first-target order is unsafe."""
+    trigger = _number(setup.get("trigger"))
+    invalidation = _number(setup.get("invalidation"))
+    targets = setup.get("targets")
+    if trigger is None or invalidation is None or not isinstance(targets, (list, tuple)):
+        return False
+    first = targets[0] if targets else None
+    target_1 = _number(first.get("price")) if isinstance(first, dict) else _number(first)
+    return target_1 is not None and invalidation < trigger < target_1
+
+
+def _review_context(wave: dict) -> tuple[str, str]:
+    """Return only a valid Daily mapped context; absent/malformed context fails closed."""
+    context = wave.get("context")
+    if not isinstance(context, dict):
+        return "UNKNOWN", "LOW"
+    state = _status_token(context.get("mapped_state"))
+    confidence = _status_token(context.get("confidence"))
+    confidence = {"INSUFFICIENT": "LOW", "PARTIAL": "MEDIUM"}.get(
+        confidence, confidence
+    )
+    if (state not in WAVE_CONTEXT_STATES
+            or context.get("source_timeframe") != "daily"
+            or confidence not in {"LOW", "MEDIUM", "HIGH"}):
+        return "UNKNOWN", "LOW"
+    return state, confidence
+
+
 def project_decision_lane(data_status: dict, wave: dict, setup: dict,
                           trend: dict | None = None) -> str:
     """Project one canonical item into the fail-closed user decision lanes."""
@@ -395,13 +430,20 @@ def project_decision_lane(data_status: dict, wave: dict, setup: dict,
         return "AVOID"
 
     confidence = _wave_confidence(wave)
+    context_state, context_confidence = _review_context(wave)
     has_plan = _has_plan(setup)
+    if has_plan and not _has_coherent_risk(setup):
+        return "AVOID"
     rr = _number((setup.get("rr") or {}).get("to_target_1"))
     review_status = setup_status in {"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"}
-    if (review_status and confidence in {"MEDIUM", "HIGH"} and has_plan
+    reviewable_context = context_state in REVIEWABLE_WAVE_CONTEXT_STATES
+    effective_confidence = (confidence in {"MEDIUM", "HIGH"}
+                            and context_confidence in {"MEDIUM", "HIGH"})
+    if (review_status and reviewable_context and effective_confidence and has_plan
             and rr is not None and rr >= 2):
         return "REVIEW_NOW"
-    if has_plan and (confidence == "LOW" or setup_status == "FORMING"
+    if has_plan and reviewable_context and (not effective_confidence
+                     or setup_status == "FORMING"
                      or (rr is not None and rr < 2)):
         return "SETUP_FORMING"
     if wave_state not in {"", "UNKNOWN", "INSUFFICIENT", "NOT_VERIFIABLE"}:
