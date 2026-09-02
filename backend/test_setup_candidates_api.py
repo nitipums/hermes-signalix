@@ -59,6 +59,35 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["universe_filter"] == "marginable_long"
 
 
+def test_canonical_symbol_route_does_not_run_legacy_shortlist_projection(monkeypatch):
+    import mvp_api
+
+    class PG:
+        def close(self): pass
+
+    row = candidate("DRAWER")
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", PG)
+    monkeypatch.setattr(mvp_routes, "load_payload",
+                        lambda: (_ for _ in ()).throw(AssertionError("legacy snapshot loaded")))
+    monkeypatch.setattr(mvp_api, "project_shortlist_response",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(
+                            AssertionError("legacy shortlist projection invoked")))
+    monkeypatch.setattr(mvp_api, "build_setup_candidates_from_data",
+                        lambda pg, market="TH": ([row], {
+                            "scan_time": "2026-08-30", "freshness": {}}))
+    mvp_routes.clear_setup_candidates_cache()
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/symbol/DRAWER", handler)
+    assert handler.status == 200
+    payload = json.loads(handler.body)
+    assert payload["symbol"] == "DRAWER"
+    assert payload["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert payload["setup"]["trigger"] == 12
+    assert payload["sector"] == "Technology"
+    assert "action_queue" not in payload
+    mvp_routes.clear_setup_candidates_cache()
+
+
 @pytest.mark.parametrize("builder_result", [
     [candidate()],
     (candidate(), {"scan_time": "2026-08-30"}),
@@ -498,6 +527,52 @@ def test_setup_candidate_source_version_uses_one_freshness_query():
     assert len(pg.cur.calls) == 1
     assert "SELECT MAX(date)" in pg.cur.calls[0][0]
     assert "fetch_completed_at" in pg.cur.calls[0][0]
+
+
+def test_setup_candidates_connection_pool_returns_connection_and_closes_pool(monkeypatch):
+    import psycopg2.pool
+
+    class Connection:
+        closed = 0
+
+        def __init__(self):
+            self.rollbacks = 0
+
+        def rollback(self):
+            self.rollbacks += 1
+
+    class FakePool:
+        instances = []
+
+        def __init__(self, minimum, maximum, **dsn):
+            self.minimum = minimum
+            self.maximum = maximum
+            self.dsn = dsn
+            self.connection = Connection()
+            self.puts = []
+            self.closed = False
+            FakePool.instances.append(self)
+
+        def getconn(self):
+            return self.connection
+
+        def putconn(self, connection, close=False):
+            self.puts.append((connection, close))
+
+        def closeall(self):
+            self.closed = True
+
+    monkeypatch.setattr(psycopg2.pool, "ThreadedConnectionPool", FakePool)
+    monkeypatch.setattr(mvp_routes, "_vcp_pg", mvp_routes._DEFAULT_VCP_PG)
+    mvp_routes.close_setup_candidates_pg_pool()
+    connection, release = mvp_routes._acquire_setup_candidates_pg()
+    release()
+    pool = FakePool.instances[-1]
+    assert pool.minimum == 1 and pool.maximum == 4
+    assert connection.rollbacks == 1
+    assert pool.puts == [(connection, False)]
+    mvp_routes.close_setup_candidates_pg_pool()
+    assert pool.closed is True
 
 
 def test_bulk_candidate_frames_uses_two_indexed_full_universe_queries():

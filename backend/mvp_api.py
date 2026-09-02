@@ -1270,3 +1270,31 @@ def project_symbol_detail(items: list[dict], symbol: str) -> dict | None:
         detail["action"] = shortlist_item.get("action") or detail.get("action")
         detail["action_queue"] = shortlist_item.get("action_queue") or detail.get("action_queue")
     return detail
+
+
+def project_canonical_symbol_detail(items: list[dict], symbol: str,
+                                   snapshot_meta: dict | None = None) -> dict | None:
+    """Return one canonical setup item plus metadata used by the drawer."""
+    item = _find_item_by_symbol(items, symbol)
+    if item is None:
+        return None
+    scan_time = (snapshot_meta or {}).get("scan_time") or item.get("as_of")
+    scan_run_id = ((snapshot_meta or {}).get("run_id")
+                   or (item.get("provenance") or {}).get("scan_run_id"))
+    drawer_metadata = _card_to_shortlist_item(item, scan_time, scan_run_id)
+    metadata_fields = (
+        "name", "sector", "industry", "market_cap", "description", "close",
+        "change_pct", "change_amount", "trade_value", "avgDailyValue20",
+        "index_membership", "margin_pct", "margin_rate_pct", "high52", "low52",
+        "ath_high", "ath_low",
+    )
+    context = item.get("context") or {}
+    if drawer_metadata.get("sector") is None:
+        drawer_metadata["sector"] = context.get("sector")
+    if drawer_metadata.get("industry") is None:
+        drawer_metadata["industry"] = context.get("industry")
+    return {
+        **item,
+        **{field: drawer_metadata[field] for field in metadata_fields
+           if drawer_metadata.get(field) is not None},
+    }

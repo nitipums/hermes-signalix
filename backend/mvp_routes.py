@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 import time
+import atexit
 from urllib.parse import parse_qs, urlsplit
 
 from mvp_snapshot import load_mvp_artifact
@@ -28,6 +29,10 @@ _SETUP_CANDIDATES_CACHE_TTL_SECONDS = 300.0
 _setup_candidates_cache = None
 _setup_candidates_inflight = None
 _setup_candidates_cache_lock = threading.Lock()
+_setup_candidates_pg_pool = None
+_setup_candidates_pg_pool_lock = threading.Lock()
+_SETUP_CANDIDATES_PG_POOL_MIN = 1
+_SETUP_CANDIDATES_PG_POOL_MAX = 4
 
 
 class SetupCandidatesBuilderContractError(RuntimeError):
@@ -67,6 +72,55 @@ def clear_setup_candidates_cache():
     global _setup_candidates_cache
     with _setup_candidates_cache_lock:
         _setup_candidates_cache = None
+
+
+def _setup_candidates_pg_dsn():
+    return {
+        "host": os.getenv("POSTGRES_HOST", "127.0.0.1"),
+        "port": int(os.getenv("POSTGRES_PORT", "5432")),
+        "user": os.getenv("POSTGRES_USER", "signalix"),
+        "password": os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
+        "dbname": os.getenv("POSTGRES_DB", "signalix"),
+    }
+
+
+def _acquire_setup_candidates_pg():
+    """Acquire a canonical connection with a bounded threaded pool."""
+    global _setup_candidates_pg_pool
+    # Preserve the simple fake-connection seam used by focused tests and any
+    # explicitly replaced factory; production uses the pool below.
+    if _vcp_pg is not _DEFAULT_VCP_PG:
+        connection = _vcp_pg()
+        return connection, connection.close
+    with _setup_candidates_pg_pool_lock:
+        if _setup_candidates_pg_pool is None:
+            from psycopg2.pool import ThreadedConnectionPool
+            _setup_candidates_pg_pool = ThreadedConnectionPool(
+                _SETUP_CANDIDATES_PG_POOL_MIN, _SETUP_CANDIDATES_PG_POOL_MAX,
+                **_setup_candidates_pg_dsn(),
+            )
+        pool = _setup_candidates_pg_pool
+    connection = pool.getconn()
+
+    def release():
+        close = bool(getattr(connection, "closed", 0))
+        if not close:
+            try:
+                connection.rollback()
+            except Exception:
+                close = True
+        pool.putconn(connection, close=close)
+
+    return connection, release
+
+
+def close_setup_candidates_pg_pool():
+    """Close canonical pooled connections during process teardown/tests."""
+    global _setup_candidates_pg_pool
+    with _setup_candidates_pg_pool_lock:
+        if _setup_candidates_pg_pool is not None:
+            _setup_candidates_pg_pool.closeall()
+            _setup_candidates_pg_pool = None
 
 
 def _setup_candidates_source_version(pg):
@@ -236,6 +290,10 @@ def _vcp_pg():
         password=os.getenv("POSTGRES_PASSWORD", "signalix_pass"),
         dbname=os.getenv("POSTGRES_DB", "signalix"),
     )
+
+
+_DEFAULT_VCP_PG = _vcp_pg
+atexit.register(close_setup_candidates_pg_pool)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
@@ -319,6 +377,7 @@ def handle_mvp_api(path, handler) -> bool:
         return True
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
         pg = None
+        release_pg = None
         try:
             page = int(qs.get("page", ["1"])[0])
             page_size = int(qs.get("page_size", ["50"])[0])
@@ -329,7 +388,7 @@ def handle_mvp_api(path, handler) -> bool:
             import mvp_api
             # Canonical serving is always built from authoritative OHLCV. The
             # legacy MVP artifact is neither a source nor a fallback here.
-            pg = _vcp_pg()
+            pg, release_pg = _acquire_setup_candidates_pg()
             payload = _load_setup_candidates_cached(
                 mvp_api.build_setup_candidates_from_data, pg, market="TH"
             )
@@ -348,8 +407,32 @@ def handle_mvp_api(path, handler) -> bool:
         except Exception:
             json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
         finally:
-            if pg is not None:
-                pg.close()
+            if release_pg is not None:
+                release_pg()
+        return True
+    if route.startswith("/api/symbol/"):
+        symbol = route[len("/api/symbol/"):].strip().rstrip("/")
+        if not symbol:
+            json_response(handler, {"error": "symbol required"}, status=400); return True
+        release_pg = None
+        try:
+            import mvp_api
+            pg, release_pg = _acquire_setup_candidates_pg()
+            payload = _load_setup_candidates_cached(
+                mvp_api.build_setup_candidates_from_data, pg, market="TH"
+            )
+            result = mvp_api.project_canonical_symbol_detail(
+                payload["items"], symbol, snapshot_meta=payload
+            )
+            if result is None:
+                _not_found(handler, symbol)
+            else:
+                json_response(handler, result)
+        except Exception:
+            json_response(handler, {"error": "setup_candidates_unavailable"}, status=503)
+        finally:
+            if release_pg is not None:
+                release_pg()
         return True
     try:
         payload = load_payload()
@@ -384,14 +467,6 @@ def handle_mvp_api(path, handler) -> bool:
             price_band=qs.get("price_band", ["all"])[0],
         )
         json_response(handler, _legacy_response(result)); return True
-    if route.startswith("/api/symbol/"):
-        symbol = route[len("/api/symbol/"):].strip().rstrip("/")
-        if not symbol:
-            json_response(handler, {"error": "symbol required"}, status=400); return True
-        result = mvp_api.project_symbol_detail(items, symbol)
-        if result is None: _not_found(handler, symbol)
-        else: json_response(handler, _legacy_response(result))
-        return True
     if route.startswith("/api/chart-db/"):
         symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
         if not symbol:
