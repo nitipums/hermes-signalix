@@ -373,6 +373,12 @@ def test_setup_candidate_freshness_reports_mixed_timeframes_without_collapsing_t
     assert 'prefix + ": fresh · "' in js
 
 
+def test_setup_candidate_freshness_prefers_full_universe_aggregate_statuses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert "freshness.daily_status" in js
+    assert "freshness.intraday_status" in js
+
+
 def test_canonical_setup_refresh_failure_clears_cached_rows_and_retry_is_forced():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "dailyVcpRequests.clear(endpoint);" in js

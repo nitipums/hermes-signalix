@@ -739,6 +739,8 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     expected_daily_session = expected_market_date()
     expected_intraday_interval = _expected_intraday_interval_start()
     freshness_statuses = []
+    daily_freshness_statuses = []
+    intraday_freshness_statuses = []
     evaluation_inputs = {}
     for symbol in symbols:
         daily_df = (daily_frames.get(symbol) if daily_frames is not None
@@ -876,6 +878,8 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             data_status["intraday_60m_freshness"] = "invalid"
             data_status["intraday_60m_status"] = "invalid"
         freshness_statuses.append(candidate_freshness)
+        daily_freshness_statuses.append(daily_freshness)
+        intraday_freshness_statuses.append(intraday_freshness)
         bonus_evidence = {}
         attach_bonus_vcp({"bonus_evidence": bonus_evidence}, {
             "present": None, "quality": "NOT_VERIFIED", "source": "legacy_audit_only"
@@ -899,7 +903,21 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
     evaluate_ms = round((time.monotonic() - stage_started) * 1000, 3)
     total_ms = round((time.monotonic() - build_started) * 1000, 3)
-    return candidates, {"scan_time": latest_daily, "freshness": {"status": overall_freshness},
+    def aggregate_statuses(statuses):
+        statuses = set(statuses)
+        if "stale" in statuses:
+            return "stale"
+        if "unknown" in statuses:
+            return "unknown"
+        if "fresh" in statuses:
+            return "fresh"
+        return "unknown"
+
+    return candidates, {"scan_time": latest_daily, "freshness": {
+                            "status": overall_freshness,
+                            "daily_status": aggregate_statuses(daily_freshness_statuses),
+                            "intraday_status": aggregate_statuses(intraday_freshness_statuses),
+                        },
                         "source": "price_data+intraday_price_data", "universe": "TH-ORD",
                         "build_observability": {
                             "duration_ms": total_ms,

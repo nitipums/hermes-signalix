@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from elliott_structure_engine import build_wave_contract
 from setup_candidate_contract import project_decision_lane
@@ -74,6 +75,10 @@ def test_missing_short_flat_no_lookahead_hysteresis_and_json_safety():
 
 def test_bcp_bbgi_regression_snapshots_are_explicit_not_forced():
     root = Path("/tmp/signalix-wave-validation-20260901")
+    missing = [symbol for symbol in ("BCP", "BBGI")
+               if not (root / f"{symbol}-day.json").is_file()]
+    if missing:
+        pytest.skip("external wave validation fixtures unavailable: " + ", ".join(missing))
     observed = {}
     for symbol in ("BCP", "BBGI"):
         payload = json.loads((root / f"{symbol}-day.json").read_text())
