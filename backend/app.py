@@ -1130,6 +1130,7 @@ def chart_data(symbol: str, timeframe: str = "1D", limit: int = 180, market: str
     cur.close()
     if not rows:
         raise HTTPException(status_code=404, detail=f"no stored {label} chart data")
+    has_provisional = any(bool(row[-1]) for row in rows)
     bars = [{"time": str(stamp), "open": float(open_), "high": float(high), "low": float(low),
              "close": float(close), "volume": float(volume or 0), "provisional": bool(provisional)}
             for stamp, open_, high, low, close, volume, provisional in reversed(rows)]

@@ -1,6 +1,9 @@
 """Focused contract tests for provisional 60m chart bars."""
 from datetime import datetime, timezone
 
+import pytest
+
+import app
 from app import fetch_chart_rows
 
 
@@ -28,6 +31,9 @@ class _DailyAndIntradayCursor:
         result = self.responses[self.index]
         self.index += 1
         return result
+
+    def close(self):
+        pass
 
 
 def test_60m_marks_only_latest_stored_bar_provisional():
@@ -80,3 +86,29 @@ def test_day_without_current_session_data_keeps_daily_eod_provenance():
         [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []), "SIS", "1D", 30)
     assert rows[-1][-1] is False
     assert "no current-session 60m data" in label
+
+
+class _Connection:
+    def __init__(self, daily, intraday):
+        self.cursor_value = _DailyAndIntradayCursor(daily, intraday)
+
+    def cursor(self):
+        return self.cursor_value
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1W"])
+def test_chart_route_returns_provenance_for_non_empty_daily_timeframes(monkeypatch, timeframe):
+    daily = [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)]
+    intraday = [(datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100)]
+    connection = _Connection(daily, intraday)
+    monkeypatch.setattr(app, "get_pg", lambda: connection)
+
+    response = app.chart_data("sis", timeframe=timeframe, limit=30)
+
+    assert response["timeframe"] == timeframe
+    assert response["provenance"] == {
+        "source": "price_data + intraday_price_data",
+        "intraday_current_session": True,
+        "daily_decision_source": "price_data EOD",
+        "note": "current-session 60m aggregate is provisional/as-is; not official EOD",
+    }
