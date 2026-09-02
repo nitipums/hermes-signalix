@@ -6,6 +6,15 @@
 > Model policy: every implementation/package card used real Codex CLI with `HOME=/root CODEX_HOME=/root/.codex -m gpt-5.6-luna`; no Sol.
 > Kanban policy: `kanban.auto_decompose=false` is persisted and verified. Release one shared-worktree card at a time; auto-promoted children from before the toggle are held/archived only after inspection.
 
+## Timeline
+
+All timestamps are Asia/Bangkok (ICT); exact times are retained where recorded in the evidence.
+
+- `2026-09-01` — T1–T9 source/package chain, read-model performance work, and public dashboard acceptance were reconciled.
+- `2026-09-01 18:12` — Public canonical API freshness discrepancy for TASCO was recorded as a product/contract follow-up.
+- `2026-09-01` — Public 390px failure → Retry → recovery evidence was separately completed in the vault closeout record.
+- `2026-09-02` — This handoff was superseded by the timestamped 2026-09-02 closeout records; historical evidence remains preserved.
+
 ## Workspace and release
 
 - Repo: `/root/signalix`

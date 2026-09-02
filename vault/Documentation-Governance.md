@@ -21,6 +21,14 @@
 | Durable cross-session invariants | compact MEMORY / `fact_store` | raw sessions, task progress, secrets |
 | Repeatable procedures | one primary Hermes skill per workflow | copied instructions in many notes |
 
+## Handoff naming and timeline convention
+
+- New Signalix handoffs use `YYYY-MM-DD-HHmm-<topic>-handoff.md`.
+- The filename timestamp is always `Asia/Bangkok (ICT)`.
+- If multiple handoffs are created within the same minute, use `YYYY-MM-DD-HHmmss-<topic>-handoff.md`.
+- Every new handoff must include a `## Timeline` section with timestamped events, evidence-backed status changes, and links to the previous/superseding handoff when applicable.
+- Historical handoffs keep their original names for reference integrity; add a timeline and explicit `HISTORICAL`/superseded note rather than silently renaming them.
+
 ## Status vocabulary
 
 Use one of these banners at the top of project notes:

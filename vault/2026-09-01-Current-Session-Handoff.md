@@ -3,6 +3,16 @@
 > **STATUS: CURRENT HANDOFF** · Reconciled 2026-09-01
 > **Owner:** Arm / Lite
 > **Full evidence:** [[../.scratch/2026-09-01-signalix-session-close-handoff]]
+> **Latest timestamped follow-up:** [[../.scratch/2026-09-02-1027-ui-remediation-session-close-handoff]]
+
+## Timeline
+
+All timestamps are Asia/Bangkok (ICT). This note remains the current historical/product handoff for the 2026-09-01 release gate; the timestamped 2026-09-02 note records the later UI/data remediation.
+
+- `2026-09-01` — Release T1–T9 and public dashboard gates reconciled.
+- `2026-09-01 18:12` — TASCO freshness discrepancy recorded for follow-up.
+- `2026-09-02 10:27` — UI/data remediation happy-path closeout completed; browser recoverable-error gate remained `NOT VERIFIED`.
+
 
 ## Current release
 

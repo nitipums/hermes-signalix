@@ -4,6 +4,18 @@
 > Owner: Arm · Final gate: Lite
 > Supersedes only the UI/data-remediation resume note for this session. Prior owner artifacts remain untouched.
 
+## Timeline
+
+All timestamps are Asia/Bangkok (ICT).
+
+- `2026-09-02 09:52` — Rebaseline found Daily gaps (`3BBIF`, `COM7`, `PR9`) and one stale 60m symbol (`BKIH`); these were operational freshness items, not this UI change.
+- `2026-09-02 10:12` — Codex `gpt-5.6-luna` started in isolated worktree.
+- `2026-09-02 10:20` — Initial implementation committed and promoted; first canonical read-model rebuild failed closed on exact-envelope validation.
+- `2026-09-02 10:22–10:25` — Codex follow-up aligned the strict canonical metadata allowlist; focused tests passed.
+- `2026-09-02 10:26` — Canonical read model rebuilt successfully and backend/dashboard reloaded.
+- `2026-09-02 10:27` — Public API/UI happy path and 390px drawer gate passed; browser error-state gate remained `NOT VERIFIED` because retained browser cache hid the blocked response.
+- `2026-09-02 10:30` — Release and handoff pushed; timestamped filename convention applied.
+
 ## Scope
 
 Owner-approved mobile-first cleanup and canonical detail metadata correction:

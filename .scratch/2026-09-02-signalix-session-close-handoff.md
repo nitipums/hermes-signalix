@@ -4,6 +4,15 @@
 > Owner: Arm · Final gate: Lite
 > Temporary navigation record; canonical product/acceptance authority remains `vault/Execution-Pipeline.md`, `vault/Deployment.md`, `vault/Decisions.md`, and `AGENTS.md`.
 
+## Timeline
+
+All timestamps are Asia/Bangkok (ICT); this earlier handoff is retained as historical evidence and is superseded for the UI remediation by `2026-09-02-1027-ui-remediation-session-close-handoff.md`.
+
+- `2026-09-02 09:10` — Read-model/runtime baseline captured after the prior closeout.
+- `2026-09-02 09:52` — Freshness rebaseline identified `BKIH` 60m stale and Daily gaps `3BBIF`, `COM7`, `PR9`.
+- `2026-09-02 10:00` — First guarded intraday window began; later UI remediation continued separately.
+- `2026-09-02 10:27` — This close state was superseded by the timestamped UI/data remediation handoff.
+
 ## Verified close state
 
 - Repo: `/root/signalix`
