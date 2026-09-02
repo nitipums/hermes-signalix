@@ -71,9 +71,11 @@ labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
 `mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:
-`1D` Daily, `1W`/`1M` aggregate Daily, and `60M` stored intraday bars. The
+`1D` Daily with a current-session provisional 60m replacement when available,
+`1W`/`1M` aggregate those Day bars, and `60M` stored intraday bars. The
 frontend renders candlestick OHLC, volume, MA, and RSI; timeframe/layer controls
-and indicator values sit below the chart plot.
+and indicator values sit below the chart plot. `as_of` is the chart period key;
+`latest_time` identifies the actual latest stored candle.
 
 ## `mvp_server.py` — MVP static server (separate dashboard service)
 Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
