@@ -317,12 +317,10 @@ def update_intraday_feed_status(pg, summary, cooldown_hours=24):
     """Track per-symbol intraday capability without excluding Daily/EOD data."""
     ensure_intraday_feed_status_table(pg)
     failed = set(summary.get("failed_symbols") or [])
-    attempted = set()
-    # Summary failed_symbols is authoritative for failures; attempted symbols
-    # are read from the active universe so successful symbols can be reset.
+    attempted = set(summary.get("attempted_symbols") or [])
+    # Only symbols in this run may have their feed status changed.  The
+    # product fetch scope is intentionally narrower than active ORD.
     cur = pg.cursor()
-    cur.execute("SELECT symbol FROM symbol_master WHERE instrument_type='ORD' AND (status IS NULL OR status='active')")
-    attempted.update(row[0] for row in cur.fetchall())
     now = dt.datetime.now(dt.timezone.utc)
     for symbol in sorted(attempted):
         if symbol in failed:
@@ -541,28 +539,22 @@ def _parse_settrade_intraday(sym, interval, res, stats):
     return rows
 
 
-def _intraday_universe(pg, instrument_types=("ORD",)):
-    """Return the complete active Settrade universe for every 60m run.
-
-    Intraday follows the current universe contract directly from symbol_master;
-    it is independent of scan output, groups, and scan timing.
-    """
+def _intraday_universe(pg, universe="marginable_long"):
+    """Resolve the canonical product scope; active_ord is explicit audit mode."""
+    if universe not in {"marginable_long", "active_ord"}:
+        raise ValueError("intraday universe must be marginable_long or active_ord")
+    from mvp_api import resolve_universe
+    symbols, _manifest = resolve_universe(pg, universe)
     ensure_intraday_feed_status_table(pg)
     cur = pg.cursor()
     cur.execute(
-        "SELECT sm.symbol FROM symbol_master sm "
-        "WHERE sm.instrument_type = ANY(%s) "
-        "AND (sm.status IS NULL OR sm.status = 'active') "
-        "AND NOT EXISTS ("
-        "  SELECT 1 FROM intraday_feed_status fs "
-        "  WHERE fs.symbol = sm.symbol AND fs.feed='settrade_intraday_60m' "
-        "    AND fs.status='unavailable' AND (fs.retry_at IS NULL OR fs.retry_at > now())"
-        ") ORDER BY sm.symbol",
-        (list(instrument_types),),
+        "SELECT symbol FROM intraday_feed_status "
+        "WHERE feed='settrade_intraday_60m' AND status='unavailable' "
+        "AND (retry_at IS NULL OR retry_at > now())"
     )
-    symbols = [row[0] for row in cur.fetchall() if row[0] != "SET"]
+    unavailable = {row[0] for row in cur.fetchall()}
     cur.close()
-    return symbols
+    return [symbol for symbol in symbols if symbol != "SET" and symbol not in unavailable]
 
 
 def fetch_intraday(pg, stats, limit=10, mode="full", interval="60m"):
@@ -637,7 +629,8 @@ def ingest_intraday(
     summary = {
         "run_id": run_id, "status": "failure",
         "symbols_attempted": len(symbols), "symbols_succeeded": 0,
-        "symbols_failed": 0, "failed_symbols": [], "retry_count": 0,
+        "symbols_failed": 0, "attempted_symbols": list(symbols),
+        "failed_symbols": [], "retry_count": 0,
         "fetch_started_at": _utc_now_iso(), "fetch_completed_at": None,
         "rows_offered": 0, "rows_inserted": 0, "rows_updated": 0,
         "batches": [],
@@ -1239,8 +1232,7 @@ def run_vcp_after_ingestion(pg, summary):
 
 def _finish_successful_run(args):
     """Publish once, after the complete daily/intraday canonical build."""
-    full_intraday = getattr(args, "intraday_full_universe", getattr(args, "intraday_shortlist", False))
-    if (args.scan or full_intraday) and not args.dry_run:
+    if args.scan and not args.dry_run:
         publish_canonical_read_model()
     return 0
 
@@ -1252,21 +1244,25 @@ def run(args):
     print(f"timestamp={started_at.isoformat()} run_id={run_id} event=run_started")
     stats = {"files": 0, "rows_kept": 0, "dropped": 0, "bad_row": 0, "inserted": 0}
     full_intraday = getattr(args, "intraday_full_universe", getattr(args, "intraday_shortlist", False))
-    # Intraday scheduler path: full active ORD universe, no scan-derived filter.
+    # Intraday scheduler path is fetch/evaluate only. A Daily scan is an
+    # explicit EOD operation and must never overlap every 60m round.
     if args.intraday_only:
+        if args.scan:
+            raise ValueError("--scan is not allowed with --intraday-only")
         mode = args.intraday_mode
         interval = args.intraday_interval
+        universe = getattr(args, "intraday_universe", "marginable_long")
         pg = get_pg()
         try:
-            symbols = _intraday_universe(pg)
-            print(f"intraday-only mode=full interval={interval} universe : {len(symbols)} symbols")
+            symbols = _intraday_universe(pg, universe)
+            print(f"intraday-only mode={mode} interval={interval} universe={universe} : {len(symbols)} symbols")
             if args.dry_run:
                 print("  symbols: " + (", ".join(symbols) if symbols else "none"))
                 return 0
             ensure_intraday_table(pg)
             summary = ingest_intraday(
                 pg, stats, symbols=symbols, limit=args.intraday_limit,
-                mode="full", interval=interval,
+                mode=mode, interval=interval,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
                 batch_jitter=args.intraday_batch_jitter,
@@ -1405,8 +1401,9 @@ def run(args):
         pg = get_pg()
         try:
             ensure_intraday_table(pg)
+            symbols = _intraday_universe(pg, getattr(args, "intraday_universe", "marginable_long"))
             summary = ingest_intraday(
-                pg, stats, limit=args.intraday_limit,
+                pg, stats, symbols=symbols, limit=args.intraday_limit,
                 interval=args.intraday_interval,
                 batch_size=args.intraday_batch_size,
                 batch_delay=args.intraday_batch_delay,
@@ -1453,13 +1450,16 @@ def main():
                     help="if Settrade credentials/import fail, fall back to yfinance")
     ap.add_argument("--scan", action="store_true",
                     help="trigger a universe rescan after loading (default off)")
-    # Full-universe intraday refresh; legacy flag remains accepted as an alias.
+    # Explicit opt-in post-scan refresh; legacy flag remains accepted as alias.
     ap.add_argument("--intraday-full-universe", dest="intraday_full_universe", action="store_true",
-                    help="after scan fetch 60m for every active ORD symbol")
+                    help="after scan fetch 60m for the selected intraday universe")
     ap.add_argument("--intraday-shortlist", dest="intraday_full_universe", action="store_true",
                     help=argparse.SUPPRESS)
     ap.add_argument("--intraday-only", action="store_true",
-                    help="refresh 60m for every active ORD symbol; skips daily fetch and scan")
+                    help="refresh 60m for the selected universe; skips daily fetch and scan")
+    ap.add_argument("--intraday-universe", choices=("marginable_long", "active_ord"),
+                    default="marginable_long",
+                    help="60m fetch scope; active_ord is explicit audit/rollback mode")
     ap.add_argument("--intraday-limit", type=int, default=4,
                     help="60m bars per active ORD symbol (default 4)")
     ap.add_argument("--intraday-workers", type=int, default=SETTRADE_INTRADAY_WORKERS,

@@ -366,6 +366,51 @@ def _read_model_snapshot_meta(model):
     }
 
 
+def _overlay_latest_intraday_metadata(payload):
+    """Attach latest completed fetch lineage without rebuilding Daily items."""
+    provenance = payload.get("provenance") or {}
+    versions = provenance.get("source_versions") or {}
+    if not isinstance(versions.get("intraday"), dict):
+        return payload
+    connection, release = _acquire_setup_candidates_pg()
+    try:
+        cur = connection.cursor()
+        cur.execute("""SELECT run_id, status, fetch_completed_at
+                       FROM intraday_ingestion_runs
+                       WHERE status IN ('full_success','partial_success')
+                         AND fetch_completed_at IS NOT NULL
+                       ORDER BY fetch_completed_at DESC, run_id DESC LIMIT 1""")
+        row = cur.fetchone()
+        cur.close()
+    finally:
+        release()
+    if not row:
+        return payload
+    run_id, status, completed = row
+    completed = completed.isoformat() if hasattr(completed, "isoformat") else str(completed)
+    freshness = dict(payload.get("freshness") or {})
+    freshness.update({"intraday_fetched_at": completed,
+                      "intraday_source": "settrade_intraday_60m",
+                      "intraday_latest_run_id": str(run_id),
+                      "intraday_latest_status": status})
+    updated = dict(payload)
+    updated["freshness"] = freshness
+    updated_provenance = dict(provenance)
+    updated_versions = dict(versions)
+    updated_versions["intraday"] = {
+        **versions["intraday"],
+        "run_id": str(run_id),
+        "status": status,
+        "as_of": completed,
+    }
+    updated_provenance["source_versions"] = updated_versions
+    updated_provenance["intraday_as_of"] = completed
+    updated["provenance"] = updated_provenance
+    updated["intraday_latest_run"] = {"run_id": str(run_id), "status": status,
+                                       "fetch_completed_at": completed}
+    return updated
+
+
 def _not_found(handler, symbol):
     json_response(handler, {"error": "symbol not found", "symbol": symbol}, status=404)
 
@@ -432,6 +477,7 @@ def handle_mvp_api(path, handler) -> bool:
             from read_model_publisher import load_current_read_model
             model = load_current_read_model()
             payload = _read_model_snapshot_meta(model)
+            payload = _overlay_latest_intraday_metadata(payload)
             payload["items"] = model["items"]
             items = payload["items"]
             projection_started = time.monotonic()
@@ -459,6 +505,7 @@ def handle_mvp_api(path, handler) -> bool:
             from read_model_publisher import load_current_read_model
             model = load_current_read_model()
             payload = _read_model_snapshot_meta(model)
+            payload = _overlay_latest_intraday_metadata(payload)
             payload["items"] = model["items"]
             result = mvp_api.project_canonical_symbol_detail(
                 payload["items"], symbol, snapshot_meta=payload

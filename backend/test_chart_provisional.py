@@ -16,6 +16,20 @@ class _Cursor:
         return self.rows
 
 
+class _DailyAndIntradayCursor:
+    def __init__(self, daily, intraday):
+        self.responses = [daily, intraday]
+        self.index = 0
+
+    def execute(self, query, params):
+        pass
+
+    def fetchall(self):
+        result = self.responses[self.index]
+        self.index += 1
+        return result
+
+
 def test_60m_marks_only_latest_stored_bar_provisional():
     rows = [
         (datetime(2026, 8, 27, 5, 0, tzinfo=timezone.utc), 10, 11, 9, 10.5, 100, False),
@@ -49,3 +63,20 @@ def test_chart_response_exposes_provisional_status_and_exact_as_of():
     assert actual_rows[-1][-1] is True
     assert actual_rows[-1][0].isoformat() == "2026-08-27T06:00:00+00:00"
     assert "in progress" in label
+
+
+def test_day_replaces_existing_same_day_daily_row_with_provisional_60m_aggregate():
+    daily = [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)]
+    intra = [(datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100,)]
+    rows, label = fetch_chart_rows(_DailyAndIntradayCursor(daily, intra), "SIS", "1D", 30)
+    assert len(rows) == 1
+    assert rows[0][1:6] == (10, 12, 9, 11, 100)
+    assert rows[0][-1] is True
+    assert "provisional" in label
+
+
+def test_day_without_current_session_data_keeps_daily_eod_provenance():
+    rows, label = fetch_chart_rows(_DailyAndIntradayCursor(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []), "SIS", "1D", 30)
+    assert rows[-1][-1] is False
+    assert "no current-session 60m data" in label

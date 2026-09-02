@@ -35,8 +35,9 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
             intraday_interval="60m",
             dry_run=False,
             scan=False,
-            intraday_full_universe=True,
+            intraday_full_universe=False,
             intraday_shortlist=False,
+            intraday_universe="marginable_long",
             intraday_limit=None,
             intraday_batch_size=1,
             intraday_batch_delay=0,
@@ -46,7 +47,37 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
         )
 
         self.assertEqual(update_data.run(args), 0)
-        publish.assert_called_once_with()
+        # Intraday refresh must not rebuild/publish Daily decisions.
+        publish.assert_not_called()
+
+    @patch("mvp_api.resolve_universe", side_effect=[
+        (["AAA"], {"universe_filter": "marginable_long"}),
+        (["AAA", "BBB", "CCC"], {"universe_filter": "active_ord"}),
+    ])
+    def test_intraday_default_scope_is_canonical_and_active_ord_is_explicit(self, resolver):
+        assert update_data._intraday_universe(MagicMock(), "marginable_long") == ["AAA"]
+        assert update_data._intraday_universe(MagicMock(), "active_ord") == ["AAA", "BBB", "CCC"]
+        assert [call.args[1] for call in resolver.call_args_list] == ["marginable_long", "active_ord"]
+
+    @patch("update_data.time.sleep")
+    @patch("update_data._parse_settrade_intraday", return_value=[("AAA", "bar")])
+    @patch("update_data._settrade_market")
+    @patch("update_data._intraday_universe", return_value=["AAA"])
+    def test_legacy_fetch_intraday_returns_rows_without_undefined_summary(
+        self, universe, market_factory, parse, sleep,
+    ):
+        market_factory.return_value.get_candlestick.return_value = {"time": []}
+
+        rows = update_data.fetch_intraday(MagicMock(), {}, limit=4)
+
+        assert rows == [("AAA", "bar")]
+        market_factory.return_value.get_candlestick.assert_called_once_with(
+            symbol="AAA", interval="60m", limit=4, normalized=update_data.SETTRADE_NORMALIZED)
+
+    def test_intraday_only_rejects_scan_to_prevent_overlapping_rounds(self):
+        args = SimpleNamespace(intraday_only=True, scan=True)
+        with self.assertRaisesRegex(ValueError, "not allowed"):
+            update_data.run(args)
 
     @patch("update_data.publish_canonical_read_model")
     @patch("build_dashboard.build", return_value={"ok": True})
@@ -117,6 +148,44 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
 
         assert update_data.publish_canonical_read_model() is None
         publish.assert_not_called()
+
+    @patch("mvp_routes._acquire_setup_candidates_pg")
+    def test_api_metadata_overlay_uses_latest_completed_run_without_rebuilding(self, acquire):
+        pg = MagicMock()
+        pg.cursor.return_value.fetchone.return_value = (
+            "60m-new", "partial_success", dt.datetime(2026, 9, 2, 9, tzinfo=UTC))
+        acquire.return_value = (pg, MagicMock())
+        payload = {"freshness": {}, "provenance": {"source_versions": {
+            "intraday": {"run_id": "60m-old", "as_of": "2026-09-02T08:00:00+00:00"}}}}
+        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+        assert actual["freshness"]["intraday_latest_run_id"] == "60m-new"
+        assert actual["intraday_latest_run"]["fetch_completed_at"] == "2026-09-02T09:00:00+00:00"
+        assert actual["provenance"]["source_versions"]["intraday"] == {
+            "run_id": "60m-new", "status": "partial_success",
+            "as_of": "2026-09-02T09:00:00+00:00",
+        }
+        assert actual["provenance"]["intraday_as_of"] == "2026-09-02T09:00:00+00:00"
+
+    @patch("mvp_routes._acquire_setup_candidates_pg")
+    def test_api_metadata_overlay_preserves_read_model_identity_and_daily_lineage(self, acquire):
+        pg = MagicMock()
+        pg.cursor.return_value.fetchone.return_value = (
+            "60m-new", "full_success", "2026-09-02T09:00:00+00:00")
+        acquire.return_value = (pg, MagicMock())
+        payload = {
+            "source_version": "immutable-read-model-id",
+            "provenance": {"as_of": "2026-09-01", "intraday_as_of": "old",
+                            "source_versions": {
+                                "daily": {"run_id": "daily-1", "as_of": "2026-09-01"},
+                                "intraday": {"run_id": "60m-old", "as_of": "old"}}},
+        }
+
+        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+
+        assert actual["source_version"] == "immutable-read-model-id"
+        assert actual["provenance"]["source_versions"]["daily"] == {
+            "run_id": "daily-1", "as_of": "2026-09-01"}
+        assert payload["provenance"]["intraday_as_of"] == "old"
 
     def test_vcp_handoff_skips_provenance_incomplete_success(self):
         pg = MagicMock()
@@ -192,6 +261,7 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
 
         self.assertEqual(summary["rows_inserted"], 1)
         self.assertEqual(summary["rows_updated"], 1)
+        self.assertEqual(summary["attempted_symbols"], ["AAA", "BBB"])
         self.assertEqual(summary["batches"][0]["rows_inserted"], 1)
         self.assertEqual(summary["batches"][1]["rows_updated"], 1)
 
@@ -203,6 +273,8 @@ class SystemdResilienceContractTests(unittest.TestCase):
         self.assertIn("ExecStopPost=", unit)
         self.assertIn("-m backend.run_intraday_evaluation", unit)
         self.assertNotIn("ExecStartPost=", unit)
+        self.assertIn("--intraday-universe marginable_long", unit)
+        self.assertIn("--no-scan", unit)
 
 
 if __name__ == "__main__":

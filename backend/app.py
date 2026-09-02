@@ -1072,14 +1072,19 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
     if intra:
         stamp = intra[-1][0]
         today = stamp.astimezone(dt.timezone(dt.timedelta(hours=7))).date()
-        # Avoid duplicate EOD/provisional day: EOD is authoritative when already present.
-        if not daily or daily[0][0].date() != today:
-            provisional = (dt.datetime.combine(today, dt.time()), intra[0][1], max(r[2] for r in intra),
-                           min(r[3] for r in intra), intra[-1][4], sum(float(r[5] or 0) for r in intra), True)
-            daily.append(provisional)
+        # The stored Daily row for today may be stale or official. Replace it
+        # for chart display with the latest current-session 60m aggregate; this
+        # does not alter price_data or any Daily decision provenance.
+        provisional = (dt.datetime.combine(today, dt.time()), intra[0][1], max(r[2] for r in intra),
+                       min(r[3] for r in intra), intra[-1][4], sum(float(r[5] or 0) for r in intra), True)
+        daily = [row for row in daily if row[0].date() != today]
+        daily.append(provisional)
+    has_provisional = bool(intra)
     daily.sort(key=lambda r: r[0], reverse=True)
     if timeframe == "1D":
-        return daily[:limit], "Daily EOD + current session (in progress)"
+        label = ("Daily EOD + provisional current session (60m as-is)"
+                 if has_provisional else "Daily EOD (no current-session 60m data)")
+        return daily[:limit], label
     # Aggregate Daily OHLCV into a higher period.  The first daily open and
     # latest daily close are retained; high/low/volume span the period.
     periods = {}
@@ -1096,7 +1101,12 @@ def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
             p[5] += float(volume or 0)
             p[6] = p[6] or bool(provisional)
     rows = list(reversed(sorted(periods.values(), key=lambda r: r[0])))[:limit]
-    label = "Weekly + current week (in progress)" if timeframe == "1W" else "Monthly + current month (in progress)"
+    if timeframe == "1W":
+        label = ("Weekly + provisional current session (60m as-is)"
+                 if has_provisional else "Weekly Daily EOD (no current-session 60m data)")
+    else:
+        label = ("Monthly + provisional current session (60m as-is)"
+                 if has_provisional else "Monthly Daily EOD (no current-session 60m data)")
     return rows, label
 
 
@@ -1124,7 +1134,14 @@ def chart_data(symbol: str, timeframe: str = "1D", limit: int = 180, market: str
              "close": float(close), "volume": float(volume or 0), "provisional": bool(provisional)}
             for stamp, open_, high, low, close, volume, provisional in reversed(rows)]
     return {"symbol": symbol, "timeframe": timeframe, "label": label,
-            "latest_time": bars[-1]["time"], "provisional": bars[-1]["provisional"], "bars": bars}
+            "latest_time": bars[-1]["time"], "provisional": bars[-1]["provisional"],
+            "provenance": {
+                "source": "price_data + intraday_price_data" if has_provisional else "price_data",
+                "intraday_current_session": has_provisional,
+                "daily_decision_source": "price_data EOD",
+                "note": ("current-session 60m aggregate is provisional/as-is; not official EOD"
+                         if has_provisional else "no current-session 60m data; Daily EOD bars shown"),
+            }, "bars": bars}
 
 
 @app.post("/scan")

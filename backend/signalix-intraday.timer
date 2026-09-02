@@ -1,5 +1,5 @@
 [Unit]
-Description=Refresh Signalix full ORD 60m candles every 30 minutes during SET hours
+Description=Refresh Signalix marginable-long 60m candles every 30 minutes during SET hours
 
 [Timer]
 # Data/evaluation owner: 30-minute cadence; service applies the 10:00–16:45 BKK guard.
