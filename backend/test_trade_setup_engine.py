@@ -56,6 +56,32 @@ def test_one_bar_advance_noise_below_one_pct_fails_closed():
     assert _intraday_anchors(anchor_frame([104, 100, 100.2, 100.1])) == {}
 
 
+def test_earlier_qualifying_up_leg_is_used_when_last_up_leg_fails():
+    pre_trigger = anchor_frame([110, 100, 104, 103, 104, 103])
+    triggered = anchor_frame([110, 100, 104, 103, 104, 106])
+
+    anchors = _intraday_anchors(pre_trigger)
+    assert anchors["trigger"] == 105
+    assert anchors["invalidation"] == 99
+    pre_trigger_result = build_trade_setup(
+        {**daily_wave_two_evidence(), "state": "EARLY_WAVE_3"},
+        pre_trigger,
+        risk_helper=GoodFib,
+    )
+    assert pre_trigger_result["status"] == "PRE_TRIGGER"
+    assert pre_trigger_result["trigger"] is not None
+    assert pre_trigger_result["entry_zone"]["low"] is not None
+    assert pre_trigger_result["entry_zone"]["high"] is not None
+    assert pre_trigger_result["invalidation"] is not None
+    assert pre_trigger_result["targets"]
+    assert pre_trigger_result["rr"]["to_target_1"] is not None
+    assert build_trade_setup(
+        {**daily_wave_two_evidence(), "state": "EARLY_WAVE_3"},
+        triggered,
+        risk_helper=GoodFib,
+    )["status"] == "TRIGGERED"
+
+
 def test_two_bar_pullback_still_requires_three_pct():
     assert _intraday_anchors(anchor_frame([100, 99, 98, 100, 102, 101])) == {}
 
@@ -175,6 +201,23 @@ def test_targets_are_ordered_metadata_and_levels_use_source_pivots():
     assert result["trigger_timestamp"] != result["provenance"]["as_of"]
     assert result["trade_stop_timestamp"] != result["provenance"]["as_of"]
     json.dumps(result)
+
+
+def test_qualifying_real_shaped_frame_produces_complete_pre_trigger_plan():
+    frame = anchor_frame([110, 100, 104, 103])
+    result = build_trade_setup(
+        {**daily_wave_two_evidence(), "state": "EARLY_WAVE_3"},
+        frame,
+        risk_helper=GoodFib,
+    )
+
+    assert result["status"] == "PRE_TRIGGER"
+    assert result["trigger"] is not None
+    assert result["entry_zone"]["low"] is not None
+    assert result["entry_zone"]["high"] is not None
+    assert result["invalidation"] is not None
+    assert result["targets"]
+    assert result["rr"]["to_target_1"] is not None
 
 
 def test_target_one_preserves_method_when_nearest_fib_is_filtered():

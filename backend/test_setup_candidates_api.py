@@ -592,6 +592,24 @@ def test_setup_candidate_full_frames_use_process_workers_in_symbol_order(monkeyp
     assert meta["build_observability"]["candidate_evaluation_parallel"] is True
 
 
+def test_process_worker_restores_explicit_intraday_metadata():
+    import mvp_api
+    from test_elliott_setup_engine import rising_60m_frame
+
+    intraday = rising_60m_frame().copy()
+    intraday.attrs.clear()
+    with mvp_api.ProcessPoolExecutor(max_workers=1) as executor:
+        result_wave, setup = next(executor.map(
+            mvp_api._evaluate_candidate_engines_worker,
+            [(None, intraday, False, "60m", intraday.index[-1])],
+        ))
+
+    assert result_wave["primary_state"] == "NOT_VERIFIABLE"
+    assert setup["status"] == "EXTENDED"
+    assert setup["provenance"]["timeframe"] == "60m"
+    assert setup["provenance"]["as_of"] == intraday.index[-1].isoformat()
+
+
 def test_setup_candidate_data_build_is_cached(monkeypatch):
     import mvp_routes
     calls = []

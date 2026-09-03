@@ -126,38 +126,48 @@ def _intraday_anchors(df: pd.DataFrame) -> dict[str, float | str | None]:
     up_legs = [leg for leg in legs if leg[0] == 1 and leg[2] - leg[1] >= 1]
     if not up_legs:
         return {}
-    _, leg_start, leg_end = up_legs[-1]
-    preceding = [leg for leg in legs if leg[2] <= leg_start and leg[0] == -1]
-    if not preceding:
+    # Prefer the most recent fully qualifying structure. A later minor advance
+    # must not mask an earlier qualifying pullback/advance pair.
+    selected = None
+    for _, leg_start, leg_end in reversed(up_legs):
+        preceding = [leg for leg in legs if leg[2] <= leg_start and leg[0] == -1]
+        if not preceding:
+            continue
+        _, pullback_start, pullback_end = preceding[-1]
+        if pullback_end - pullback_start < 1:
+            continue
+        pullback_start_close = _number(closes[pullback_start])
+        pullback_end_close = _number(closes[pullback_end])
+        advance_start_close = _number(closes[leg_start])
+        advance_end_close = _number(closes[leg_end])
+        if any(value is None for value in (
+            pullback_start_close, pullback_end_close, advance_start_close, advance_end_close
+        )):
+            continue
+        # A structural pullback and advance need price significance as well as
+        # direction. One-bar legs use a scaled threshold; longer legs retain 3%.
+        pullback_pct = 0.01 if pullback_end - pullback_start == 1 else 0.03
+        advance_pct = 0.01 if leg_end - leg_start == 1 else 0.03
+        if pullback_end_close > pullback_start_close * (1 - pullback_pct):
+            continue
+        if advance_end_close < advance_start_close * (1 + advance_pct):
+            continue
+        leg = prior.iloc[leg_start:leg_end + 1]
+        pivot = prior.iloc[pullback_end]
+        pivot_low = _number(pivot["Low"])
+        swing_low = _number(leg["Low"].min())
+        swing_high = _number(leg["High"].max())
+        if (pivot_low is None or swing_low is None or swing_high is None or
+                pivot_low <= 0 or swing_low <= 0 or swing_high <= swing_low or
+                abs(swing_low - pivot_low) > max(pivot_low * 0.02, 1e-12)):
+            continue
+        selected = (leg_start, leg_end, pullback_end, pivot_low, swing_low, swing_high)
+        break
+    if selected is None:
         return {}
-    _, pullback_start, pullback_end = preceding[-1]
-    if pullback_end - pullback_start < 1:
-        return {}
-    pullback_start_close = _number(closes[pullback_start])
-    pullback_end_close = _number(closes[pullback_end])
-    advance_start_close = _number(closes[leg_start])
-    advance_end_close = _number(closes[leg_end])
-    if any(value is None for value in (
-        pullback_start_close, pullback_end_close, advance_start_close, advance_end_close
-    )):
-        return {}
-    # A structural pullback and advance need price significance as well as
-    # direction. One-bar legs use a scaled threshold; longer legs retain 3%.
-    pullback_pct = 0.01 if pullback_end - pullback_start == 1 else 0.03
-    advance_pct = 0.01 if leg_end - leg_start == 1 else 0.03
-    if pullback_end_close > pullback_start_close * (1 - pullback_pct):
-        return {}
-    if advance_end_close < advance_start_close * (1 + advance_pct):
-        return {}
-    leg = prior.iloc[leg_start:leg_end + 1]
-    pivot = prior.iloc[pullback_end]
-    pivot_low = _number(pivot["Low"])
-    swing_low = _number(leg["Low"].min())
-    swing_high = _number(leg["High"].max())
+    leg_start, leg_end, pullback_end, pivot_low, swing_low, swing_high = selected
     close = _number(df["Close"].iloc[-1])
-    if (pivot_low is None or swing_low is None or swing_high is None or close is None or
-            pivot_low <= 0 or swing_low <= 0 or swing_high <= swing_low or
-            abs(swing_low - pivot_low) > max(pivot_low * 0.02, 1e-12)):
+    if close is None:
         return {}
     swing_low = pivot_low
     pullback_low = swing_low + (swing_high - swing_low) * 0.5

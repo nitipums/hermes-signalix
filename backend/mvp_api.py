@@ -444,7 +444,8 @@ def _normalize_candidate_ohlcv_frame(frame, *, timeframe=None):
     return normalized
 
 
-def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
+def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid,
+                                intraday_timeframe=None, intraday_as_of=None):
     """Run the independent Daily/60m engines for one symbol.
 
     The engines are pure transforms over per-symbol frames. Keeping this
@@ -452,6 +453,15 @@ def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
     consumes ``executor.map`` in symbol order) while preserving the existing
     evidence inputs and the historical setup-state adapter.
     """
+    # DataFrame.attrs happen to survive pickling with the pandas version used
+    # by this checkout, but attrs are incidental transport metadata.  Restore
+    # the explicit producer metadata at the worker seam so setup validation
+    # remains deterministic across pandas/runtime versions.
+    if intraday_df is not None:
+        if intraday_timeframe is not None:
+            intraday_df.attrs["timeframe"] = intraday_timeframe
+        if intraday_as_of is not None:
+            intraday_df.attrs["as_of"] = intraday_as_of
     daily_input = daily_df if daily_evidence_valid else None
     wave = build_wave_contract(
         daily_input, _wave_inputs(daily_df) if daily_evidence_valid else {}
@@ -940,7 +950,12 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
             results = executor.map(
                 _evaluate_candidate_engines_worker,
                 ((evaluation_inputs[symbol][0], evaluation_inputs[symbol][1],
-                  evaluation_inputs[symbol][2]) for symbol in symbols),
+                  evaluation_inputs[symbol][2],
+                  (evaluation_inputs[symbol][1].attrs.get("timeframe")
+                   if evaluation_inputs[symbol][1] is not None else None),
+                  (evaluation_inputs[symbol][1].attrs.get("as_of")
+                   if evaluation_inputs[symbol][1] is not None else None))
+                 for symbol in symbols),
                 chunksize=8,
             )
             engine_results = dict(zip(symbols, results))
