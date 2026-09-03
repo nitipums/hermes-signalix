@@ -167,17 +167,18 @@ body {
 .setup-candidate__header { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
 .setup-candidate__symbol { font-size:15px; }
 .setup-candidate__name { display:block; max-width:150px; color:var(--text-2); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.setup-candidate__direction { font-size:11px; font-weight:700; white-space:nowrap; }
-.setup-candidate__direction--bullish { color:var(--green); }
-.setup-candidate__direction--bearish { color:var(--red); }
-.setup-candidate__direction--neutral { color:var(--text-3); }
+.setup-candidate__quote { display:flex; align-items:baseline; gap:6px; text-align:right; font-variant-numeric:tabular-nums; }
+.setup-candidate__quote > b { font-size:15px; }
+.setup-candidate__change { font-size:11px; font-weight:700; }
+.setup-candidate__change--bullish { color:var(--green); }
+.setup-candidate__change--bearish { color:var(--red); }
+.setup-candidate__change--neutral { color:var(--text-3); }
 .setup-candidate__confidence { display:inline-flex; align-items:center; gap:4px; }
-.setup-candidate-card--bullish .setup-candidate__confidence { color:var(--green); }
-.setup-candidate-card--bearish .setup-candidate__confidence { color:var(--red); }
-.setup-candidate-card--neutral .setup-candidate__confidence { color:var(--text-3); }
-.setup-candidate__confidence i { display:inline-block; width:30px; height:5px; border-radius:99px; background:currentColor; opacity:.25; }
+.setup-candidate__confidence { color:var(--text-2); }
+.setup-candidate__confidence i { display:inline-block; width:30px; height:5px; border-radius:99px; background:var(--accent); opacity:.25; }
 .setup-candidate__confidence--medium i { opacity:.55; }
 .setup-candidate__confidence--high i { opacity:1; }
+.setup-candidate__wave-badge { display:inline-flex; padding:3px 7px; border:1px solid rgba(38,166,154,.4); border-radius:999px; color:var(--green); font-weight:700; }
 .setup-candidate__plan { grid-template-columns:repeat(5,minmax(0,1fr)); }
 .setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
 .setup-candidate__plan b { display:block; margin-top:2px; }
@@ -388,6 +389,7 @@ body {
 
 .drawer-body { padding:12px; }
 .drawer-identity { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.drawer-lane { align-self:flex-start; margin-top:5px; padding:3px 7px; border:1px solid var(--border); border-radius:999px; color:var(--text-2); background:var(--surface-2); font-size:11px; }
 .drawer-symbol-link { color:var(--text); text-decoration:none; }
 .drawer-symbol-link:hover { color:var(--accent); }
 .drawer-price-row { display:flex; align-items:baseline; gap:10px; margin:8px 0 4px; flex-wrap:wrap; }
@@ -443,9 +445,23 @@ body {
 .chart-context { color:var(--text-3); font-size:10px; margin:4px 0; overflow-wrap:anywhere; }
 
 .drawer-fields { display: flex; flex-direction: column; gap: 6px; }
+.drawer-section { margin-top:16px; }
+.drawer-section-title { margin:0 0 8px; color:var(--gold); font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+.drawer-setup-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin:0; }
+.drawer-setup-field { min-width:0; padding:9px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); }
+.drawer-setup-field dt { color:var(--text-3); font-size:11px; }
+.drawer-setup-field dd { margin:3px 0 0; color:var(--text); font-size:14px; font-weight:650; overflow-wrap:anywhere; }
+.drawer-details { margin-top:14px; color:var(--text-2); font-size:11px; }
+.drawer-details summary { cursor:pointer; color:var(--accent); }
+.drawer-details[open] { padding-top:8px; border-top:1px solid var(--border); }
 .drawer-field { display: flex; justify-content: space-between; gap: 10px; }
 .drawer-field dt { font-size: 14px; color: var(--text-3); flex-shrink: 0; min-width: 90px; }
 .drawer-field dd { font-size: 15px; color: var(--text); text-align: right; word-break: break-word; }
+
+@media (min-width: 601px) {
+  .drawer { justify-content:flex-end; align-items:stretch; }
+  .drawer-panel { width:min(520px,100%); max-width:none; max-height:none; height:100%; border-radius:0; border-left:1px solid var(--border); }
+}
 
 @media (max-width: 767px) {
   .card-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -499,6 +515,7 @@ body {
   .drawer-panel { max-width:none; max-height:none; height:100dvh; border-radius:0; }
   .drawer-header { padding:8px; }
   .drawer-body { padding:10px; }
+  .drawer-setup-grid { grid-template-columns:1fr 1fr; }
 }
 
 /* ── reduced motion ── */

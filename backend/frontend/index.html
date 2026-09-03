@@ -130,6 +130,7 @@
             <div class="drawer-company-context">
               <span id="drawer-sector">–</span><span id="drawer-industry">–</span><span id="drawer-market-cap">Market cap –</span>
             </div>
+            <span id="drawer-lane" class="drawer-lane">Not verified</span>
           </div>
           <div class="drawer-nav" aria-label="Navigate stocks">
             <button id="drawer-prev" class="drawer-nav-button" type="button" aria-label="Previous stock">←</button>
@@ -149,12 +150,10 @@
             <strong id="drawer-action" class="drawer-action">–</strong>
           </div>
           <div class="drawer-wave-summary" aria-label="Daily structural wave">
-            <span>Daily context <strong id="drawer-wave">Unavailable</strong></span>
+            <span><strong id="drawer-wave">Wave · Not verified</strong></span>
             <span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span>
             <span id="drawer-wave-source">Daily structural · source unavailable</span>
           </div>
-          <section id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></section>
-          <p id="drawer-description" class="drawer-description">–</p>
 
           <!-- chart area: overlays are supplied by the real API contract -->
           <div id="drawer-chart" class="drawer-chart">
@@ -176,16 +175,34 @@
             <button id="drawer-method-link" class="btn btn--guide" type="button">Open guide</button>
           </section>
 
-          <dl class="drawer-fields">
+          <section class="drawer-section drawer-section--setup" aria-labelledby="drawer-setup-title">
+            <h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2>
+            <dl class="drawer-setup-grid">
+              <div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div>
+              <div class="drawer-setup-field"><dt>Daily context</dt><dd id="drawer-daily-context">Wave · Not verified</dd></div>
+              <div class="drawer-setup-field"><dt>Entry zone / Trigger</dt><dd id="drawer-trigger">Not ready</dd></div>
+              <div class="drawer-setup-field"><dt>Invalidation / Stop</dt><dd id="drawer-stop">Not ready</dd></div>
+              <div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div>
+              <div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div>
+            </dl>
+          </section>
+          <section class="drawer-section drawer-section--evidence" aria-labelledby="drawer-evidence-title">
+            <h2 id="drawer-evidence-title" class="drawer-section-title">Why this context</h2>
+            <div id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></div>
+          </section>
+          <details class="drawer-details">
+            <summary>Evidence details and provenance</summary>
+            <p id="drawer-description" class="drawer-description">–</p>
+            <dl class="drawer-fields">
             <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>
             <div class="drawer-field"><dt>Raw V1 state</dt><dd id="drawer-raw-state">–</dd></div>
-            <div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>
             <div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div>
             <div class="drawer-field"><dt>Marginable</dt><dd id="drawer-margin">–</dd></div>
             <div class="drawer-field"><dt>52W High / Low</dt><dd id="drawer-52w">–</dd></div>
             <div class="drawer-field"><dt>ATH High / Low</dt><dd id="drawer-ath">–</dd></div>
             <div class="drawer-field"><dt>Provenance</dt><dd id="drawer-provenance">–</dd></div>
-          </dl>
+            </dl>
+          </details>
         </div>
       </div>
     </aside>

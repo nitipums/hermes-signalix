@@ -92,7 +92,7 @@ def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
         [states, context, wave_state, wave_confidence],
         "({unknown: canonicalWaveState({wave: {context:{mapped_state:'NOT_VERIFIABLE'}}}), wave2: canonicalWaveState({wave: {context:{mapped_state:'WAVE_2_FORMING'}}}), confidence: compactWaveConfidence({wave: {context:{confidence:'UNSURE'}}})})",
     ) == {"unknown": "Unknown / Not verified", "wave2": "WAVE_2_FORMING", "confidence": "NOT_VERIFIED"}
-    assert 'Daily context ' in js and 'Confidence ' in js
+    assert 'compactWaveLabel' in js and 'Confidence' in js
 
 
 def test_daily_wave_bucket_consumes_all_mapped_context_and_collapses_unmapped_values():
@@ -155,10 +155,32 @@ def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact
     assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' in toolbar
     assert 'summary>More filters</summary>' in html
     card = _extract_function(js, "setupCandidateCard")
-    for token in ("Current", "Entry", "Invalidation", "R:R", "setup-candidate__confidence", "Bullish", "Bearish"):
+    for token in ("Entry", "Invalidation", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
         assert token in card
+    for forbidden in ("Daily context", "Secondary", "Trigger readiness"):
+        assert forbidden not in card
+    assert "compactWaveLabel(item)" in card
     assert 'id="drawer-chart-context"' in html
     assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
+
+
+def test_review_cockpit_drawer_follows_identity_price_chart_setup_evidence_hierarchy():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    identity = html.index('id="drawer-symbol"')
+    lane = html.index('id="drawer-lane"')
+    price = html.index('id="drawer-price"')
+    action = html.index('id="drawer-wave"')
+    chart = html.index('id="drawer-chart"')
+    timeframes = html.index('class="chart-timeframe-controls"')
+    setup = html.index('id="drawer-setup-title"')
+    evidence = html.index('id="drawer-evidence-title"')
+    details = html.index('class="drawer-details"')
+    assert identity < lane < price < action < chart < timeframes < setup < evidence < details
+    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-wave-context"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"'):
+        assert marker in html
+    assert 'dom.drawerLane' in js and 'dom.drawerCurrent' in js
+    assert 'dom.drawerDailyContext' in js and 'compactWaveLabel(item)' in js
 
 
 def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_direction_evidence_neutral():
@@ -199,10 +221,10 @@ def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_fr
     assert 'id="drawer-wave-source"' in html
     assert 'Daily structural' in html
     card = _extract_function(js, "setupCandidateCard")
-    assert 'canonicalWaveState(item)' in card
+    assert 'compactWaveLabel(item)' in card
     assert 'compactWaveConfidence(item)' in card
     drawer = _extract_function(js, "renderDrawerDetail")
-    assert 'dom.drawerWave.textContent = canonicalWaveState(item)' in drawer
+    assert 'dom.drawerWave.textContent = compactWaveLabel(item)' in drawer
     assert 'dom.drawerWaveSource.textContent = waveContextPresentation(item).source' in drawer
     assert 'setup.minor_structure' not in drawer
     assert '60m' in js
@@ -617,7 +639,8 @@ def test_setup_targets_render_ordered_metadata_and_malformed_targets_fail_closed
     assert "targets = Array.isArray(setup.targets) ? setup.targets : [];" in js
     assert 'target.name === "target_1"' in js
     assert "target1 = firstTarget && firstTarget.price;" in js
-    assert 'Target 1 <b>' in js
+    assert 'Target 1 <b>' not in js
+    assert 'id="drawer-target"' in (ROOT / "index.html").read_text(encoding="utf-8")
 
 
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
@@ -676,7 +699,7 @@ def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
     assert 'class="vcp-row__details" aria-label="View details for ' in js
     assert 'class="vcp-row__rr">' in js
     assert '<th class="vcp-row__rr">R/R</th>' in js
-    assert '<div class="drawer-field"><dt>R/R</dt><dd id="drawer-rr">–</dd></div>' in (ROOT / "index.html").read_text(encoding="utf-8")
+    assert '<div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div>' in (ROOT / "index.html").read_text(encoding="utf-8")
 
 
 def test_mobile_vcp_secondary_evidence_and_freshness_have_containment_contracts():
@@ -905,7 +928,7 @@ def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     assert "function renderSetupCandidates(data)" in js
     assert "setupCandidateCard" in js
     assert "setupCandidateCard" in js
-    assert "Trigger readiness" in js and "Target 1" in js and "Stop" in js
+    assert "R:R" in js and "Target 1" in html and "Stop" in html
 
 
 def test_shared_canonical_client_is_loaded_by_both_surfaces_and_owns_policy():
@@ -928,11 +951,11 @@ def test_t03_compact_card_keeps_decision_hierarchy_and_moves_evidence_to_drawer(
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     card = _extract_function(js, "setupCandidateCard")
-    assert 'class="setup-candidate__decision"' in card
     assert 'class="setup-candidate__readiness"' in card
     assert 'class="setup-candidate__plan"' in card
-    for marker in ("Trigger readiness", "R:R", "Target 1", "Stop"):
+    for marker in ("R:R", "Invalidation", "Stop"):
         assert marker in card
+    assert "Trigger readiness" not in card and "Target 1" not in card
     for evidence_marker in ("setup-candidate__evidence", "Market / sector", "Peers", "VCP bonus", "as of"):
         assert evidence_marker not in card
     assert "function openDrawer" in js
