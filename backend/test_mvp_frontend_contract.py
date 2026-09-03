@@ -161,6 +161,36 @@ def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact
     assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
 
 
+def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_direction_evidence_neutral():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    draw = _extract_function(js, "drawChart")
+    legend = _extract_function(js, "renderChartLegend")
+    assert 'up: "#26a69a", down: "#ef5350"' in draw
+    assert 'ma20: "#93c5fd", ma50: "#60a5fa"' in draw
+    assert 'decisionLine(chart.stop, "#8896a6", [2, 4], "Stop")' in draw
+    assert 'decisionLine(chart.trigger, "#60a5fa", [7, 5], "Required close")' in draw
+    assert 'markerShapes' in draw and 'shape/label identifies marker' in legend
+    assert '#f4c95d' not in draw and '#ffa726' not in draw
+    assert '.freshness-dot--stale   { background: var(--text-3); }' in css
+    assert '.setup-candidate__decision { color:var(--text-2);' in css
+
+
+def test_compact_setup_card_does_not_infer_missing_current_or_change_and_keeps_canonical_rr():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    direction = _extract_function(js, "setupCandidateDirection")
+    fmt_change = _extract_function(js, "fmtChange")
+    result = _run_node(
+        [direction, fmt_change],
+        "({missing: setupCandidateDirection({change_pct: null}, false), up: setupCandidateDirection({change_pct: 2.5}, false), absent: fmtChange(null)[0]})",
+    )
+    assert result == {"missing": "neutral", "up": "bullish", "absent": "Not verified"}
+    assert 'valueOrUnavailable(item.close, "Not verified")' in card
+    assert 'fmtChange(item.change_pct)[0]' in card
+    assert 'valueOrUnavailable(rr.to_target_1)' in card
+
+
 def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")

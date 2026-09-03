@@ -195,7 +195,7 @@
   function hide(el) { if (el) el.classList.add("state--hidden"); }
 
   function fmtChange(pct) {
-    if (pct == null) return ["0.00%", "flat"];
+    if (pct == null || pct === "" || !Number.isFinite(Number(pct))) return ["Not verified", "flat"];
     var n = Number(pct);
     var s = (n >= 0 ? "+" : "") + n.toFixed(1) + "%";
     var dir = n > 0 ? "up" : n < 0 ? "down" : "flat";
@@ -217,7 +217,7 @@
   }
 
   function fmtChangeAmount(value) {
-    if (value == null || Number.isNaN(Number(value))) return "–";
+    if (value == null || value === "" || Number.isNaN(Number(value))) return "Not verified";
     var n = Number(value);
     return (n >= 0 ? "+" : "") + n.toFixed(2);
   }
@@ -703,6 +703,7 @@
     dom.drawerDescription.hidden = !item.description;
     dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
     var drawerChg = fmtChange(item.change_pct);
+    dom.drawerChange.className = "drawer-change drawer-change--" + drawerChg[1];
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
     var metadataPending = item._canonicalMetadataPending === true;
     dom.drawerRR.textContent = displayMetadataValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null, metadataPending);
@@ -759,10 +760,10 @@
     }).length;
     var markerState = isDaily ? (dailyMarkerCount ? dailyMarkerCount + " exact Daily source marker(s)" : "Daily markers unavailable") : "Daily markers shown on Day only";
     var timeframe = chart && chart.timeframe || chartTimeframe;
-    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>' + escapeHTML(timeframe) + " OHLC</span>" +
-      '<span><i class="legend-line legend-line--ma20"></i>MA20</span><span><i class="legend-line legend-line--ma50"></i>MA50</span>' +
-      '<span><i class="legend-dot legend-dot--wave"></i>' + escapeHTML(markerState) + '</span>' +
-      '<span><i class="legend-line legend-line--setup"></i>60m trigger / stop / target</span>';
+    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>' + escapeHTML(timeframe) + " OHLC · green/red = candle direction</span>" +
+      '<span><i class="legend-line legend-line--ma20"></i>MA20 (blue solid)</span><span><i class="legend-line legend-line--ma50"></i>MA50 (blue dashed)</span>' +
+      '<span><i class="legend-dot legend-dot--wave"></i>' + escapeHTML(markerState) + ' · shape/label identifies marker</span>' +
+      '<span><i class="legend-line legend-line--setup"></i>60m trigger / stop / target · label/line style identifies role</span>';
   }
 
   function renderDrawerChart(chart) {
@@ -808,7 +809,9 @@
     var range = (max - min) || 1;
     var xFor = function(i) { return left + (i / Math.max(1, candles.length - 1)) * plotW; };
     var yPrice = function(v) { return top + priceH - ((v - min) / range) * priceH; };
-    var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#c9a84c", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#f472b6" };
+    // Green/red communicate candle and volume direction only. All other
+    // chart evidence uses neutral/blue annotation colors.
+    var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#93c5fd", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#93c5fd" };
     ctx.font = "11px sans-serif";
     ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
     [top, top + priceH, top + priceH + volH, top + priceH + volH + rsiH].forEach(function(y){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});
@@ -844,11 +847,11 @@
     }
     // Decision levels live on the price chart; no duplicate metric boxes below it.
     var decisionLabelYs = [];
-    function decisionLine(value, color, label) {
+    function decisionLine(value, color, dash, label) {
       value = Number(value);
       if (!Number.isFinite(value)) return;
       var y = yPrice(value);
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash([7, 5]);
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.setLineDash(dash);
       ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w - right, y); ctx.stroke();
       ctx.setLineDash([]); ctx.fillStyle = color; ctx.font = "11px sans-serif";
       var labelY = Math.max(top + 12, Math.min(top + priceH - 2, y - 4));
@@ -862,14 +865,17 @@
       ctx.fillText(label + " " + value.toFixed(2), left + 4, labelY);
     }
     if (chart.timeframe === "60M") {
-      decisionLine(chart.trigger, "#f4c95d", "Required close");
-      decisionLine(chart.stop, "#ef7777", "Stop");
-      decisionLine(chart.target, "#6ee7b7", "Target");
+      decisionLine(chart.trigger, "#60a5fa", [7, 5], "Required close");
+      decisionLine(chart.stop, "#8896a6", [2, 4], "Stop");
+      decisionLine(chart.target, "#93c5fd", [11, 4, 2, 4], "Target");
     }
     if (chartLayers.waveEvidence && chart.timeframe === "1D" && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
       var markerColors = {WAVE_1_LOW: "#a78bfa", WAVE_1_HIGH: "#a78bfa", WAVE_2_PULLBACK_LOW: "#60a5fa",
-        WAVE_3_CLOSE_CONFIRMATION: "#26a69a", TESTED_HIGH: "#ffa726", STRUCTURE_BREAK: "#ef5350",
-        THESIS_INVALIDATION: "#ef5350", TRIGGER: "#f4c95d", TRADE_STOP: "#ef7777"};
+        WAVE_3_CLOSE_CONFIRMATION: "#93c5fd", TESTED_HIGH: "#60a5fa", STRUCTURE_BREAK: "#8896a6",
+        THESIS_INVALIDATION: "#8896a6", TRIGGER: "#60a5fa", TRADE_STOP: "#8896a6"};
+      var markerShapes = {WAVE_1_LOW: "square", WAVE_1_HIGH: "square", WAVE_2_PULLBACK_LOW: "diamond",
+        WAVE_3_CLOSE_CONFIRMATION: "circle", TESTED_HIGH: "diamond", STRUCTURE_BREAK: "cross",
+        THESIS_INVALIDATION: "cross", TRIGGER: "triangle", TRADE_STOP: "cross"};
       chart.wave_evidence.markers.forEach(function(marker) {
         if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;
         if (marker.timeframe !== "daily" || marker.timestamp == null || marker.price == null) return;
@@ -877,8 +883,17 @@
         if (sourceIndex < start || sourceIndex >= start + candles.length || sourceIndex < 0) return;
         var price = Number(marker.price); if (!Number.isFinite(price)) return;
         var localIndex = sourceIndex - start, x = xFor(localIndex), y = yPrice(price);
-        ctx.fillStyle = markerColors[marker.kind] || "#c9a84c";
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = markerColors[marker.kind] || "#8896a6";
+        ctx.fillStyle = ctx.strokeStyle;
+        ctx.lineWidth = 1.5;
+        var shape = markerShapes[marker.kind] || "circle";
+        ctx.beginPath();
+        if (shape === "square") ctx.rect(x - 4, y - 4, 8, 8);
+        else if (shape === "diamond") { ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); }
+        else if (shape === "triangle") { ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y + 4); ctx.lineTo(x - 5, y + 4); ctx.closePath(); }
+        else if (shape === "cross") { ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); }
+        else ctx.arc(x, y, 4, 0, Math.PI * 2);
+        shape === "cross" ? ctx.stroke() : ctx.fill();
         ctx.fillText(waveEvidenceText(marker.label || marker.kind), Math.max(left, x - 24), Math.max(top + 10, y - 8));
         window.__signalixWaveMarkerHits.push({x: x, y: y, marker: marker});
       });
@@ -1422,19 +1437,25 @@
       var firstTarget = targets.find(function(target) { return target && target.name === "target_1"; });
       target1 = firstTarget && firstTarget.price;
     }
-    var valueOrUnavailable = function(value) { return value == null || value === "" ? "Not ready" : value; };
+    var valueOrUnavailable = function(value, missing) { return value == null || value === "" ? (missing || "Not ready") : value; };
     var confidence = compactWaveConfidence(item).toLowerCase().replace("_", "-");
     var dataStatus = item.data_status || {};
     var incomplete = decision === "DATA_BLOCKED" || [dataStatus.daily_freshness, dataStatus.intraday_60m_freshness].some(function(value) {
       return ["stale", "unknown", "unavailable", "not_verified"].indexOf(String(value || "").toLowerCase()) >= 0;
     });
-    var direction = incomplete ? "neutral" : Number(item.change_pct) > 0 ? "bullish" : Number(item.change_pct) < 0 ? "bearish" : "neutral";
+    var direction = setupCandidateDirection(item, incomplete);
     var directionCue = direction === "bullish" ? "↑ Bullish" : direction === "bearish" ? "↓ Bearish" : "→ Neutral";
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><span class="setup-candidate__direction setup-candidate__direction--' + direction + '" aria-label="' + directionCue + '">' + directionCue + '</span></div>' +
       '<div class="setup-candidate__wave"><span>Daily context <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i> Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span></div>' +
-      '<div class="setup-candidate__plan"><span>Current <b>' + escapeHTML(valueOrUnavailable(item.close)) + '</b></span><span>Entry <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span>Invalidation / Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span><span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span></div>' +
+      '<div class="setup-candidate__plan"><span>Current <b>' + escapeHTML(valueOrUnavailable(item.close, "Not verified")) + '</b></span><span>Change <b>' + escapeHTML(fmtChange(item.change_pct)[0]) + '</b></span><span>Entry <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span>Invalidation / Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span><span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span class="setup-candidate__decision">' + escapeHTML(decision) + '</span><b>Trigger readiness · ' + escapeHTML(readiness) + '</b></p></article>';
+  }
+
+  function setupCandidateDirection(item, incomplete) {
+    if (incomplete || item == null || item.change_pct == null || item.change_pct === "") return "neutral";
+    var change = Number(item.change_pct);
+    return Number.isFinite(change) && change > 0 ? "bullish" : Number.isFinite(change) && change < 0 ? "bearish" : "neutral";
   }
 
   function setupCandidateMatchesToolbar(item) {
