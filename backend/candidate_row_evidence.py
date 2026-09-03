@@ -13,6 +13,15 @@ def _quote_number(value: Any) -> float | None:
     return value if value == value and value not in (float("inf"), float("-inf")) else None
 
 
+def _close_series(frame: Any) -> Any:
+    """Resolve the persisted OHLCV close without changing the frame."""
+    columns = getattr(frame, "columns", ())
+    for column in columns:
+        if str(column).casefold() == "close":
+            return frame[column]
+    return None
+
+
 def build_current_quote(*, daily_df: Any, intraday_df: Any,
                         intraday_current: bool,
                         daily_evidence_valid: bool = True) -> dict[str, Any] | None:
@@ -26,14 +35,15 @@ def build_current_quote(*, daily_df: Any, intraday_df: Any,
     frame = intraday_df if intraday_current else daily_df
     if not intraday_current and not daily_evidence_valid:
         return None
-    if frame is None or len(frame) == 0 or "Close" not in frame:
+    closes = _close_series(frame) if frame is not None else None
+    if frame is None or len(frame) == 0 or closes is None:
         return None
     rows = []
-    for index, value in frame["Close"].items():
+    for index, value in closes.items():
         close = _quote_number(value)
         if close is not None:
             rows.append((index, close))
-    if not rows or _quote_number(frame["Close"].iloc[-1]) is None:
+    if not rows or _quote_number(closes.iloc[-1]) is None:
         return None
     timestamp, price = rows[-1]
     as_of = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)

@@ -80,6 +80,29 @@ def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     assert payload["build_observability"]["serialized_bytes"] == len(handler.body)
 
 
+def test_symbol_detail_route_preserves_canonical_quote_from_read_model(monkeypatch):
+    row = candidate("DETAIL_QUOTE")
+    row["quote"] = {
+        "price": 13.5, "change_pct": 2.5,
+        "change_basis": "previous_completed_60m_close", "change_amount": 0.33,
+        "change_amount_basis": "previous_completed_60m_close",
+        "source": "intraday_price_data", "as_of": "2026-09-03T11:00:00+07:00",
+        "provisional": True,
+    }
+    model = {"items": [row], "universe": "marginable_long",
+             "base_active_ord_count": 1, "eligible_count": 1, "excluded_count": 0,
+             "freshness": {"status": "fresh"},
+             "provenance": {"as_of": "2026-09-03", "source_versions": {},
+                            "policy_version": "setup-candidates-v1"},
+             "source_version": "test-version", "published_at": "t1"}
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model)
+    handler = Handler()
+
+    assert mvp_routes.handle_mvp_api("/api/symbol/DETAIL_QUOTE", handler)
+    assert handler.status == 200
+    assert json.loads(handler.body)["quote"] == row["quote"]
+
+
 @pytest.mark.parametrize("universe", ["active_ord", "unknown"])
 def test_setup_candidates_route_rejects_unsupported_universe_before_loading_model(monkeypatch, universe):
     monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: (_ for _ in ()).throw(

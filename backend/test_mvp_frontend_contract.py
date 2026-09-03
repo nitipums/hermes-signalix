@@ -221,6 +221,8 @@ def test_canonical_quote_drives_card_and_drawer_with_absent_quote_fallback():
     assert 'item.quote' in card
     assert 'quote.price' in drawer and 'quote.change_pct' in drawer
     assert '60m provisional' in drawer and 'Daily close' in drawer
+    assert 'quoteEnvelope(item)' in card
+    assert 'quoteSource' in card
     result = _run_node(
         [direction],
         "({up: setupCandidateDirection({quote:{change_pct:2.5}}, false), absent: setupCandidateDirection({quote:{}}, false)})",

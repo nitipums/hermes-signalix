@@ -416,7 +416,32 @@ def _load_daily_for_symbol(screening, symbol, pg, market):
 
 def _load_intraday_for_symbol(screening, symbol, pg, market):
     frame = screening.load_symbol_intraday(symbol, pg=pg, interval="60m", lookback=400, market=market)
-    return frame
+    return _normalize_candidate_ohlcv_frame(frame, timeframe="60m")
+
+
+def _normalize_candidate_ohlcv_frame(frame, *, timeframe=None):
+    """Normalize producer frames before they reach validation and row building.
+
+    DB loaders currently emit title-case columns, but the producer boundary is
+    also used by read-only compatibility/test loaders.  Keep the evaluator and
+    quote publisher on one explicit OHLCV contract without weakening global
+    validation or changing the frame's values/index.
+    """
+    if frame is None:
+        return None
+    columns = {}
+    for canonical in ("Open", "High", "Low", "Close", "Volume"):
+        matches = [column for column in frame.columns
+                   if str(column).casefold() == canonical.casefold()]
+        if len(matches) != 1:
+            return frame
+        columns[matches[0]] = canonical
+    normalized = frame.rename(columns=columns)
+    if timeframe:
+        normalized.attrs["timeframe"] = timeframe
+    if hasattr(frame, "attrs"):
+        normalized.attrs.update(frame.attrs)
+    return normalized
 
 
 def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid):
@@ -466,7 +491,7 @@ def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
             if timeframe:
                 frame.attrs["timeframe"] = timeframe
                 frame.attrs["as_of"] = frame.index[-1]
-            frames[symbol] = frame
+            frames[symbol] = _normalize_candidate_ohlcv_frame(frame, timeframe=timeframe)
         return frames
 
     # A partitioned window query makes PostgreSQL scan/sort the complete

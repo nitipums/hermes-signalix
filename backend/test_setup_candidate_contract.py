@@ -92,6 +92,96 @@ def test_builder_selects_current_intraday_quote_without_overwriting_daily_as_of(
     assert result.row["setup"]["status"] == "FORMING"
 
 
+def test_current_quote_builder_has_intraday_daily_and_missing_frame_contracts():
+    from candidate_row_evidence import build_current_quote
+
+    daily = pd.DataFrame(
+        {"Close": [100.0, 102.0]},
+        index=pd.date_range("2026-09-01", periods=2, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Close": [103.0, 104.5]},
+        index=pd.date_range("2026-09-03 10:00", periods=2, freq="h", tz="Asia/Bangkok"),
+    )
+    quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=True,
+    )
+    assert quote == {
+        "price": 104.5, "source": "intraday_price_data",
+        "as_of": intraday.index[-1].isoformat(), "provisional": True,
+        "change_amount": 1.5, "change_amount_basis": "previous_completed_60m_close",
+        "change_pct": (104.5 / 103.0 - 1.0) * 100.0,
+        "change_basis": "previous_completed_60m_close",
+    }
+
+    daily_quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=False,
+    )
+    assert daily_quote["price"] == 102.0
+    assert daily_quote["source"] == "price_data"
+    assert daily_quote["provisional"] is False
+    assert daily_quote["change_basis"] == "previous_daily_close"
+    assert build_current_quote(daily_df=daily, intraday_df=None, intraday_current=True) is None
+
+
+def test_compact_projection_omits_absent_quote_but_preserves_real_quote():
+    from setup_candidate_contract import compact_setup_candidate_for_list
+
+    absent = compact_setup_candidate_for_list(sample_inputs())
+    assert "quote" not in absent
+    quote = dict(price=104.5, source="intraday_price_data",
+                 as_of="2026-09-03T11:00:00+07:00", provisional=True)
+    present = compact_setup_candidate_for_list(dict(sample_inputs(), quote=quote))
+    assert present["quote"] == quote
+    assert "quote" not in compact_setup_candidate_for_list(dict(sample_inputs(), quote={}))
+
+
+def test_full_candidate_builder_carries_current_intraday_frame_to_quote_row(monkeypatch):
+    """Exercise build_setup_candidates_from_data, not only its quote helper."""
+    import mvp_api
+    import screening
+
+    daily_index = pd.date_range("2026-09-01", periods=25, freq="D")
+    daily = pd.DataFrame({
+        "open": np.arange(100.0, 125.0), "high": np.arange(101.0, 126.0),
+        "low": np.arange(99.0, 124.0), "close": np.arange(100.5, 125.5),
+        "volume": np.full(25, 1000.0),
+    }, index=daily_index)
+    intraday_index = pd.date_range(
+        "2026-09-03 10:00", periods=3, freq="h", tz="Asia/Bangkok"
+    )
+    intraday = pd.DataFrame({
+        "open": [125.0, 125.5, 126.0], "high": [125.5, 126.0, 126.5],
+        "low": [124.5, 125.0, 125.5], "close": [125.25, 125.75, 126.25],
+        "volume": [100.0, 110.0, 120.0],
+    }, index=intraday_index)
+    intraday.attrs["timeframe"] = "60m"
+
+    monkeypatch.setattr(mvp_api.instruments, "active_ord_symbols", lambda pg: ["AAA"])
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "eligible_symbols", lambda active: (["AAA"], {
+        "universe_filter": "marginable_long", "base_active_ord_count": 1,
+        "eligible_count": 1, "excluded_count": 0,
+    }))
+    monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
+    monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "_bulk_candidate_frames",
+                        lambda *a, **k: ({"AAA": daily}, {"AAA": intraday}, 2))
+    monkeypatch.setattr(mvp_api, "expected_market_date", lambda: daily_index[-1].date())
+    monkeypatch.setattr(mvp_api, "_expected_intraday_interval_start",
+                        lambda: intraday_index[-1].to_pydatetime())
+    monkeypatch.setattr(mvp_api, "_load_daily_canonical_metadata", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "_evaluate_candidate_engines",
+                        lambda *a, **k: ({"state": "EARLY_WAVE_3"}, {"status": "FORMING"}))
+
+    rows, _ = mvp_api.build_setup_candidates_from_data(object())
+
+    assert rows[0]["quote"]["price"] == 126.25
+    assert rows[0]["quote"]["source"] == "intraday_price_data"
+    assert rows[0]["quote"]["provisional"] is True
+    assert rows[0]["quote"]["change_basis"] == "previous_completed_60m_close"
+
+
 def test_builder_emits_bounded_canonical_daily_metadata():
     inputs = sample_inputs()
     inputs["canonical_metadata"] = {

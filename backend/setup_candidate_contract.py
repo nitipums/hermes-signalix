@@ -528,7 +528,7 @@ def build_setup_candidate(
                       "index_membership_evidence"):
             if field in canonical_metadata:
                 item[field] = _json_value(canonical_metadata[field])
-    if isinstance(quote, dict):
+    if isinstance(quote, dict) and quote:
         item["quote"] = _json_value(quote)
     return _json_value(item)
 
@@ -701,6 +701,11 @@ def compact_setup_candidate_for_list(item: dict) -> dict:
         value = item.get(field)
         if field not in _LIST_NESTED_FIELDS:
             compact[field] = _json_value(value)
+            continue
+        # ``quote`` is optional. Do not turn an absent observation into an
+        # empty envelope; consumers must distinguish unavailable data from a
+        # real quote.
+        if field == "quote" and (not isinstance(value, dict) or not value):
             continue
         source = value if isinstance(value, dict) else {}
         compact[field] = {
