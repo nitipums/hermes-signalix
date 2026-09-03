@@ -2,6 +2,7 @@ import json
 from decimal import Decimal
 
 import numpy as np
+import pandas as pd
 
 from setup_candidate_contract import (
     _setup_evidence_markers,
@@ -9,6 +10,7 @@ from setup_candidate_contract import (
     build_setup_candidate,
     project_setup_candidate_list,
 )
+from canonical_setup_projection import _validate_canonical_setup_candidate
 from trade_setup_engine import build_trade_setup
 
 
@@ -35,6 +37,59 @@ def test_candidate_contract_keeps_layers_separate():
     assert item["decision_lane"] == "DAILY_CANDIDATE"
     assert "decision" not in item
     json.dumps(item)
+
+
+def test_quote_is_optional_and_has_explicit_source_boundary():
+    inputs = sample_inputs()
+    inputs["provenance"] = {
+        "policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
+        "as_of": inputs["as_of"], "freshness": "fresh",
+    }
+    inputs["quote"] = {
+        "price": 13.0, "change_pct": 4.0,
+        "change_basis": "previous_completed_60m_close",
+        "change_amount": 0.5,
+        "change_amount_basis": "previous_completed_60m_close",
+        "source": "intraday_price_data", "as_of": "2026-08-30T10:00:00+07:00",
+        "provisional": True,
+    }
+    item = build_setup_candidate(**inputs)
+    assert item["quote"]["source"] == "intraday_price_data"
+    assert item["quote"]["provisional"] is True
+    assert _validate_canonical_setup_candidate(item) is item
+    assert "quote" not in build_setup_candidate(**sample_inputs())
+
+
+def test_builder_selects_current_intraday_quote_without_overwriting_daily_as_of():
+    import mvp_api
+
+    daily = pd.DataFrame(
+        {"Open": [10, 11, 12], "High": [11, 12, 13], "Low": [9, 10, 11],
+         "Close": [10, 11, 12], "Volume": [100, 100, 100]},
+        index=pd.date_range("2026-08-28", periods=3, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Open": [12, 12.2, 12.4], "High": [12.3, 12.5, 12.7],
+         "Low": [11.9, 12.1, 12.3], "Close": [12, 12.2, 12.5],
+         "Volume": [10, 10, 10]},
+        index=pd.date_range("2026-09-03 10:00", periods=3, freq="h", tz="Asia/Bangkok"),
+    )
+    intraday.attrs["timeframe"] = "60m"
+    result = mvp_api._build_candidate_row(context=mvp_api._CandidateRowContext(
+        symbol="QUOTE", daily_df=daily, intraday_df=intraday,
+        daily_evidence_valid=True, daily_evidence_usable=True, daily_current=True,
+        daily_freshness="fresh", daily_final_status="fresh",
+        intraday_available=True, intraday_current=True, intraday_freshness="fresh",
+        intraday_as_of=intraday.index[-1].isoformat(), rs_rank=None, profile={},
+        universe_manifest={"universe_filter": "marginable_long"}, wave={"state": "EARLY_WAVE_3"},
+        setup={"status": "FORMING"}, canonical_metadata=None,
+    ))
+    assert result.row["quote"]["price"] == 12.5
+    assert result.row["quote"]["source"] == "intraday_price_data"
+    assert result.row["quote"]["provisional"] is True
+    assert result.row["quote"]["change_basis"] == "previous_completed_60m_close"
+    assert result.row["as_of"] == daily.index[-1].isoformat()
+    assert result.row["setup"]["status"] == "FORMING"
 
 
 def test_builder_emits_bounded_canonical_daily_metadata():

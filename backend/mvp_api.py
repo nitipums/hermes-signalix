@@ -47,7 +47,8 @@ from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
 from candidate_row_evidence import (assemble_candidate_data_status,
-                                    assemble_candidate_provenance)
+                                    assemble_candidate_provenance,
+                                    build_current_quote)
 from canonical_setup_projection import (
     _validate_canonical_setup_candidate,
     project_setup_candidates_response,
@@ -701,6 +702,7 @@ class _CandidateRowContext:
 
     symbol: str
     daily_df: Any
+    intraday_df: Any
     daily_evidence_valid: bool
     daily_evidence_usable: bool
     daily_current: bool
@@ -804,11 +806,17 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
         candidate_freshness=candidate_freshness,
         universe_manifest=universe_manifest,
     )
+    quote = build_current_quote(
+        daily_df=daily_df, intraday_df=context.intraday_df,
+        intraday_current=intraday_current,
+        daily_evidence_valid=daily_evidence_valid,
+    )
     row = build_setup_candidate(
         symbol, as_of, data_status, trend, wave, setup, peer_context,
         bonus_evidence,
         provenance,
         canonical_metadata,
+        quote,
     )
     return _CandidateRowResult(
         row=row,
@@ -932,6 +940,7 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
         result = _build_candidate_row(context=_CandidateRowContext(
             symbol=symbol,
             daily_df=daily_df,
+            intraday_df=intraday_df,
             daily_evidence_valid=daily_evidence_valid,
             daily_evidence_usable=daily_evidence_usable,
             daily_current=daily_current,

@@ -37,6 +37,21 @@ def candidate(symbol="ABC", *, decision_lane="REVIEW_NOW", sector="Technology"):
     }
 
 
+def test_quote_survives_compact_list_and_symbol_detail_projection():
+    row = candidate("QUOTE")
+    row["quote"] = {
+        "price": 13.5, "change_pct": 2.5,
+        "change_basis": "previous_daily_close", "change_amount": 0.33,
+        "change_amount_basis": "previous_daily_close", "source": "price_data",
+        "as_of": "2026-08-30", "provisional": False,
+    }
+    listed = project_setup_candidates_response([row])["items"][0]
+    assert listed["quote"] == row["quote"]
+    from mvp_api import project_canonical_symbol_detail
+    detail = project_canonical_symbol_detail([row], "QUOTE")
+    assert detail["quote"] == row["quote"]
+
+
 def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     row = candidate()
     model = {"items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,

@@ -13,6 +13,7 @@ from freshness_assessment import (assess_projection_freshness as _resolve_freshn
                                   daily_eod_status as _daily_eod_status)
 from setup_candidate_contract import (
     CANONICAL_METADATA_FIELDS,
+    QUOTE_FIELDS,
     WAVE_CONTEXT_FIELDS,
     WAVE_CONTEXT_SECONDARY_MARKERS,
     WAVE_CONTEXT_STATES,
@@ -37,13 +38,30 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
         raise ValueError(
             "canonical snapshot contains legacy decision aliases: " + ", ".join(present)
         )
-    allowed = set(required) | set(CANONICAL_METADATA_FIELDS)
+    allowed = set(required) | set(CANONICAL_METADATA_FIELDS) | {"quote"}
     if set(item) - allowed or not set(required).issubset(item):
         raise ValueError("snapshot is not an exact canonical envelope")
     provenance = item.get("provenance") or {}
     provenance_required = {"policy_version", "source", "as_of", "freshness"}
     if not provenance_required.issubset(provenance):
         raise ValueError("canonical snapshot provenance is incomplete")
+    quote = item.get("quote")
+    if quote is not None:
+        if not isinstance(quote, dict) or not {"price", "source", "as_of", "provisional"}.issubset(quote):
+            raise ValueError("canonical quote is incomplete")
+        if set(quote) - QUOTE_FIELDS:
+            raise ValueError("canonical quote is not an exact envelope")
+        if quote.get("source") not in {"intraday_price_data", "price_data"}:
+            raise ValueError("canonical quote source is invalid")
+        expected_provisional = quote["source"] == "intraday_price_data"
+        if quote.get("provisional") is not expected_provisional:
+            raise ValueError("canonical quote provisional boundary is invalid")
+        has_pct = quote.get("change_pct") is not None
+        has_amount = quote.get("change_amount") is not None
+        if has_pct != (quote.get("change_basis") is not None):
+            raise ValueError("canonical quote change basis is incomplete")
+        if has_amount != (quote.get("change_amount_basis") is not None):
+            raise ValueError("canonical quote amount basis is incomplete")
     wave_context = (item.get("wave") or {}).get("context")
     if wave_context is not None:
         if not isinstance(wave_context, dict):

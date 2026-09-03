@@ -26,6 +26,10 @@ CANONICAL_METADATA_FIELDS = (
     "high52", "low52", "ath_high", "ath_low", "index_membership",
     "index_membership_evidence",
 )
+QUOTE_FIELDS = {
+    "price", "change_pct", "change_basis", "change_amount",
+    "change_amount_basis", "source", "as_of", "provisional",
+}
 _LANE_ORDER = {
     "REVIEW_NOW": 0, "SETUP_FORMING": 1, "DAILY_CANDIDATE": 2,
     "WAIT": 3, "AVOID": 4, "DATA_BLOCKED": 5,
@@ -467,6 +471,7 @@ def build_setup_candidate(
     bonus_evidence: dict,
     provenance: dict,
     canonical_metadata: dict | None = None,
+    quote: dict | None = None,
 ) -> dict:
     """Build one canonical, JSON-safe setup-candidate item."""
     wave_out = _normalize_wave_evidence(wave)
@@ -523,6 +528,8 @@ def build_setup_candidate(
                       "index_membership_evidence"):
             if field in canonical_metadata:
                 item[field] = _json_value(canonical_metadata[field])
+    if isinstance(quote, dict):
+        item["quote"] = _json_value(quote)
     return _json_value(item)
 
 
@@ -643,8 +650,10 @@ _LIST_ITEM_FIELDS = (
     "context", "bonus_evidence", "decision_lane", "provenance",
     "high52", "low52", "ath_high", "ath_low", "index_membership",
     "index_membership_evidence",
+    "quote",
 )
 _LIST_NESTED_FIELDS = {
+    "quote": tuple(QUOTE_FIELDS),
     "data_status": (
         "sufficient", "freshness", "source", "daily_available",
         "daily_final_session_available", "daily_final_session_status",

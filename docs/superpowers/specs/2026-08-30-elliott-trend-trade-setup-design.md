@@ -301,6 +301,7 @@ Each item contains these top-level groups:
   "setup": {},
   "context": {},
   "bonus_evidence": {},
+  "quote": {},
   "decision_lane": "REVIEW_NOW",
   "provenance": {}
 }
@@ -316,6 +317,13 @@ Each item contains these top-level groups:
 - `setup.minor_structure` is lower-degree 60m evidence and cannot replace `wave.primary_state`.
 - `setup.trade_stop` and `setup.thesis_invalidation` are separate from `wave.primary_state`.
 - `bonus_evidence.vcp` is optional supporting evidence.
+- `quote` is an optional current-quote observation from the already loaded
+  OHLCV frames. It contains `price`, `source` (`intraday_price_data` or
+  `price_data`), `as_of`, and `provisional`; when two same-frame closes are
+  known it also contains deterministically derived `change_pct` and
+  `change_amount`, each with an explicit basis. Current 60m quotes are
+  provisional; Daily quotes are official Daily-close observations. Quote
+  provenance does not replace or overwrite Daily trend/Elliott evidence.
 - `provenance` identifies policy version, source, as-of time/date, and freshness.
 - `data_status` carries a deterministic `reason_code` for data availability/freshness: `NO_DAILY_DATA`, `NO_60M_DATA`, `DAILY_STALE`, `60M_STALE`, `60M_INVALID`, or `NONE` when required inputs are available.
 - `setup` carries a deterministic `reason_code` for setup readiness/risk: `NO_SETUP_DETECTED`, `RISK_INVALID`, or another explicit setup reason; `NONE` means no blocking setup reason.

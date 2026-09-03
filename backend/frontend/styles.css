@@ -398,6 +398,7 @@ body {
 .drawer-change--up { color:var(--green); }
 .drawer-change--down { color:var(--red); }
 .drawer-change--flat { color:var(--text-3); }
+.drawer-quote-source { color:var(--text-3); font-size:11px; overflow-wrap:anywhere; }
 .drawer-trade-value { font-size:13px; color:var(--text-2); }
 .drawer-decision { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .drawer-trend { color:var(--text-2); font-size:13px; }

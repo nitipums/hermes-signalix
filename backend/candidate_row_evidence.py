@@ -5,6 +5,55 @@ from __future__ import annotations
 from typing import Any
 
 
+def _quote_number(value: Any) -> float | None:
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if value == value and value not in (float("inf"), float("-inf")) else None
+
+
+def build_current_quote(*, daily_df: Any, intraday_df: Any,
+                        intraday_current: bool,
+                        daily_evidence_valid: bool = True) -> dict[str, Any] | None:
+    """Publish the latest known quote without changing analytical provenance.
+
+    A current 60m observation is provisional.  Otherwise the latest valid
+    Daily close is published as the official Daily quote.  Change values are
+    derived only from the same frame's two latest known closes.
+    """
+    source = "intraday_price_data" if intraday_current else "price_data"
+    frame = intraday_df if intraday_current else daily_df
+    if not intraday_current and not daily_evidence_valid:
+        return None
+    if frame is None or len(frame) == 0 or "Close" not in frame:
+        return None
+    rows = []
+    for index, value in frame["Close"].items():
+        close = _quote_number(value)
+        if close is not None:
+            rows.append((index, close))
+    if not rows or _quote_number(frame["Close"].iloc[-1]) is None:
+        return None
+    timestamp, price = rows[-1]
+    as_of = timestamp.isoformat() if hasattr(timestamp, "isoformat") else str(timestamp)
+    quote = {
+        "price": price,
+        "source": source,
+        "as_of": as_of,
+        "provisional": bool(intraday_current),
+    }
+    if len(rows) >= 2:
+        previous = rows[-2][1]
+        basis = "previous_completed_60m_close" if intraday_current else "previous_daily_close"
+        quote["change_amount"] = price - previous
+        quote["change_amount_basis"] = basis
+        if previous != 0:
+            quote["change_pct"] = (price / previous - 1.0) * 100.0
+            quote["change_basis"] = basis
+    return quote
+
+
 def assemble_candidate_data_status(
     *,
     daily_df: Any,

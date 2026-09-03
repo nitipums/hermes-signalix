@@ -115,6 +115,7 @@
     drawerPrice:   $("#drawer-price"),
     drawerCurrent: $("#drawer-current"),
     drawerChange:  $("#drawer-change"),
+    drawerQuoteSource: $("#drawer-quote-source"),
     drawerTrend:    $("#drawer-trend"),
     drawerAction:   $("#drawer-action"),
     drawerWave:     $("#drawer-wave"),
@@ -723,11 +724,15 @@
     dom.drawerTradeValue.textContent = "Trade value " + fmtNum(item.trade_value || item.avgDailyValue20);
     dom.drawerDescription.textContent = item.description || "";
     dom.drawerDescription.hidden = !item.description;
-    dom.drawerPrice.textContent = item.close != null ? Number(item.close).toFixed(2) : "–";
-    if (dom.drawerCurrent) dom.drawerCurrent.textContent = item.close != null ? Number(item.close).toFixed(2) : "Not verified";
-    var drawerChg = fmtChange(item.change_pct);
+    var quote = item.quote && typeof item.quote === "object" && !Array.isArray(item.quote)
+      ? item.quote : (item.vcp_result ? {price: item.close, change_pct: item.change_pct, change_amount: item.change_amount} : {});
+    dom.drawerPrice.textContent = quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
+    if (dom.drawerCurrent) dom.drawerCurrent.textContent = quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
+    var drawerChg = fmtChange(quote.change_pct);
     dom.drawerChange.className = "drawer-change drawer-change--" + drawerChg[1];
-    dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(item.change_amount) + ")";
+    dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(quote.change_amount) + ")";
+    if (dom.drawerQuoteSource) dom.drawerQuoteSource.textContent = quote.source === "intraday_price_data"
+      ? "Quote · 60m provisional" : quote.source === "price_data" ? "Quote · Daily close" : "Quote · Not verified";
     var metadataPending = item._canonicalMetadataPending === true;
     dom.drawerRR.textContent = displayMetadataValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null, metadataPending);
     if (dom.drawerTrigger) dom.drawerTrigger.textContent = item.setup && item.setup.trigger != null ? item.setup.trigger : "Not ready";
@@ -1014,6 +1019,7 @@
     metadataFields.forEach(function(field) {
       if (merged[field] == null && detail && detail[field] != null) merged[field] = detail[field];
     });
+    if (merged.quote == null && detail && detail.quote != null) merged.quote = detail.quote;
 
     function fillNestedFields(parent, source, fields) {
       if (!source || typeof source !== "object" || Array.isArray(source)) return;
@@ -1463,22 +1469,25 @@
       target1 = firstTarget && firstTarget.price;
     }
     var valueOrUnavailable = function(value, missing) { return value == null || value === "" ? (missing || "Not ready") : value; };
+    var quote = item && item.quote && typeof item.quote === "object" && !Array.isArray(item.quote) ? item.quote : {};
     var confidence = compactWaveConfidence(item).toLowerCase().replace("_", "-");
     var dataStatus = item.data_status || {};
     var incomplete = decision === "DATA_BLOCKED" || [dataStatus.daily_freshness, dataStatus.intraday_60m_freshness].some(function(value) {
       return ["stale", "unknown", "unavailable", "not_verified"].indexOf(String(value || "").toLowerCase()) >= 0;
     });
-    var direction = setupCandidateDirection(item, incomplete);
+    var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b>' + escapeHTML(valueOrUnavailable(item.close, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(item.change_pct)[0]) + '</span></div></div>' +
+      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b>' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(quote.change_pct)[0]) + '</span></div></div>' +
       '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Entry <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span>Invalidation / Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
   }
 
   function setupCandidateDirection(item, incomplete) {
-    if (incomplete || item == null || item.change_pct == null || item.change_pct === "") return "neutral";
-    var change = Number(item.change_pct);
+    var quote = item && item.quote && typeof item.quote === "object" ? item.quote : {};
+    var changeValue = quote.change_pct != null ? quote.change_pct : (item && item.change_pct);
+    if (incomplete || item == null || changeValue == null || changeValue === "") return "neutral";
+    var change = Number(changeValue);
     return Number.isFinite(change) && change > 0 ? "bullish" : Number.isFinite(change) && change < 0 ? "bearish" : "neutral";
   }
 
