@@ -101,6 +101,10 @@ Codex CLI (`gpt-5.6-luna`) became the default Signalix coding/review/implementat
 
 `2efed71` reconciled full-universe freshness aggregation and `cfc2c22` exposed intraday `fetch_completed_at` separately from the latest completed 60m candle. Kanban stale R4/R5 todo/blocked graph was archived without purge; active queue is empty. Three official Daily rows and one 60m row remain pending source-timer repair and are recorded in the current handoff, not hidden by documentation.
 
+## 2026-09-03 — Review Cockpit + quote completeness closeout
+
+Owner-approved Review Cockpit direction became the canonical `/mvp` surface: Lane/Wave-only primary toolbar, compact cards with real quote + Wave badge + Trigger/Stop/Target/R:R, restructured drawer (Key setup grid, Company context with market cap/sector/industry, `(i)` evidence toggle, compact chart legend, semantic colors). Canonical `quote` envelope published from loaded OHLCV frames (provisional 60m / Daily fallback with explicit basis); setup anchor detector now selects the most recent fully qualifying pullback→advance (no policy relaxation); read-model `MODEL_REVISION` enables contract-safe republish. Live: 237/237 quotes, 46–48 symbols with full plan levels, ~189 FORMING honestly `Not ready`. Commits `9804684`→`ee8cf1b`; handoff `vault/2026-09-03-Current-Session-Handoff.md`.
+
 ## 5. สิ่งที่ต้องทำ (backlog จริงตรวจพบ 2026-08-19)
 ~~1. **รีเฟรช `Architecture.md`** — เขียนใหม่ให้ตรง stage-first ✅ เสร็จ 2026-08-19~~
 ~~2. **Mark handoff เก่า** — ทั้ง 5 ตัว mark HISTORICAL/SUPERSEDED เรียบร้อย ✅~~
