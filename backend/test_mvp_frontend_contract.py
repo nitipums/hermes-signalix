@@ -146,6 +146,21 @@ def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_rec
     assert '#panel-daily-vcp' in js and '[data-symbol].setup-candidate-card' in js
 
 
+def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact_risk_direction_fields():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    toolbar = html[html.index('id="daily-setup-toolbar"'):html.index('</div>', html.index('id="daily-setup-toolbar"')) + 6]
+    assert 'id="daily-setup-search"' not in toolbar
+    assert 'id="daily-setup-refresh"' not in toolbar
+    assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' in toolbar
+    assert 'summary>More filters</summary>' in html
+    card = _extract_function(js, "setupCandidateCard")
+    for token in ("Current", "Entry", "Invalidation", "R:R", "setup-candidate__confidence", "Bullish", "Bearish"):
+        assert token in card
+    assert 'id="drawer-chart-context"' in html
+    assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
+
+
 def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
@@ -519,8 +534,8 @@ def test_daily_marker_legend_and_60m_setup_levels_are_timeframe_separated():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert 'id="drawer-chart-legend"' in html
-    assert 'data-timeframe="1D">Daily context' in html
-    assert 'data-timeframe="60M">60m setup' in html
+    assert 'data-timeframe="1D">1D' in html
+    assert 'data-timeframe="60M">60m' in html
     assert 'if (chart.timeframe === "60M")' in _extract_function(js, "drawChart")
     legend = _extract_function(js, "renderChartLegend")
     assert 'marker.timeframe === "daily"' in legend

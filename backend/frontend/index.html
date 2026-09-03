@@ -41,9 +41,6 @@
           </div>
         </details>
         <div id="daily-setup-toolbar" class="setup-toolbar" aria-label="Setup candidate controls">
-          <label class="setup-toolbar__search">Search
-            <input id="daily-setup-search" type="search" placeholder="Symbol / name" aria-label="Search setup candidates">
-          </label>
           <label>Lane
             <select id="daily-setup-lane" aria-label="Filter setup candidates by lane">
               <option value="ALL" selected>All lanes</option>
@@ -68,12 +65,13 @@
               <option value="UNKNOWN">Unknown / Not verified</option>
             </select>
           </label>
-          <button id="daily-setup-refresh" class="btn btn--filter" type="button">Refresh</button>
-          <span id="daily-setup-updated" class="setup-toolbar__updated" aria-live="polite">No update applied</span>
         </div>
         <details id="daily-setup-advanced" class="setup-advanced">
-          <summary>Advanced filters</summary>
+          <summary>More filters</summary>
           <div class="watchlist-default-filters" aria-label="Advanced setup candidate filters">
+            <label class="setup-advanced__search">Search
+              <input id="daily-setup-search" type="search" placeholder="Symbol / name" aria-label="Search setup candidates">
+            </label>
             <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
             <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
             <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
@@ -106,6 +104,8 @@
             </select>
             </label>
             <label><input type="checkbox" id="daily-setup-live-refresh"> Live refresh (opt in)</label>
+            <button id="daily-setup-refresh" class="btn btn--filter" type="button">Refresh data</button>
+            <span id="daily-setup-updated" class="setup-toolbar__updated" aria-live="polite">No update applied</span>
           </div>
         </details>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
@@ -162,12 +162,13 @@
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
           </div>
           <p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p>
+          <p id="drawer-chart-context" class="chart-context" aria-live="polite">Timeframe: 1D · Source: Daily price data</p>
           <div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>
           <div class="chart-timeframe-controls" aria-label="Chart timeframe">
             <span class="chart-control-label">Timeframe</span>
-            <button type="button" class="chart-timeframe" data-timeframe="60M">60m setup</button>
-            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">Daily context</button>
-            <button type="button" class="chart-timeframe" data-timeframe="1W">Week</button>
+            <button type="button" class="chart-timeframe" data-timeframe="60M">60m</button>
+            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button>
+            <button type="button" class="chart-timeframe" data-timeframe="1W">1W</button>
           </div>
           <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
           <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">

@@ -164,6 +164,23 @@ body {
 
 .setup-candidate-card { min-width: 0; overflow: hidden; }
 .setup-candidate-card b { color: var(--text); }
+.setup-candidate__header { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.setup-candidate__symbol { font-size:15px; }
+.setup-candidate__name { display:block; max-width:150px; color:var(--text-2); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.setup-candidate__direction { font-size:11px; font-weight:700; white-space:nowrap; }
+.setup-candidate__direction--bullish { color:var(--green); }
+.setup-candidate__direction--bearish { color:var(--red); }
+.setup-candidate__direction--neutral { color:var(--text-3); }
+.setup-candidate__confidence { display:inline-flex; align-items:center; gap:4px; }
+.setup-candidate-card--bullish .setup-candidate__confidence { color:var(--green); }
+.setup-candidate-card--bearish .setup-candidate__confidence { color:var(--red); }
+.setup-candidate-card--neutral .setup-candidate__confidence { color:var(--text-3); }
+.setup-candidate__confidence i { display:inline-block; width:30px; height:5px; border-radius:99px; background:currentColor; opacity:.25; }
+.setup-candidate__confidence--medium i { opacity:.55; }
+.setup-candidate__confidence--high i { opacity:1; }
+.setup-candidate__plan { grid-template-columns:repeat(5,minmax(0,1fr)); }
+.setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
+.setup-candidate__plan b { display:block; margin-top:2px; }
 .setup-candidate__readiness { display:flex; justify-content:space-between; gap:8px; margin:8px 0; color:var(--text-2); font-size:.78rem; }
 .setup-candidate__readiness span, .setup-candidate__readiness b { min-width:0; overflow-wrap:anywhere; }
 .setup-candidate__readiness b { text-align:right; }
@@ -310,8 +327,9 @@ body {
 }
 .setup-toolbar > label { display:flex; flex-direction:column; gap:3px; color:var(--text-3); font-size:10px; font-weight:600; }
 .setup-toolbar input, .setup-toolbar select { min-height:44px; min-width:0; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); color:var(--text); padding:0 9px; font:inherit; }
-.setup-toolbar__search { flex:1 1 145px; }
 .setup-toolbar__updated { flex:1 1 100%; color:var(--text-3); font-size:10px; }
+.setup-advanced__search { flex:1 1 150px; }
+.setup-advanced__search input { min-height:44px; margin-left:4px; max-width:100%; }
 .method-guide { margin:0 0 8px; color:var(--text-2); font-size:11px; }
 .method-guide summary { min-height:36px; padding:8px 10px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface-2); cursor:pointer; }
 .method-guide__content { padding:10px; border:1px solid var(--border); border-top:0; line-height:1.5; }
@@ -414,9 +432,12 @@ body {
 .wave-chart-legend span { display:inline-flex; align-items:center; min-width:0; overflow-wrap:anywhere; }
 .legend-line { display:inline-block; width:18px; margin-right:5px; border-top:2px solid var(--text); }
 .legend-line--setup { border-top-color:#f4c95d; border-top-style:dashed; }
+.legend-line--ma20 { border-top-color:var(--accent); }
+.legend-line--ma50 { border-top-color:#60a5fa; }
 .legend-dot { width:9px; height:9px; margin-right:5px; border-radius:50%; background:var(--accent); }
 .chart-toggle { min-height:44px; min-width:44px; padding:0 7px; border:1px solid var(--border); border-radius:3px; background:rgba(10,14,23,.82); color:var(--text-3); font-size:10px; cursor:pointer; }
 .chart-toggle.is-active { color:var(--accent); border-color:var(--accent); }
+.chart-context { color:var(--text-3); font-size:10px; margin:4px 0; overflow-wrap:anywhere; }
 
 .drawer-fields { display: flex; flex-direction: column; gap: 6px; }
 .drawer-field { display: flex; justify-content: space-between; gap: 10px; }
@@ -468,7 +489,6 @@ body {
   .nav-tab { min-height:36px; padding:5px 4px; font-size:11px; }
   .setup-toolbar { gap:4px; padding:5px 6px; }
   .setup-toolbar > label { flex:1 1 0; }
-  .setup-toolbar__search { flex-basis:100%; }
   .setup-toolbar input, .setup-toolbar select { min-height:36px; padding:0 6px; }
   .setup-toolbar .btn--filter { min-height:36px; }
   .setup-toolbar__updated { display:none; }

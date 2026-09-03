@@ -128,6 +128,7 @@
     drawerCanvas:  $("#drawer-canvas"),
     drawerChartPH: $("#drawer-chart-placeholder"),
     drawerChartStatus: $("#drawer-chart-status"),
+    drawerChartContext: $("#drawer-chart-context"),
     drawerChartLegend: $("#drawer-chart-legend"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
@@ -741,6 +742,12 @@
     var label = provisional ? "Provisional · current candle" : "Confirmed candle";
     dom.drawerChartStatus.textContent = "Chart status: " + label + (timestamp ? " · " + timestamp : "");
     dom.drawerChartStatus.classList.toggle("chart-status--provisional", provisional);
+    if (dom.drawerChartContext) {
+      var timeframe = chart && chart.timeframe || chartTimeframe;
+      var source = chart && chart.provenance && (chart.provenance.source || chart.provenance.interval);
+      var sourceLabel = timeframe === "60M" ? "60m intraday price data" : timeframe === "1W" ? "Weekly price data" : "Daily price data";
+      dom.drawerChartContext.textContent = "Timeframe: " + timeframe + " · Source: " + (source || sourceLabel);
+    }
   }
 
   function renderChartLegend(chart) {
@@ -751,7 +758,9 @@
       return marker && marker.timeframe === "daily" && marker.timestamp != null && Number.isFinite(Number(marker.price));
     }).length;
     var markerState = isDaily ? (dailyMarkerCount ? dailyMarkerCount + " exact Daily source marker(s)" : "Daily markers unavailable") : "Daily markers shown on Day only";
-    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>Daily OHLC</span>' +
+    var timeframe = chart && chart.timeframe || chartTimeframe;
+    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>' + escapeHTML(timeframe) + " OHLC</span>" +
+      '<span><i class="legend-line legend-line--ma20"></i>MA20</span><span><i class="legend-line legend-line--ma50"></i>MA50</span>' +
       '<span><i class="legend-dot legend-dot--wave"></i>' + escapeHTML(markerState) + '</span>' +
       '<span><i class="legend-line legend-line--setup"></i>60m trigger / stop / target</span>';
   }
@@ -1414,15 +1423,18 @@
       target1 = firstTarget && firstTarget.price;
     }
     var valueOrUnavailable = function(value) { return value == null || value === "" ? "Not ready" : value; };
-    return '<article class="decision-card setup-candidate-card" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="decision-card__top"><strong>' + escapeHTML(item.symbol || "–") + '</strong><b class="setup-candidate__decision">' + escapeHTML(decision) + '</b></div>' +
-      '<div class="setup-candidate__wave"><span>Daily context <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span>Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span>' +
-      '<span>Secondary <b>' + escapeHTML(waveEvidenceText(waveContextPresentation(item).secondary)) + '</b></span></div>' +
-      '<p class="setup-candidate__context-status">' + escapeHTML(waveContextPresentation(item).actionability) + '</p>' +
-      '<p class="setup-candidate__readiness"><span>Trigger readiness</span><b>' + escapeHTML(readiness) + '</b></p>' +
-      '<div class="setup-candidate__plan"><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span>' +
-      '<span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span>' +
-      '<span>Stop <b>' + escapeHTML(valueOrUnavailable(setup.trade_stop)) + '</b></span></div></article>';
+    var confidence = compactWaveConfidence(item).toLowerCase().replace("_", "-");
+    var dataStatus = item.data_status || {};
+    var incomplete = decision === "DATA_BLOCKED" || [dataStatus.daily_freshness, dataStatus.intraday_60m_freshness].some(function(value) {
+      return ["stale", "unknown", "unavailable", "not_verified"].indexOf(String(value || "").toLowerCase()) >= 0;
+    });
+    var direction = incomplete ? "neutral" : Number(item.change_pct) > 0 ? "bullish" : Number(item.change_pct) < 0 ? "bearish" : "neutral";
+    var directionCue = direction === "bullish" ? "↑ Bullish" : direction === "bearish" ? "↓ Bearish" : "→ Neutral";
+    return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
+      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><span class="setup-candidate__direction setup-candidate__direction--' + direction + '" aria-label="' + directionCue + '">' + directionCue + '</span></div>' +
+      '<div class="setup-candidate__wave"><span>Daily context <b>' + escapeHTML(canonicalWaveState(item)) + '</b></span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i> Confidence <b>' + escapeHTML(compactWaveConfidence(item)) + '</b></span></div>' +
+      '<div class="setup-candidate__plan"><span>Current <b>' + escapeHTML(valueOrUnavailable(item.close)) + '</b></span><span>Entry <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span>Invalidation / Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span><span>Target 1 <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span></div>' +
+      '<p class="setup-candidate__readiness"><span class="setup-candidate__decision">' + escapeHTML(decision) + '</span><b>Trigger readiness · ' + escapeHTML(readiness) + '</b></p></article>';
   }
 
   function setupCandidateMatchesToolbar(item) {
