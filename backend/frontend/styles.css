@@ -179,6 +179,7 @@ body {
 .setup-candidate__confidence--medium i { opacity:.55; }
 .setup-candidate__confidence--high i { opacity:1; }
 .setup-candidate__wave-badge { display:inline-flex; padding:3px 7px; border:1px solid rgba(38,166,154,.4); border-radius:999px; color:var(--green); font-weight:700; }
+.setup-candidate__structure-badge { display:inline-flex; padding:3px 7px; border:1px solid var(--border); border-radius:999px; color:var(--text-2); font-weight:600; }
 .setup-candidate__plan { grid-template-columns:repeat(5,minmax(0,1fr)); }
 .setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
 .setup-candidate__plan b { display:block; margin-top:2px; }

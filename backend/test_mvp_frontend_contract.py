@@ -110,30 +110,41 @@ def test_daily_wave_bucket_consumes_all_primary_states_and_collapses_unmapped_va
 def test_t08_wave_filter_composes_with_search_and_lane_without_inference():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "setupCandidateMatchesToolbar")
-    bucket = _extract_function(js, "setupCandidateWaveBucket")
+    phase = _extract_function(js, "dailyStructurePhase")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     context = _extract_function(js, "waveContextForItem")
     dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}, dailySetupWave:{value:"EARLY_WAVE_3"}};'
-    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE'}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}})]"
-    assert _run_node([states, context, bucket, dom, helper], expression) == [True, False, False]
+    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'WAVE_2_FORMING'}}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'EARLY_WAVE_3'}}})]"
+    assert _run_node([states, context, phase, dom, helper], expression) == [False, True, False]
 
 
-def test_t08_grouping_has_canonical_wave_order_unknown_bucket_and_stable_symbol_order():
+def test_daily_structure_phase_fails_closed_and_card_label_is_explicitly_non_actionable():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    phase = _extract_function(js, "dailyStructurePhase")
+    label = _extract_function(js, "compactDailyStructureLabel")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    result = _run_node([states, phase, label], "({valid:dailyStructurePhase({wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_1_ADVANCE'}}}), missing:dailyStructurePhase({wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'WAVE_4_CORRECTION'}}}), invalid:dailyStructurePhase({wave:{daily_structure:{phase:'NOPE'}}}), label:compactDailyStructureLabel({wave:{daily_structure:{phase:'WAVE_4_CORRECTION'}}})})")
+    assert result == {"valid": "WAVE_1_ADVANCE", "missing": "UNKNOWN", "invalid": "UNKNOWN", "label": "Daily structure · WAVE_4_CORRECTION · non-actionable"}
+
+
+def test_t08_grouping_has_canonical_phase_order_for_every_lane_and_preserves_lane_totals():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "groupSetupCandidates")
-    bucket = _extract_function(js, "setupCandidateWaveBucket")
+    phase = _extract_function(js, "dailyStructurePhase")
     stable = _extract_function(js, "stableSetupCandidateOrder")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     context = _extract_function(js, "waveContextForItem")
-    items = "[{symbol:'ZZZ',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'}}},{symbol:'AAA',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'WAVE_1_ADVANCE'}}},{symbol:'ONE',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'NOPE'}}},{symbol:'BAD',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'NOPE',context:{mapped_state:'EARLY_WAVE_3'}}}]"
-    result = _run_node([states, context, bucket, stable, helper], "(function(g){return {order:g.waveOrder, early:g.waveGroups.EARLY_WAVE_3[0].symbol, one:g.waveGroups.WAVE_1_ADVANCE[0].symbol, unknown:g.waveGroups.UNKNOWN.map(function(x){return x.symbol;})};})(groupSetupCandidates(" + items + "))")
-    assert result == {"order": ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE", "UNKNOWN"], "early": "ZZZ", "one": "ONE", "unknown": ["BAD"]}
+    items = "[{symbol:'ZZZ',decision_lane:'WAIT',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_2_FORMING'}}},{symbol:'AAA',decision_lane:'REVIEW_NOW',setup:{status:'TRIGGERED'},wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_1_ADVANCE'}}},{symbol:'ONE',decision_lane:'AVOID',wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'NOPE'},daily_structure:{phase:'WAVE_5_ADVANCE'}}},{symbol:'BAD',decision_lane:'DATA_BLOCKED',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'}}}]"
+    result = _run_node([states, context, phase, stable, helper], "(function(g){return {order:g.phaseOrder, wait:g.phaseGroups.WAIT.WAVE_2_FORMING[0].symbol, review:g.phaseGroups.REVIEW_NOW.WAVE_1_ADVANCE[0].symbol, avoid:g.phaseGroups.AVOID.WAVE_5_ADVANCE[0].symbol, unknown:g.phaseGroups.DATA_BLOCKED.UNKNOWN[0].symbol, laneCounts:g.order.map(function(lane){return g.groups[lane].length;})};})(groupSetupCandidates(" + items + "))")
+    assert result == {"order": ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE", "UNKNOWN"], "wait": "ZZZ", "review": "AAA", "avoid": "ONE", "unknown": "BAD", "laneCounts": [1, 0, 0, 1, 1, 1]}
 
 
 def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_reconciliation():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'id="daily-setup-wave"' in html
+    assert "Daily structure phase" in html
+    assert "Filter setup candidates by Daily structural phase" in html
     assert "Unknown / Not verified" in html and "Unknown / Not verified" in js
     assert html.count('value="EARLY_WAVE_3"') == 1
     assert html.count('value="WAVE_3_CONTINUATION"') == 1
@@ -155,11 +166,12 @@ def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact
     assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' in toolbar
     assert 'summary>More filters</summary>' in html
     card = _extract_function(js, "setupCandidateCard")
-    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
+    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__structure-badge", "setup-candidate__confidence", "setupLaneLabel"):
         assert token in card
     for forbidden in ("Daily context", "Secondary", "Trigger readiness"):
         assert forbidden not in card
     assert "compactWaveLabel(item)" in card
+    assert "Primary Daily Wave" in card and "compactDailyStructureLabel(item)" in card
     assert 'id="drawer-chart-context"' in html
     assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
 
@@ -1227,7 +1239,8 @@ def test_setup_candidates_group_in_canonical_lane_order_and_block_unknown_lanes(
     assert "function groupSetupCandidates(items)" in js
     assert 'var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED"' in js
     assert "groups.REVIEW_NOW" in js and '"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"' in js
-    assert "laneItems.map(setupCandidateCard).join(\"\")" in js
+    assert "phaseItems.map(setupCandidateCard).join(\"\")" in js
+    assert "DAILY STRUCTURE · " in js
 
 
 def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
@@ -1243,6 +1256,7 @@ def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
       <main class="app"><article class="decision-card setup-candidate-card">
         <div class="decision-card__top"><strong>LONGSYMBOL</strong><b>DATA_BLOCKED</b></div>
         <p class="setup-candidate__evidence">Trend emerging_uptrend · 20D 18.4% · 60D 42.1% · RS 91 · 52W BREAKOUT · ATH NO BREAKOUT</p>
+        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span><span class="setup-candidate__structure-badge">Daily structure · WAVE_2_NEAR_COMPLETION · non-actionable</span></div>
         <div class="setup-candidate__grid"><span>Wave <b>EARLY_WAVE_3 · structure intact</b></span><span>Setup <b>DATA_BLOCKED · trigger – · invalidation –</b></span><span>Targets <b>– / –</b></span><span>R:R <b>–</b></span><span>Market / sector <b>UNKNOWN · Electronic Components</b></span><span>Peers <b>6/10</b></span></div>
       </article></main>
     """
@@ -1268,7 +1282,7 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
     collection = _extract_function(js, "setupDrawerCollection")
     grouping = _extract_function(js, "groupSetupCandidates")
     stable = _extract_function(js, "stableSetupCandidateOrder")
-    bucket = _extract_function(js, "setupCandidateWaveBucket")
+    phase = _extract_function(js, "dailyStructurePhase")
     context = _extract_function(js, "waveContextForItem")
     navigation = _extract_function(js, "drawerNavigationState")
     items = [
@@ -1278,7 +1292,7 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
         {"symbol": "MID", "decision_lane": "SETUP_FORMING"},
     ]
     states = 'var canonicalDailyWaveStates = ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"];'
-    assert _run_node([states, context, bucket, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
+    assert _run_node([states, context, phase, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 0)") == {"index": 0, "count": 3, "position": "1 of 3", "previousDisabled": True, "nextDisabled": False}
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 2)") == {"index": 2, "count": 3, "position": "3 of 3", "previousDisabled": False, "nextDisabled": True}
     assert 'id="drawer-position"' in html

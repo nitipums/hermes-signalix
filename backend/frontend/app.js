@@ -593,6 +593,12 @@
     return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "UNKNOWN";
   }
 
+  function dailyStructurePhase(item) {
+    var daily = item && item.wave && item.wave.daily_structure;
+    var phase = daily && typeof daily === "object" && !Array.isArray(daily) ? daily.phase : null;
+    return canonicalDailyWaveStates.indexOf(phase) >= 0 ? phase : "UNKNOWN";
+  }
+
   function compactWaveConfidence(item) {
     var wave = item && item.wave;
     var confidence = wave && wave.confidence;
@@ -601,9 +607,9 @@
   }
 
   function compactDailyStructureLabel(item) {
-    var daily = item && item.wave && item.wave.daily_structure;
-    if (!daily || typeof daily !== "object" || Array.isArray(daily) || !daily.phase) return "Not actionable · unavailable";
-    return daily.phase + " · non-actionable context";
+    return dailyStructurePhase(item) === "UNKNOWN"
+      ? "Daily structure · UNKNOWN · non-actionable"
+      : "Daily structure · " + dailyStructurePhase(item) + " · non-actionable";
   }
 
   function waveContextPresentation(item) {
@@ -1518,7 +1524,7 @@
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(quote.change_pct)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
-      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
+      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge">' + escapeHTML(compactDailyStructureLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
   }
@@ -1544,7 +1550,7 @@
     var wave = dom.dailySetupWave ? dom.dailySetupWave.value : "ALL";
     var haystack = ((item.symbol || "") + " " + (item.name || "")).toLowerCase();
     return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane) &&
-      (wave === "ALL" || setupCandidateWaveBucket(item) === wave);
+      (wave === "ALL" || dailyStructurePhase(item) === wave);
   }
 
   function stableSetupCandidateOrder(items) {
@@ -1577,11 +1583,14 @@
         return result.concat(reviewGroups[status]);
       }, []).concat(reviewUnknown);
     }
-    var waveOrder = canonicalDailyWaveStates.concat(["UNKNOWN"]);
-    var waveGroups = {};
-    waveOrder.forEach(function(state) { waveGroups[state] = []; });
-    groups.DAILY_CANDIDATE.forEach(function(item) { waveGroups[setupCandidateWaveBucket(item)].push(item); });
-    return {order: laneOrder, groups: groups, waveOrder: waveOrder, waveGroups: waveGroups};
+    var phaseOrder = canonicalDailyWaveStates.concat(["UNKNOWN"]);
+    var phaseGroups = {};
+    laneOrder.forEach(function(lane) {
+      phaseGroups[lane] = {};
+      phaseOrder.forEach(function(phase) { phaseGroups[lane][phase] = []; });
+      groups[lane].forEach(function(item) { phaseGroups[lane][dailyStructurePhase(item)].push(item); });
+    });
+    return {order: laneOrder, groups: groups, phaseOrder: phaseOrder, phaseGroups: phaseGroups};
   }
 
   function reconcileDailyDrawerNavigation() {
@@ -1687,12 +1696,11 @@
     var groupedHTML = grouped.order.reduce(function(html, lane) {
       var laneItems = grouped.groups[lane];
       if (!laneItems.length) return html;
-      var content = lane === "DAILY_CANDIDATE" ? grouped.waveOrder.reduce(function(waveHTML, wave) {
-        var waveItems = grouped.waveGroups[wave];
-        if (!waveItems.length) return waveHTML;
-        var label = wave === "UNKNOWN" ? "Unknown / Not verified" : wave;
-        return waveHTML + '<section class="setup-candidate-wave-group"><h3 class="section-head">' + escapeHTML(label) + ' <span class="section-subhead">' + waveItems.length + '</span></h3>' + waveItems.map(setupCandidateCard).join("") + '</section>';
-      }, "") : laneItems.map(setupCandidateCard).join("");
+      var content = grouped.phaseOrder.reduce(function(phaseHTML, phase) {
+        var phaseItems = grouped.phaseGroups[lane][phase];
+        if (!phaseItems.length) return phaseHTML;
+        return phaseHTML + '<section class="setup-candidate-wave-group"><h3 class="section-head">DAILY STRUCTURE · ' + escapeHTML(phase) + ' <span class="section-subhead">' + phaseItems.length + '</span></h3>' + phaseItems.map(setupCandidateCard).join("") + '</section>';
+      }, "");
       return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + content + '</section>';
     }, "");
     dom.dailyVcpCards.innerHTML = groupedHTML ||
