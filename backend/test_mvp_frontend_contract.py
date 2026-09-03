@@ -245,6 +245,8 @@ def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_fr
     drawer = _extract_function(js, "renderDrawerDetail")
     assert 'dom.drawerWave.textContent = compactWaveLabel(item)' in drawer
     assert 'dom.drawerWaveSource.textContent = waveContextPresentation(item).source' in drawer
+    assert "Primary Daily Wave" in html and "Daily structural context" in html
+    assert "compactDailyStructureLabel(item)" in drawer
     assert 'setup.minor_structure' not in drawer
     assert '60m' in js
 

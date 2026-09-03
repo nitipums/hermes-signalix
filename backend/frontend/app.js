@@ -600,22 +600,33 @@
     return ["LOW", "MEDIUM", "HIGH"].indexOf(confidence) >= 0 ? confidence : "NOT_VERIFIED";
   }
 
+  function compactDailyStructureLabel(item) {
+    var daily = item && item.wave && item.wave.daily_structure;
+    if (!daily || typeof daily !== "object" || Array.isArray(daily) || !daily.phase) return "Not actionable · unavailable";
+    return daily.phase + " · non-actionable context";
+  }
+
   function waveContextPresentation(item) {
     var context = waveContextForItem(item);
+    var daily = item && item.wave && item.wave.daily_structure;
+    var hasDaily = daily && typeof daily === "object" && !Array.isArray(daily);
+    if (!hasDaily) daily = context;
     var state = canonicalWaveState(item);
-    var secondary = context && Array.isArray(context.secondary_markers)
-      ? context.secondary_markers.filter(function(value) { return value === "WAVE_3_EXTENDED"; }) : [];
+    var secondary = hasDaily && Array.isArray(daily.alternative_phases)
+      ? daily.alternative_phases : context && Array.isArray(context.secondary_markers)
+        ? context.secondary_markers.filter(function(value) { return value === "WAVE_3_EXTENDED"; }) : [];
     var nonActionable = ["WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION", "Unknown / Not verified"].indexOf(state) >= 0;
     return {
       state: state, secondary: secondary, confidence: compactWaveConfidence(item),
-      contextState: context && context.mapped_state,
-      rule: context && context.rule_version,
-      source: context && context.source_timeframe === "daily" ? "Daily structural · daily" : "Daily structural · source unavailable",
-      supporting: context && context.supporting_evidence, contradicting: context && context.contradicting_evidence,
-      missing: context && context.missing_evidence, rationale: context && context.rationale,
-      firstDate: context && context.first_context_date, lastDate: context && context.last_context_date,
-      transitions: context && Array.isArray(context.transitions) ? context.transitions : [],
-      actionability: item && item.decision_lane === "REVIEW_NOW" ? "Review eligible · backend REVIEW_NOW" :
+      contextState: hasDaily ? daily.phase : context.mapped_state,
+      rule: daily && (daily.policy_version || daily.rule_version),
+      source: daily && daily.source_timeframe === "daily" ? (hasDaily ? "Daily structural context · daily" : "Daily structural · daily") : "Daily structural context · source unavailable",
+      supporting: daily && daily.supporting_evidence, contradicting: daily && daily.contradicting_evidence,
+      missing: daily && daily.missing_evidence, rationale: hasDaily ? "Evidence context only; it cannot change the Primary Daily Wave or decision lane." : context && context.rationale,
+      firstDate: hasDaily ? daily.as_of : context && context.first_context_date,
+      lastDate: hasDaily ? daily.snapshot_id : context && context.last_context_date,
+      transitions: hasDaily ? [] : context && Array.isArray(context.transitions) ? context.transitions : [],
+      actionability: hasDaily ? "Non-actionable Daily context · actionability NONE" : item && item.decision_lane === "REVIEW_NOW" ? "Review eligible · backend REVIEW_NOW" :
         nonActionable ? "Non-actionable context · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED") :
         "Not review eligible · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED")
     };
@@ -631,8 +642,8 @@
       return '<li>' + escapeHTML(waveEvidenceText(entry)) + '</li>';
     }).join("") : '<li>Unavailable · no source-linked transition history</li>';
     dom.drawerWaveContext.innerHTML = '<strong class="wave-context-detail__status">' + escapeHTML(view.actionability) + '</strong>' +
-      '<dl>' + evidenceRow("Daily context state", view.contextState) + evidenceRow("Secondary", view.secondary) + evidenceRow("Rule", view.rule) +
-      evidenceRow("First / last context", view.firstDate && view.lastDate ? view.firstDate + " / " + view.lastDate : null) +
+      '<dl>' + evidenceRow("Daily structural phase", view.contextState) + evidenceRow("Alternative phases", view.secondary) + evidenceRow("Policy", view.rule) +
+      evidenceRow("As-of / snapshot", view.firstDate && view.lastDate ? view.firstDate + " / " + view.lastDate : null) +
       evidenceRow("Supporting", view.supporting) + evidenceRow("Contradicting", view.contradicting) +
       evidenceRow("Missing", view.missing) + evidenceRow("Rationale", view.rationale) + '</dl>' +
       '<div class="wave-context-transitions"><span>Source transitions</span><ul>' + transitions + '</ul></div>';
@@ -718,7 +729,7 @@
     if (dom.drawerWave) dom.drawerWave.textContent = compactWaveLabel(item);
     if (dom.drawerWaveConfidence) dom.drawerWaveConfidence.textContent = compactWaveConfidence(item);
     if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = waveContextPresentation(item).source;
-    if (dom.drawerDailyContext) dom.drawerDailyContext.textContent = compactWaveLabel(item);
+    if (dom.drawerDailyContext) dom.drawerDailyContext.textContent = compactDailyStructureLabel(item);
     if (dom.drawerEvidenceDetails) dom.drawerEvidenceDetails.open = false;
     if (dom.drawerContextInfo) dom.drawerContextInfo.setAttribute("aria-expanded", "false");
     renderWaveContextDetail(item);

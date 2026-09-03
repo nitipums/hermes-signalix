@@ -78,6 +78,15 @@ The first slice is additive evidence only:
 4. Add full-detail API projection and a drawer section showing the phase as non-actionable context.
 5. Do not promote W1/W2/W4/W5 to primary or alter lane mapping in this slice.
 
+### Source implementation status — 2026-09-03
+
+The bounded source slice is implemented in the canonical engine/contract/API
+projection and `/mvp` drawer seams. `wave.daily_structure` is projected from
+the existing full-wave Daily result, validated as an additive exact nested
+envelope, and carried through list/detail parity with `actionability=NONE`.
+Focused source and contract tests pass; runtime reload/public API and browser
+evidence remain Lite acceptance work.
+
 ## Acceptance criteria
 
 - [ ] Every evaluated eligible row retains one canonical `wave.primary_state` and one decision lane.

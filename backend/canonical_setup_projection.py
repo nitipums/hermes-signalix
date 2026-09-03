@@ -13,6 +13,7 @@ from freshness_assessment import (assess_projection_freshness as _resolve_freshn
                                   daily_eod_status as _daily_eod_status)
 from setup_candidate_contract import (
     CANONICAL_METADATA_FIELDS,
+    DAILY_STRUCTURE_FIELDS,
     QUOTE_FIELDS,
     WAVE_CONTEXT_FIELDS,
     WAVE_CONTEXT_SECONDARY_MARKERS,
@@ -88,6 +89,26 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
                 or any(marker not in WAVE_CONTEXT_SECONDARY_MARKERS for marker in secondary)
                 or (secondary and wave_context.get("mapped_state") != "WAVE_3_CONTINUATION")):
             raise ValueError("canonical wave context secondary marker is invalid")
+    daily_structure = (item.get("wave") or {}).get("daily_structure")
+    if daily_structure is not None:
+        if not isinstance(daily_structure, dict) or set(daily_structure) != DAILY_STRUCTURE_FIELDS:
+            raise ValueError("canonical daily structure is not an exact envelope")
+        if daily_structure.get("phase") not in WAVE_CONTEXT_STATES:
+            raise ValueError("canonical daily structure phase is invalid")
+        if daily_structure.get("confidence") not in {"LOW", "MEDIUM", "HIGH"}:
+            raise ValueError("canonical daily structure confidence is invalid")
+        if daily_structure.get("actionability") != "NONE":
+            raise ValueError("canonical daily structure must be non-actionable")
+        if daily_structure.get("source_timeframe") != "daily":
+            raise ValueError("canonical daily structure timeframe is invalid")
+        if not isinstance(daily_structure.get("policy_version"), str):
+            raise ValueError("canonical daily structure policy is invalid")
+        for evidence_field in (
+            "supporting_evidence", "contradicting_evidence", "missing_evidence",
+            "alternative_phases",
+        ):
+            if not isinstance(daily_structure.get(evidence_field), list):
+                raise ValueError("canonical daily structure evidence is invalid")
     data_status = item.get("data_status") or {}
     freshness = str(data_status.get("freshness", "")).lower()
     if (data_status.get("sufficient") is False

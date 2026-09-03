@@ -6,7 +6,8 @@
   var dom={loading:$("#loading"),error:$("#error"),errorMessage:$("#error-message"),empty:$("#empty"),workspace:$("#workspace"),search:$("#search"),wave:$("#wave-filter"),laneFilter:$("#lane-filter"),select:$("#symbol-select"),retry:$("#retry"),errorRetry:$("#error-retry"),provenance:$("#provenance"),symbol:$("#symbol"),lane:$("#lane"),blocked:$("#blocked"),chart:$("#chart"),chartEmpty:$("#chart-empty"),chartStatus:$("#chart-status"),legend:$("#legend"),summary:$("#summary"),supporting:$("#supporting"),contradicting:$("#contradicting"),missing:$("#missing"),transitions:$("#transitions")};
   function esc(v){return String(v==null?"":v).replace(/[&<>"']/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c];});}
   function contextOf(item){var c=item&&item.wave&&item.wave.context;return c&&typeof c==="object"&&!Array.isArray(c)?c:{};}
-  function mappedState(item){var s=contextOf(item).mapped_state;return STATES.indexOf(s)>=0?s:"UNKNOWN";}
+  // Fix A (Ploy 2026-09-03): grouping must use wave.primary_state only — mapped_state is display-only context
+  function mappedState(item){var s=item&&item.wave&&item.wave.primary_state;return STATES.indexOf(s)>=0?s:"UNKNOWN";}
   function actionability(item){var state=mappedState(item),lane=item&&item.decision_lane||"DATA_BLOCKED";if(["WAVE_2_FORMING","WAVE_2_NEAR_COMPLETION","WAVE_4_CORRECTION","UNKNOWN"].indexOf(state)>=0)return "Non-actionable context · backend lane "+lane;return lane==="REVIEW_NOW"?"Review eligible only because backend lane is REVIEW_NOW":"Not review eligible · backend lane "+lane;}
   var fetchAllCandidates=window.SignalixCanonicalClient.fetchAllCandidates;
   var markerRows=window.SignalixCanonicalClient.dailyMarkers;

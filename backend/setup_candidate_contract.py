@@ -49,6 +49,11 @@ WAVE_CONTEXT_FIELDS = {
     "source_timeframe", "supporting_evidence", "contradicting_evidence",
     "missing_evidence", "rationale",
 }
+DAILY_STRUCTURE_FIELDS = {
+    "phase", "confidence", "actionability", "source_timeframe", "policy_version",
+    "as_of", "snapshot_id", "anchors", "retracement", "supporting_evidence",
+    "contradicting_evidence", "missing_evidence", "alternative_phases",
+}
 
 
 def _json_value(value: Any):
@@ -290,9 +295,51 @@ def _normalize_wave_evidence(wave: dict) -> dict:
         result["primary_state"] = result["state"]
     if "context" in result:
         result["context"] = _normalize_wave_context(result.get("context"))
+    if "daily_structure" in result:
+        result["daily_structure"] = _normalize_daily_structure(result.get("daily_structure"))
     if state != "UNKNOWN":
         return result
     return result
+
+
+def _normalize_daily_structure(value: Any) -> dict:
+    """Keep additive Daily structural context explicit and non-actionable."""
+    source = value if isinstance(value, dict) else {}
+    phase = source.get("phase") if source.get("phase") in WAVE_CONTEXT_STATES else "UNKNOWN"
+    confidence = _status_token(source.get("confidence"))
+    if confidence not in {"LOW", "MEDIUM", "HIGH"} or phase == "UNKNOWN":
+        confidence = "LOW"
+
+    def evidence_array(field: str) -> list:
+        raw = source.get(field)
+        if raw is None:
+            return []
+        return ([_json_value(item) for item in raw]
+                if isinstance(raw, (list, tuple, set)) else [_json_value(raw)])
+
+    missing = evidence_array("missing_evidence")
+    if not isinstance(value, dict) or phase == "UNKNOWN":
+        missing.append("full_wave_phase")
+    if source.get("source_timeframe") not in {None, "daily"}:
+        missing.append("invalid_daily_source_timeframe")
+    anchors = source.get("anchors")
+    anchors = _json_value(anchors) if isinstance(anchors, dict) else {}
+    return {
+        "phase": phase,
+        "confidence": confidence,
+        "actionability": "NONE",
+        "source_timeframe": "daily",
+        "policy_version": str(source.get("policy_version") or "daily-structure-evidence-v1"),
+        "as_of": _json_value(source.get("as_of")),
+        "snapshot_id": _json_value(source.get("snapshot_id")),
+        "anchors": anchors,
+        "retracement": _json_value(source.get("retracement")),
+        "supporting_evidence": evidence_array("supporting_evidence"),
+        "contradicting_evidence": evidence_array("contradicting_evidence"),
+        "missing_evidence": sorted(set(missing)),
+        "alternative_phases": [phase for phase in (source.get("alternative_phases") or [])
+                               if phase in WAVE_CONTEXT_STATES and phase != "UNKNOWN"],
+    }
 
 
 def _normalize_wave_context(value: Any) -> dict:
@@ -452,6 +499,12 @@ def project_decision_lane(data_status: dict, wave: dict, setup: dict,
                      or (rr is not None and rr < 2)):
         return "SETUP_FORMING"
     if wave_state not in {"", "UNKNOWN", "INSUFFICIENT", "NOT_VERIFIABLE"}:
+        # Fix B (Ploy 2026-09-03 Lite-only): DAILY_CANDIDATE requires confidence>=MEDIUM + uptrend/emerging when trend known (filters WHAIR etc., keeps legacy tests with no trend)
+        if _wave_confidence(wave) not in {"MEDIUM", "HIGH"}:
+            return "WAIT"
+        ts = (trend or {}).get("state")
+        if ts is not None and str(ts).lower() not in {"uptrend", "emerging_uptrend"}:
+            return "WAIT"
         return "DAILY_CANDIDATE"
     return "WAIT"
 
@@ -478,7 +531,49 @@ def build_setup_candidate(
     wave_out = _normalize_wave_evidence(wave)
     if wave_out.get("timeframe") is None:
         wave_out["timeframe"] = "daily"
+    # Fix C (Ploy 2026-09-03 Lite-only): W3 HIGH requires volume+MA, W5 requires near ATH
+    try:
+        ps = wave_out.get("primary_state") or wave_out.get("state")
+        conf = str(wave_out.get("confidence") or "").upper()
+        ctx = wave_out.get("context") if isinstance(wave_out.get("context"), dict) else {}
+        supp = ctx.get("supporting_evidence") or wave_out.get("supporting_evidence") or []
+        trend_state = str((trend or {}).get("state") or "").lower()
+        near52 = (trend or {}).get("near_52w_high")
+        is_ath = (trend or {}).get("is_ath_breakout")
+        # W3 continuation HIGH without volume support -> downgrade to MEDIUM
+        if ps == "WAVE_3_CONTINUATION" and conf == "HIGH":
+            has_vol = "breakout_volume_above_20d_avg" in supp or "volume_support" in str(supp)
+            if not has_vol or trend_state not in {"uptrend", "emerging_uptrend"}:
+                wave_out["confidence"] = "MEDIUM"
+        # W5 without near 52W/ATH -> downgrade to UNKNOWN (cannot tag W5 far from high)
+        if ps == "WAVE_5_ADVANCE" and not (near52 is True or is_ath is True):
+            wave_out["primary_state"] = "UNKNOWN"
+            wave_out["state"] = "UNKNOWN"
+            wave_out["confidence"] = "LOW"
+            if isinstance(wave_out.get("context"), dict):
+                wave_out["context"]["mapped_state"] = "UNKNOWN"
+                wave_out["context"]["confidence"] = "LOW"
+    except Exception:
+        pass
     setup_out = dict(setup or {})
+    # Fix D (Ploy 2026-09-03 Lite-only): always expose thesis_invalidation even when trigger==null
+    try:
+        if not setup_out.get("thesis_invalidation"):
+            ev = wave.get("evidence") if isinstance(wave.get("evidence"), dict) else {}
+            w1_low = ev.get("wave1_low") or ev.get("wave1_anchor_low")
+            pullback_low = ev.get("pullback_low")
+            if w1_low is not None:
+                try:
+                    setup_out["thesis_invalidation"] = f"Close <= {float(w1_low):.2f} (W1 low · thesis invalidation)"
+                except Exception:
+                    setup_out["thesis_invalidation"] = str(w1_low)
+            elif pullback_low is not None:
+                try:
+                    setup_out["thesis_invalidation"] = f"Close <= {float(pullback_low):.2f} (W2 low · thesis invalidation)"
+                except Exception:
+                    setup_out["thesis_invalidation"] = str(pullback_low)
+    except Exception:
+        pass
     # Direct engine-to-contract composition can carry this legacy adapter
     # field.  Normalize it into the data layer so setup.reason_code remains a
     # setup-only diagnostic.
@@ -672,7 +767,7 @@ _LIST_NESTED_FIELDS = {
     ),
     "wave": (
         "timeframe", "primary_state", "state", "alternative_state", "confidence",
-        "context",
+        "context", "daily_structure",
     ),
     "setup": (
         "timeframe", "state", "status", "minor_structure", "trigger",

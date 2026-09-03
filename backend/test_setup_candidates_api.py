@@ -52,6 +52,22 @@ def test_quote_survives_compact_list_and_symbol_detail_projection():
     assert detail["quote"] == row["quote"]
 
 
+def test_daily_structure_is_preserved_with_list_detail_parity_and_exact_validation():
+    row = candidate("STRUCTURE")
+    row["wave"]["daily_structure"] = {
+        "phase": "WAVE_2_FORMING", "confidence": "MEDIUM", "actionability": "NONE",
+        "source_timeframe": "daily", "policy_version": "daily-structure-evidence-v1",
+        "as_of": "2026-08-30", "snapshot_id": "daily:2026-08-30", "anchors": {},
+        "retracement": None, "supporting_evidence": ["measured_retracement"],
+        "contradicting_evidence": [], "missing_evidence": [], "alternative_phases": [],
+    }
+    listed = project_setup_candidates_response([row])["items"][0]
+    from mvp_api import project_canonical_symbol_detail
+    detail = project_canonical_symbol_detail([row], "STRUCTURE")
+    assert listed["wave"]["daily_structure"] == row["wave"]["daily_structure"]
+    assert detail["wave"]["daily_structure"] == listed["wave"]["daily_structure"]
+
+
 def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     row = candidate()
     model = {"items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,

@@ -38,6 +38,39 @@ def test_only_wave3_states_are_publishable_and_api_fails_closed():
         assert "legacy_full_wave" in contract["audit_compatibility"]
 
 
+def test_daily_structure_exposes_full_wave_phase_without_promoting_it(monkeypatch):
+    import elliott_structure_engine as engine
+
+    monkeypatch.setattr(engine, "classify_wave_candidate", lambda *_: {
+        "timeframe": "daily", "state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH",
+        "evidence": {"retracement_pct": 42, "wave1_low": 10, "wave1_high": 20,
+                     "pullback_low": 14, "missing_evidence": []},
+    })
+    monkeypatch.setattr(engine, "classify_wave3_candidate", lambda *_: {
+        "published_state": "EARLY_WAVE_3", "raw_state": "EARLY_WAVE_3", "confidence": "MEDIUM",
+        "anchors": {}, "evidence": {}, "rejection_reasons": [],
+    })
+    result = build_wave_contract(frame(candles([10] * 5)), snapshot_id="daily:test")
+    daily = result["daily_structure"]
+    assert result["primary_state"] == "EARLY_WAVE_3"
+    assert daily["phase"] == "WAVE_2_NEAR_COMPLETION"
+    assert daily["actionability"] == "NONE"
+    assert daily["source_timeframe"] == "daily"
+    assert daily["policy_version"] == "daily-structure-evidence-v1"
+    assert daily["retracement"] == pytest.approx(0.42)
+    assert daily["snapshot_id"] == "daily:test"
+
+
+def test_daily_structure_unknown_keeps_missing_evidence_explicit():
+    result = build_wave_contract(pd.DataFrame())
+    daily = result["daily_structure"]
+    assert result["primary_state"] == "NOT_VERIFIABLE"
+    assert daily["phase"] == "UNKNOWN"
+    assert daily["actionability"] == "NONE"
+    assert "full_wave_phase" in daily["missing_evidence"]
+    assert daily["source_timeframe"] == "daily"
+
+
 def test_ordered_w1_w2_and_invalid_relation():
     result = _raw(candles(BASE + [14.8, 14.9]))
     low, high, w2 = (result["anchors"][k] for k in ("w1_low", "w1_high", "w2_low"))

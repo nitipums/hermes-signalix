@@ -39,6 +39,27 @@ def test_candidate_contract_keeps_layers_separate():
     json.dumps(item)
 
 
+def test_daily_structure_is_non_actionable_and_cannot_change_lane():
+    base = build_setup_candidate(**sample_inputs())
+    with_context = dict(sample_inputs())
+    with_context["wave"] = {
+        **with_context["wave"],
+        "primary_state": "WAVE_2_NEAR_COMPLETION",
+        "daily_structure": {
+            "phase": "WAVE_4_CORRECTION", "confidence": "HIGH", "actionability": "REVIEW",
+            "source_timeframe": "60m", "policy_version": "wrong", "as_of": "x",
+            "snapshot_id": "x", "anchors": {}, "retracement": None,
+            "supporting_evidence": [], "contradicting_evidence": [], "missing_evidence": [],
+            "alternative_phases": [],
+        },
+    }
+    context = build_setup_candidate(**with_context)
+    assert context["decision_lane"] == base["decision_lane"]
+    assert context["wave"]["daily_structure"]["actionability"] == "NONE"
+    assert context["wave"]["daily_structure"]["source_timeframe"] == "daily"
+    assert context["setup"]["timeframe"] == "60m"
+
+
 def test_quote_is_optional_and_has_explicit_source_boundary():
     inputs = sample_inputs()
     inputs["provenance"] = {

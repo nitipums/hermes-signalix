@@ -1110,6 +1110,61 @@ _NEXT_PLAUSIBLE = {
 _CONFIDENCE_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 _WAVE_CONTEXT_RULE_VERSION = "elliott-full-wave-context-v1"
 _WAVE_CONTEXT_SECONDARY_MARKERS = {"WAVE_3_EXTENDED"}
+_DAILY_STRUCTURE_POLICY_VERSION = "daily-structure-evidence-v1"
+
+
+def _build_daily_structure(legacy_raw: dict, daily_df, snapshot_id: str | None,
+                           as_of: str | None) -> dict:
+    """Expose the already-computed full Daily result as non-actionable evidence."""
+    raw = legacy_raw if isinstance(legacy_raw, dict) else {}
+    evidence = raw.get("evidence") if isinstance(raw.get("evidence"), dict) else {}
+    phase = raw.get("state") if raw.get("state") in _WAVE_CONTRACT_STATES else "UNKNOWN"
+    confidence = {"PARTIAL": "MEDIUM", "INSUFFICIENT": "LOW"}.get(
+        str(raw.get("confidence") or "").upper(), str(raw.get("confidence") or "").upper()
+    )
+    if confidence not in _CONFIDENCE_ORDER or phase == "UNKNOWN":
+        confidence = "LOW"
+
+    # These are values already emitted by the full-wave classifier. Do not
+    # infer an anchor or retracement from the narrow Wave-3 detector here.
+    anchors = {}
+    for name in ("wave1_low", "wave1_high", "pullback_low", "pullback_high"):
+        value = evidence.get(name)
+        if value is not None:
+            anchors[name] = _json_value(value)
+    retracement = evidence.get("retracement_pct")
+    if retracement is not None:
+        try:
+            retracement = float(retracement) / 100.0
+        except (TypeError, ValueError):
+            retracement = None
+        if retracement is not None and not math.isfinite(retracement):
+            retracement = None
+
+    supporting = _supporting_evidence(evidence, phase)
+    contradicting = _contradicting_evidence(evidence, phase)
+    missing = _missing_evidence(evidence, phase)
+    if not isinstance(raw.get("state"), str) or phase == "UNKNOWN":
+        missing.append("full_wave_phase")
+    alternatives = []
+    alternative = evidence.get("alternative_state") or raw.get("alternative_state")
+    if alternative in _WAVE_CONTRACT_STATES and alternative != phase:
+        alternatives.append(alternative)
+    return {
+        "phase": phase,
+        "confidence": confidence,
+        "actionability": "NONE",
+        "source_timeframe": "daily",
+        "policy_version": _DAILY_STRUCTURE_POLICY_VERSION,
+        "as_of": as_of,
+        "snapshot_id": snapshot_id,
+        "anchors": anchors,
+        "retracement": _json_value(retracement),
+        "supporting_evidence": sorted(set(supporting)),
+        "contradicting_evidence": sorted(set(contradicting)),
+        "missing_evidence": sorted(set(missing)),
+        "alternative_phases": alternatives,
+    }
 
 
 def _evidence_list(value) -> list[str]:
@@ -1436,6 +1491,9 @@ def build_wave_contract(daily_df, swing_evidence: dict | None = None, *, snapsho
     as_of = _marker_timestamp(daily_df, len(daily_df) - 1) if daily_df is not None and len(daily_df) else None
     identity = snapshot_id or ("daily:" + as_of if as_of is not None else None)
     contract["snapshot_id"] = identity
+    contract["daily_structure"] = _build_daily_structure(
+        legacy_raw, daily_df, identity, as_of
+    )
     marker_specs = [
         ("WAVE_1_LOW", anchors.get("w1_low"), "Wave 1 low", "WAVE_1"),
         ("WAVE_1_HIGH", anchors.get("w1_high"), "Wave 1 high", "WAVE_1"),
