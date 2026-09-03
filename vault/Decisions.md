@@ -96,6 +96,12 @@ Decision: `EARLY_WAVE_3`/`WAVE_3_CONTINUATION` require a Daily Close above the W
 
 Evidence: commit `d31a2d2` + OHLC fail-closed remediation; frozen fixtures CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION HIGH.
 
+## 2026-09-03 — Daily structural evidence integration direction (OWNER-APPROVED)
+
+Decision: Keep `wave.primary_state` as the sole canonical decision spine and restore broader Daily Wave 1/2/4/5 visibility through an additive `wave.daily_structure` evidence object. The phase is explicitly non-actionable (`actionability=NONE`), cannot create `REVIEW_NOW`, cannot change setup validity, and cannot let 60m overwrite Daily structure. W3 publication gate `r<=0.60` remains unchanged. W1/W2 are evidence-only first; `WAVE_2_NEAR_COMPLETION` is the next candidate for a separately gated lane experiment; W4/W5 remain context/risk evidence until replay proves stability.
+
+Evidence: Codex read-only integration review `/tmp/codex_other_wave_integration_last.md`; current live distribution showed broader states only in `wave.context.mapped_state` (237/237 evaluated). Focused design: `docs/current/2026-09-03-daily-structure-evidence-integration-spec.md`. Implementation/runtime acceptance remains pending.
+
 ## 2026-09-03 — W3 publication gate milestone (LITE-VERIFIED)
 
 Decision: Keep `0.236 <= r <= 0.786` as internal anchor admissibility only. Require raw finite `r <= 0.60` for published `EARLY_WAVE_3` and `WAVE_3_CONTINUATION`; a hard failure becomes `NOT_VERIFIABLE` before hysteresis. `EARLY_WAVE_3` requires a completed Daily close above W1 high without follow-through PASS; continuation requires the same close plus follow-through. Other wave states remain a separate next tuning decision and are not treated as deleted data.
