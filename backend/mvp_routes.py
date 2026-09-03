@@ -6,11 +6,13 @@ projection and chart DB access never run a scan or mutate PostgreSQL.
 from __future__ import annotations
 
 import json
+import hmac
 import os
 import sys
 import threading
 import time
 import atexit
+from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlsplit
 
 from mvp_snapshot import load_mvp_artifact
@@ -383,6 +385,16 @@ def _validate_canonical_serving_model(model):
     return model
 
 
+def _team_scan_authorized(handler):
+    """Authenticate the dedicated read-only team consumer at request time."""
+    configured = os.getenv("TEAM_SCAN_API_KEY", "")
+    presented = ""
+    headers = getattr(handler, "headers", None)
+    if headers is not None:
+        presented = headers.get("X-Signalix-Team-Key", "") or ""
+    return bool(configured) and hmac.compare_digest(str(presented), str(configured))
+
+
 def _overlay_latest_intraday_metadata(payload):
     """Compatibility adapter for the canonical freshness-lineage seam."""
     from canonical_freshness_lineage import overlay_latest_intraday_metadata
@@ -395,6 +407,81 @@ def _not_found(handler, symbol):
 
 def _handle_canonical_routes(route, qs, handler) -> bool:
     """Handle canonical setup-candidate and symbol routes."""
+    team_history_prefix = "/api/team/setup-candidates/"
+    if route.startswith(team_history_prefix) and route.endswith("/history"):
+        if not _team_scan_authorized(handler):
+            json_response(handler, {"error": "team_scan_unauthorized"}, status=401)
+            return True
+        symbol = route[len(team_history_prefix):-len("/history")].strip().strip("/").upper()
+        if not symbol:
+            json_response(handler, {"error": "symbol required"}, status=400)
+            return True
+        timeframe = (qs.get("timeframe", ["1D"])[0] or "").strip()
+        if timeframe not in {"1D", "60m"}:
+            json_response(handler, {"error": "invalid_request", "reason": "invalid_timeframe"}, status=400)
+            return True
+        try:
+            limit = int(qs.get("limit", ["400" if timeframe == "1D" else "200"])[0])
+        except (TypeError, ValueError):
+            limit = 0
+        from team_facts_api import MAX_DAILY, MAX_INTRADAY
+        maximum = MAX_DAILY if timeframe == "1D" else MAX_INTRADAY
+        if limit <= 0 or limit > maximum:
+            json_response(handler, {"error": "invalid_request", "reason": "invalid_limit",
+                                    "max_limit": maximum}, status=400)
+            return True
+        try:
+            from read_model_publisher import load_current_read_model
+            from team_facts_api import MAX_DAILY, build_history_response, load_history
+            model = _validate_canonical_serving_model(load_current_read_model())
+            if not any(str(item.get("symbol", "")).upper() == symbol for item in model["items"]):
+                _not_found(handler, symbol)
+                return True
+            pg, release = _acquire_setup_candidates_pg()
+            try:
+                daily_rows = load_history(pg, symbol, "1D", MAX_DAILY)
+                intraday_rows = load_history(pg, symbol, "60m", MAX_INTRADAY)
+            finally:
+                release()
+            result = build_history_response(
+                model, symbol, daily_rows, intraday_rows,
+                timeframe=timeframe, limit=limit, now=datetime.now(timezone.utc),
+            )
+            if result is None:
+                _not_found(handler, symbol)
+            else:
+                json_response(handler, result)
+        except Exception:
+            json_response(handler, {"error": "team_facts_unavailable"}, status=503)
+        return True
+    if route in ("/api/team/setup-candidates", "/api/team/setup-candidates/"):
+        if not _team_scan_authorized(handler):
+            json_response(handler, {"error": "team_scan_unauthorized"}, status=401)
+            return True
+        universe = (qs.get("universe", [_CANONICAL_UNIVERSE])[0]
+                    or _CANONICAL_UNIVERSE).strip().lower()
+        if universe != _CANONICAL_UNIVERSE:
+            json_response(handler, {
+                "error": "invalid_request",
+                "reason": "unsupported_universe",
+                "universe": universe,
+            }, status=400)
+            return True
+        try:
+            from team_facts_api import build_response, load_ohlcv
+            from read_model_publisher import load_current_read_model
+            model = _validate_canonical_serving_model(load_current_read_model())
+            symbols = sorted(str(item.get("symbol", "")).upper() for item in model["items"])
+            pg, release = _acquire_setup_candidates_pg()
+            try:
+                daily, intraday = load_ohlcv(pg, symbols)
+            finally:
+                release()
+            result = build_response(model, daily, intraday, now=datetime.now(timezone.utc))
+            json_response(handler, result)
+        except Exception:
+            json_response(handler, {"error": "team_facts_unavailable"}, status=503)
+        return True
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
         universe = (qs.get("universe", [_CANONICAL_UNIVERSE])[0] or _CANONICAL_UNIVERSE).strip().lower()
         if universe != _CANONICAL_UNIVERSE:
