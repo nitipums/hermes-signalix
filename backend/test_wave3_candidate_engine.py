@@ -48,15 +48,87 @@ def test_ordered_w1_w2_and_invalid_relation():
     assert "invalid_w2_relation_requires_w1_low<w2_low<w1_high" in anchor_contradictions(invalid)
 
 
+def test_invalid_anchor_denominator_fails_closed_without_wave3_publication():
+    flat = candles([10] * 10)
+    raw = _raw(flat)
+    assert raw["raw_state"] == "NOT_VERIFIABLE"
+    assert raw["retracement"] is None
+    assert "no_valid_ordered_w1_w2_retracement" in raw["rejection_reasons"]
+
+
 def test_close_only_early_continuation_and_post_impulse_exclusion():
     wick = candles(BASE + [14.8, 14.9]); wick[-1]["high"] = 16
     assert _raw(wick)["close_vs_wick_confirmation"] == "WICK_ONLY"
     assert _raw(wick)["raw_state"] != "WAVE_3_CONTINUATION"
-    assert _raw(candles(BASE + [14.8, 14.9]))["raw_state"] == "EARLY_WAVE_3"
+    assert _raw(candles(BASE + [14.8, 14.9]))["raw_state"] == "NOT_VERIFIABLE"
     assert _raw(candles(BASE + [15.2, 15.4, 15.6]))["raw_state"] == "WAVE_3_CONTINUATION"
     corrected = _raw(candles(BASE + [15.2, 15.6, 16.2, 17, 18, 17.8, 17.1, 16.2, 15.2]))
     assert corrected["raw_state"] == "NOT_VERIFIABLE"
     assert "post_impulse_correction_excluded" in corrected["rejection_reasons"]
+
+
+@pytest.mark.parametrize("retracement", [0.5999, 0.6000])
+@pytest.mark.parametrize("state", ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"])
+def test_publication_boundary_allows_raw_retracement_at_or_below_sixty(monkeypatch, retracement, state):
+    candidate = {"raw_state": state, "published_state": state, "retracement": retracement,
+                 "rejection_reasons": [], "evidence": {}}
+    monkeypatch.setattr("wave3_candidate_engine._raw", lambda _candles: dict(candidate))
+    monkeypatch.setattr("wave3_candidate_engine._safe", lambda value: value)
+    result = classify_candles(candles([10] * 5))
+    assert result["published_state"] == state
+
+
+@pytest.mark.parametrize("retracement", [0.6001, 0.6049, 0.625])
+@pytest.mark.parametrize("state", ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"])
+def test_publication_boundary_blocks_raw_retracement_above_sixty_even_with_hysteresis(monkeypatch, retracement, state):
+    candidate = {"raw_state": state, "published_state": state, "retracement": retracement,
+                 "rejection_reasons": [], "evidence": {}}
+    monkeypatch.setattr("wave3_candidate_engine._raw", lambda _candles: dict(candidate))
+    monkeypatch.setattr("wave3_candidate_engine._safe", lambda value: value)
+    result = classify_candles(candles([10] * 5))
+    assert result["raw_state"] == state
+    assert result["published_state"] == "NOT_VERIFIABLE"
+    assert "retracement_gate_exceeded" in result["rejection_reasons"]
+    assert "adjacent_as_of_hysteresis_not_satisfied" not in result["rejection_reasons"]
+
+
+@pytest.mark.parametrize("retracement", [None, float("nan")])
+def test_publication_requires_finite_raw_retracement(monkeypatch, retracement):
+    candidate = {"raw_state": "EARLY_WAVE_3", "published_state": "EARLY_WAVE_3",
+                 "retracement": retracement, "rejection_reasons": [], "evidence": {}}
+    monkeypatch.setattr("wave3_candidate_engine._raw", lambda _candles: dict(candidate))
+    monkeypatch.setattr("wave3_candidate_engine._safe", lambda value: value)
+    result = classify_candles(candles([10] * 5))
+    assert result["published_state"] == "NOT_VERIFIABLE"
+    assert "retracement_gate_unmeasured" in result["rejection_reasons"]
+
+
+@pytest.mark.parametrize("symbol, expected_retracement", [("CRC", 0.7307692307692308), ("BGRIM", 0.6249999999999999)])
+def test_frozen_crc_bgrim_candidates_do_not_publish_above_raw_gate(symbol, expected_retracement):
+    payload = json.loads((Path(__file__).parent / "fixtures" / "elliott" / f"{symbol}_daily_1y.json").read_text())
+    daily = pd.DataFrame(payload["rows"]).rename(
+        columns={"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+    )
+    daily.index = pd.date_range("2026-01-01", periods=len(daily), freq="D")
+    candidate = classify_frame(daily.drop(columns=["date"]))
+    assert candidate["retracement"] == pytest.approx(expected_retracement)
+    assert candidate["published_state"] == "NOT_VERIFIABLE"
+    if candidate["raw_state"] in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}:
+        assert "retracement_gate_exceeded" in candidate["rejection_reasons"]
+
+
+def test_hysteresis_suppresses_only_an_otherwise_eligible_candidate(monkeypatch):
+    calls = {"count": 0}
+    def raw(_candles):
+        calls["count"] += 1
+        state = "EARLY_WAVE_3" if len(_candles) == 60 else "NOT_VERIFIABLE"
+        return {"raw_state": state, "published_state": state, "retracement": 0.60,
+                "rejection_reasons": [], "evidence": {}}
+    monkeypatch.setattr("wave3_candidate_engine._raw", raw)
+    monkeypatch.setattr("wave3_candidate_engine._safe", lambda value: value)
+    result = classify_candles(candles([10] * 5))
+    assert result["published_state"] == "NOT_VERIFIABLE"
+    assert "adjacent_as_of_hysteresis_not_satisfied" in result["rejection_reasons"]
 
 
 def test_missing_short_flat_no_lookahead_hysteresis_and_json_safety():
@@ -69,7 +141,7 @@ def test_missing_short_flat_no_lookahead_hysteresis_and_json_safety():
     future = {**prefix[-1], "date": "2026-04-01", "open": 99, "high": 99, "low": 99, "close": 99}
     assert classify_candles(prefix) == classify_candles((prefix + [future])[:-1])
     result = classify_candles(prefix)
-    assert result["evidence"]["adjacent_as_of_raw_states"] == ["EARLY_WAVE_3", "EARLY_WAVE_3"]
+    assert result["evidence"]["adjacent_as_of_raw_states"] == ["NOT_VERIFIABLE", "NOT_VERIFIABLE"]
     json.dumps(build_wave_contract(frame(prefix)), allow_nan=False)
 
 

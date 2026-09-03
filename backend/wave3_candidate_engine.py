@@ -23,7 +23,7 @@ MIN_ADVANCE = 0.08
 MIN_LEG_BARS = 5
 MIN_RETRACE = 0.236
 MAX_RETRACE = 0.786
-APPROACH_RATIO = 0.95
+MAX_PUBLICATION_RETRACE = 0.60
 FOLLOW_THROUGH_WINDOW = 5
 POST_IMPULSE_DRAWDOWN = 0.20
 
@@ -212,8 +212,6 @@ def _raw(candles: list[dict]) -> dict:
         state = "NOT_VERIFIABLE"; reasons.append("post_impulse_correction_excluded")
     elif follow:
         state = "WAVE_3_CONTINUATION"
-    elif breakout_i is None and last["close"] >= high.price * APPROACH_RATIO:
-        state = "EARLY_WAVE_3"; reasons.append("awaiting_sustained_daily_close_confirmation")
     elif breakout_i is not None and close_above:
         state = "EARLY_WAVE_3"; reasons.append("daily_close_break_present_but_follow_through_not_yet_sustained")
     else:
@@ -227,7 +225,9 @@ def _raw(candles: list[dict]) -> dict:
     return _safe({
         "policy_version": POLICY_VERSION, "raw_state": state, "published_state": state,
         "confidence": confidence, "as_of": last["date"], "bars": len(bars), "anchors": anchors,
-        "retracement": round(retrace, 4),
+        # Keep the raw ratio for the publication gate and downstream audit;
+        # display rounding must never decide whether W3 is publishable.
+        "retracement": retrace,
         "close_vs_wick_confirmation": "CLOSE" if close_above else "WICK_ONLY" if wick_only else "NONE",
         "follow_through": {"status": "PASS" if follow else "ABSENT", "closes_above_w1_high": closes_above, "window_bars": FOLLOW_THROUGH_WINDOW},
         "evidence": {"timeframe": "Daily", "no_lookahead": True,
@@ -247,7 +247,20 @@ def classify_candles(candles: list[dict]) -> dict:
     adjacent = [previous["raw_state"], current["raw_state"]]
     current["evidence"]["adjacent_as_of_raw_states"] = adjacent
     current["evidence"]["hysteresis_rule"] = "same candidate state on two adjacent as-of prefixes"
-    if current["raw_state"] not in PUBLISHABLE_STATES or adjacent[0] != adjacent[1]:
+    retracement = current.get("retracement")
+    publication_gate_ok = (
+        current["raw_state"] not in PUBLISHABLE_STATES
+        or (isinstance(retracement, (int, float))
+            and math.isfinite(retracement)
+            and retracement <= MAX_PUBLICATION_RETRACE)
+    )
+    if not publication_gate_ok:
+        current["published_state"] = "NOT_VERIFIABLE"
+        has_finite_retracement = isinstance(retracement, (int, float)) and math.isfinite(retracement)
+        reason = "retracement_gate_exceeded" if has_finite_retracement else "retracement_gate_unmeasured"
+        if reason not in current["rejection_reasons"]:
+            current["rejection_reasons"].append(reason)
+    elif current["raw_state"] not in PUBLISHABLE_STATES or adjacent[0] != adjacent[1]:
         current["published_state"] = "NOT_VERIFIABLE"
         if current["raw_state"] in PUBLISHABLE_STATES and adjacent[0] != adjacent[1]:
             current["rejection_reasons"].append("adjacent_as_of_hysteresis_not_satisfied")

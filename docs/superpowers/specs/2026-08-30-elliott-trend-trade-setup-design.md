@@ -149,7 +149,8 @@ Elliott v1 uses a conservative observable proxy. It derives candidates only from
 Owner-tuned 2026-09-01 Wave-3 publication boundary:
 - The canonical detector publishes only `EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, or fail-closed `NOT_VERIFIABLE`. Wave 1/2 anchors are prerequisites/evidence, not public primary states. The prior full-wave interpretation may remain only in an explicit audit/compatibility namespace.
 - Required Daily structure is strictly ordered `W1 low -> W1 high -> W2 low`, with `W1_low < W2_low < W1_high`, a significant advance, and a 23.6%–78.6% retracement. Centred pivots are usable only after their right-hand confirmation bars exist.
-- `EARLY_WAVE_3` requires a valid W1/W2 sequence approaching/testing the W1 high without sustained confirmation. `WAVE_3_CONTINUATION` requires final Daily closes above W1 high with follow-through. A wick never confirms.
+- `EARLY_WAVE_3` requires a valid W1/W2 sequence and a completed Daily close above W1 high without follow-through PASS. `WAVE_3_CONTINUATION` requires the same close plus follow-through PASS. A wick never confirms, and follow-through is not universal to Early.
+- Publication guard: either published Wave-3 state requires the raw finite retracement ratio `r <= 0.60`; the anchor admissibility range remains `0.236 <= r <= 0.786`. Values above 0.60 remain preserved as raw candidate/evidence but publish fail-closed as `NOT_VERIFIABLE`. Adjacent-as-of hysteresis is suppression-only and cannot rescue this hard gate.
 - A confirmed post-impulse correction is excluded as `NOT_VERIFIABLE`; it must not remain Wave 3 continuation. MA and volume affect confidence only and never create state.
 
 Owner-tuned 2026-08-31:
