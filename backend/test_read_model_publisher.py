@@ -9,6 +9,7 @@ from read_model_publisher import (build_read_model, load_current_read_model,
                                   load_intraday_metadata, publish_builder_result,
                                   publish_intraday_metadata, publish_read_model,
                                   DEFAULT_ROOT, UniverseIdentity)
+import read_model_publisher
 
 
 def test_default_root_is_shared_backend_read_model_path():
@@ -173,6 +174,49 @@ def test_publish_is_deterministic_and_pointer_selects_complete_version(tmp_path)
     stored = json.loads((tmp_path / "versions" / pointer["path"]).read_text())
     assert result["source_version"] == stored["source_version"]
     assert [item["symbol"] for item in stored["items"]] == [item["symbol"] for item in model["items"]]
+
+
+def test_model_revision_changes_identity_without_changing_ingestion_lineage(monkeypatch):
+    first = read_model_publisher._source_version(VERSIONS)
+    monkeypatch.setattr(read_model_publisher, "MODEL_REVISION", "test-next")
+    second = read_model_publisher._source_version(VERSIONS)
+    assert first != second
+
+
+def test_identical_lineage_and_revision_is_idempotent_but_content_collision_stays_blocked(tmp_path):
+    items, metadata = _build()
+    model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    first = publish_read_model(model, tmp_path)
+    second = publish_read_model(model, tmp_path)
+    assert second == first
+    changed = dict(model, published_at="t2")
+    with pytest.raises(ValueError, match="different content"):
+        publish_read_model(changed, tmp_path)
+
+
+def test_quote_bearing_republish_gets_new_revision_and_preserves_old_file(tmp_path, monkeypatch):
+    items, metadata = _build(1)
+    old_revision = read_model_publisher.MODEL_REVISION
+    monkeypatch.setattr(read_model_publisher, "MODEL_REVISION", "1")
+    old_model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="old")
+    old_result = publish_read_model(old_model, tmp_path)
+    old_path = tmp_path / "versions" / f"{old_result['source_version']}.json"
+    old_bytes = old_path.read_bytes()
+
+    monkeypatch.setattr(read_model_publisher, "MODEL_REVISION", old_revision)
+    items[0]["quote"] = {
+        "price": 13.5, "change_pct": 2.5,
+        "change_basis": "previous_daily_close", "change_amount": 0.33,
+        "change_amount_basis": "previous_daily_close", "source": "price_data",
+        "as_of": "2026-09-01", "provisional": False,
+    }
+    new_model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="new")
+    new_result = publish_read_model(new_model, tmp_path)
+    assert new_result["source_version"] != old_result["source_version"]
+    assert json.loads((tmp_path / "current.json").read_text())["source_version"] == new_result["source_version"]
+    assert json.loads((tmp_path / "versions" / f"{new_result['source_version']}.json").read_text())["items"][0]["quote"]["price"] == 13.5
+    assert load_current_read_model(tmp_path)["items"][0]["quote"]["price"] == 13.5
+    assert old_path.read_bytes() == old_bytes
 
 
 def test_load_current_read_model_rejects_missing_or_malformed_pointer(tmp_path):

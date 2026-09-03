@@ -34,6 +34,23 @@ The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `si
 
 The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
 
+### Quote-complete read-model republish (after promotion)
+
+After the code promotion/reload is approved, Lite runs the publisher in-process
+inside the backend container; this does not run ingestion or write PostgreSQL:
+
+```bash
+docker exec signalix_backend python -c 'import update_data; update_data.publish_canonical_read_model()'
+```
+
+Expected success output includes one line beginning
+`READ_MODEL_PUBLISHED ` with JSON containing `count: 237`, a new
+`source_version` beginning `read-model-`, and the versioned artifact path.
+The publisher first builds the quote-bearing model, writes the new immutable
+`backend/read-model/versions/<source_version>.json`, then atomically moves
+`backend/read-model/current.json`. A `READ_MODEL_SKIP` line means the
+republish did not complete and must not be treated as acceptance evidence.
+
 `/root/signalix` is the canonical production bind mount. Session closeout 2026-09-02 archived the stale R4/R5 Kanban graph; many historical/feature worktrees remain on disk and must be inspected before removal. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`; no retired path is treated as current source.
 
 

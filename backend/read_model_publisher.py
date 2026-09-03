@@ -23,6 +23,9 @@ from setup_candidate_contract import sort_setup_candidates
 
 
 CONTRACT_VERSION = "signalix.setup-candidates.read-model.v1"
+# Bump when the serving representation changes while ingestion lineage stays
+# the same. Version files remain immutable for each lineage + revision.
+MODEL_REVISION = "2"
 DEFAULT_UNIVERSE = "marginable_long"
 LANES = ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED")
 DEFAULT_ROOT = Path(__file__).resolve().parent / "read-model"
@@ -129,10 +132,10 @@ def _json_bytes(payload: Any) -> bytes:
 
 
 def _source_version(source_versions: dict[str, Any]) -> str:
-    """Create a stable identity from the completed Daily/60m inputs."""
+    """Create a stable identity from inputs and the serving-model revision."""
     if not isinstance(source_versions, dict) or not source_versions:
         raise ValueError("source_versions are required")
-    identity = _json_bytes(source_versions)
+    identity = _json_bytes({"revision": MODEL_REVISION, **source_versions})
     return "read-model-" + hashlib.sha256(identity).hexdigest()[:16]
 
 
