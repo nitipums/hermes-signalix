@@ -406,10 +406,10 @@
     return daily === "unknown" || intraday === "unknown" ? "partial" : "mixed";
   }
 
-  function freshnessTimeLabel(prefix, status, timestamp) {
+  function freshnessTimeLabel(prefix, status, timestamp, unavailableCount) {
     status = normalizeFreshnessStatus(status);
     if (status === "loading") return prefix + ": Loading…";
-    if (status === "fresh" || status === "market_closed") return prefix + ": fresh · " + timeAgo(timestamp);
+    if (status === "fresh" || status === "market_closed") return prefix + ": fresh" + (unavailableCount ? " · " + unavailableCount + " unavailable" : "") + " · " + timeAgo(timestamp);
     if (status === "expected_previous") return prefix + ": expected previous completed session · " + timeAgo(timestamp);
     if (status === "stale") return prefix + ": stale · " + timeAgo(timestamp);
     return prefix + ": unavailable";
@@ -420,7 +420,8 @@
     var effectiveIntradayStatus = normalizeFreshnessStatus(intradayStatus || (intradayAt ? "fresh" : "unknown"));
     var summary = freshnessSummary(effectiveDailyStatus, effectiveIntradayStatus);
     dom.freshnessDot.className = "freshness-dot freshness-dot--" + (summary === "mixed" || summary === "partial" ? "stale" : summary);
-    var daily = freshnessTimeLabel("Daily EOD", effectiveDailyStatus, asOf);
+    var dailyUnavailableCount = arguments.length > 5 && arguments[5] != null ? Number(arguments[5]) : 0;
+    var daily = freshnessTimeLabel("Daily EOD", effectiveDailyStatus, asOf, dailyUnavailableCount);
     var intraday = freshnessTimeLabel("60m", effectiveIntradayStatus, intradayAt);
     if (dom.freshnessDaily) dom.freshnessDaily.textContent = daily;
     if (dom.freshness60m) dom.freshness60m.textContent = intraday;
@@ -568,8 +569,8 @@
   }
 
   function canonicalWaveState(item) {
-    var context = waveContextForItem(item);
-    var state = context && context.mapped_state;
+    var wave = item && item.wave;
+    var state = wave && wave.primary_state;
     return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "Unknown / Not verified";
   }
 
@@ -587,14 +588,14 @@
   }
 
   function setupCandidateWaveBucket(item) {
-    var context = waveContextForItem(item);
-    var state = context && context.mapped_state;
+    var wave = item && item.wave;
+    var state = wave && wave.primary_state;
     return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "UNKNOWN";
   }
 
   function compactWaveConfidence(item) {
-    var context = waveContextForItem(item);
-    var confidence = context && context.confidence;
+    var wave = item && item.wave;
+    var confidence = wave && wave.confidence;
     confidence = confidence == null ? "" : String(confidence).toUpperCase();
     return ["LOW", "MEDIUM", "HIGH"].indexOf(confidence) >= 0 ? confidence : "NOT_VERIFIED";
   }
@@ -607,6 +608,7 @@
     var nonActionable = ["WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION", "Unknown / Not verified"].indexOf(state) >= 0;
     return {
       state: state, secondary: secondary, confidence: compactWaveConfidence(item),
+      contextState: context && context.mapped_state,
       rule: context && context.rule_version,
       source: context && context.source_timeframe === "daily" ? "Daily structural · daily" : "Daily structural · source unavailable",
       supporting: context && context.supporting_evidence, contradicting: context && context.contradicting_evidence,
@@ -629,7 +631,7 @@
       return '<li>' + escapeHTML(waveEvidenceText(entry)) + '</li>';
     }).join("") : '<li>Unavailable · no source-linked transition history</li>';
     dom.drawerWaveContext.innerHTML = '<strong class="wave-context-detail__status">' + escapeHTML(view.actionability) + '</strong>' +
-      '<dl>' + evidenceRow("Secondary", view.secondary) + evidenceRow("Rule", view.rule) +
+      '<dl>' + evidenceRow("Daily context state", view.contextState) + evidenceRow("Secondary", view.secondary) + evidenceRow("Rule", view.rule) +
       evidenceRow("First / last context", view.firstDate && view.lastDate ? view.firstDate + " / " + view.lastDate : null) +
       evidenceRow("Supporting", view.supporting) + evidenceRow("Contradicting", view.contradicting) +
       evidenceRow("Missing", view.missing) + evidenceRow("Rationale", view.rationale) + '</dl>' +
@@ -675,7 +677,7 @@
     var explanation = wave.evidence_explanation && typeof wave.evidence_explanation === "object" && !Array.isArray(wave.evidence_explanation)
       ? wave.evidence_explanation : wave.explanation && typeof wave.explanation === "object" && !Array.isArray(wave.explanation) ? wave.explanation : {};
     return {
-      timeframe: "1D", source: provenance.daily_source || "price_data", confidence: context.confidence || wave.confidence,
+      timeframe: "1D", source: provenance.daily_source || "price_data", confidence: wave.confidence,
       rule: context.rule_version || explanation.rule, evidence: explanation.evidence, policy: explanation.policy,
       supporting_evidence: context.supporting_evidence || wave.supporting_evidence,
       contradicting_evidence: context.contradicting_evidence || wave.contradicting_evidence,
@@ -726,7 +728,10 @@
     dom.drawerSector.textContent = "Sector " + (item.sector || companyContext.sector || "Unknown");
     dom.drawerIndustry.textContent = "Industry " + (item.industry || companyContext.industry || "Unknown");
     dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap != null ? item.market_cap : companyContext.market_cap);
-    dom.drawerTradeValue.textContent = "Trade value " + fmtNum(item.trade_value || item.avgDailyValue20);
+    var dailyMetrics = item.daily_metrics && typeof item.daily_metrics === "object" ? item.daily_metrics : {};
+    var tradeValue = item.trade_value != null ? item.trade_value
+      : item.avgDailyValue20 != null ? item.avgDailyValue20 : dailyMetrics.avg_trade_value_20;
+    dom.drawerTradeValue.textContent = tradeValue == null ? "Trade value Not verified" : "Trade value " + fmtNum(tradeValue);
     dom.drawerDescription.textContent = item.description || "";
     dom.drawerDescription.hidden = !item.description;
     var quote = quoteEnvelope(item) || (item.vcp_result ? {price: item.close, change_pct: item.change_pct, change_amount: item.change_amount} : null);
@@ -1658,7 +1663,7 @@
     var intradayStatuses = items.map(function(item) { return (item.data_status || {}).intraday_60m_freshness; }).filter(Boolean);
     var dailyStatus = freshness.daily_status || (dailyStatuses.indexOf("stale") >= 0 ? "stale" : dailyStatuses.length && dailyStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
     var intradayStatus = freshness.intraday_status || (intradayStatuses.indexOf("stale") >= 0 ? "stale" : intradayStatuses.length && intradayStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
-    setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus);
+    setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus, freshness.daily_unavailable_count);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
     var provenanceSource = freshness.source || (items[0] && items[0].provenance && items[0].provenance.source) || "price_data+intraday_price_data";
     dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m fetched " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · latest completed 60m candle " + (intradayLatestBarAt ? formatProvenance(intradayLatestBarAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");

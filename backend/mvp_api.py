@@ -255,7 +255,11 @@ def _card_to_shortlist_item(item: dict, scan_time: str | None, scan_run_id: str 
         "change_pct": _resolve_change_pct(item),
         "change_amount": _resolve_change_amount(item),
         "volume": _number(item.get("volume"), 0),
-        "avgDailyValue20": _number(item.get("avgDailyValue20"), 0),
+        "avgDailyValue20": _number(
+            item.get("avgDailyValue20")
+            if item.get("avgDailyValue20") is not None
+            else (item.get("daily_metrics") or {}).get("avg_trade_value_20")
+        ),
         "setup_quality": {
             "pass": bool(sq.get("pass")),
             "score": _number(sq.get("score")),
@@ -765,6 +769,32 @@ class _CandidateRowResult:
     intraday_freshness: str
 
 
+def _daily_metrics_observation(daily_df) -> dict:
+    """Return only the bounded Daily liquidity observation used by the drawer."""
+    if daily_df is None or len(daily_df) == 0:
+        return {}
+    try:
+        values = (daily_df[["close", "volume"]].tail(20).astype(float)
+                  .dropna())
+        if values.empty:
+            return {}
+        return {"avg_trade_value_20": float(
+            (values["close"] * values["volume"]).mean()
+        )}
+    except (KeyError, TypeError, ValueError):
+        return {}
+
+
+def _aggregate_freshness_status(statuses: list[str]) -> str:
+    """Use the strict majority status; ties fail closed to stale/unknown."""
+    counts = {status: statuses.count(status) for status in ("fresh", "stale", "unknown")}
+    if counts["fresh"] > counts["stale"] and counts["fresh"] > counts["unknown"]:
+        return "fresh"
+    if counts["stale"] >= counts["fresh"] and counts["stale"] >= counts["unknown"]:
+        return "stale"
+    return "unknown"
+
+
 def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResult:
     """Finalize one evaluated symbol into the canonical candidate contract."""
     symbol = context.symbol
@@ -784,6 +814,10 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
     wave = context.wave
     setup = dict(context.setup)
     canonical_metadata = context.canonical_metadata
+    if canonical_metadata is None:
+        canonical_metadata = {}
+    canonical_metadata = dict(canonical_metadata)
+    canonical_metadata.setdefault("daily_metrics", _daily_metrics_observation(daily_df))
     as_of = daily_df.index[-1].isoformat() if daily_evidence_valid else None
     prior_ath = None
     if daily_df is not None and "High" in daily_df and len(daily_df) > 1:
@@ -1006,20 +1040,11 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                          else "stale" if any(value == "stale" for value in freshness_statuses) else "unknown")
     evaluate_ms = round((time.monotonic() - stage_started) * 1000, 3)
     total_ms = round((time.monotonic() - build_started) * 1000, 3)
-    def aggregate_statuses(statuses):
-        statuses = set(statuses)
-        if "stale" in statuses:
-            return "stale"
-        if "unknown" in statuses:
-            return "unknown"
-        if "fresh" in statuses:
-            return "fresh"
-        return "unknown"
-
     return candidates, {"scan_time": latest_daily, "freshness": {
                             "status": overall_freshness,
-                            "daily_status": aggregate_statuses(daily_freshness_statuses),
-                            "intraday_status": aggregate_statuses(intraday_freshness_statuses),
+                            "daily_status": _aggregate_freshness_status(daily_freshness_statuses),
+                            "daily_unavailable_count": daily_freshness_statuses.count("unknown"),
+                            "intraday_status": _aggregate_freshness_status(intraday_freshness_statuses),
                         },
                         "source": "price_data+intraday_price_data", "universe": "TH-ORD",
                         "build_observability": {
@@ -1249,8 +1274,8 @@ def project_explorer_response(
             "close": _number(item.get("close")),
             "change_pct": _resolve_change_pct(item),
             "phase": item.get("phase"),
-            "volume": _number(item.get("volume"), 0),
-            "avgDailyValue20": _number(item.get("avgDailyValue20"), 0),
+        "volume": _number(item.get("volume"), 0),
+        "avgDailyValue20": _number(item.get("avgDailyValue20"), 0),
             "rs": _number(item.get("rs"), 0),
             "source": item.get("priceSource") or "Daily EOD",
             "data_freshness": item.get("dataFreshness")
@@ -1327,6 +1352,7 @@ def project_canonical_symbol_detail(items: list[dict], symbol: str,
     metadata_fields = (
         "name", "sector", "industry", "market_cap", "description", "close",
         "change_pct", "change_amount", "trade_value", "avgDailyValue20",
+        "daily_metrics",
         "index_membership", "margin_pct", "margin_rate_pct", "high52", "low52",
         "ath_high", "ath_low",
     )

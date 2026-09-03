@@ -86,25 +86,25 @@ def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
     context = _extract_function(js, "waveContextForItem")
     assert _run_node(
         [states, context, wave_state, wave_confidence],
-        "({state: canonicalWaveState({wave: {context:{mapped_state:'EARLY_WAVE_3', confidence:'MEDIUM'}}}), confidence: compactWaveConfidence({wave: {context:{mapped_state:'EARLY_WAVE_3', confidence:'MEDIUM'}}})})",
+        "({state: canonicalWaveState({wave: {primary_state:'EARLY_WAVE_3', confidence:'MEDIUM', context:{mapped_state:'WAVE_1_ADVANCE'}}}), confidence: compactWaveConfidence({wave: {primary_state:'EARLY_WAVE_3', confidence:'MEDIUM', context:{mapped_state:'WAVE_1_ADVANCE'}}})})",
     ) == {"state": "EARLY_WAVE_3", "confidence": "MEDIUM"}
     assert _run_node(
         [states, context, wave_state, wave_confidence],
-        "({unknown: canonicalWaveState({wave: {context:{mapped_state:'NOT_VERIFIABLE'}}}), wave2: canonicalWaveState({wave: {context:{mapped_state:'WAVE_2_FORMING'}}}), confidence: compactWaveConfidence({wave: {context:{confidence:'UNSURE'}}})})",
+        "({unknown: canonicalWaveState({wave: {primary_state:'NOT_VERIFIABLE', context:{mapped_state:'WAVE_3_CONTINUATION'}}}), wave2: canonicalWaveState({wave: {primary_state:'WAVE_2_FORMING', context:{mapped_state:'WAVE_1_ADVANCE'}}}), confidence: compactWaveConfidence({wave: {primary_state:'WAVE_2_FORMING', confidence:'UNSURE', context:{confidence:'HIGH'}}})})",
     ) == {"unknown": "Unknown / Not verified", "wave2": "WAVE_2_FORMING", "confidence": "NOT_VERIFIED"}
     assert 'compactWaveLabel' in js and 'Confidence' in js
 
 
-def test_daily_wave_bucket_consumes_all_mapped_context_and_collapses_unmapped_values():
+def test_daily_wave_bucket_consumes_all_primary_states_and_collapses_unmapped_values():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "setupCandidateWaveBucket")
     states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"]
     declaration = 'var canonicalDailyWaveStates = ' + json.dumps(states) + ';'
     context = _extract_function(js, "waveContextForItem")
     result = _run_node([declaration, context, helper], "[" + ",".join(
-        "setupCandidateWaveBucket({wave:{context:{mapped_state:" + json.dumps(state) + "}}})" for state in states
+        "setupCandidateWaveBucket({wave:{primary_state:" + json.dumps(state) + ",context:{mapped_state:'WAVE_1_ADVANCE'}}})" for state in states
     ) + ", setupCandidateWaveBucket({wave:{primary_state:'WAVE_5_ADVANCE'}}), setupCandidateWaveBucket({})]")
-    assert result == states + ["UNKNOWN", "UNKNOWN"]
+    assert result == states + ["WAVE_5_ADVANCE", "UNKNOWN"]
 
 
 def test_t08_wave_filter_composes_with_search_and_lane_without_inference():
@@ -114,7 +114,7 @@ def test_t08_wave_filter_composes_with_search_and_lane_without_inference():
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     context = _extract_function(js, "waveContextForItem")
     dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}, dailySetupWave:{value:"EARLY_WAVE_3"}};'
-    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'WAVE_1_ADVANCE'}}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'EARLY_WAVE_3'}}})]"
+    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE'}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3'}})]"
     assert _run_node([states, context, bucket, dom, helper], expression) == [True, False, False]
 
 
@@ -125,7 +125,7 @@ def test_t08_grouping_has_canonical_wave_order_unknown_bucket_and_stable_symbol_
     stable = _extract_function(js, "stableSetupCandidateOrder")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     context = _extract_function(js, "waveContextForItem")
-    items = "[{symbol:'ZZZ',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'EARLY_WAVE_3'}}},{symbol:'AAA',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'WAVE_3_CONTINUATION'}}},{symbol:'ONE',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'WAVE_1_ADVANCE'}}},{symbol:'BAD',decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'NOPE'}}}]"
+    items = "[{symbol:'ZZZ',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'}}},{symbol:'AAA',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'WAVE_1_ADVANCE'}}},{symbol:'ONE',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'NOPE'}}},{symbol:'BAD',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'NOPE',context:{mapped_state:'EARLY_WAVE_3'}}}]"
     result = _run_node([states, context, bucket, stable, helper], "(function(g){return {order:g.waveOrder, early:g.waveGroups.EARLY_WAVE_3[0].symbol, one:g.waveGroups.WAVE_1_ADVANCE[0].symbol, unknown:g.waveGroups.UNKNOWN.map(function(x){return x.symbol;})};})(groupSetupCandidates(" + items + "))")
     assert result == {"order": ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE", "UNKNOWN"], "early": "ZZZ", "one": "ONE", "unknown": ["BAD"]}
 
@@ -223,6 +223,8 @@ def test_canonical_quote_drives_card_and_drawer_with_absent_quote_fallback():
     assert '60m provisional' in drawer and 'Daily close' in drawer
     assert 'quoteEnvelope(item)' in card
     assert 'quoteSource' in card
+    assert '"Trade value Not verified"' in drawer
+    assert '"Trade value " + fmtNum(tradeValue)' in drawer
     result = _run_node(
         [direction],
         "({up: setupCandidateDirection({quote:{change_pct:2.5}}, false), absent: setupCandidateDirection({quote:{}}, false)})",
@@ -442,7 +444,7 @@ def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
     assert "intraday_fetched_at" in source
-    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus)" in js
+    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus, freshness.daily_unavailable_count)" in js
     assert 'id="freshness-daily"' in html
     assert 'id="freshness-60m"' in html
     assert "Daily EOD" in js
@@ -461,7 +463,7 @@ def test_setup_candidate_freshness_reports_mixed_timeframes_without_collapsing_t
     assert _run_node([normalizer, summary], 'freshnessSummary("unknown", "fresh")') == "partial"
     assert '"Freshness mixed by timeframe"' in js
     assert 'expected previous completed session' in js
-    assert 'prefix + ": fresh · "' in js
+    assert 'prefix + ": fresh"' in js
 
 
 def test_setup_candidate_freshness_prefers_full_universe_aggregate_statuses():
@@ -568,18 +570,19 @@ def test_wave_context_cards_and_drawer_consume_nested_contract_without_creating_
     wave_state = _extract_function(js, "canonicalWaveState")
     confidence = _extract_function(js, "compactWaveConfidence")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
-    item = "{decision_lane:'DAILY_CANDIDATE',wave:{context:{mapped_state:'WAVE_2_FORMING',secondary_markers:[],confidence:'HIGH',rule_version:'ctx-v1',source_timeframe:'daily',supporting_evidence:['pullback'],contradicting_evidence:['volume'],missing_evidence:['60m'],rationale:'Daily pullback'}}}"
+    item = "{decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_2_FORMING',confidence:'HIGH',context:{mapped_state:'WAVE_1_ADVANCE',secondary_markers:[],confidence:'LOW',rule_version:'ctx-v1',source_timeframe:'daily',supporting_evidence:['pullback'],contradicting_evidence:['volume'],missing_evidence:['60m'],rationale:'Daily pullback'}}}"
     result = _run_node([states, context, wave_state, confidence, presentation], "waveContextPresentation(" + item + ")")
     assert result["state"] == "WAVE_2_FORMING"
     assert result["source"] == "Daily structural · daily"
     assert result["actionability"] == "Non-actionable context · backend lane DAILY_CANDIDATE"
     assert result["supporting"] == ["pullback"]
+    assert result["contextState"] == "WAVE_1_ADVANCE"
     assert "firstDate" not in result and result["transitions"] == []
     assert 'id="drawer-wave-context"' in html
     assert "first_context_date" in js and "Unavailable · no source-linked transition history" in js
     assert 'item.decision_lane === "REVIEW_NOW"' in presentation
-    assert "context.mapped_state" in wave_state
-    assert "primary_state" not in presentation + wave_state + context
+    assert "primary_state" in wave_state
+    assert "context.mapped_state" in presentation
 
 
 def test_wave_3_extended_is_secondary_only_and_missing_marker_coordinates_are_not_inferred():
@@ -589,7 +592,7 @@ def test_wave_3_extended_is_secondary_only_and_missing_marker_coordinates_are_no
     wave_state = _extract_function(js, "canonicalWaveState")
     confidence = _extract_function(js, "compactWaveConfidence")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
-    result = _run_node([states, context, wave_state, confidence, presentation], "waveContextPresentation({decision_lane:'WAIT',wave:{context:{mapped_state:'WAVE_3_CONTINUATION',secondary_markers:['WAVE_3_EXTENDED'],confidence:'HIGH',source_timeframe:'daily'}}})")
+    result = _run_node([states, context, wave_state, confidence, presentation], "waveContextPresentation({decision_lane:'WAIT',wave:{primary_state:'WAVE_3_CONTINUATION',confidence:'HIGH',context:{mapped_state:'WAVE_1_ADVANCE',secondary_markers:['WAVE_3_EXTENDED'],confidence:'LOW',source_timeframe:'daily'}}})")
     assert result["state"] == "WAVE_3_CONTINUATION"
     assert result["secondary"] == ["WAVE_3_EXTENDED"]
     draw = _extract_function(js, "drawChart")

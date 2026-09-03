@@ -24,7 +24,7 @@ DECISION_LANES = {
 # disagree about the contract.
 CANONICAL_METADATA_FIELDS = (
     "high52", "low52", "ath_high", "ath_low", "index_membership",
-    "index_membership_evidence",
+    "index_membership_evidence", "daily_metrics",
 )
 QUOTE_FIELDS = {
     "price", "change_pct", "change_basis", "change_amount",
@@ -526,9 +526,13 @@ def build_setup_candidate(
     }
     if isinstance(canonical_metadata, dict):
         for field in ("high52", "low52", "ath_high", "ath_low", "index_membership",
-                      "index_membership_evidence"):
+                      "index_membership_evidence", "daily_metrics"):
             if field in canonical_metadata:
-                item[field] = _json_value(canonical_metadata[field])
+                value = canonical_metadata[field]
+                if field == "daily_metrics" and isinstance(value, dict):
+                    value = {key: value[key] for key in ("avg_trade_value_20",)
+                             if key in value}
+                item[field] = _json_value(value)
     if isinstance(quote, dict) and quote:
         item["quote"] = _json_value(quote)
     return _json_value(item)
@@ -650,7 +654,7 @@ _LIST_ITEM_FIELDS = (
     "symbol", "as_of", "data_status", "trend", "wave", "setup",
     "context", "bonus_evidence", "decision_lane", "provenance",
     "high52", "low52", "ath_high", "ath_low", "index_membership",
-    "index_membership_evidence",
+    "index_membership_evidence", "daily_metrics",
     "quote",
 )
 _LIST_NESTED_FIELDS = {
@@ -680,6 +684,7 @@ _LIST_NESTED_FIELDS = {
         "peer_trend_breadth", "peer_breakout_count", "sector_leader_or_laggard",
         "relative_strength_vs_sector", "peer_data_status",
     ),
+    "daily_metrics": ("avg_trade_value_20",),
     "bonus_evidence": ("vcp", "breakout_volume", "contraction"),
     "provenance": (
         "policy_version", "source", "daily_source", "intraday_source", "as_of",

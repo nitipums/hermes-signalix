@@ -707,6 +707,14 @@ def test_setup_candidate_source_version_uses_one_freshness_query():
     assert "fetch_completed_at" in pg.cur.calls[0][0]
 
 
+def test_setup_candidate_freshness_aggregate_uses_strict_majority_and_counts_unknown():
+    import mvp_api
+
+    assert mvp_api._aggregate_freshness_status(["fresh"] * 234 + ["unknown"] * 3) == "fresh"
+    assert mvp_api._aggregate_freshness_status(["unknown"] * 3 + ["stale"] * 2) == "unknown"
+    assert mvp_api._aggregate_freshness_status(["fresh"] * 2 + ["stale"] * 3) == "stale"
+
+
 def test_setup_candidates_connection_pool_returns_connection_and_closes_pool(monkeypatch):
     import psycopg2.pool
 

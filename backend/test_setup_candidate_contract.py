@@ -188,6 +188,7 @@ def test_builder_emits_bounded_canonical_daily_metadata():
         "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
         "index_membership": ["SET50"],
         "index_membership_evidence": {"source": "set-index"},
+        "daily_metrics": {"avg_trade_value_20": 12345678, "unbounded": "drop"},
         "unexpected": "must not be copied",
     }
 
@@ -199,6 +200,7 @@ def test_builder_emits_bounded_canonical_daily_metadata():
     assert item["ath_low"] == 12
     assert item["index_membership"] == ["SET50"]
     assert item["index_membership_evidence"] == {"source": "set-index"}
+    assert item["daily_metrics"] == {"avg_trade_value_20": 12345678}
     assert "unexpected" not in item
 
 
