@@ -774,12 +774,12 @@ def _daily_metrics_observation(daily_df) -> dict:
     if daily_df is None or len(daily_df) == 0:
         return {}
     try:
-        values = (daily_df[["close", "volume"]].tail(20).astype(float)
+        values = (daily_df[["Close", "Volume"]].tail(20).astype(float)
                   .dropna())
         if values.empty:
             return {}
         return {"avg_trade_value_20": float(
-            (values["close"] * values["volume"]).mean()
+            (values["Close"] * values["Volume"]).mean()
         )}
     except (KeyError, TypeError, ValueError):
         return {}
