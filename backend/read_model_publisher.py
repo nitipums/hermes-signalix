@@ -25,7 +25,7 @@ from setup_candidate_contract import sort_setup_candidates
 CONTRACT_VERSION = "signalix.setup-candidates.read-model.v1"
 # Bump when the serving representation changes while ingestion lineage stays
 # the same. Version files remain immutable for each lineage + revision.
-MODEL_REVISION = "2"
+MODEL_REVISION = "3"
 DEFAULT_UNIVERSE = "marginable_long"
 LANES = ("REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED")
 DEFAULT_ROOT = Path(__file__).resolve().parent / "read-model"
