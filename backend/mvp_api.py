@@ -809,6 +809,7 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
         setup = {**setup, "status": "DATA_BLOCKED"}
     peer_data = {
         "sector": profile.get("sector"), "industry": profile.get("industry"),
+        "market_cap": profile.get("market_cap"),
         "peer_data_status": "UNKNOWN",
     }
     peer_symbols = profile.get("peer_symbols") or profile.get("peers")

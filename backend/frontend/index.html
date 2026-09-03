@@ -127,9 +127,6 @@
           <div class="drawer-identity">
             <a id="drawer-symbol" class="drawer-title drawer-symbol-link" target="_blank" rel="noopener noreferrer"></a>
             <span id="drawer-name" class="drawer-name"></span>
-            <div class="drawer-company-context">
-              <span id="drawer-sector">–</span><span id="drawer-industry">–</span><span id="drawer-market-cap">Market cap –</span>
-            </div>
             <span id="drawer-lane" class="drawer-lane">Not verified</span>
           </div>
           <div class="drawer-nav" aria-label="Navigate stocks">
@@ -180,19 +177,22 @@
             <h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2>
             <dl class="drawer-setup-grid">
               <div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div>
-              <div class="drawer-setup-field"><dt>Daily context</dt><dd id="drawer-daily-context">Wave · Not verified</dd></div>
-              <div class="drawer-setup-field"><dt>Entry zone / Trigger</dt><dd id="drawer-trigger">Not ready</dd></div>
-              <div class="drawer-setup-field"><dt>Invalidation / Stop</dt><dd id="drawer-stop">Not ready</dd></div>
+              <div class="drawer-setup-field"><dt>Daily context <button id="drawer-context-info" class="drawer-info" type="button" aria-expanded="false" aria-controls="drawer-evidence-details" aria-label="Show Daily context evidence">(i)</button></dt><dd id="drawer-daily-context">Wave · Not verified</dd></div>
+              <div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div>
+              <div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div>
               <div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div>
               <div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div>
             </dl>
           </section>
-          <section class="drawer-section drawer-section--evidence" aria-labelledby="drawer-evidence-title">
-            <h2 id="drawer-evidence-title" class="drawer-section-title">Why this context</h2>
-            <div id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></div>
+          <section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title">
+            <h2 id="drawer-company-title" class="drawer-section-title">Company context</h2>
+            <div class="drawer-company-context">
+              <span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span>
+            </div>
           </section>
-          <details class="drawer-details">
+          <details id="drawer-evidence-details" class="drawer-details">
             <summary>Evidence details and provenance</summary>
+            <div id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></div>
             <p id="drawer-description" class="drawer-description">–</p>
             <dl class="drawer-fields">
             <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>

@@ -120,6 +120,8 @@
     drawerAction:   $("#drawer-action"),
     drawerWave:     $("#drawer-wave"),
     drawerDailyContext: $("#drawer-daily-context"),
+    drawerContextInfo: $("#drawer-context-info"),
+    drawerEvidenceDetails: $("#drawer-evidence-details"),
     drawerWaveConfidence: $("#drawer-wave-confidence"),
     drawerWaveSource: $("#drawer-wave-source"),
     drawerWaveContext: $("#drawer-wave-context"),
@@ -715,12 +717,15 @@
     if (dom.drawerWaveConfidence) dom.drawerWaveConfidence.textContent = compactWaveConfidence(item);
     if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = waveContextPresentation(item).source;
     if (dom.drawerDailyContext) dom.drawerDailyContext.textContent = compactWaveLabel(item);
+    if (dom.drawerEvidenceDetails) dom.drawerEvidenceDetails.open = false;
+    if (dom.drawerContextInfo) dom.drawerContextInfo.setAttribute("aria-expanded", "false");
     renderWaveContextDetail(item);
     if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
     if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
-    dom.drawerSector.textContent = item.sector || "Sector –";
-    dom.drawerIndustry.textContent = item.industry || "Industry –";
-    dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap);
+    var companyContext = item.context || {};
+    dom.drawerSector.textContent = "Sector " + (item.sector || companyContext.sector || "Unknown");
+    dom.drawerIndustry.textContent = "Industry " + (item.industry || companyContext.industry || "Unknown");
+    dom.drawerMarketCap.textContent = "Market cap " + fmtNum(item.market_cap != null ? item.market_cap : companyContext.market_cap);
     dom.drawerTradeValue.textContent = "Trade value " + fmtNum(item.trade_value || item.avgDailyValue20);
     dom.drawerDescription.textContent = item.description || "";
     dom.drawerDescription.hidden = !item.description;
@@ -728,15 +733,21 @@
     dom.drawerPrice.textContent = quote && quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
     if (dom.drawerCurrent) dom.drawerCurrent.textContent = quote && quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
     var drawerChg = fmtChange(quote ? quote.change_pct : null);
+    dom.drawerPrice.className = "drawer-price drawer-price--" + drawerChg[1];
     dom.drawerChange.className = "drawer-change drawer-change--" + drawerChg[1];
     dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(quote ? quote.change_amount : null) + ")";
     if (dom.drawerQuoteSource) dom.drawerQuoteSource.textContent = quote && quote.source === "intraday_price_data"
       ? "Quote · 60m provisional" : quote && quote.source === "price_data" ? "Quote · Daily close" : "Quote · Not verified";
     var metadataPending = item._canonicalMetadataPending === true;
     dom.drawerRR.textContent = displayMetadataValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null, metadataPending);
-    if (dom.drawerTrigger) dom.drawerTrigger.textContent = item.setup && item.setup.trigger != null ? item.setup.trigger : "Not ready";
-    if (dom.drawerStop) dom.drawerStop.textContent = item.setup && (item.setup.invalidation != null || item.setup.trade_stop != null) ? (item.setup.invalidation != null ? item.setup.invalidation : item.setup.trade_stop) : "Not ready";
-    if (dom.drawerTarget) dom.drawerTarget.textContent = item.setup && item.setup.target_1 != null ? item.setup.target_1 : "Not ready";
+    var drawerSetup = item.setup || {};
+    var drawerStop = drawerSetup.invalidation != null ? drawerSetup.invalidation : drawerSetup.trade_stop;
+    if (dom.drawerTrigger) dom.drawerTrigger.textContent = drawerSetup.trigger != null ? drawerSetup.trigger : "Not ready";
+    if (dom.drawerStop) {
+      dom.drawerStop.textContent = drawerStop != null ? drawerStop : "Not ready";
+      dom.drawerStop.className = "drawer-value " + (isInvalidationNear(item, drawerStop) ? "drawer-value--warning" : "drawer-value--neutral");
+    }
+    if (dom.drawerTarget) dom.drawerTarget.textContent = drawerSetup.target_1 != null ? drawerSetup.target_1 : "Not ready";
     setOptionalDrawerField(dom.drawerMembership, (item.index_membership || []).join(" · "));
     var marginRate = item.margin_rate_pct != null ? item.margin_rate_pct : item.margin_pct;
     setOptionalDrawerField(dom.drawerMargin, marginRate != null ? Number(marginRate).toFixed(0) + "%" : null);
@@ -788,12 +799,10 @@
     var dailyMarkerCount = markers.filter(function(marker) {
       return marker && marker.timeframe === "daily" && marker.timestamp != null && Number.isFinite(Number(marker.price));
     }).length;
-    var markerState = isDaily ? (dailyMarkerCount ? dailyMarkerCount + " exact Daily source marker(s)" : "Daily markers unavailable") : "Daily markers shown on Day only";
+    var markerState = isDaily ? (dailyMarkerCount ? String(dailyMarkerCount) : "none") : "Day only";
     var timeframe = chart && chart.timeframe || chartTimeframe;
-    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>' + escapeHTML(timeframe) + " OHLC · green/red = candle direction</span>" +
-      '<span><i class="legend-line legend-line--ma20"></i>MA20 (blue solid)</span><span><i class="legend-line legend-line--ma50"></i>MA50 (blue dashed)</span>' +
-      '<span><i class="legend-dot legend-dot--wave"></i>' + escapeHTML(markerState) + ' · shape/label identifies marker</span>' +
-      '<span><i class="legend-line legend-line--setup"></i>60m trigger / stop / target · label/line style identifies role</span>';
+    dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA20 is blue solid; MA50 is blue dashed; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
+    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>OHLC</span><span><i class="legend-line legend-line--ma20"></i>MA20</span><span><i class="legend-line legend-line--ma50"></i>MA50</span><span><i class="legend-dot legend-dot--wave"></i>markers (' + escapeHTML(markerState) + ') <button type="button" class="legend-info" aria-label="Show full chart legend">(i)</button></span>';
   }
 
   function renderDrawerChart(chart) {
@@ -1073,6 +1082,7 @@
       var trend = item.trend || {}, setup = item.setup || {}, context = item.context || {};
       item = Object.assign({}, item, {name: item.name || symbol, stage: trend.state,
         action: item.decision, sector: context.sector, industry: context.industry,
+        market_cap: context.market_cap,
         trigger: setup.trigger, invalidation: setup.invalidation,
         risk_stop: setup.trade_stop, rr: (setup.rr || {}).to_target_1});
     }
@@ -1259,6 +1269,12 @@
   if (dom.drawerMethodLink) dom.drawerMethodLink.addEventListener("click", function() {
     if (dom.methodGuide) dom.methodGuide.open = true;
     if (dom.methodGuide) dom.methodGuide.scrollIntoView({behavior:"smooth", block:"start"});
+  });
+  if (dom.drawerContextInfo) dom.drawerContextInfo.addEventListener("click", function() {
+    if (!dom.drawerEvidenceDetails) return;
+    dom.drawerEvidenceDetails.open = !dom.drawerEvidenceDetails.open;
+    dom.drawerContextInfo.setAttribute("aria-expanded", String(dom.drawerEvidenceDetails.open));
+    if (dom.drawerEvidenceDetails.open) dom.drawerEvidenceDetails.scrollIntoView({behavior:"smooth", block:"nearest"});
   });
   if (dom.drawer) dom.drawer.addEventListener("touchstart", function(e) {
     if (e.touches && e.touches.length === 1) drawerTouchStartX = e.touches[0].clientX;
@@ -1485,10 +1501,17 @@
     });
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b>' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(quote.change_pct)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
+      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(quote.change_pct)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
       '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
-      '<div class="setup-candidate__plan"><span>Entry <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span>Invalidation / Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
+      '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
+  }
+
+  function isInvalidationNear(item, stop) {
+    var quote = quoteEnvelope(item) || {};
+    var price = Number(quote.price);
+    var level = Number(stop);
+    return Number.isFinite(price) && Number.isFinite(level) && price >= level && price <= level * 1.05;
   }
 
   function setupCandidateDirection(item, incomplete) {

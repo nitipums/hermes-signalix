@@ -220,7 +220,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
     sector or industry. If `symbols` is omitted, defaults to the active ORD
     universe (capped by `limit`) so the caller cannot accidentally fan out.
 
-    Returns: {symbol: {company_name, sector, industry, business_summary,
+    Returns: {symbol: {company_name, sector, industry, market_cap, business_summary,
                        source, fetched_at, missing}} where `missing` is True
     when NO profile row exists for an active-ORD symbol.
     """
@@ -241,7 +241,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                       sm.venue, sm.asset_class, sm.currency,
                       sm.timezone, sm.session, sm.source AS inst_source,
                       sm.status,
-                      cp.company_name, cp.sector, cp.industry,
+                      cp.company_name, cp.sector, cp.industry, cp.market_cap,
                       cp.business_summary, cp.source AS prof_source,
                       cp.fetched_at
                FROM symbol_master sm
@@ -252,10 +252,10 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                ORDER BY sm.symbol""", (symbols,))
         for row in cur.fetchall():
             (symbol, venue, asset_class, currency, tz, session, inst_source,
-             status, name, sector, industry, summary, prof_source,
+             status, name, sector, industry, market_cap, summary, prof_source,
              fetched_at) = row
             prof_rank = _source_rank(prof_source)
-            has_profile = any(v is not None for v in (name, sector, industry, summary))
+            has_profile = any(v is not None for v in (name, sector, industry, market_cap, summary))
             out[symbol] = {
                 "symbol": symbol,
                 "venue": venue,
@@ -268,6 +268,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                 "company_name": name,
                 "sector": sector,
                 "industry": industry,
+                "market_cap": market_cap,
                 "business_summary": summary,
                 "profile_source": prof_source,
                 "profile_fetched_at": fetched_at.isoformat() if hasattr(fetched_at, "isoformat") else (str(fetched_at) if fetched_at else None),
@@ -284,6 +285,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                     "currency": None, "timezone": None, "session": None,
                     "source": None, "status": "absent",
                     "company_name": None, "sector": None, "industry": None,
+                    "market_cap": None,
                     "business_summary": None, "profile_source": None,
                     "profile_fetched_at": None, "profile_rank": len(SOURCE_PRIORITY),
                     "missing": True,

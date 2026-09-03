@@ -190,9 +190,13 @@ body {
 .setup-candidate__wave span { min-width:0; overflow-wrap:anywhere; }
 .setup-candidate__wave b { color:var(--text); }
 .setup-candidate__context-status { margin:0 0 8px; color:var(--text-2); font-size:.74rem; overflow-wrap:anywhere; }
-.setup-candidate__plan { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; margin:0; font-size:.78rem; }
+.setup-candidate__plan { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; margin:0; font-size:.78rem; }
 .setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
 .setup-candidate__plan b { display:block; margin-top:2px; overflow-wrap:anywhere; }
+.setup-candidate__price--bullish, .setup-candidate__change--bullish { color:var(--green); }
+.setup-candidate__price--bearish, .setup-candidate__change--bearish { color:var(--red); }
+.setup-candidate__price--neutral { color:var(--text); }
+.setup-candidate__stop--warning b, .drawer-value--warning { color:var(--amber); }
 .setup-candidate__grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px 12px; margin:10px 0; font-size:.78rem; }
 .setup-candidate__grid span { min-width:0; overflow-wrap:anywhere; color:var(--text-2); }
 .setup-candidate__grid b { display:block; overflow-wrap:anywhere; }
@@ -394,6 +398,9 @@ body {
 .drawer-symbol-link:hover { color:var(--accent); }
 .drawer-price-row { display:flex; align-items:baseline; gap:10px; margin:8px 0 4px; flex-wrap:wrap; }
 .drawer-price-row strong { font-size:26px; font-variant-numeric:tabular-nums; }
+.drawer-price--up { color:var(--green); }
+.drawer-price--down { color:var(--red); }
+.drawer-price--flat { color:var(--text); }
 .drawer-change { font-size:15px; color:var(--text-2); }
 .drawer-change--up { color:var(--green); }
 .drawer-change--down { color:var(--red); }
@@ -416,6 +423,8 @@ body {
 .wave-context-transitions ul { margin:4px 0 0 18px; overflow-wrap:anywhere; }
 .drawer-company-context { display:flex; flex-wrap:wrap; gap:4px 8px; font-size:12px; color:var(--text-2); }
 .drawer-company-context span { border:1px solid var(--border); border-radius:4px; padding:2px 5px; }
+.drawer-info, .legend-info { min-height:44px; min-width:44px; padding:0; border:0; background:none; color:var(--accent); cursor:pointer; font:inherit; }
+.drawer-info { min-height:28px; min-width:28px; font-size:11px; vertical-align:middle; }
 .drawer-description { color:var(--text-2); font-size:12px; margin:8px 0 12px; }
 .drawer-indicator-legend { display:flex; flex-wrap:wrap; gap:6px; margin:-8px 0 14px; font-size:10px; color:var(--text-3); }
 .drawer-indicator-legend span { border:1px solid var(--border); border-radius:3px; padding:2px 5px; }
@@ -434,7 +443,7 @@ body {
 .chart-control-label { font-size:10px; color:var(--text-3); margin-right:2px; }
 .chart-timeframe { min-height:44px; min-width:44px; padding:0 10px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--text-2); font-size:11px; cursor:pointer; }
 .chart-timeframe.is-active { color:var(--accent); border-color:var(--accent); }
-.wave-chart-legend { display:flex; flex-wrap:wrap; gap:6px 12px; min-width:0; margin:6px 0; color:var(--text-2); font-size:10px; }
+.wave-chart-legend { display:flex; flex-wrap:wrap; gap:4px 8px; min-width:0; margin:6px 0; color:var(--text-2); font-size:10px; }
 .wave-chart-legend span { display:inline-flex; align-items:center; min-width:0; overflow-wrap:anywhere; }
 .legend-line { display:inline-block; width:18px; margin-right:5px; border-top:2px solid var(--text); }
 .legend-line--setup { border-top-color:#60a5fa; border-top-style:dashed; }
@@ -493,7 +502,7 @@ body {
     overflow: hidden;
   }
   .setup-candidate__grid { grid-template-columns: 1fr; gap: 6px; }
-  .setup-candidate__plan { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+  .setup-candidate__plan { grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
   .setup-candidate-card { width: 100%; max-width: 100%; }
   .wave-context-detail dl { grid-template-columns:1fr; }
   .wave-chart-legend { width:100%; max-width:100%; }

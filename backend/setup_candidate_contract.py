@@ -141,6 +141,7 @@ def build_peer_context(symbol: str, peer_data: dict | None = None) -> dict:
         "market_regime": source.get("market_regime"),
         "sector": source.get("sector"),
         "industry": source.get("industry"),
+        "market_cap": source.get("market_cap"),
         "peer_symbols": peer_symbols,
         "sector_trend": source.get("sector_trend"),
         "peer_trend_breadth": _json_value(breadth),
@@ -675,7 +676,7 @@ _LIST_NESTED_FIELDS = {
         "targets", "target_1", "rr", "reason", "reason_code",
     ),
     "context": (
-        "market_regime", "sector", "industry", "peer_symbols", "sector_trend",
+        "market_regime", "sector", "industry", "market_cap", "peer_symbols", "sector_trend",
         "peer_trend_breadth", "peer_breakout_count", "sector_leader_or_laggard",
         "relative_strength_vs_sector", "peer_data_status",
     ),

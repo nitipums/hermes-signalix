@@ -155,7 +155,7 @@ def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact
     assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' in toolbar
     assert 'summary>More filters</summary>' in html
     card = _extract_function(js, "setupCandidateCard")
-    for token in ("Entry", "Invalidation", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
+    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
         assert token in card
     for forbidden in ("Daily context", "Secondary", "Trigger readiness"):
         assert forbidden not in card
@@ -174,10 +174,10 @@ def test_review_cockpit_drawer_follows_identity_price_chart_setup_evidence_hiera
     chart = html.index('id="drawer-chart"')
     timeframes = html.index('class="chart-timeframe-controls"')
     setup = html.index('id="drawer-setup-title"')
-    evidence = html.index('id="drawer-evidence-title"')
+    company = html.index('id="drawer-company-title"')
     details = html.index('class="drawer-details"')
-    assert identity < lane < price < action < chart < timeframes < setup < evidence < details
-    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-wave-context"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"'):
+    assert identity < lane < price < action < chart < timeframes < setup < company < details
+    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-wave-context"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"', 'id="drawer-context-info"', 'id="drawer-evidence-details"', 'id="drawer-market-cap"', 'id="drawer-sector"', 'id="drawer-industry"'):
         assert marker in html
     assert 'dom.drawerLane' in js and 'dom.drawerCurrent' in js
     assert 'dom.drawerDailyContext' in js and 'compactWaveLabel(item)' in js
@@ -192,7 +192,7 @@ def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_directi
     assert 'ma20: "#93c5fd", ma50: "#60a5fa"' in draw
     assert 'decisionLine(chart.stop, "#8896a6", [2, 4], "Stop")' in draw
     assert 'decisionLine(chart.trigger, "#60a5fa", [7, 5], "Required close")' in draw
-    assert 'markerShapes' in draw and 'shape/label identifies marker' in legend
+    assert 'markerShapes' in draw and 'aria-label="Show full chart legend"' in legend
     assert '#f4c95d' not in draw and '#ffa726' not in draw
     assert '.freshness-dot--stale   { background: var(--text-3); }' in css
     assert '.setup-candidate__decision { color:var(--text-2);' in css
@@ -608,8 +608,8 @@ def test_daily_marker_legend_and_60m_setup_levels_are_timeframe_separated():
     assert 'if (chart.timeframe === "60M")' in _extract_function(js, "drawChart")
     legend = _extract_function(js, "renderChartLegend")
     assert 'marker.timeframe === "daily"' in legend
-    assert "Daily markers unavailable" in legend
-    assert "60m trigger / stop / target" in legend
+    assert "escapeHTML(markerState)" in legend
+    assert "OHLC" in legend and "MA20" in legend and "MA50" in legend
     assert ".wave-chart-legend" in css and "flex-wrap:wrap" in css
     merge = _extract_function(js, "mergeChartDecisionOverlay")
     assert 'chart.wave_evidence = waveEvidenceForItem(item)' in merge
@@ -948,6 +948,27 @@ def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
     assert "R:R" in js and "Target 1" in html and "Stop" in html
 
 
+def test_review_cockpit_card_and_drawer_use_compact_plan_and_company_context():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    assert all(label in card for label in ("Trigger", "Stop", "Target", "R:R"))
+    assert "valueOrUnavailable(target1)" in card
+    assert 'class="drawer-info"' in html and 'aria-controls="drawer-evidence-details"' in html
+    assert "Company context" in html and "market_cap" in js and "companyContext.market_cap" in js
+    assert '"market_cap"' in js
+    assert "isInvalidationNear" in js
+
+
+def test_drawer_info_preserves_not_verified_honesty_and_collapsed_evidence():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'id="drawer-evidence-details" class="drawer-details"' in html
+    assert 'id="drawer-context-info"' in html
+    assert 'dom.drawerEvidenceDetails.open = false' in js
+    assert '"Not ready"' in js and '"Not verified"' in js and '"Unavailable"' in js
+
+
 def test_shared_canonical_client_is_loaded_by_both_surfaces_and_owns_policy():
     client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
     classic = (ROOT / "index.html").read_text(encoding="utf-8")
@@ -970,9 +991,9 @@ def test_t03_compact_card_keeps_decision_hierarchy_and_moves_evidence_to_drawer(
     card = _extract_function(js, "setupCandidateCard")
     assert 'class="setup-candidate__readiness"' in card
     assert 'class="setup-candidate__plan"' in card
-    for marker in ("R:R", "Invalidation", "Stop"):
+    for marker in ("Trigger", "Target", "R:R", "Stop"):
         assert marker in card
-    assert "Trigger readiness" not in card and "Target 1" not in card
+    assert "Trigger readiness" not in card and "Invalidation / Stop" not in card
     for evidence_marker in ("setup-candidate__evidence", "Market / sector", "Peers", "VCP bonus", "as of"):
         assert evidence_marker not in card
     assert "function openDrawer" in js

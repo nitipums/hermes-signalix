@@ -24,10 +24,11 @@ def _candidate_inputs():
 
 def test_peer_symbols_are_preserved_and_missing_context_is_explicit():
     context = build_peer_context("ABC", {
-        "sector": "Technology", "industry": "Components",
+        "sector": "Technology", "industry": "Components", "market_cap": 174900000000,
         "peer_symbols": ["AAA", "BBB"],
     })
     assert context["peer_symbols"] == ["AAA", "BBB"]
+    assert context["market_cap"] == 174900000000
     assert context["peer_trend_breadth"] is None
     assert context["peer_breakout_count"] is None
 
@@ -36,6 +37,7 @@ def test_peer_symbols_are_preserved_and_missing_context_is_explicit():
     assert missing["peer_symbols"] == []
     assert missing["sector_trend"] is None
     assert missing["relative_strength_vs_sector"] is None
+    assert missing["market_cap"] is None
     json.dumps(missing)
 
 
