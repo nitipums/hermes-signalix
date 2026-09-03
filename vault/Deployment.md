@@ -32,7 +32,11 @@ Stable local commit `807cdde` promoted the Codex-implemented W3 publication gate
 
 The narrow canonical detector intentionally publishes only `EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, and `NOT_VERIFIABLE`; Wave 1/2/4/5 visibility is the next bounded product/contract tuning decision, not a runtime data-loss claim.
 
-### Daily structural evidence integration milestone — 2026-09-03
+### Main `/mvp` Daily phase grouping milestone — 2026-09-03
+
+Stable commit `9669e2e` groups main-list cards by `wave.daily_structure.phase` inside each existing decision lane and makes the phase filter presentation-only across all lanes. Public `/mvp` browser verification passed with W1/W2/W4/W5 phase headings visible, primary/lane separation intact, and 390px no-overflow. No read-model republish was needed because the backend contract was unchanged; dashboard reload served the new frontend.
+
+## Daily structural evidence integration milestone — 2026-09-03
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.
 

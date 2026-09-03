@@ -96,7 +96,7 @@ evidence remain Lite acceptance work.
 - [x] Existing W3 raw finite `r<=0.60` publication gate remains unchanged; CRC/BGRIM remain fail-closed.
 - [x] Full-detail canonical API exposes phase/evidence with explicit source timeframe and snapshot/as-of identity; list projection remains backward-compatible.
 - [x] `/mvp` drawer shows `Daily structural context` separately from `Primary Daily Wave`, setup, and decision lane; no phase creates `REVIEW_NOW` or `AVOID`.
-- [ ] `/mvp` main-list grouping and phase filtering use Daily structural phase for all lanes as presentation-only behavior; canonical primary state, lane totals, pagination, and the W3 gate remain unchanged. Missing/invalid phase fails closed to `UNKNOWN`, with explicit non-actionable labels and mobile-safe containment.
+- [x] `/mvp` main-list grouping and phase filtering use Daily structural phase for all lanes as presentation-only behavior; canonical primary state, lane totals, pagination, and the W3 gate remain unchanged. Missing/invalid phase fails closed to `UNKNOWN`, with explicit non-actionable labels and mobile-safe containment.
 - [x] Tests cover primary/phase divergence, missing/unknown evidence, Daily-vs-60m separation, lane invariance, and API list/detail parity.
 - [x] Public API and `/mvp` were rechecked after runtime reload; full universe remains `expected=evaluated=237` with pagination accounted for.
 

@@ -102,6 +102,12 @@ Decision: Keep `wave.primary_state` as the sole canonical decision spine and res
 
 Evidence: Codex read-only integration review `/tmp/codex_other_wave_integration_last.md`; current live distribution showed broader states only in `wave.context.mapped_state` (237/237 evaluated). Focused design: `docs/current/2026-09-03-daily-structure-evidence-integration-spec.md`. Implementation/runtime acceptance remains pending.
 
+## 2026-09-03 — Main `/mvp` Daily structural phase grouping (LITE-VERIFIED)
+
+Decision: Show `wave.daily_structure.phase` directly on the main `/mvp` list by grouping cards inside every existing decision lane and filtering by Daily phase. Keep `Primary Daily Wave`, decision lane, setup/actionability, pagination, full-universe counts, and W3 publication gate authoritative and unchanged. Use explicit `DAILY STRUCTURE · <phase>` headings and `non-actionable` card labels; `context.mapped_state` remains compatibility/audit only.
+
+Evidence: Codex UI commit `fd716ea`, promoted stable commit `9669e2e`; focused UI/API/contract tests passed; public `/mvp` HTTP 200; 237 evaluated; W1 filter journey returned DAILY_CANDIDATE 1/7 and WAIT 6/179; 390px `scrollWidth=375` under `innerWidth=390`. Handoff: `vault/2026-09-03-1830-main-mvp-daily-phase-grouping-handoff.md`.
+
 ## 2026-09-03 — Daily structural evidence integration milestone (LITE-VERIFIED)
 
 Decision: restore broader Daily Wave 1/2/4/5 visibility through additive `wave.daily_structure` evidence while keeping `wave.primary_state` as the sole canonical decision spine. The phase is `actionability=NONE`, cannot create `REVIEW_NOW`/`AVOID` or change setup validity, and remains separate from 60m setup evidence. W1/W2 are evidence-only; `WAVE_2_NEAR_COMPLETION` is the next candidate for a separately gated lane experiment. W4/W5 remain context/risk evidence.
