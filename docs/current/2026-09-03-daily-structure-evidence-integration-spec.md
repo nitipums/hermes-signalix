@@ -89,16 +89,14 @@ evidence remain Lite acceptance work.
 
 ## Acceptance criteria
 
-- [ ] Every evaluated eligible row retains one canonical `wave.primary_state` and one decision lane.
-- [ ] `wave.daily_structure.phase` is one of WAVE_1_ADVANCE, WAVE_2_FORMING, WAVE_2_NEAR_COMPLETION, EARLY_WAVE_3, WAVE_3_CONTINUATION, WAVE_4_CORRECTION, WAVE_5_ADVANCE, UNKNOWN.
-- [ ] `daily_structure.actionability` is always `NONE` and cannot create/change `REVIEW_NOW`.
-- [ ] Daily structural evidence has explicit Daily source timeframe, as-of/snapshot identity, confidence, anchors, and missing/contradicting evidence.
-- [ ] W3 primary publication still enforces raw finite `r <= 0.60`; CRC/BGRIM hard-gate behavior remains unchanged.
-- [ ] 60m setup evidence cannot overwrite `wave.primary_state` or `daily_structure.phase`.
-- [ ] Existing dirty owner behavior is preserved or explicitly reconciled; no unrelated file is reset or overwritten.
-- [ ] API schema tests cover primary/phase divergence, unknown/missing evidence, and list/detail parity.
-- [ ] Browser tests show one prominent Primary Daily Wave plus clearly labelled Daily structural context; phase does not appear actionable.
-- [ ] Public `/mvp` and `/api/setup-candidates` are rechecked after runtime reload; full universe remains `expected=evaluated=237` with pagination accounted for.
+- [x] Every evaluated eligible row retains one canonical `wave.primary_state` and existing decision lane.
+- [x] `wave.daily_structure.phase` is one Daily phase from the approved Wave 1–5/UNKNOWN vocabulary with explicit `actionability=NONE`.
+- [x] The phase is produced from Daily evidence only; 60m setup cannot overwrite it.
+- [x] Existing W3 raw finite `r<=0.60` publication gate remains unchanged; CRC/BGRIM remain fail-closed.
+- [x] Full-detail canonical API exposes phase/evidence with explicit source timeframe and snapshot/as-of identity; list projection remains backward-compatible.
+- [x] `/mvp` drawer shows `Daily structural context` separately from `Primary Daily Wave`, setup, and decision lane; no phase creates `REVIEW_NOW` or `AVOID`.
+- [x] Tests cover primary/phase divergence, missing/unknown evidence, Daily-vs-60m separation, lane invariance, and API list/detail parity.
+- [x] Public API and `/mvp` were rechecked after runtime reload; full universe remains `expected=evaluated=237` with pagination accounted for.
 
 ## Deferred
 

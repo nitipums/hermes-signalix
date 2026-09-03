@@ -102,6 +102,12 @@ Decision: Keep `wave.primary_state` as the sole canonical decision spine and res
 
 Evidence: Codex read-only integration review `/tmp/codex_other_wave_integration_last.md`; current live distribution showed broader states only in `wave.context.mapped_state` (237/237 evaluated). Focused design: `docs/current/2026-09-03-daily-structure-evidence-integration-spec.md`. Implementation/runtime acceptance remains pending.
 
+## 2026-09-03 — Daily structural evidence integration milestone (LITE-VERIFIED)
+
+Decision: restore broader Daily Wave 1/2/4/5 visibility through additive `wave.daily_structure` evidence while keeping `wave.primary_state` as the sole canonical decision spine. The phase is `actionability=NONE`, cannot create `REVIEW_NOW`/`AVOID` or change setup validity, and remains separate from 60m setup evidence. W1/W2 are evidence-only; `WAVE_2_NEAR_COMPLETION` is the next candidate for a separately gated lane experiment. W4/W5 remain context/risk evidence.
+
+Evidence: Codex/Lite implementation commit `9ec9e20`; dashboard reload/read-model `read-model-fb71255aa17e8e3b`; public and loopback API returned 237/237 rows with daily_structure; public `/mvp` drawer showed separate Primary Daily Wave and Daily structural context; 390px no-overflow verified. Full backend suite retains one pre-existing frontend assertion failure.
+
 ## 2026-09-03 — W3 publication gate milestone (LITE-VERIFIED)
 
 Decision: Keep `0.236 <= r <= 0.786` as internal anchor admissibility only. Require raw finite `r <= 0.60` for published `EARLY_WAVE_3` and `WAVE_3_CONTINUATION`; a hard failure becomes `NOT_VERIFIABLE` before hysteresis. `EARLY_WAVE_3` requires a completed Daily close above W1 high without follow-through PASS; continuation requires the same close plus follow-through. Other wave states remain a separate next tuning decision and are not treated as deleted data.

@@ -2,7 +2,7 @@
 
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
-> **Last reconciled:** 2026-09-03 16:31 ICT · W3 publication gate promoted/served; other-wave visibility remains next tuning frontier; evaluator auto-caller separate.
+> **Last reconciled:** 2026-09-03 17:48 ICT · W3 gate + additive Daily structural evidence served; W2 candidate-lane experiment remains deferred; evaluator auto-caller separate.
 > Governance: [[Documentation-Governance]]
 > Product/acceptance authority: `Execution-Pipeline.md` + linked focused plans. Active named-worker execution state: Kanban board `signalix`; live card status is not mirrored into vault notes.
 
@@ -47,7 +47,7 @@ Cleanup matrix: `../docs/current/2026-09-02-documentation-authority-matrix.md`
 | `Codex-Standard-Workflow-2026-08-29.md` | Current Lite + Codex + Ploy team roles and bounded Codex workflow | ✅ current | standard coding/review path; Lite remains final gate |
 | `../docs/current/2026-08-31-elliott-grill-decision-record.md` | Consolidated owner grill, Elliott evidence, and AiPASS/Opus consultation record | ✅ current | decision/evidence index; does not replace executable spec or runtime proof |
 | `../docs/current/2026-09-02-documentation-authority-matrix.md` | Cleanup source-of-truth matrix and wave ledger | ✅ current | navigation/control record; not product authority |
-| `../docs/current/2026-09-03-daily-structure-evidence-integration-spec.md` | Additive Daily Wave 1/2/4/5 structural evidence contract | ✅ current design | preserves W3 primary and keeps other phases non-actionable evidence |
+| `../docs/current/2026-09-03-daily-structure-evidence-integration-spec.md` | Additive Daily Wave 1/2/4/5 structural evidence contract | ✅ current design | implemented/served in 9ec9e20; W2 lane experiment deferred |
 | `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by current closeouts; findings retained |
 || `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
 | `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | superseded for W3 gate by 2026-09-03 milestone handoff |
