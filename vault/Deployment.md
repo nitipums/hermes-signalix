@@ -26,7 +26,13 @@ The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `si
 - Public read-back: `/mvp`, `/api/setup-candidates`, and `/api/chart-db/BBL?timeframe=1D|1W` returned HTTP 200. Day last candle was provisional `2026-09-02`; Week candles were ascending with `latest_time=2026-09-02T05:00:00+00:00`.
 - Review boundary: code/tests/runtime/browser are PASS for this slice. Remaining `REVISE` follow-up: bound request-time intraday metadata overlay and persist explicit fetch-universe identity for audit runs.
 
-### Deferred features — 2026-09-01
+### W3 publication-gate milestone — 2026-09-03
+
+Stable local commit `807cdde` promoted the Codex-implemented W3 publication gate from candidate `717b7c7`. After `docker restart signalix_dashboard`, the canonical read model was republished as `read-model-7db1dfb3e7cf3f9e` with `count=237`. Loopback and public `/api/setup-candidates` returned HTTP 200 with `evaluated=237`; CRC and BGRIM were `NOT_VERIFIABLE` with `retracement_gate_exceeded`; AWC remained blocked by post-impulse correction. Public `/mvp` smoke at 390px showed `237 evaluated` and `scrollWidth=375` under `innerWidth=390`. The local branch is one commit ahead of origin; no push was performed.
+
+The narrow canonical detector intentionally publishes only `EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, and `NOT_VERIFIABLE`; Wave 1/2/4/5 visibility is the next bounded product/contract tuning decision, not a runtime data-loss claim.
+
+## Deferred features — 2026-09-01
 
 - Alerts/delivery: `PENDING / FUTURE FEATURE`, OFF.
 - Automatic trading/broker execution: `PENDING / FUTURE FEATURE`, OFF and not authorized.

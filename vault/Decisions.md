@@ -96,6 +96,12 @@ Decision: `EARLY_WAVE_3`/`WAVE_3_CONTINUATION` require a Daily Close above the W
 
 Evidence: commit `d31a2d2` + OHLC fail-closed remediation; frozen fixtures CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION HIGH.
 
+## 2026-09-03 — W3 publication gate milestone (LITE-VERIFIED)
+
+Decision: Keep `0.236 <= r <= 0.786` as internal anchor admissibility only. Require raw finite `r <= 0.60` for published `EARLY_WAVE_3` and `WAVE_3_CONTINUATION`; a hard failure becomes `NOT_VERIFIABLE` before hysteresis. `EARLY_WAVE_3` requires a completed Daily close above W1 high without follow-through PASS; continuation requires the same close plus follow-through. Other wave states remain a separate next tuning decision and are not treated as deleted data.
+
+Evidence: Codex commit `717b7c7`, promoted stable commit `807cdde`; dashboard reload/read-model `read-model-7db1dfb3e7cf3f9e`; live CRC/BGRIM fail-closed via `retracement_gate_exceeded`; targeted tests passed; public `/mvp` and canonical API returned 200 with 237 evaluated. Full-suite pre-existing `test_marginable.py::test_frontend_has_both_filters_and_drawer_permissions` remains documented separately in the milestone handoff.
+
 ## 2026-08-31 — Elliott grill and AiPASS consultation record
 Decision: Preserve the owner-approved Elliott/Trend/Trade-Setup grill decisions, prototype/replay evidence, open gates, and AiPASS routing caveat in `docs/current/2026-08-31-elliott-grill-decision-record.md`. Treat the record as a curated decision/evidence index; it does not promote the prototype, override runtime evidence, or attribute mismatched AiPASS output to Claude Opus 5.
 Reason: Keep the latest product reasoning and external challenger input durable and reviewable without confusing advisory output with owner decisions or deterministic production truth.

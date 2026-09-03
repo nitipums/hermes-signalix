@@ -2,7 +2,7 @@
 
 > **Master catalog ของ Signalix Level-4 vault** (Karpathy-style LLM-wiki index)
 > อัปเดตทุกครั้งที่มีไฟล์เข้า/ย้าย/ลบหรือเปลี่ยนสถานะ
-> **Last reconciled:** 2026-09-02 · T1–T9 promoted; fetch-time/candle-time UI distinction verified; stale R4/R5 graph archived; evaluator auto-caller separate.
+> **Last reconciled:** 2026-09-03 16:31 ICT · W3 publication gate promoted/served; other-wave visibility remains next tuning frontier; evaluator auto-caller separate.
 > Governance: [[Documentation-Governance]]
 > Product/acceptance authority: `Execution-Pipeline.md` + linked focused plans. Active named-worker execution state: Kanban board `signalix`; live card status is not mirrored into vault notes.
 
@@ -49,7 +49,8 @@ Cleanup matrix: `../docs/current/2026-09-02-documentation-authority-matrix.md`
 | `../docs/current/2026-09-02-documentation-authority-matrix.md` | Cleanup source-of-truth matrix and wave ledger | ✅ current | navigation/control record; not product authority |
 | `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` | Independent Lite + Codex + Ploy review of DATA_BLOCKED, latency, wave traceability, and legacy removal | 🟡 historical review packet | superseded by current closeouts; findings retained |
 || `2026-08-31-lifecycle-persistence-owner-review-api-design.md` | Owner-approved T9 lifecycle persistence/API design: PostgreSQL append-only candidate/snapshot/review model | ✅ current | Source + real PostgreSQL integration done; evaluator auto-caller remains pending owner decision |
-|| `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | Arm manual Wave-identification review is next |
+| `2026-09-01-Current-Session-Handoff.md` | Current release closeout, browser evidence, deferred features, and next user-validation loop | ✅ current | superseded for W3 gate by 2026-09-03 milestone handoff |
+| `2026-09-03-1631-wave3-publication-gate-milestone-handoff.md` | W3 hard retracement gate promotion, runtime evidence, and other-wave tuning frontier | ✅ current milestone | canonical W3 safety milestone; next work must define other-wave evidence scope |
 || `../.scratch/2026-09-02-signalix-session-close-handoff.md` | 2026-09-02 session closeout, fetch/candle display fix, Kanban archive, and data repair boundary | ✅ current handoff | temporary navigation record; canonical contract remains in Deployment/Execution-Pipeline |
 || `../docs/current/2026-09-01-owner-wave-validation.md` | Owner-confirmed Wave fixture review, exact snapshot/as-of, disputes, and bounded follow-ups | ✅ current | CRC/AWC/BGRIM confirmed; TASCO examples remain unconfirmed feedback |
 || `../docs/superpowers/specs/2026-09-01-user-validation-refresh-card-wave-contract.md` | Owner-approved user-validation redesign: freshness, refresh, compact cards, and multi-timeframe Wave evidence | ✅ current design | T01–T04 engineering tickets; T05 owner confirmation |
