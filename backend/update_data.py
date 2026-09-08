@@ -605,6 +605,46 @@ def _utc_now_iso():
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def _intraday_candle_coverage(latest_by_symbol, attempted_symbols):
+    """Classify returned candle timestamps independently from fetch health."""
+    from mvp_api import _expected_intraday_interval_start
+
+    expected = _expected_intraday_interval_start()
+    if expected.tzinfo is None:
+        expected = expected.replace(tzinfo=BANGKOK_TZ)
+    else:
+        expected = expected.astimezone(BANGKOK_TZ)
+    fresh, stale = [], []
+    for symbol, value in latest_by_symbol.items():
+        try:
+            timestamp = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+            if timestamp.tzinfo is None:
+                timestamp = timestamp.replace(tzinfo=BANGKOK_TZ)
+            else:
+                timestamp = timestamp.astimezone(BANGKOK_TZ)
+            (fresh if timestamp >= expected else stale).append(symbol)
+        except (TypeError, ValueError):
+            stale.append(symbol)
+    unavailable = sorted(set(attempted_symbols) - set(latest_by_symbol))
+    if fresh and not stale and not unavailable:
+        status = "fresh"
+    elif fresh:
+        status = "partial"
+    elif stale:
+        status = "stale"
+    else:
+        status = "unavailable"
+    latest = max(latest_by_symbol.values()) if latest_by_symbol else None
+    return {
+        "latest_candle_at": latest,
+        "expected_interval_start": expected.isoformat(),
+        "fresh_symbols": len(fresh),
+        "stale_symbols": len(stale),
+        "unavailable_symbols": len(unavailable),
+        "candle_status": status,
+    }
+
+
 def ingest_intraday(
         pg, stats, *, symbols=None, limit=10, mode="full", interval="60m",
         universe="marginable_long",
@@ -672,6 +712,7 @@ def ingest_intraday(
     batches = [symbols[i:i + batch_size] for i in range(0, len(symbols), batch_size)]
     run_has_failure = False
     session_exhausted = False
+    latest_by_symbol = {}
 
     for batch_index, batch_symbols in enumerate(batches, 1):
         batch_info = {
@@ -773,6 +814,10 @@ def ingest_intraday(
         is_last_batch = batch_index == len(batches)
         claim_full_success = is_last_batch and not run_has_failure and bool(batch_rows)
         if batch_rows:
+            for row in batch_rows:
+                symbol, timestamp = row[0], row[2]
+                if symbol not in latest_by_symbol or str(timestamp) > str(latest_by_symbol[symbol]):
+                    latest_by_symbol[symbol] = timestamp
             batch_stats = {}
             batch_info["db_upsert_result"] = insert_intraday_rows(
                 pg, batch_rows, stats=batch_stats,
@@ -802,6 +847,7 @@ def ingest_intraday(
     elif summary["symbols_succeeded"]:
         summary["status"] = "partial_success"
     summary["fetch_completed_at"] = _utc_now_iso()
+    summary.update(_intraday_candle_coverage(latest_by_symbol, symbols))
     return summary
 
 
@@ -1129,7 +1175,8 @@ def _canonical_read_model_source_versions(pg):
         """)
         daily = cur.fetchone()
         cur.execute("""
-            SELECT run_id, status, fetch_completed_at, fetch_universe
+            SELECT run_id, status, fetch_completed_at, fetch_universe,
+                   (SELECT MAX(ts) FROM intraday_price_data WHERE interval = '60m')
             FROM intraday_ingestion_runs
             WHERE status IN ('full_success', 'partial_success')
               AND fetch_completed_at IS NOT NULL
@@ -1143,11 +1190,12 @@ def _canonical_read_model_source_versions(pg):
     if not daily or not intraday:
         return None
     daily_run_id, daily_scan_date, daily_run_timestamp, daily_lineage = daily
-    intraday_run_id, intraday_status, intraday_completed_at, intraday_universe = intraday
+    (intraday_run_id, intraday_status, intraday_completed_at,
+     intraday_universe, intraday_candle_at) = intraday
     if (not daily_run_id or not daily_scan_date or not daily_run_timestamp
             or not isinstance(daily_lineage, dict)
             or not intraday_run_id or not intraday_status or not intraday_completed_at
-            or intraday_universe != "marginable_long"):
+            or intraday_universe != "marginable_long" or not intraday_candle_at):
         return None
     return {
         "daily": {
@@ -1159,7 +1207,8 @@ def _canonical_read_model_source_versions(pg):
         "intraday": {
             "run_id": str(intraday_run_id),
             "status": intraday_status,
-            "as_of": intraday_completed_at.isoformat() if hasattr(intraday_completed_at, "isoformat") else str(intraday_completed_at),
+            "as_of": intraday_candle_at.isoformat() if hasattr(intraday_candle_at, "isoformat") else str(intraday_candle_at),
+            "fetched_at": intraday_completed_at.isoformat() if hasattr(intraday_completed_at, "isoformat") else str(intraday_completed_at),
         },
     }
 
@@ -1194,9 +1243,8 @@ def publish_canonical_read_model():
 
 
 def publish_intraday_metadata_after_commit(summary):
-    """Publish product freshness only after the run summary commit succeeds."""
-    if (summary.get("fetch_universe") != "marginable_long"
-            or summary.get("status") not in {"full_success", "partial_success"}):
+    """Publish product fetch/candle health only after the summary commit."""
+    if summary.get("fetch_universe") != "marginable_long":
         return None
     from read_model_publisher import publish_intraday_metadata
     try:
@@ -1204,6 +1252,12 @@ def publish_intraday_metadata_after_commit(summary):
             "run_id": summary.get("run_id"),
             "status": summary.get("status"),
             "fetch_completed_at": summary.get("fetch_completed_at"),
+            "candle_status": summary.get("candle_status", "unavailable"),
+            "latest_candle_at": summary.get("latest_candle_at"),
+            "expected_interval_start": summary.get("expected_interval_start"),
+            "fresh_symbols": summary.get("fresh_symbols", 0),
+            "stale_symbols": summary.get("stale_symbols", 0),
+            "unavailable_symbols": summary.get("unavailable_symbols", summary.get("symbols_attempted", 0)),
             "universe": summary.get("fetch_universe"),
             "published_at": _utc_now_iso(),
         })
@@ -1319,6 +1373,8 @@ def run(args):
                 failed=summary["symbols_failed"],
             ))
             refresh_dashboard_from_existing_scan()
+            if summary["status"] in ("full_success", "partial_success") and summary.get("rows_offered", 0):
+                publish_canonical_read_model()
         finally:
             pg.close()
         # Partial coverage is recorded in the run summary and is operationally

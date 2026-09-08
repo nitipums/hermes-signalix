@@ -40,6 +40,20 @@ def test_intraday_metadata_sidecar_rejects_audit_or_legacy_identity(tmp_path):
     assert load_intraday_metadata(tmp_path) is None
 
 
+def test_failed_intraday_metadata_exposes_unavailable_without_moving_read_model_pointer(tmp_path):
+    pointer = tmp_path / "current.json"
+    pointer.write_text('{"source_version":"old"}', encoding="utf-8")
+
+    publish_intraday_metadata({
+        "run_id": "failed-1", "status": "failure",
+        "fetch_completed_at": "2026-09-08T05:30:00+00:00",
+        "candle_status": "unavailable", "universe": "marginable_long",
+    }, tmp_path)
+
+    assert load_intraday_metadata(tmp_path)["candle_status"] == "unavailable"
+    assert json.loads(pointer.read_text(encoding="utf-8")) == {"source_version": "old"}
+
+
 def _item(symbol, lane="WAIT"):
     return {
         "symbol": symbol, "as_of": "2026-09-01T00:00:00", "data_status": {"sufficient": True, "freshness": "fresh"},

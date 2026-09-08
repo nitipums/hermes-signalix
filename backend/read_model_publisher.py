@@ -261,8 +261,8 @@ def publish_intraday_metadata(metadata: dict, root: str | Path | None = None) ->
         raise ValueError("intraday metadata identity is incomplete")
     if metadata["universe"] != DEFAULT_UNIVERSE:
         raise ValueError("only marginable_long intraday metadata is publishable")
-    if metadata["status"] not in {"full_success", "partial_success"}:
-        raise ValueError("intraday metadata status is not product-eligible")
+    if metadata["status"] not in {"full_success", "partial_success", "failure"}:
+        raise ValueError("intraday metadata status is invalid")
     payload = {
         "schema_version": "signalix.intraday-metadata.v1",
         "run_id": str(metadata["run_id"]),
@@ -271,6 +271,10 @@ def publish_intraday_metadata(metadata: dict, root: str | Path | None = None) ->
         "universe": DEFAULT_UNIVERSE,
         "published_at": str(metadata.get("published_at") or ""),
     }
+    for key in ("candle_status", "latest_candle_at", "expected_interval_start", "fresh_symbols",
+                "stale_symbols", "unavailable_symbols"):
+        if metadata.get(key) is not None:
+            payload[key] = metadata[key]
     path = _intraday_metadata_path(root)
     atomic_write_json(path, payload)
     return {"path": str(path), **payload}
@@ -285,7 +289,7 @@ def load_intraday_metadata(root: str | Path | None = None) -> dict | None:
     if (not isinstance(payload, dict)
             or payload.get("schema_version") != "signalix.intraday-metadata.v1"
             or payload.get("universe") != DEFAULT_UNIVERSE
-            or payload.get("status") not in {"full_success", "partial_success"}
+            or payload.get("status") not in {"full_success", "partial_success", "failure"}
             or not payload.get("run_id") or not payload.get("fetch_completed_at")):
         return None
     return payload
