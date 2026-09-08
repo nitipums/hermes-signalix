@@ -195,21 +195,30 @@ class IntradayUpsertAccountingTests(unittest.TestCase):
         assert actual["provenance"]["intraday_as_of"] == "2026-09-02T08:00:00+00:00"
 
     @patch("read_model_publisher.load_intraday_metadata")
-    def test_current_fetch_does_not_make_previous_session_candle_fresh(self, load):
-        load.return_value = {
-            "schema_version": "signalix.intraday-metadata.v1", "run_id": "60m-new",
-            "status": "full_success", "fetch_completed_at": "2026-09-08T05:30:00+00:00",
-            "candle_status": "stale", "universe": "marginable_long",
-        }
-        payload = {"freshness": {"intraday_status": "stale"}, "provenance": {
-            "intraday_as_of": "2026-09-07T09:00:00+00:00", "source_versions": {
-                "intraday": {"run_id": "old", "as_of": "2026-09-07T09:00:00+00:00"}}}}
+    def test_current_fetch_overlays_valid_candle_status_without_changing_lineage(self, load):
+        for candle_status, embedded_status in (
+            ("fresh", "stale"), ("partial", "fresh"),
+            ("stale", "fresh"), ("unavailable", "fresh"),
+        ):
+            with self.subTest(candle_status=candle_status):
+                load.return_value = {
+                    "schema_version": "signalix.intraday-metadata.v1", "run_id": "60m-new",
+                    "status": "full_success", "fetch_completed_at": "2026-09-08T05:30:00+00:00",
+                    "candle_status": candle_status, "universe": "marginable_long",
+                }
+                payload = {"freshness": {"intraday_status": embedded_status}, "provenance": {
+                    "intraday_as_of": "2026-09-07T09:00:00+00:00", "source_versions": {
+                        "intraday": {"run_id": "old", "as_of": "2026-09-07T09:00:00+00:00"}}}}
 
-        actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
+                actual = __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)
 
-        assert actual["freshness"]["intraday_fetched_at"] == "2026-09-08T05:30:00+00:00"
-        assert actual["freshness"]["intraday_status"] == "stale"
-        assert actual["provenance"]["intraday_as_of"] == "2026-09-07T09:00:00+00:00"
+                assert actual["freshness"]["intraday_fetched_at"] == "2026-09-08T05:30:00+00:00"
+                assert actual["freshness"]["intraday_status"] == candle_status
+                assert actual["provenance"]["intraday_as_of"] == "2026-09-07T09:00:00+00:00"
+
+        load.return_value["candle_status"] = "unexpected"
+        assert __import__("mvp_routes")._overlay_latest_intraday_metadata(payload)[
+            "freshness"]["intraday_status"] == embedded_status
 
     @patch("mvp_routes._acquire_setup_candidates_pg")
     @patch("read_model_publisher.load_intraday_metadata")

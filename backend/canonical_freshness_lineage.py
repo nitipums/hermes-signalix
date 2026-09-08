@@ -18,11 +18,14 @@ def overlay_latest_intraday_metadata(payload):
     completed = str(metadata["fetch_completed_at"])
     run_id = str(metadata["run_id"])
     status = metadata["status"]
+    candle_status = metadata.get("candle_status", "unavailable")
     freshness = dict(payload.get("freshness") or {})
     freshness.update({"intraday_fetched_at": completed,
                       "intraday_source": "settrade_intraday_60m",
                       "intraday_latest_run_id": str(run_id),
                       "intraday_latest_status": status})
+    if candle_status in {"fresh", "partial", "stale", "unavailable"}:
+        freshness["intraday_status"] = candle_status
     updated = dict(payload)
     updated["freshness"] = freshness
     updated_provenance = dict(provenance)
@@ -32,5 +35,5 @@ def overlay_latest_intraday_metadata(payload):
     updated["provenance"] = updated_provenance
     updated["intraday_latest_run"] = {"run_id": run_id, "status": status,
                                        "fetch_completed_at": completed,
-                                       "candle_status": metadata.get("candle_status", "unavailable")}
+                                       "candle_status": candle_status}
     return updated
