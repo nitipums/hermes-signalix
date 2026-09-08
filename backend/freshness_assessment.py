@@ -45,7 +45,7 @@ def assess_projection_freshness(items: list[dict[str, Any]], *, now: datetime | 
     if latest_as_of:
         try:
             datetime.fromisoformat(latest_as_of.replace("Z", "+00:00"))
-            status = compute_freshness(latest_as_of)
+            status = compute_freshness(latest_as_of, now=now)
             status = daily_eod_status(latest_as_of, now=now) or status
             if status == "unknown":
                 status = "fresh"
