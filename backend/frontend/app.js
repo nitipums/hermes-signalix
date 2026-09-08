@@ -412,6 +412,7 @@
     if (status === "fresh" || status === "market_closed") return prefix + ": fresh" + (unavailableCount ? " · " + unavailableCount + " unavailable" : "") + " · " + timeAgo(timestamp);
     if (status === "expected_previous") return prefix + ": expected previous completed session · " + timeAgo(timestamp);
     if (status === "stale") return prefix + ": stale · " + timeAgo(timestamp);
+    if (status === "partial") return prefix + ": partial · " + timeAgo(timestamp);
     return prefix + ": unavailable";
   }
 

@@ -480,6 +480,21 @@ def test_setup_candidate_freshness_reports_mixed_timeframes_without_collapsing_t
     assert 'prefix + ": fresh"' in js
 
 
+def test_freshness_time_label_renders_partial_with_timestamp_and_keeps_unknown_unavailable():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    normalizer = _extract_function(js, "normalizeFreshnessStatus")
+    time_ago = _extract_function(js, "timeAgo")
+    label = _extract_function(js, "freshnessTimeLabel")
+    result = _run_node(
+        [normalizer, time_ago, label],
+        "({partial:freshnessTimeLabel('60m','partial',new Date(Date.now()-120000).toISOString()), unavailable:freshnessTimeLabel('60m','unavailable','2026-09-08T09:00:00+07:00'), unknown:freshnessTimeLabel('60m','unknown','2026-09-08T09:00:00+07:00')})",
+    )
+    assert result["partial"].startswith("60m: partial · ")
+    assert "ago" in result["partial"]
+    assert result["unavailable"] == "60m: unavailable"
+    assert result["unknown"] == "60m: unavailable"
+
+
 def test_setup_candidate_freshness_prefers_full_universe_aggregate_statuses():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "freshness.daily_status" in js
