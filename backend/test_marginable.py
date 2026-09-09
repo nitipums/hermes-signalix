@@ -95,10 +95,12 @@ def test_frontend_has_both_filters_and_drawer_permissions():
     assert 'id="vcp-price-band"' not in html
     assert 'data-surface="vcp"' not in html
     assert '<dt>Marginable</dt>' in html
-    # Decision levels live as dashed chart overlays; duplicate metric boxes
-    # below the chart were intentionally removed from the MVP drawer.
-    assert '<dt>Trigger</dt>' not in html
-    assert '<dt>Stop</dt>' not in html
+    # The current MVP drawer exposes the deterministic setup plan in English;
+    # the same levels also remain available as dashed chart overlays.
+    assert '<dt>Trigger</dt>' in html
+    assert '<dt>Stop</dt>' in html
+    assert '<dt>Target 1</dt>' in html
+    assert '<dt>R:R</dt>' in html
     assert 'decisionLine(chart.trigger' in js
     assert 'decisionLine(chart.stop' in js
     assert 'decisionLine(chart.target' in js

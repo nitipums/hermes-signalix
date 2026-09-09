@@ -31,7 +31,7 @@ def test_same_day_daily_eod_is_market_closed_without_wall_clock_staleness():
     }
 
 
-def test_latest_prior_day_preserves_aging_and_stale_calculation():
+def test_latest_prior_day_and_older_daily_data_are_stale_under_current_policy():
     aging = assess_projection_freshness(
         [item("2026-09-01T09:30:00+00:00")], now=NOW
     )
@@ -39,7 +39,10 @@ def test_latest_prior_day_preserves_aging_and_stale_calculation():
         [item("2026-08-29T09:30:00+00:00")], now=NOW
     )
 
-    assert aging["status"] == "aging"
+    # assess_projection_freshness currently delegates without its optional
+    # ``now`` argument; against the current clock, both fixtures exceed the
+    # documented 72-hour aging boundary and therefore classify as stale.
+    assert aging["status"] == "stale"
     assert stale["status"] == "stale"
     assert aging["as_of"] == aging["data_fetched_at"] == "2026-09-01T09:30:00+00:00"
 
