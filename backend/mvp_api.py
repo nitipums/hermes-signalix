@@ -1137,8 +1137,8 @@ def build_setup_candidates_from_data(pg, *, market="TH", as_of=None,
                                           "candidate_evaluation": evaluate_ms},
                             "ohlcv_query_count": ohlcv_query_count,
                             "ohlcv_row_count": (
-                                sum(len(frame) for frame in daily_frames.values())
-                                + sum(len(frame) for frame in intraday_frames.values())
+                                sum(len(frame) for frame in daily_frames.values() if frame is not None)
+                                + sum(len(frame) for frame in intraday_frames.values() if frame is not None)
                             ) if daily_frames is not None and intraday_frames is not None else None,
                             "evaluated_row_count": len(candidates),
                             "candidate_evaluation_workers": evaluation_workers,

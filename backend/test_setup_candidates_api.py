@@ -608,6 +608,55 @@ def test_setup_candidate_full_frames_use_process_workers_in_symbol_order(monkeyp
     assert meta["build_observability"]["candidate_evaluation_parallel"] is True
 
 
+def test_missing_observation_frame_preserves_candidates_and_counts_real_rows(monkeypatch):
+    import mvp_api
+    import pandas as pd
+
+    symbols = ["AAA", "BBB"]
+    index = pd.date_range("2026-07-01", periods=25)
+    values = [10.0 + i / 10 for i in range(25)]
+    daily = pd.DataFrame(
+        {"Open": values, "High": [v + .1 for v in values],
+         "Low": [v - .1 for v in values], "Close": values,
+         "Volume": [10] * 25}, index=index
+    )
+    intraday = daily.copy()
+    intraday.attrs["timeframe"] = "60m"
+    intraday.attrs["as_of"] = intraday.index[-1]
+
+    class FakePool:
+        def __init__(self, max_workers):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def map(self, fn, args, *, chunksize):
+            return [mvp_api._evaluate_candidate_engines(*item) for item in args]
+
+    monkeypatch.setattr(mvp_api, "ProcessPoolExecutor", FakePool)
+    monkeypatch.setattr(mvp_api, "resolve_universe", lambda pg, universe: (symbols, {
+        "universe_filter": "marginable_long", "eligible_count": len(symbols)
+    }))
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr("screening.load_market", lambda *a, **k: None)
+    monkeypatch.setattr(mvp_api, "expected_market_date", lambda: index[-1].date())
+    monkeypatch.setattr(mvp_api, "compute_trend_strength", lambda *args, **kwargs: {})
+    monkeypatch.setattr(mvp_api, "_bulk_candidate_frames", lambda *args, **kwargs: (
+        {"AAA": daily.copy()}, {"AAA": intraday.copy()}, 2,
+    ))
+
+    rows, meta = mvp_api.build_setup_candidates_from_data(object())
+
+    assert [row["symbol"] for row in rows] == symbols
+    assert rows[1]["decision_lane"] == "DATA_BLOCKED"
+    assert rows[1]["data_status"]["reason_code"] == "NO_DAILY_DATA"
+    assert meta["build_observability"]["ohlcv_row_count"] == len(daily) + len(intraday)
+
+
 def test_process_worker_restores_explicit_intraday_metadata():
     import mvp_api
     from test_elliott_setup_engine import rising_60m_frame
