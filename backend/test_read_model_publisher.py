@@ -250,10 +250,10 @@ def test_identical_lineage_and_revision_is_idempotent_but_content_collision_stay
         publish_read_model(changed, tmp_path)
 
 
-def test_quote_bearing_republish_gets_new_revision_and_preserves_old_file(tmp_path, monkeypatch):
+def test_revision_bump_for_representation_change_preserves_old_file(tmp_path, monkeypatch):
     items, metadata = _build(1)
     old_revision = read_model_publisher.MODEL_REVISION
-    monkeypatch.setattr(read_model_publisher, "MODEL_REVISION", "1")
+    monkeypatch.setattr(read_model_publisher, "MODEL_REVISION", "5")
     old_model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="old")
     old_result = publish_read_model(old_model, tmp_path)
     old_path = tmp_path / "versions" / f"{old_result['source_version']}.json"
