@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 import numbers
 from collections.abc import Iterable
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
@@ -54,6 +55,29 @@ DAILY_STRUCTURE_FIELDS = {
     "as_of", "snapshot_id", "anchors", "retracement", "supporting_evidence",
     "contradicting_evidence", "missing_evidence", "alternative_phases",
 }
+
+
+@dataclass(frozen=True)
+class CandidateEvaluation:
+    """Immutable handoff from candidate evidence assembly to finalization.
+
+    The mappings are intentionally retained as the existing dict-shaped
+    contract inputs.  Freezing the handoff prevents the finalizer from being
+    called with a partially mutated collection of positional values while
+    preserving the public JSON shape and compatibility adapter below.
+    """
+
+    symbol: str
+    as_of: str | None
+    data_status: dict
+    trend: dict
+    wave: dict
+    setup: dict
+    context: dict
+    bonus_evidence: dict
+    provenance: dict
+    canonical_metadata: dict | None = None
+    quote: dict | None = None
 
 
 def _json_value(value: Any):
@@ -514,20 +538,21 @@ def _decision(data_status: dict, wave: dict, setup: dict) -> str:
     return project_decision_lane(data_status, wave, setup)
 
 
-def build_setup_candidate(
-    symbol: str,
-    as_of: str,
-    data_status: dict,
-    trend: dict,
-    wave: dict,
-    setup: dict,
-    context: dict,
-    bonus_evidence: dict,
-    provenance: dict,
-    canonical_metadata: dict | None = None,
-    quote: dict | None = None,
-) -> dict:
-    """Build one canonical, JSON-safe setup-candidate item."""
+def finalize_candidate_evaluation(evaluation: CandidateEvaluation) -> dict:
+    """Finalize one immutable evidence evaluation into the canonical row."""
+    if not isinstance(evaluation, CandidateEvaluation):
+        raise TypeError("evaluation must be a CandidateEvaluation")
+    symbol = evaluation.symbol
+    as_of = evaluation.as_of
+    data_status = evaluation.data_status
+    trend = evaluation.trend
+    wave = evaluation.wave
+    setup = evaluation.setup
+    context = evaluation.context
+    bonus_evidence = evaluation.bonus_evidence
+    provenance = evaluation.provenance
+    canonical_metadata = evaluation.canonical_metadata
+    quote = evaluation.quote
     wave_out = _normalize_wave_evidence(wave)
     if wave_out.get("timeframe") is None:
         wave_out["timeframe"] = "daily"
@@ -631,6 +656,28 @@ def build_setup_candidate(
     if isinstance(quote, dict) and quote:
         item["quote"] = _json_value(quote)
     return _json_value(item)
+
+
+def build_setup_candidate(
+    symbol: str,
+    as_of: str,
+    data_status: dict,
+    trend: dict,
+    wave: dict,
+    setup: dict,
+    context: dict,
+    bonus_evidence: dict,
+    provenance: dict,
+    canonical_metadata: dict | None = None,
+    quote: dict | None = None,
+) -> dict:
+    """Compatibility adapter for callers using the original builder API."""
+    return finalize_candidate_evaluation(CandidateEvaluation(
+        symbol=symbol, as_of=as_of, data_status=data_status, trend=trend,
+        wave=wave, setup=setup, context=context,
+        bonus_evidence=bonus_evidence, provenance=provenance,
+        canonical_metadata=canonical_metadata, quote=quote,
+    ))
 
 
 def project_lane_order(item: dict) -> tuple:

@@ -3,11 +3,14 @@ from decimal import Decimal
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from setup_candidate_contract import (
+    CandidateEvaluation,
     _setup_evidence_markers,
     build_peer_context,
     build_setup_candidate,
+    finalize_candidate_evaluation,
     project_setup_candidate_list,
 )
 from canonical_setup_projection import _validate_canonical_setup_candidate
@@ -37,6 +40,47 @@ def test_candidate_contract_keeps_layers_separate():
     assert item["decision_lane"] == "DAILY_CANDIDATE"
     assert "decision" not in item
     json.dumps(item)
+
+
+@pytest.mark.parametrize("freshness, expected_lane", [
+    ("fresh", "DAILY_CANDIDATE"),
+    ("stale", "DATA_BLOCKED"),
+    ("unknown", "DATA_BLOCKED"),
+])
+def test_candidate_evaluation_finalizer_matches_compatibility_builder(
+    freshness, expected_lane,
+):
+    inputs = sample_inputs()
+    inputs["data_status"] = {
+        "sufficient": freshness == "fresh", "freshness": freshness,
+        "intraday_60m_freshness": freshness,
+    }
+    old_row = build_setup_candidate(**inputs)
+    new_row = finalize_candidate_evaluation(CandidateEvaluation(**inputs))
+
+    assert new_row == old_row
+    assert new_row["decision_lane"] == expected_lane
+    assert new_row["data_status"] == old_row["data_status"]
+    assert new_row["provenance"] == old_row["provenance"]
+    assert new_row["setup"] == old_row["setup"]
+
+
+def test_stale_intraday_finalization_has_one_precedence_and_does_not_mutate_input():
+    inputs = sample_inputs()
+    original_setup = dict(inputs["setup"])
+    inputs["data_status"] = {
+        "sufficient": False, "freshness": "stale",
+        "intraday_60m_freshness": "stale", "reason_code": "STALE_60M_DATA",
+    }
+    inputs["setup"] = {**inputs["setup"], "data_reason_code": "ENGINE_REASON"}
+
+    row = finalize_candidate_evaluation(CandidateEvaluation(**inputs))
+
+    assert row["decision_lane"] == "DATA_BLOCKED"
+    assert row["setup"]["status"] == "PRE_TRIGGER"
+    assert row["data_status"]["reason_code"] == "STALE_60M_DATA"
+    assert row["data_status"]["reason_codes"] == ["STALE_60M_DATA", "ENGINE_REASON"]
+    assert inputs["setup"] == {**original_setup, "data_reason_code": "ENGINE_REASON"}
 
 
 def test_daily_structure_is_non_actionable_and_cannot_change_lane():

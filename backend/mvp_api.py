@@ -41,8 +41,9 @@ from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from freshness_assessment import (assess_projection_freshness as _resolve_freshness,
                                   daily_eod_status as _daily_eod_status)
-from setup_candidate_contract import (attach_bonus_vcp, build_peer_context,
-                                      build_setup_candidate)
+from setup_candidate_contract import (CandidateEvaluation, attach_bonus_vcp,
+                                      build_peer_context, build_setup_candidate,
+                                      finalize_candidate_evaluation)
 from elliott_structure_engine import build_wave_contract
 from trade_setup_engine import build_trade_setup
 from trend_strength_engine import compute_trend_strength
@@ -940,13 +941,12 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
         intraday_current=intraday_current,
         daily_evidence_valid=daily_evidence_valid,
     )
-    row = build_setup_candidate(
-        symbol, as_of, data_status, trend, wave, setup, peer_context,
-        bonus_evidence,
-        provenance,
-        canonical_metadata,
-        quote,
-    )
+    row = finalize_candidate_evaluation(CandidateEvaluation(
+        symbol=symbol, as_of=as_of, data_status=data_status, trend=trend,
+        wave=wave, setup=setup, context=peer_context,
+        bonus_evidence=bonus_evidence, provenance=provenance,
+        canonical_metadata=canonical_metadata, quote=quote,
+    ))
     return _CandidateRowResult(
         row=row,
         candidate_freshness=candidate_freshness,
