@@ -1,8 +1,10 @@
 """Focused unit coverage for the T9A persistence seam (no database required)."""
 
+import ast
 import datetime as dt
 import json
 import unittest
+from pathlib import Path
 
 from lifecycle_persistence import (
     IdempotencyConflict, ImmutableConflict, REVIEW_EVENTS, build_candidate_record,
@@ -264,6 +266,31 @@ class LifecyclePersistenceTests(unittest.TestCase):
         second = persist_setup_candidate_lifecycle(cur, candidate)
         self.assertEqual(first["snapshot"]["snapshot_id"], second["snapshot"]["snapshot_id"])
         self.assertEqual(sum("ON CONFLICT (snapshot_id) DO NOTHING" in sql for sql, _ in cur.calls), 2)
+
+    def test_intraday_evaluator_has_no_lifecycle_persistence_call_path(self):
+        """Lifecycle persistence remains opt-in at the producer boundary."""
+        path = Path(__file__).with_name("intraday_evaluator.py")
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        lifecycle_names = {
+            "persist_completed_60m_candidate",
+            "persist_setup_candidate_lifecycle",
+        }
+        calls = {
+            node.func.id for node in ast.walk(tree)
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+        }
+        imported_modules = {
+            alias.name for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        imported_modules.update(
+            alias.name for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module
+            for alias in node.names
+        )
+        self.assertTrue(lifecycle_names.isdisjoint(calls))
+        self.assertNotIn("lifecycle_persistence", imported_modules)
 
 
 if __name__ == "__main__":
