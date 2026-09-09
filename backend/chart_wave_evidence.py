@@ -28,6 +28,25 @@ def canonical_chart_wave_evidence(item: dict | None) -> dict | None:
             "mapping": {"daily": "authoritative", "60m": "not_projected"}}
 
 
+def neutral_chart_wave_evidence(timeframe: str) -> dict:
+    """Return the safe primary chart evidence when Daily evidence is absent.
+
+    A chart read may still have candles, including a provisional 60m
+    aggregation, but that data is not a substitute for the published Daily
+    Wave interpretation.
+    """
+    timeframe = {"1D": "daily", "1W": "weekly", "1M": "monthly",
+                 "60M": "60m"}.get(str(timeframe).upper(), str(timeframe).lower())
+    return {
+        "timeframe": timeframe,
+        "markers": [],
+        "status": "NOT_VERIFIED",
+        "mapping": {"daily": "not_verified", "60m": "setup_only"},
+        "missing": ["canonical_daily_wave_evidence"],
+        "source": "canonical_daily_evidence_unavailable",
+    }
+
+
 def build_legacy_chart_wave_evidence(candles: list[dict], timeframe: str, as_of: str | None) -> dict:
     """Preserve the historical wave_evidence response shape and marker values."""
     evidence = {

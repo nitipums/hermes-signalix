@@ -197,7 +197,26 @@ def test_chart_db_prefers_canonical_daily_wave_evidence(monkeypatch):
     assert response["wave_evidence"]["snapshot_id"] == "daily:canonical"
 
 
-def test_chart_db_uses_named_legacy_wave_fallback_when_canonical_evidence_unavailable(monkeypatch):
+def test_60m_chart_never_emits_daily_wave_markers_or_primary_state(monkeypatch):
+    connection = _Connection(
+        [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)],
+        [(datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100)],
+    )
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    canonical = {"symbol": "SIS", "wave": {"evidence_markers": [
+        {"timestamp": "2026-08-27", "price": 12, "source": "canonical"}
+    ], "primary_state": "EARLY_WAVE_3"}}
+
+    response = mvp_chart_db.project_chart_db_response("sis", timeframe="60M",
+                                                       canonical_item=canonical)
+    evidence = response["wave_evidence"]
+    assert evidence["markers"] == []
+    assert evidence["status"] == "NOT_VERIFIED"
+    assert "primary_state" not in evidence
+    assert evidence["mapping"]["daily"] != "authoritative"
+
+
+def test_chart_db_marks_missing_canonical_daily_evidence_neutral_and_audit_only(monkeypatch):
     connection = _Connection(
         [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []
     )
@@ -205,7 +224,13 @@ def test_chart_db_uses_named_legacy_wave_fallback_when_canonical_evidence_unavai
     monkeypatch.setattr("mvp_chart_db.build_legacy_chart_wave_evidence",
                         lambda candles, timeframe, as_of: {"mapping": {"daily": "legacy_fallback"}, "markers": []})
     response = mvp_chart_db.project_chart_db_response("sis")
-    assert response["wave_evidence"]["mapping"]["daily"] == "legacy_fallback"
+    evidence = response["wave_evidence"]
+    assert evidence["status"] == "NOT_VERIFIED"
+    assert evidence["markers"] == []
+    assert evidence["mapping"]["daily"] == "not_verified"
+    assert evidence["audit_compatibility"]["status"] == "audit_only"
+    assert evidence["audit_compatibility"]["source"] == "legacy_chart_generated"
+    assert evidence["audit_compatibility"]["wave_evidence"]["mapping"]["daily"] == "legacy_fallback"
 
 
 class _Connection:

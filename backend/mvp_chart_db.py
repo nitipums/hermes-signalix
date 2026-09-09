@@ -26,7 +26,8 @@ from threading import Lock
 
 from canonical_chart_read import ChartReadResult, read_chart_result
 from chart_wave_evidence import (build_legacy_chart_wave_evidence,
-                                 canonical_chart_wave_evidence)
+                                 canonical_chart_wave_evidence,
+                                 neutral_chart_wave_evidence)
 
 
 _POOL = None
@@ -349,9 +350,17 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
             f"Computed from {chart_source} (SELECT only). All indicators available."))
 
     wave_evidence = (canonical_chart_wave_evidence(canonical_item)
-                     if timeframe == "1D" else None)
+                     if timeframe != "60M" else None)
     if wave_evidence is None:
-        wave_evidence = build_legacy_chart_wave_evidence(candles, timeframe, as_of)
+        # The primary field is never generated from chart candles. Preserve
+        # the historical projection only as explicitly labelled audit data.
+        wave_evidence = neutral_chart_wave_evidence(timeframe)
+        if timeframe != "60M":
+            wave_evidence["audit_compatibility"] = {
+                "status": "audit_only",
+                "source": "legacy_chart_generated",
+                "wave_evidence": build_legacy_chart_wave_evidence(candles, timeframe, as_of),
+            }
     return {
         "symbol": symbol.upper(),
         "timeframe": timeframe,
