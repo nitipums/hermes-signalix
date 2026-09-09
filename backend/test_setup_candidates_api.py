@@ -1190,6 +1190,73 @@ def test_intraday_loader_stamps_requested_timeframe_and_last_timestamp():
     assert frame.attrs["as_of"] == frame.index[-1]
 
 
+def test_observation_window_future_rows_do_not_change_candidate_output():
+    import pandas as pd
+    import mvp_api
+
+    daily_index = pd.date_range("2025-08-01", periods=260, freq="D")
+    daily = pd.DataFrame({
+        "Open": [100.0] * 260, "High": [101.0] * 260,
+        "Low": [99.0] * 260, "Close": [100.0] * 260,
+        "Volume": [1000.0] * 260,
+    }, index=daily_index)
+    daily.index = daily_index[:-1].append(pd.DatetimeIndex([pd.Timestamp("2026-08-28")]))
+    intra_index = pd.date_range("2026-08-28 09:00", periods=3, freq="60min")
+    intraday = pd.DataFrame({
+        "Open": [100.0] * 3, "High": [101.0] * 3,
+        "Low": [99.0] * 3, "Close": [100.0] * 3,
+        "Volume": [100.0] * 3,
+    }, index=intra_index)
+    intraday.attrs["timeframe"] = "60m"
+    boundary = pd.Timestamp("2026-08-28 11:00")
+
+    def build(daily_input, intra_input):
+        daily_bounded, intra_bounded = mvp_api._bound_observation_window(
+            daily_input, intra_input, as_of=boundary,
+            completed_60m_as_of=boundary,
+        )
+        wave, setup = mvp_api._evaluate_candidate_engines(
+            daily_bounded, intra_bounded, True,
+            intraday_timeframe="60m", intraday_as_of=intra_bounded.index[-1],
+        )
+        result = mvp_api._build_candidate_row(context=mvp_api._CandidateRowContext(
+            symbol="AAA", daily_df=daily_bounded, intraday_df=intra_bounded,
+            daily_evidence_valid=True, daily_evidence_usable=True,
+            daily_current=True, daily_freshness="fresh", daily_final_status="available",
+            intraday_available=True, intraday_current=True,
+            intraday_freshness="fresh", intraday_as_of=intra_bounded.index[-1].isoformat(),
+            rs_rank=91.0, profile={}, universe_manifest={"universe_filter": "marginable_long"},
+            wave=wave, setup=setup, canonical_metadata={},
+        ))
+        return result.row
+
+    future_daily = pd.concat([daily, daily.iloc[[-1]].set_axis([pd.Timestamp("2026-08-29")])])
+    future_intraday = pd.concat([intraday, intraday.iloc[[-1]].set_axis([pd.Timestamp("2026-08-28 12:00")])])
+    baseline = build(daily, intraday)
+    future = build(future_daily, future_intraday)
+    assert future == baseline
+    assert future["as_of"] == "2026-08-28T00:00:00"
+    assert future["provenance"]["intraday_as_of"] == "2026-08-28T11:00:00"
+
+
+def test_observation_window_uses_candle_boundary_not_fetch_completion():
+    import pandas as pd
+    import mvp_api
+
+    daily = pd.DataFrame({"Open": [1], "High": [2], "Low": [1], "Close": [1.5], "Volume": [10]},
+                         index=pd.to_datetime(["2026-08-28"]))
+    intraday = pd.DataFrame({"Open": [1, 1], "High": [2, 2], "Low": [1, 1],
+                             "Close": [1.5, 1.6], "Volume": [10, 11]},
+                            index=pd.to_datetime(["2026-08-28 11:00", "2026-08-28 12:00"]))
+    intraday.attrs.update({"timeframe": "60m", "fetch_completed_at": "2026-08-28T10:00:00+00:00"})
+    _, bounded = mvp_api._bound_observation_window(
+        daily, intraday, as_of="2026-08-28T11:30:00+00:00",
+        completed_60m_as_of="2026-08-28T11:00:00+00:00",
+    )
+    assert list(bounded.index) == [pd.Timestamp("2026-08-28 11:00")]
+    assert bounded.attrs["fetch_completed_at"] == "2026-08-28T10:00:00+00:00"
+
+
 def test_prior_completed_session_is_current_before_eod_cutoff(monkeypatch):
     import datetime as dt
     import mvp_api

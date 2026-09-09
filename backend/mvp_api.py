@@ -448,6 +448,49 @@ def _normalize_candidate_ohlcv_frame(frame, *, timeframe=None):
     return normalized
 
 
+def _bound_observation_window(daily_df, intraday_df, *, as_of=None,
+                              completed_60m_as_of=None):
+    """Return Daily/60m observations available at an explicit decision point.
+
+    Daily uses the calendar date of ``as_of``; 60m uses the independently
+    supplied completed-candle boundary (or a datetime ``as_of``).  Fetch
+    completion is deliberately not consulted: it is transport metadata, not
+    the candle's observation time.
+    """
+    import pandas as pd
+
+    if as_of is None and completed_60m_as_of is None:
+        return daily_df, intraday_df
+
+    decision = pd.Timestamp(as_of) if as_of is not None else None
+    completed = (pd.Timestamp(completed_60m_as_of)
+                 if completed_60m_as_of is not None else decision)
+
+    def clip(frame, boundary, *, daily=False):
+        if frame is None or boundary is None or len(frame) == 0:
+            return frame
+        bound = pd.Timestamp(boundary)
+        if daily:
+            mask = frame.index.normalize().date <= bound.date()
+        else:
+            index = frame.index
+            if getattr(index, "tz", None) is None:
+                bound = bound.tz_localize(None) if bound.tzinfo else bound
+            elif bound.tzinfo is None:
+                bound = bound.tz_localize(index.tz)
+            else:
+                bound = bound.tz_convert(index.tz)
+            mask = index <= bound
+        bounded = frame.loc[mask].copy()
+        bounded.attrs.update(getattr(frame, "attrs", {}))
+        if len(bounded):
+            bounded.attrs["as_of"] = bounded.index[-1]
+        return bounded
+
+    return (clip(daily_df, decision, daily=True),
+            clip(intraday_df, completed, daily=False))
+
+
 def _evaluate_candidate_engines(daily_df, intraday_df, daily_evidence_valid,
                                 intraday_timeframe=None, intraday_as_of=None):
     """Run the independent Daily/60m engines for one symbol.
@@ -481,7 +524,8 @@ def _evaluate_candidate_engines_worker(args):
     return _evaluate_candidate_engines(*args)
 
 
-def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
+def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400,
+                           as_of=None, completed_60m_as_of=None):
     """Load bounded Daily and 60m frames in two queries, grouped by symbol."""
     import pandas as pd
     if not symbols:
@@ -512,28 +556,39 @@ def _bulk_candidate_frames(pg, symbols, *, market="TH", lookback=400):
     # matching history before discarding all but 400 rows per symbol.  The
     # candidate universe is bounded, so indexed per-symbol probes are both
     # cheaper and preserve the full-universe result without changing evidence.
-    ranked_daily = """SELECT symbols.symbol, rows.date, rows.open, rows.high,
+    daily_boundary_sql = " AND date <= %s" if as_of is not None else ""
+    intraday_boundary = completed_60m_as_of if completed_60m_as_of is not None else (
+        as_of if as_of is not None and (
+            hasattr(as_of, "hour") or "T" in str(as_of)
+        ) else None
+    )
+    intraday_boundary_sql = " AND ts <= %s" if intraday_boundary is not None else ""
+    ranked_daily = f"""SELECT symbols.symbol, rows.date, rows.open, rows.high,
                              rows.low, rows.close, rows.volume
                       FROM unnest(%s::text[]) AS symbols(symbol)
                       CROSS JOIN LATERAL (
                           SELECT date, open, high, low, close, volume
                           FROM price_data
-                          WHERE market=%s AND symbol=symbols.symbol
+                          WHERE market=%s AND symbol=symbols.symbol{daily_boundary_sql}
                           ORDER BY date DESC LIMIT %s
                       ) rows
                       ORDER BY symbols.symbol, rows.date"""
-    ranked_intraday = """SELECT symbols.symbol, rows.ts, rows.open, rows.high,
+    ranked_intraday = f"""SELECT symbols.symbol, rows.ts, rows.open, rows.high,
                                 rows.low, rows.close, rows.volume
                          FROM unnest(%s::text[]) AS symbols(symbol)
                          CROSS JOIN LATERAL (
                              SELECT ts, open, high, low, close, volume
                              FROM intraday_price_data
-                             WHERE interval=%s AND symbol=symbols.symbol
+                             WHERE interval=%s AND symbol=symbols.symbol{intraday_boundary_sql}
                              ORDER BY ts DESC LIMIT %s
                          ) rows
                          ORDER BY symbols.symbol, rows.ts"""
-    daily = load(ranked_daily, (list(symbols), market.upper(), lookback))
-    intraday = load(ranked_intraday, (list(symbols), "60m", lookback), "60m")
+    daily_params = (list(symbols), market.upper(), as_of, lookback) if as_of is not None else (
+        list(symbols), market.upper(), lookback)
+    intraday_params = (list(symbols), "60m", intraday_boundary, lookback) if intraday_boundary is not None else (
+        list(symbols), "60m", lookback)
+    daily = load(ranked_daily, daily_params)
+    intraday = load(ranked_intraday, intraday_params, "60m")
     return daily, intraday, 2
 
 
@@ -896,8 +951,9 @@ def _build_candidate_row(*, context: _CandidateRowContext) -> _CandidateRowResul
     )
 
 
-def build_setup_candidates_from_data(pg, *, market="TH"):
-    """Build the canonical source from the authoritative read-only data path."""
+def build_setup_candidates_from_data(pg, *, market="TH", as_of=None,
+                                     completed_60m_as_of=None):
+    """Build the canonical source, optionally bounded to an observation point."""
     import screening
     # RS ranking only reads the latest and 252nd benchmark closes. Keep the
     # market query bounded to that actual dependency; candidate Daily/60m
@@ -908,12 +964,21 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     symbols, universe_manifest = resolve_universe(pg, "marginable_long")
     profiles = instruments.profile_taxonomy(pg, symbols=symbols)
     market_df = screening.load_market(pg, lookback=rs_lookback, market=market)
+    market_df, _ = _bound_observation_window(
+        market_df, None, as_of=as_of, completed_60m_as_of=completed_60m_as_of
+    )
     source_ms = round((time.monotonic() - stage_started) * 1000, 3)
     stage_started = time.monotonic()
     try:
         daily_frames, intraday_frames, ohlcv_query_count = _bulk_candidate_frames(
-            pg, symbols, market=market
+            pg, symbols, market=market, as_of=as_of,
+            completed_60m_as_of=completed_60m_as_of
         )
+        for symbol in symbols:
+            daily_frames[symbol], intraday_frames[symbol] = _bound_observation_window(
+                daily_frames.get(symbol), intraday_frames.get(symbol),
+                as_of=as_of, completed_60m_as_of=completed_60m_as_of
+            )
         rs_ranks = _relative_strength_ranks(daily_frames, market_df)
     except (AttributeError, TypeError):
         # Small pure tests may provide a sentinel instead of a DB connection.
@@ -930,8 +995,19 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
     stage_started = time.monotonic()
     candidates = []
     latest_daily = None
-    expected_daily_session = expected_market_date()
-    expected_intraday_interval = _expected_intraday_interval_start()
+    if as_of is None:
+        expected_daily_session = expected_market_date()
+    else:
+        import pandas as pd
+        expected_daily_session = pd.Timestamp(as_of).date()
+    if completed_60m_as_of is not None:
+        import pandas as pd
+        expected_intraday_interval = pd.Timestamp(completed_60m_as_of).to_pydatetime()
+    elif as_of is not None and (hasattr(as_of, "hour") or "T" in str(as_of)):
+        import pandas as pd
+        expected_intraday_interval = pd.Timestamp(as_of).to_pydatetime()
+    else:
+        expected_intraday_interval = _expected_intraday_interval_start()
     freshness_statuses = []
     daily_freshness_statuses = []
     intraday_freshness_statuses = []
@@ -941,6 +1017,10 @@ def build_setup_candidates_from_data(pg, *, market="TH"):
                     else _load_daily_for_symbol(screening, symbol, pg, market))
         intraday_df = (intraday_frames.get(symbol) if intraday_frames is not None
                        else _load_intraday_for_symbol(screening, symbol, pg, market))
+        daily_df, intraday_df = _bound_observation_window(
+            daily_df, intraday_df, as_of=as_of,
+            completed_60m_as_of=completed_60m_as_of
+        )
         if intraday_df is not None:
             intraday_df.attrs["as_of"] = intraday_df.index[-1]
         daily_evidence_valid = _valid_candidate_ohlcv(daily_df)
