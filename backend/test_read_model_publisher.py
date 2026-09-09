@@ -8,7 +8,8 @@ import pytest
 from read_model_publisher import (build_read_model, load_current_read_model,
                                   load_intraday_metadata, publish_builder_result,
                                   publish_intraday_metadata, publish_read_model,
-                                  DEFAULT_ROOT, UniverseIdentity)
+                                  DEFAULT_ROOT, UniverseIdentity,
+                                  canonical_membership_digest)
 import read_model_publisher
 
 
@@ -67,7 +68,48 @@ def _build(count=237):
     items = [_item(f"S{n:03d}") for n in range(count)]
     return items, {"universe_filter": "marginable_long", "base_active_ord_count": count + 694,
                    "eligible_count": count, "excluded_count": 694,
+                   "universe_membership": {
+                       "symbols": [f"S{n:03d}" for n in range(count)],
+                       "digest": canonical_membership_digest([f"S{n:03d}" for n in range(count)]),
+                   },
                    "scan_time": "2026-09-01", "freshness": {"status": "fresh"}}
+
+
+def test_canonical_membership_digest_is_order_independent():
+    symbols = ["BBB", "AAA"]
+    assert canonical_membership_digest(symbols) == canonical_membership_digest(["AAA", "BBB"])
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda metadata: metadata["universe_membership"].update(
+        symbols=["S000", "S001", "WRONG"]
+    ),
+    lambda metadata: metadata["universe_membership"].update(
+        symbols=["S000", "S001"]
+    ),
+])
+def test_membership_rejects_same_count_wrong_or_missing_symbol_set(mutate):
+    items, metadata = _build(3)
+    mutate(metadata)
+    with pytest.raises(ValueError, match="membership"):
+        build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+
+
+def test_membership_rejects_conflicting_universe_metadata():
+    items, metadata = _build(3)
+    metadata["universe"] = "TH-ORD"
+    with pytest.raises(ValueError, match="conflicts"):
+        build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+
+
+def test_valid_canonical_membership_is_published_and_round_trips(tmp_path):
+    items, metadata = _build(3)
+    model = build_read_model(items, metadata, source_versions=VERSIONS, published_at="t1")
+    result = publish_read_model(model, tmp_path)
+    loaded = load_current_read_model(tmp_path)
+    assert result["count"] == 3
+    assert loaded["universe"] == "marginable_long"
+    assert loaded["universe_membership"] == metadata["universe_membership"]
 
 
 def test_build_rejects_missing_canonical_universe_identity():

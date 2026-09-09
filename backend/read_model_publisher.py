@@ -36,6 +36,31 @@ _READ_MODEL_CACHE: OrderedDict[tuple[str, str, str, str], dict] = OrderedDict()
 _READ_MODEL_CURRENT_IDENTITIES: dict[str, tuple[str, str, str, str]] = {}
 
 
+def canonical_membership_digest(symbols: list[str]) -> str:
+    """Return the stable identity for a symbol set, independent of input order."""
+    canonical = sorted(str(symbol).strip().upper() for symbol in symbols)
+    return hashlib.sha256(_json_bytes(canonical)).hexdigest()
+
+
+def _canonical_membership(value: Any, *, expected_count: int) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError("read model universe membership is required")
+    symbols = value.get("symbols")
+    digest = value.get("digest")
+    if (not isinstance(symbols, list)
+            or any(type(symbol) is not str for symbol in symbols)):
+        raise ValueError("read model universe membership symbols are required")
+    normalized = [symbol.strip().upper() for symbol in symbols]
+    if (normalized != sorted(normalized)
+            or any(not symbol for symbol in normalized)
+            or len(set(normalized)) != len(normalized)
+            or len(normalized) != expected_count):
+        raise ValueError("read model universe membership symbols are not canonical")
+    if not isinstance(digest, str) or digest != canonical_membership_digest(normalized):
+        raise ValueError("read model universe membership digest is invalid")
+    return {"symbols": normalized, "digest": digest}
+
+
 @dataclass(frozen=True)
 class UniverseIdentity:
     """Immutable identity of the universe represented by a read model."""
@@ -53,7 +78,11 @@ class UniverseIdentity:
     def from_metadata(cls, metadata: dict, *, evaluated_count: int | None = None):
         if not isinstance(metadata, dict):
             raise ValueError("builder metadata must be an object")
-        universe = metadata.get("universe_filter", metadata.get("universe"))
+        universe_filter = metadata.get("universe_filter")
+        universe_value = metadata.get("universe")
+        if universe_filter is not None and universe_value is not None and universe_filter != universe_value:
+            raise ValueError("read model universe metadata conflicts")
+        universe = universe_filter if universe_filter is not None else universe_value
         eligible_count = metadata.get("eligible_count")
         evaluated = evaluated_count if evaluated_count is not None else metadata.get("evaluated_count", eligible_count)
         if universe != DEFAULT_UNIVERSE:
@@ -153,6 +182,9 @@ def _validate_build(items: list[dict], metadata: dict, source_versions: dict[str
     symbols = [str(item.get("symbol", "")).upper() if isinstance(item, dict) else "" for item in items]
     if any(not symbol for symbol in symbols) or len(set(symbols)) != scope.evaluated_count:
         raise ValueError("read model symbols must be unique and complete")
+    membership = _canonical_membership(metadata.get("universe_membership"), expected_count=scope.evaluated_count)
+    if symbols != membership["symbols"] and sorted(symbols) != membership["symbols"]:
+        raise ValueError("read model symbols do not match universe membership")
     validated = [_validate_canonical_setup_candidate(item) for item in items]
     ordered = sort_setup_candidates(copy.deepcopy(validated))
     counts = {lane: sum(item.get("decision_lane") == lane for item in ordered) for lane in LANES}
@@ -184,6 +216,9 @@ def build_read_model(
         "published_at": published_at,
         "policy_version": "setup-candidates-v1",
         "universe": scope.universe,
+        "universe_membership": _canonical_membership(
+            metadata["universe_membership"], expected_count=scope.evaluated_count
+        ),
         "items": ordered,
         "count": len(ordered),
         "evaluated_count": len(ordered),
@@ -219,6 +254,7 @@ def publish_read_model(model: dict, root: str | Path) -> dict:
             "excluded_count": model.get("excluded_count"),
             "base_active_ord_count": model.get("base_active_ord_count"),
             "universe_metadata": model.get("universe_metadata"),
+            "universe_membership": model.get("universe_membership"),
         },
         model.get("provenance", {}).get("source_versions"),
     )
@@ -345,6 +381,7 @@ def load_current_read_model(root: str | Path | None = None) -> dict:
                 "excluded_count": model.get("excluded_count"),
                 "base_active_ord_count": model.get("base_active_ord_count"),
                 "universe_metadata": model.get("universe_metadata"),
+                "universe_membership": model.get("universe_membership"),
             },
             provenance.get("source_versions"),
         )

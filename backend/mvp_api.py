@@ -53,6 +53,7 @@ from canonical_setup_projection import (
     _validate_canonical_setup_candidate,
     project_setup_candidates_response,
 )
+from read_model_publisher import canonical_membership_digest
 
 
 def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=None):
@@ -71,6 +72,9 @@ def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=No
     symbols, manifest = eligible_symbols(active)
     manifest = dict(manifest)
     manifest["universe_filter"] = "marginable_long"
+    manifest["universe_membership"] = {
+        "symbols": list(symbols), "digest": canonical_membership_digest(symbols),
+    }
     manifest["audit_only"] = False
     return symbols, manifest
 
@@ -1126,7 +1130,7 @@ def build_setup_candidates_from_data(pg, *, market="TH", as_of=None,
                             "daily_unavailable_count": daily_freshness_statuses.count("unknown"),
                             "intraday_status": _aggregate_freshness_status(intraday_freshness_statuses),
                         },
-                        "source": "price_data+intraday_price_data", "universe": "TH-ORD",
+                        "source": "price_data+intraday_price_data", "universe": "marginable_long",
                         "build_observability": {
                             "duration_ms": total_ms,
                             "stages_ms": {"source_context": source_ms, "ohlcv_load": load_ms,
