@@ -24,7 +24,8 @@ import datetime as dt
 from typing import Any, Optional
 from threading import Lock
 
-from canonical_chart_read import ChartReadResult, read_chart_result
+from canonical_chart_read import (DEFAULT_CHART_CANDLE_LIMIT, ChartReadResult,
+                                  read_chart_result)
 from chart_wave_evidence import (build_legacy_chart_wave_evidence,
                                  canonical_chart_wave_evidence,
                                  neutral_chart_wave_evidence)
@@ -73,13 +74,15 @@ def _release_db_connection(pg: Any, *, close: bool = False) -> None:
 
 # ── Queries (SELECT only, never write) ─────────────────────────────────
 
-def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+def _fetch_candles(cur: Any, symbol: str, market: str = "TH",
+                   limit: int = DEFAULT_CHART_CANDLE_LIMIT,
                    timeframe: str = "1D") -> list[dict]:
     """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
     return read_chart_result(cur, symbol, timeframe, limit, market=market).candles
 
 
-def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH",
+                                 limit: int = DEFAULT_CHART_CANDLE_LIMIT,
                                  timeframe: str = "1D") -> tuple[list[dict], dict]:
     """Fetch candles and preserve the latest stored intraday source timestamp."""
     result: ChartReadResult = read_chart_result(cur, symbol, timeframe, limit, market=market)

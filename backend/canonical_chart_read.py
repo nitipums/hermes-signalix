@@ -13,6 +13,9 @@ from dataclasses import dataclass
 from typing import Any
 
 
+DEFAULT_CHART_CANDLE_LIMIT = 260
+
+
 @dataclass(frozen=True)
 class ChartReadResult:
     """Normalized, read-only chart data at the chart retrieval seam.
@@ -101,7 +104,7 @@ def fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market="TH"):
         rows = cur.fetchall()
         return rows, "60-minute (latest candle may be in progress)", {}
 
-    # A 250-candle monthly response needs roughly 6,250 trading-day rows.
+    # A 260-candle monthly response needs roughly 6,500 trading-day rows.
     # Keep enough read-only source history for MA240 to become verifiable.
     daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 7500)
     cur.execute("""SELECT date::timestamp, open, high, low, close, volume, false AS provisional

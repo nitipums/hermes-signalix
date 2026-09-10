@@ -2,6 +2,7 @@
 
 import json
 import math
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -221,3 +222,50 @@ def test_chart_api_projection_exposes_canonical_schema_for_each_timeframe(monkey
         "5", "10", "20", "60", "120", "260",
     }
     json.dumps(response, allow_nan=False)
+
+
+@pytest.mark.parametrize("timeframe", ["1D", "1W", "60M", "1M"])
+def test_default_chart_response_has_260_candles_for_rolling_high_low(monkeypatch, timeframe):
+    count = 270
+    if timeframe == "1M":
+        stamps = [datetime(2026 - index // 12, 12 - index % 12, 1) for index in range(count)]
+    else:
+        step = timedelta(weeks=1) if timeframe == "1W" else timedelta(hours=1 if timeframe == "60M" else 24)
+        end = datetime(2026, 8, 31, tzinfo=timezone.utc) if timeframe == "60M" else datetime(2026, 8, 31)
+        stamps = [end - index * step for index in range(count)]
+    rows = [
+        (stamp, 100 + index, 102 + index, 99 + index, 101 + index, 1000 + index, False)
+        for index, stamp in enumerate(stamps)
+    ]
+
+    class Cursor:
+        def __init__(self):
+            self.responses = [rows] if timeframe == "60M" else [rows, []]
+            self.params = None
+
+        def execute(self, query, params):
+            self.params = params
+
+        def fetchall(self):
+            response = self.responses.pop(0)
+            if self.params and isinstance(self.params[-1], int):
+                return response[:self.params[-1]]
+            return response
+
+        def close(self):
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: Connection())
+    monkeypatch.setattr(mvp_chart_db, "_release_db_connection", lambda connection: None)
+
+    response = mvp_chart_db.project_chart_db_response("TEST", timeframe=timeframe)
+
+    assert len(response["candles"]) >= 260
+    assert response["indicators"]["latest"]["rolling_high_low"]["260"] == {
+        "high": max(row["high"] for row in response["candles"][-260:]),
+        "low": min(row["low"] for row in response["candles"][-260:]),
+    }
