@@ -125,7 +125,7 @@ def test_quote_is_optional_and_has_explicit_source_boundary():
     assert "quote" not in build_setup_candidate(**sample_inputs())
 
 
-def test_builder_selects_current_intraday_quote_without_overwriting_daily_as_of():
+def test_builder_selects_current_intraday_price_with_primary_daily_change():
     import mvp_api
 
     daily = pd.DataFrame(
@@ -152,7 +152,8 @@ def test_builder_selects_current_intraday_quote_without_overwriting_daily_as_of(
     assert result.row["quote"]["price"] == 12.5
     assert result.row["quote"]["source"] == "intraday_price_data"
     assert result.row["quote"]["provisional"] is True
-    assert result.row["quote"]["change_basis"] == "previous_completed_60m_close"
+    assert result.row["quote"]["change_amount"] == 0.5
+    assert result.row["quote"]["change_basis"] == "previous_daily_close"
     assert result.row["as_of"] == daily.index[-1].isoformat()
     assert result.row["setup"]["status"] == "FORMING"
 
@@ -174,9 +175,9 @@ def test_current_quote_builder_has_intraday_daily_and_missing_frame_contracts():
     assert quote == {
         "price": 104.5, "source": "intraday_price_data",
         "as_of": intraday.index[-1].isoformat(), "provisional": True,
-        "change_amount": 1.5, "change_amount_basis": "previous_completed_60m_close",
-        "change_pct": (104.5 / 103.0 - 1.0) * 100.0,
-        "change_basis": "previous_completed_60m_close",
+        "change_amount": 2.5, "change_amount_basis": "previous_daily_close",
+        "change_pct": (104.5 / 102.0 - 1.0) * 100.0,
+        "change_basis": "previous_daily_close",
     }
 
     daily_quote = build_current_quote(
@@ -187,6 +188,34 @@ def test_current_quote_builder_has_intraday_daily_and_missing_frame_contracts():
     assert daily_quote["provisional"] is False
     assert daily_quote["change_basis"] == "previous_daily_close"
     assert build_current_quote(daily_df=daily, intraday_df=None, intraday_current=True) is None
+
+
+def test_current_quote_irpc_like_daily_change_and_60m_only_is_explicitly_unavailable():
+    from candidate_row_evidence import build_current_quote
+
+    daily = pd.DataFrame(
+        {"Close": [3.10, 3.20]},
+        index=pd.date_range("2026-09-08", periods=2, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Close": [3.04, 3.04]},
+        index=pd.date_range("2026-09-10 10:00", periods=2, freq="h", tz="Asia/Bangkok"),
+    )
+
+    quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=True,
+    )
+    assert quote["price"] == 3.04
+    assert quote["change_pct"] == pytest.approx(-5.0)
+    assert quote["change_basis"] == "previous_daily_close"
+
+    intraday_only = build_current_quote(
+        daily_df=None, intraday_df=intraday, intraday_current=True,
+    )
+    assert intraday_only == {
+        "price": 3.04, "source": "intraday_price_data",
+        "as_of": intraday.index[-1].isoformat(), "provisional": True,
+    }
 
 
 def test_compact_projection_omits_absent_quote_but_preserves_real_quote():
@@ -208,9 +237,9 @@ def test_full_candidate_builder_carries_current_intraday_frame_to_quote_row(monk
 
     daily_index = pd.date_range("2026-09-01", periods=25, freq="D")
     daily = pd.DataFrame({
-        "open": np.arange(100.0, 125.0), "high": np.arange(101.0, 126.0),
-        "low": np.arange(99.0, 124.0), "close": np.arange(100.5, 125.5),
-        "volume": np.full(25, 1000.0),
+        "Open": np.arange(100.0, 125.0), "High": np.arange(101.0, 126.0),
+        "Low": np.arange(99.0, 124.0), "Close": np.arange(100.5, 125.5),
+        "Volume": np.full(25, 1000.0),
     }, index=daily_index)
     intraday_index = pd.date_range(
         "2026-09-03 10:00", periods=3, freq="h", tz="Asia/Bangkok"
@@ -244,7 +273,10 @@ def test_full_candidate_builder_carries_current_intraday_frame_to_quote_row(monk
     assert rows[0]["quote"]["price"] == 126.25
     assert rows[0]["quote"]["source"] == "intraday_price_data"
     assert rows[0]["quote"]["provisional"] is True
-    assert rows[0]["quote"]["change_basis"] == "previous_completed_60m_close"
+    assert rows[0]["quote"]["change_basis"] == "previous_daily_close"
+    assert rows[0]["quote"]["change_pct"] == pytest.approx(
+        (126.25 / 124.5 - 1.0) * 100.0
+    )
 
 
 def test_builder_emits_bounded_canonical_daily_metadata():

@@ -41,6 +41,7 @@ The redesign is a clean replacement of the decision spine, not a deletion of use
 - **Daily** is authoritative for big-picture trend and Elliott structural candidates.
 - **60m** is used for early Wave 3 confirmation, lower-timeframe structure, trigger, and entry timing.
 - Daily and 60m evidence remain explicitly separated. A 60m series must not be labelled as Daily evidence.
+- The primary displayed price change compares the current/session price with the previous completed Daily close. A 60m-to-60m change may appear only as an explicitly labelled secondary diagnostic and must never replace the primary Daily comparison.
 - Daily exposes one `primary_state` for the medium-to-large Elliott structure. Higher-timeframe context may support it but does not create a competing primary state.
 - 60m exposes only `minor_structure` for setup preparation and entry confirmation; it cannot overwrite the Daily primary state.
 

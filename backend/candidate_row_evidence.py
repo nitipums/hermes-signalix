@@ -28,8 +28,9 @@ def build_current_quote(*, daily_df: Any, intraday_df: Any,
     """Publish the latest known quote without changing analytical provenance.
 
     A current 60m observation is provisional.  Otherwise the latest valid
-    Daily close is published as the official Daily quote.  Change values are
-    derived only from the same frame's two latest known closes.
+    Daily close is published as the official Daily quote.  The primary change
+    always compares the published price with the previous completed Daily
+    close; a current 60m price never silently substitutes a 60m comparison.
     """
     source = "intraday_price_data" if intraday_current else "price_data"
     frame = intraday_df if intraday_current else daily_df
@@ -53,9 +54,20 @@ def build_current_quote(*, daily_df: Any, intraday_df: Any,
         "as_of": as_of,
         "provisional": bool(intraday_current),
     }
-    if len(rows) >= 2:
+    daily_closes = _close_series(daily_df) if daily_df is not None else None
+    daily_rows = []
+    if daily_evidence_valid and daily_closes is not None:
+        for _, value in daily_closes.items():
+            close = _quote_number(value)
+            if close is not None:
+                daily_rows.append(close)
+    previous = None
+    if intraday_current and daily_rows:
+        previous = daily_rows[-1]
+    elif not intraday_current and len(rows) >= 2:
         previous = rows[-2][1]
-        basis = "previous_completed_60m_close" if intraday_current else "previous_daily_close"
+    if previous is not None:
+        basis = "previous_daily_close"
         quote["change_amount"] = price - previous
         quote["change_amount_basis"] = basis
         if previous != 0:

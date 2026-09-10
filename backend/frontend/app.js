@@ -761,12 +761,15 @@
     var quote = quoteEnvelope(item) || (item.vcp_result ? {price: item.close, change_pct: item.change_pct, change_amount: item.change_amount} : null);
     dom.drawerPrice.textContent = quote && quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
     if (dom.drawerCurrent) dom.drawerCurrent.textContent = quote && quote.price != null ? Number(quote.price).toFixed(2) : "Not verified";
-    var drawerChg = fmtChange(quote ? quote.change_pct : null);
+    var drawerDailyChange = primaryDailyQuoteChange(quote);
+    var drawerChg = fmtChange(drawerDailyChange);
     dom.drawerPrice.className = "drawer-price drawer-price--" + drawerChg[1];
     dom.drawerChange.className = "drawer-change drawer-change--" + drawerChg[1];
-    dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(quote ? quote.change_amount : null) + ")";
+    var drawerChangeAmount = quote && (!quote.change_amount_basis || quote.change_amount_basis === "previous_daily_close") ? quote.change_amount : null;
+    dom.drawerChange.textContent = drawerChg[0] + " (" + fmtChangeAmount(drawerChangeAmount) + ")";
+    var drawerChangeSource = quote && quote.change_basis === "previous_daily_close" ? "Change vs previous Daily close" : "Daily change not verified";
     if (dom.drawerQuoteSource) dom.drawerQuoteSource.textContent = quote && quote.source === "intraday_price_data"
-      ? "Quote · 60m provisional" : quote && quote.source === "price_data" ? "Quote · Daily close" : "Quote · Not verified";
+      ? "Quote · 60m provisional · " + drawerChangeSource : quote && quote.source === "price_data" ? "Quote · Daily close · " + drawerChangeSource : "Quote · Not verified";
     var metadataPending = item._canonicalMetadataPending === true;
     dom.drawerRR.textContent = displayMetadataValue(item.rr != null ? Number(item.rr).toFixed(2) + "R" : null, metadataPending);
     var drawerSetup = item.setup || {};
@@ -1569,6 +1572,15 @@
       ? item.quote : null;
   }
 
+  function primaryDailyQuoteChange(quote) {
+    if (!quote || quote.change_pct == null || quote.change_pct === "") return null;
+    // Missing basis remains compatible with legacy non-canonical views, but an
+    // explicitly intraday basis must never be promoted as the primary change.
+    if (quote.change_basis && quote.change_basis !== "previous_daily_close") return null;
+    var change = Number(quote.change_pct);
+    return Number.isFinite(change) ? change : null;
+  }
+
   function setupCandidateCard(item) {
     var setup = item.setup || {};
     var rr = setup.rr || {};
@@ -1585,8 +1597,10 @@
     // Canonical cards read item.quote as one envelope; an absent envelope is
     // represented locally only for rendering the explicit Not verified state.
     var quote = quoteEnvelope(item) || {};
-    var quoteSource = quote.source === "intraday_price_data" ? "60m provisional"
-      : quote.source === "price_data" ? "Daily close" : "Not verified";
+    var dailyChange = primaryDailyQuoteChange(quote);
+    var changeSource = quote.change_basis === "previous_daily_close" ? "Change vs previous Daily close" : "Daily change not verified";
+    var quoteSource = quote.source === "intraday_price_data" ? "60m provisional · " + changeSource
+      : quote.source === "price_data" ? "Daily close · " + changeSource : "Not verified";
     var confidence = compactWaveConfidence(item).toLowerCase().replace("_", "-");
     var dataStatus = item.data_status || {};
     var incomplete = decision === "DATA_BLOCKED" || [dataStatus.daily_freshness, dataStatus.intraday_60m_freshness].some(function(value) {
@@ -1594,7 +1608,7 @@
     });
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(quote.change_pct)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
+      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
       '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge">' + escapeHTML(compactDailyStructureLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
@@ -1609,7 +1623,8 @@
 
   function setupCandidateDirection(item, incomplete) {
     var quote = item && item.quote && typeof item.quote === "object" ? item.quote : {};
-    var changeValue = quote.change_pct != null ? quote.change_pct : (item && item.change_pct);
+    var quoteChange = primaryDailyQuoteChange(quote);
+    var changeValue = quoteChange != null ? quoteChange : (quote.change_basis ? null : item && item.change_pct);
     if (incomplete || item == null || changeValue == null || changeValue === "") return "neutral";
     var change = Number(changeValue);
     return Number.isFinite(change) && change > 0 ? "bullish" : Number.isFinite(change) && change < 0 ? "bearish" : "neutral";

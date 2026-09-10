@@ -214,14 +214,15 @@ def test_compact_setup_card_does_not_infer_missing_current_or_change_and_keeps_c
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     card = _extract_function(js, "setupCandidateCard")
     direction = _extract_function(js, "setupCandidateDirection")
+    quote_change = _extract_function(js, "primaryDailyQuoteChange")
     fmt_change = _extract_function(js, "fmtChange")
     result = _run_node(
-        [direction, fmt_change],
+        [quote_change, direction, fmt_change],
         "({missing: setupCandidateDirection({change_pct: null}, false), up: setupCandidateDirection({change_pct: 2.5}, false), absent: fmtChange(null)[0]})",
     )
     assert result == {"missing": "neutral", "up": "bullish", "absent": "Not verified"}
     assert 'valueOrUnavailable(quote.price, "Not verified")' in card
-    assert 'fmtChange(quote.change_pct)[0]' in card
+    assert 'fmtChange(dailyChange)[0]' in card
     assert 'valueOrUnavailable(rr.to_target_1)' in card
 
 
@@ -230,18 +231,21 @@ def test_canonical_quote_drives_card_and_drawer_with_absent_quote_fallback():
     card = _extract_function(js, "setupCandidateCard")
     drawer = _extract_function(js, "renderDrawerDetail")
     direction = _extract_function(js, "setupCandidateDirection")
+    quote_change = _extract_function(js, "primaryDailyQuoteChange")
     assert 'item.quote' in card
-    assert 'quote.price' in drawer and 'quote.change_pct' in drawer
+    assert 'quote.price' in drawer and 'primaryDailyQuoteChange(quote)' in drawer
     assert '60m provisional' in drawer and 'Daily close' in drawer
     assert 'quoteEnvelope(item)' in card
     assert 'quoteSource' in card
     assert '"Trade value Not verified"' in drawer
     assert '"Trade value " + fmtNum(tradeValue)' in drawer
     result = _run_node(
-        [direction],
-        "({up: setupCandidateDirection({quote:{change_pct:2.5}}, false), absent: setupCandidateDirection({quote:{}}, false)})",
+        [quote_change, direction],
+        "({daily: primaryDailyQuoteChange({change_pct:-5,change_basis:'previous_daily_close'}), legacy60m: primaryDailyQuoteChange({change_pct:2.5,change_basis:'previous_completed_60m_close'}), up: setupCandidateDirection({quote:{change_pct:2.5,change_basis:'previous_daily_close'}}, false), absent: setupCandidateDirection({quote:{}}, false)})",
     )
-    assert result == {"up": "bullish", "absent": "neutral"}
+    assert result == {"daily": -5, "legacy60m": None, "up": "bullish", "absent": "neutral"}
+    assert 'Change vs previous Daily close' in card
+    assert 'Change vs previous Daily close' in drawer
 
 
 def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
