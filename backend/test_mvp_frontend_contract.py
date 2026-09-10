@@ -346,14 +346,19 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
 
 def test_window_summary_table_consumes_only_canonical_latest_values():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
+    compact_volume = _extract_function(js, "formatCompactVolume")
     render = _extract_function(js, "renderTechnicalSummary")
-    expression = "(function(){renderTechnicalSummary({indicators:{latest:{window_summary:{'5':{open:10.125,high:12.345,low:8,close:11,volume_total:5000,volume_average:1000,change_pct:8.642,range_pct:54.3125,ma:9.5,availability:{status:'AVAILABLE'}},'260':{open:null,high:null,low:null,close:null,volume_total:null,volume_average:null,change_pct:null,range_pct:null,ma:null,availability:{status:'NOT_VERIFIED'}}}}}});return {open:rows[0].children[1].textContent,high:rows[0].children[2].textContent,low:rows[0].children[3].textContent,close:rows[0].children[4].textContent,avg:rows[0].children[5].textContent,ma:rows[0].children[6].textContent,detail:rows[0].detail.textContent,blocked:rows[1].children[1].textContent};})()"
+    expression = "(function(){renderTechnicalSummary({indicators:{latest:{window_summary:{'5':{open:10.125,high:12.345,low:8,close:11,volume_total:1120000000,volume_average:223563658,change_pct:8.642,range_pct:54.3125,ma:9.5,availability:{status:'AVAILABLE'}},'260':{open:null,high:null,low:null,close:null,volume_total:null,volume_average:null,change_pct:null,range_pct:null,ma:null,availability:{status:'NOT_VERIFIED'}}}}}});return {open:rows[0].children[1].textContent,high:rows[0].children[2].textContent,low:rows[0].children[3].textContent,close:rows[0].children[4].textContent,avg:rows[0].children[5].textContent,ma:rows[0].children[6].textContent,detail:rows[0].detail.textContent,blocked:rows[1].children[1].textContent};})()"
     setup = "function row(period){var detail={textContent:''};return {dataset:{rollingPeriod:period},children:[{}, {}, {}, {}, {}, {}, {}],detail:detail,querySelector:function(){return detail;}}} var rows=[row('5'),row('260')]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
-    assert _run_node([setup, render], expression) == {
+    assert _run_node([setup, compact_volume, render], expression) == {
         "open": "10.13", "high": "12.35", "low": "8.00", "close": "11.00",
-        "avg": "1,000", "ma": "9.50",
-        "detail": "Total 5,000 · Change 8.64% · Range 54.31%", "blocked": "Not verified",
+        "avg": "223.56M", "ma": "9.50",
+        "detail": "Total 1.12B · Change 8.64% · Range 54.31%", "blocked": "Not verified",
     }
+    assert _run_node(
+        [compact_volume],
+        "[formatCompactVolume(950000), formatCompactVolume(null), formatCompactVolume(Number.NaN)]",
+    ) == ["950K", "Not verified", "Not verified"]
     assert "chart.candles" not in render
 
 

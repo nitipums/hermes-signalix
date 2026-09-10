@@ -835,6 +835,25 @@
     dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>OHLC High/Low</span><span><i class="legend-line legend-line--ma20"></i>' + escapeHTML(selectedMa || "MA hidden") + '</span><span><i class="legend-dot legend-dot--wave"></i>markers (' + escapeHTML(markerState) + ') <button type="button" class="legend-info" aria-label="Show full chart legend">(i)</button></span>';
   }
 
+  function formatCompactVolume(value) {
+    if (value == null || !Number.isFinite(Number(value))) return "Not verified";
+    var number = Number(value);
+    var absolute = Math.abs(number);
+    var units = [
+      {threshold: 1e12, suffix: "T"},
+      {threshold: 1e9, suffix: "B"},
+      {threshold: 1e6, suffix: "M"},
+      {threshold: 1e3, suffix: "K"}
+    ];
+    for (var index = 0; index < units.length; index += 1) {
+      if (absolute >= units[index].threshold) {
+        var scaled = (number / units[index].threshold).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+        return scaled + units[index].suffix;
+      }
+    }
+    return String(Math.round(number));
+  }
+
   function renderTechnicalSummary(chart) {
     var latest = chart && chart.indicators && chart.indicators.latest;
     var display = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Number(value).toFixed(2); };
@@ -843,7 +862,6 @@
     if (dom.technicalRsi) dom.technicalRsi.textContent = latest ? display(latest.rsi) : "Not verified";
     if (dom.technicalAtr) dom.technicalAtr.textContent = latest ? display(latest.atr) : "Not verified";
     var windowSummary = latest && latest.window_summary;
-    var volume = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Math.round(Number(value)).toLocaleString("en-US"); };
     var percent = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Number(value).toFixed(2) + "%"; };
     if (dom.rollingHighLow) dom.rollingHighLow.querySelectorAll("[data-rolling-period]").forEach(function(row) {
       var period = row.dataset.rollingPeriod;
@@ -852,10 +870,10 @@
       ["open", "high", "low", "close"].forEach(function(key, index) {
         row.children[index + 1].textContent = available ? display(values[key]) : "Not verified";
       });
-      row.children[5].textContent = available ? volume(values.volume_average) : "Not verified";
+      row.children[5].textContent = available ? formatCompactVolume(values.volume_average) : "Not verified";
       row.children[6].textContent = available ? (period === "260" ? "—" : display(values.ma)) : "Not verified";
       var detail = row.querySelector && row.querySelector(".window-detail");
-      if (detail) detail.textContent = available ? "Total " + volume(values.volume_total) + " · Change " + percent(values.change_pct) + " · Range " + percent(values.range_pct) : "Not verified";
+      if (detail) detail.textContent = available ? "Total " + formatCompactVolume(values.volume_total) + " · Change " + percent(values.change_pct) + " · Range " + percent(values.range_pct) : "Not verified";
     });
   }
 
