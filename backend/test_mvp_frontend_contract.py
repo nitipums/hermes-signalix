@@ -320,12 +320,18 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
     for period in (5, 10, 20, 60, 120, 240):
         assert f'data-ma-period="{period}"' in html
     for marker in ('id="technical-latest"', 'id="technical-macd"',
-                   'id="technical-rsi"', 'id="technical-atr"'):
+                   'id="technical-rsi"', 'id="technical-atr"',
+                   'id="rolling-high-low"'):
         assert marker in html
+    assert "Rolling High / Low (candles)" in html
+    for period in (5, 10, 20, 60, 120, 240):
+        assert f'data-rolling-period="{period}"' in html
     assert "chart.indicators.series.ma" in js
     assert "chart.indicators.series.macd" in js
     assert "chart.indicators.series.rsi" in js
     assert "latest.atr" in js
+    assert "latest.rolling_high_low" in js
+    assert "rollingHighLow[period]" in js
     assert "renderTechnicalSummary" in js
     assert ".technical-summary" in css
     assert "overflow-x:auto" not in css[css.index(".technical-summary"):css.index(".technical-summary") + 500]
@@ -333,6 +339,18 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
     assert 'var requestedTimeframe = chartTimeframe;' in js
     assert "setChartTimeframeButtons(requestedTimeframe)" in js
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
+
+
+def test_rolling_high_low_table_consumes_only_canonical_latest_values():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    render = _extract_function(js, "renderTechnicalSummary")
+    expression = "(function(){renderTechnicalSummary({indicators:{latest:{rolling_high_low:{'5':{high:12.345,low:8},'10':{high:null,low:null}}}}});return {fiveHigh:rows[0].children[1].textContent,fiveLow:rows[0].children[2].textContent,tenHigh:rows[1].children[1].textContent,tenLow:rows[1].children[2].textContent};})()"
+    setup = "var rows=[{dataset:{rollingPeriod:'5'},children:[{}, {}, {}]},{dataset:{rollingPeriod:'10'},children:[{}, {}, {}]}]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMa:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
+    assert _run_node([setup, render], expression) == {
+        "fiveHigh": "12.35", "fiveLow": "8.00",
+        "tenHigh": "Not verified", "tenLow": "Not verified",
+    }
+    assert "chart.candles" not in render
 
 
 def test_drawer_timeframe_switch_preserves_surface_item_and_discards_stale_chart():

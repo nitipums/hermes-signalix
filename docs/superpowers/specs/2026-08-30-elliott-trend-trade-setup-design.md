@@ -275,12 +275,23 @@ Existing risk/Fib utilities and validated data loaders may be adapted behind the
 The read-only chart response for 1D, 1W, 60M, and 1M exposes aligned OHLCV
 candles plus one canonical `indicators` object. Policy
 `technical-indicators-v1` calculates SMA 5/10/20/60/120/240,
+rolling High/Low 5/10/20/60/120/240,
 SMA-seeded MACD(12,26,9), Wilder RSI(14), and Wilder ATR(14) from bars through
 the response `as_of` only. Series align one-to-one with candles; insufficient
 history and invalid input remain explicit null / `NOT_VERIFIED`. Candle High
 and Low remain source values and are also projected into latest technical
 context. Historical MA20/50/200, MACD, and RSI fields are compatibility/audit
 aliases rather than the primary UI contract.
+
+Rolling High/Low is additive within `technical-indicators-v1`. Canonical
+`indicators.series.rolling_high` and `rolling_low` are maps keyed by the string
+periods `5`, `10`, `20`, `60`, `120`, and `240`; each value is candle-aligned,
+is null before index `N-1`, and thereafter uses only the trailing window ending
+at that index. `indicators.latest.rolling_high_low` maps each period to
+`{"high": number|null, "low": number|null}`. Availability is reported separately
+as `rolling_high_N` and `rolling_low_N`, including status and required/available
+candle counts. Raw `series.high`, `series.low`, `latest.high`, and `latest.low`
+remain unchanged source projections.
 
 ### 3.2 Data flow
 

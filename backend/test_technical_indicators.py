@@ -33,6 +33,8 @@ def test_schema_is_aligned_json_safe_and_preserves_latest_high_low():
     assert result["timeframe"] == "1D"
     assert result["alignment"] == "candle_index"
     assert set(result["series"]["ma"]) == {"5", "10", "20", "60", "120", "240"}
+    assert set(result["series"]["rolling_high"]) == {"5", "10", "20", "60", "120", "240"}
+    assert set(result["series"]["rolling_low"]) == {"5", "10", "20", "60", "120", "240"}
     for values in result["series"]["ma"].values():
         assert len(values) == len(candles)
     for key in ("rsi", "atr", "high", "low"):
@@ -43,8 +45,41 @@ def test_schema_is_aligned_json_safe_and_preserves_latest_high_low():
     assert result["series"]["low"] == [row["low"] for row in candles]
     assert result["latest"]["high"] == candles[-1]["high"]
     assert result["latest"]["low"] == candles[-1]["low"]
+    assert set(result["latest"]["rolling_high_low"]) == {"5", "10", "20", "60", "120", "240"}
     assert result["provenance"]["no_lookahead"] is True
     json.dumps(result, allow_nan=False)
+
+
+def test_rolling_high_low_exact_windows_and_first_available_boundary():
+    candles = _candles(12)
+    highs = [10, 12, 11, 15, 14, 13, 16, 9, 18, 17, 8, 20]
+    lows = [5, 4, 6, 3, 7, 2, 8, 1, 9, 0, -1, 10]
+    for candle, high, low in zip(candles, highs, lows):
+        candle["high"], candle["low"] = high, low
+        candle["close"] = (high + low) / 2
+
+    result = build_technical_indicators(candles, "1D")
+
+    assert result["series"]["rolling_high"]["5"][:4] == [None] * 4
+    assert result["series"]["rolling_low"]["5"][:4] == [None] * 4
+    assert result["series"]["rolling_high"]["5"][4:] == [15, 15, 16, 16, 18, 18, 18, 20]
+    assert result["series"]["rolling_low"]["5"][4:] == [3, 2, 2, 1, 1, 0, -1, -1]
+    assert result["series"]["rolling_high"]["10"][8] is None
+    assert result["series"]["rolling_high"]["10"][9] == 18
+    assert result["series"]["rolling_low"]["10"][9] == 0
+    assert result["latest"]["rolling_high_low"]["5"] == {"high": 20, "low": -1}
+    assert result["latest"]["rolling_high_low"]["10"] == {"high": 20, "low": -1}
+    assert result["latest"]["rolling_high_low"]["20"] == {"high": None, "low": None}
+
+
+def test_rolling_high_low_availability_reports_each_period():
+    result = build_technical_indicators(_candles(19), "1D")
+    assert result["availability"]["rolling_high_5"] == {
+        "status": "AVAILABLE", "required_candles": 5, "available_candles": 19,
+    }
+    assert result["availability"]["rolling_low_20"] == {
+        "status": "NOT_VERIFIED", "required_candles": 20, "available_candles": 19,
+    }
 
 
 def test_sma_macd_rsi_and_atr_use_documented_seed_and_wilder_rules():
@@ -88,6 +123,9 @@ def test_insufficient_history_is_explicit_null_for_every_timeframe(timeframe):
     assert result["latest"]["macd"] == {"line": None, "signal": None, "histogram": None}
     assert result["latest"]["rsi"] is None
     assert result["latest"]["atr"] is None
+    assert result["latest"]["rolling_high_low"] == {
+        str(p): {"high": None, "low": None} for p in (5, 10, 20, 60, 120, 240)
+    }
     assert result["availability"]["ma_5"]["status"] == "NOT_VERIFIED"
     assert result["availability"]["atr"]["required_candles"] == 14
 
@@ -108,6 +146,9 @@ def test_as_of_prefix_never_changes_prior_indicator_values():
     assert full["series"]["macd"]["signal"][:55] == prefix["series"]["macd"]["signal"]
     assert full["series"]["rsi"][:55] == prefix["series"]["rsi"]
     assert full["series"]["atr"][:55] == prefix["series"]["atr"]
+    for period in ("5", "10", "20", "60", "120", "240"):
+        assert full["series"]["rolling_high"][period][:55] == prefix["series"]["rolling_high"][period]
+        assert full["series"]["rolling_low"][period][:55] == prefix["series"]["rolling_low"][period]
 
 
 def test_non_finite_market_input_fails_closed_and_remains_json_safe():
@@ -116,6 +157,7 @@ def test_non_finite_market_input_fails_closed_and_remains_json_safe():
     result = build_technical_indicators(candles, "1D")
     assert result["availability"]["input"]["status"] == "NOT_VERIFIED"
     assert all(value is None for value in result["series"]["rsi"])
+    assert all(value is None for value in result["series"]["rolling_high"]["5"])
     assert result["series"]["high"][7] == candles[7]["high"]
     json.dumps(result, allow_nan=False)
 
@@ -142,4 +184,9 @@ def test_chart_api_projection_exposes_canonical_schema_for_each_timeframe(monkey
     assert response["candles"][-1]["low"] == candles[-1]["low"]
     assert response["indicators"]["timeframe"] == timeframe
     assert len(response["indicators"]["series"]["atr"]) == len(candles)
+    assert len(response["indicators"]["series"]["rolling_high"]["20"]) == len(candles)
+    assert response["indicators"]["latest"]["rolling_high_low"]["20"] == {
+        "high": max(row["high"] for row in candles[-20:]),
+        "low": min(row["low"] for row in candles[-20:]),
+    }
     json.dumps(response, allow_nan=False)

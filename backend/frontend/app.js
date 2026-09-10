@@ -141,6 +141,7 @@
     technicalMacd: $("#technical-macd"),
     technicalRsi: $("#technical-rsi"),
     technicalAtr: $("#technical-atr"),
+    rollingHighLow: $("#rolling-high-low"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
     methodGuide: $("#method-guide"),
@@ -843,6 +844,13 @@
     if (dom.technicalMacd) dom.technicalMacd.textContent = latest && latest.macd ? display(latest.macd.line) + " / " + display(latest.macd.signal) + " / " + display(latest.macd.histogram) : "Not verified";
     if (dom.technicalRsi) dom.technicalRsi.textContent = latest ? display(latest.rsi) : "Not verified";
     if (dom.technicalAtr) dom.technicalAtr.textContent = latest ? display(latest.atr) : "Not verified";
+    var rollingHighLow = latest && latest.rolling_high_low;
+    if (dom.rollingHighLow) dom.rollingHighLow.querySelectorAll("[data-rolling-period]").forEach(function(row) {
+      var period = row.dataset.rollingPeriod;
+      var values = rollingHighLow && rollingHighLow[period];
+      row.children[1].textContent = display(values && values.high);
+      row.children[2].textContent = display(values && values.low);
+    });
   }
 
   function renderDrawerChart(chart) {
