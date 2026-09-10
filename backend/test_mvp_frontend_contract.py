@@ -324,16 +324,17 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
                    'id="rolling-high-low"'):
         assert marker in html
     assert 'id="technical-ma"' not in html
-    assert "Moving Average / Rolling High / Low (candles)" in html
-    assert "<th scope=\"col\">MA</th>" in html
+    assert "OHLCV Window Summary (candles)" in html
+    for column in ("Candles", "Open", "High", "Low", "Close", "Avg Vol", "MA"):
+        assert f'<th scope="col">{column}</th>' in html
     for period in (5, 10, 20, 60, 120, 240, 260):
         assert f'data-rolling-period="{period}"' in html
+    assert html.count('data-rolling-period="') == 7
     assert "chart.indicators.series.ma" in js
     assert "chart.indicators.series.macd" in js
     assert "chart.indicators.series.rsi" in js
     assert "latest.atr" in js
-    assert "latest.rolling_high_low" in js
-    assert "rollingHighLow[period]" in js
+    assert "latest.window_summary" in js
     assert "renderTechnicalSummary" in js
     assert ".technical-summary" in css
     assert "overflow-x:auto" not in css[css.index(".technical-summary"):css.index(".technical-summary") + 500]
@@ -343,15 +344,15 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
-def test_rolling_high_low_table_consumes_only_canonical_latest_values():
+def test_window_summary_table_consumes_only_canonical_latest_values():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     render = _extract_function(js, "renderTechnicalSummary")
-    expression = "(function(){renderTechnicalSummary({indicators:{latest:{ma:{'5':10.125,'240':9},rolling_high_low:{'5':{high:12.345,low:8},'260':{high:null,low:null}}}}});return {fiveMa:rows[0].children[1].textContent,fiveHigh:rows[0].children[2].textContent,fiveLow:rows[0].children[3].textContent,ma240:rows[1].children[1].textContent,high240:rows[1].children[2].textContent,low240:rows[1].children[3].textContent,ma260:rows[2].children[1].textContent,high260:rows[2].children[2].textContent,low260:rows[2].children[3].textContent};})()"
-    setup = "var rows=[{dataset:{rollingPeriod:'5'},children:[{}, {}, {}, {}]},{dataset:{rollingPeriod:'240'},children:[{}, {}, {}, {}]},{dataset:{rollingPeriod:'260'},children:[{}, {}, {}, {}]}]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
+    expression = "(function(){renderTechnicalSummary({indicators:{latest:{window_summary:{'5':{open:10.125,high:12.345,low:8,close:11,volume_total:5000,volume_average:1000,change_pct:8.642,range_pct:54.3125,ma:9.5,availability:{status:'AVAILABLE'}},'260':{open:null,high:null,low:null,close:null,volume_total:null,volume_average:null,change_pct:null,range_pct:null,ma:null,availability:{status:'NOT_VERIFIED'}}}}}});return {open:rows[0].children[1].textContent,high:rows[0].children[2].textContent,low:rows[0].children[3].textContent,close:rows[0].children[4].textContent,avg:rows[0].children[5].textContent,ma:rows[0].children[6].textContent,detail:rows[0].detail.textContent,blocked:rows[1].children[1].textContent};})()"
+    setup = "function row(period){var detail={textContent:''};return {dataset:{rollingPeriod:period},children:[{}, {}, {}, {}, {}, {}, {}],detail:detail,querySelector:function(){return detail;}}} var rows=[row('5'),row('260')]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
     assert _run_node([setup, render], expression) == {
-        "fiveMa": "10.13", "fiveHigh": "12.35", "fiveLow": "8.00",
-        "ma240": "9.00", "high240": "—", "low240": "—",
-        "ma260": "—", "high260": "Not verified", "low260": "Not verified",
+        "open": "10.13", "high": "12.35", "low": "8.00", "close": "11.00",
+        "avg": "1,000", "ma": "9.50",
+        "detail": "Total 5,000 · Change 8.64% · Range 54.31%", "blocked": "Not verified",
     }
     assert "chart.candles" not in render
 

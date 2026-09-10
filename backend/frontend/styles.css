@@ -454,12 +454,14 @@ body {
 .technical-summary strong { margin-top:3px; color:var(--text); font-size:11px; }
 .rolling-high-low { min-width:0; margin:8px 0; padding:8px; border:1px solid var(--border); border-radius:5px; background:var(--surface-2); }
 .rolling-high-low h2 { margin:0 0 6px; color:var(--text); font-size:11px; }
-.rolling-high-low table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:10px; }
-.rolling-high-low th, .rolling-high-low td { padding:4px; border-top:1px solid var(--border); text-align:right; overflow-wrap:anywhere; }
+.rolling-high-low table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:9px; }
+.rolling-high-low th, .rolling-high-low td { min-width:0; padding:4px 2px; border-top:1px solid var(--border); text-align:right; overflow-wrap:anywhere; }
 .rolling-high-low th:first-child { text-align:left; }
 .rolling-high-low thead th { color:var(--text-3); font-size:9px; text-transform:uppercase; letter-spacing:.04em; }
-.rolling-high-low tbody th { color:var(--text-2); font-weight:500; }
+.rolling-high-low tbody th { position:relative; color:var(--text-2); font-weight:500; }
+.rolling-high-low tbody th, .rolling-high-low tbody td { padding-bottom:20px; }
 .rolling-high-low td { color:var(--text); }
+.window-detail { position:absolute; left:2px; bottom:3px; display:block; width:calc(700% - 4px); color:var(--text-3); font-size:8px; font-weight:400; line-height:1.2; text-align:left; white-space:normal; }
 .wave-chart-legend { display:flex; flex-wrap:wrap; gap:4px 8px; min-width:0; margin:6px 0; color:var(--text-2); font-size:10px; }
 .wave-chart-legend span { display:inline-flex; align-items:center; min-width:0; overflow-wrap:anywhere; }
 .legend-line { display:inline-block; width:18px; margin-right:5px; border-top:2px solid var(--text); }

@@ -341,6 +341,12 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
     for period in (5, 10, 20, 60, 120, 240):
         if len(closes) < period:
             notes.append(f"MA{period} NOT_VERIFIED: insufficient data (< {period} candles)")
+    unavailable_windows = [
+        period for period, summary in indicators["latest"]["window_summary"].items()
+        if summary["availability"]["status"] != "AVAILABLE"
+    ]
+    if unavailable_windows:
+        notes.append("OHLCV windows NOT_VERIFIED: " + ",".join(unavailable_windows))
     if len(closes) < 34:
         notes.append("MACD signal NOT_VERIFIED: insufficient data (< 34 candles)")
     if len(closes) < 15:

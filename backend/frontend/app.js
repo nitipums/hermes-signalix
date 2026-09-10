@@ -842,13 +842,20 @@
     if (dom.technicalMacd) dom.technicalMacd.textContent = latest && latest.macd ? display(latest.macd.line) + " / " + display(latest.macd.signal) + " / " + display(latest.macd.histogram) : "Not verified";
     if (dom.technicalRsi) dom.technicalRsi.textContent = latest ? display(latest.rsi) : "Not verified";
     if (dom.technicalAtr) dom.technicalAtr.textContent = latest ? display(latest.atr) : "Not verified";
-    var rollingHighLow = latest && latest.rolling_high_low;
+    var windowSummary = latest && latest.window_summary;
+    var volume = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Math.round(Number(value)).toLocaleString("en-US"); };
+    var percent = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Number(value).toFixed(2) + "%"; };
     if (dom.rollingHighLow) dom.rollingHighLow.querySelectorAll("[data-rolling-period]").forEach(function(row) {
       var period = row.dataset.rollingPeriod;
-      var values = rollingHighLow && rollingHighLow[period];
-      row.children[1].textContent = period === "260" ? "—" : display(latest && latest.ma && latest.ma[period]);
-      row.children[2].textContent = period === "240" ? "—" : display(values && values.high);
-      row.children[3].textContent = period === "240" ? "—" : display(values && values.low);
+      var values = windowSummary && windowSummary[period];
+      var available = values && values.availability && values.availability.status === "AVAILABLE";
+      ["open", "high", "low", "close"].forEach(function(key, index) {
+        row.children[index + 1].textContent = available ? display(values[key]) : "Not verified";
+      });
+      row.children[5].textContent = available ? volume(values.volume_average) : "Not verified";
+      row.children[6].textContent = available ? (period === "260" ? "—" : display(values.ma)) : "Not verified";
+      var detail = row.querySelector && row.querySelector(".window-detail");
+      if (detail) detail.textContent = available ? "Total " + volume(values.volume_total) + " · Change " + percent(values.change_pct) + " · Range " + percent(values.range_pct) : "Not verified";
     });
   }
 

@@ -2,15 +2,16 @@
 
 import json
 import math
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
 import mvp_chart_db
 from technical_indicators import (
-    HIGH_LOW_PERIODS,
     MA_PERIODS,
     POLICY_VERSION,
+    WINDOW_PERIODS,
     build_technical_indicators,
 )
 
@@ -40,9 +41,10 @@ def test_schema_is_aligned_json_safe_and_preserves_latest_high_low():
     assert result["alignment"] == "candle_index"
     assert set(result["series"]["ma"]) == {"5", "10", "20", "60", "120", "240"}
     assert MA_PERIODS == (5, 10, 20, 60, 120, 240)
-    assert HIGH_LOW_PERIODS == (5, 10, 20, 60, 120, 260)
-    assert set(result["series"]["rolling_high"]) == {"5", "10", "20", "60", "120", "260"}
-    assert set(result["series"]["rolling_low"]) == {"5", "10", "20", "60", "120", "260"}
+    assert WINDOW_PERIODS == (5, 10, 20, 60, 120, 240, 260)
+    assert set(result["series"]["rolling_high"]) == {"5", "10", "20", "60", "120", "240", "260"}
+    assert set(result["series"]["rolling_low"]) == {"5", "10", "20", "60", "120", "240", "260"}
+    assert set(result["series"]["window_summary"]) == {"5", "10", "20", "60", "120", "240", "260"}
     for values in result["series"]["ma"].values():
         assert len(values) == len(candles)
     for key in ("rsi", "atr", "high", "low"):
@@ -54,7 +56,8 @@ def test_schema_is_aligned_json_safe_and_preserves_latest_high_low():
     assert result["latest"]["high"] == candles[-1]["high"]
     assert result["latest"]["low"] == candles[-1]["low"]
     assert set(result["latest"]["ma"]) == {"5", "10", "20", "60", "120", "240"}
-    assert set(result["latest"]["rolling_high_low"]) == {"5", "10", "20", "60", "120", "260"}
+    assert set(result["latest"]["rolling_high_low"]) == {"5", "10", "20", "60", "120", "240", "260"}
+    assert set(result["latest"]["window_summary"]) == {"5", "10", "20", "60", "120", "240", "260"}
     assert result["provenance"]["no_lookahead"] is True
     json.dumps(result, allow_nan=False)
 
@@ -95,7 +98,7 @@ def test_rolling_260_exact_window_boundary_and_ma240_remains_present():
     assert result["series"]["rolling_low"]["260"][260] == -700
     assert result["series"]["ma"]["240"][239] is not None
     assert "260" not in result["series"]["ma"]
-    assert "240" not in result["series"]["rolling_high"]
+    assert result["series"]["rolling_high"]["240"][239] is not None
     assert result["availability"]["rolling_high_260"] == {
         "status": "AVAILABLE", "required_candles": 260, "available_candles": 261,
     }
@@ -109,6 +112,67 @@ def test_rolling_high_low_availability_reports_each_period():
     assert result["availability"]["rolling_low_20"] == {
         "status": "NOT_VERIFIED", "required_candles": 20, "available_candles": 19,
     }
+
+
+def test_window_summary_exact_ohlcv_volume_percentages_and_ma_contract():
+    candles = _candles(260)
+    original_candles = deepcopy(candles)
+    result = build_technical_indicators(candles, "1D")
+    assert candles == original_candles
+    for period in WINDOW_PERIODS:
+        window = candles[-period:]
+        actual = result["latest"]["window_summary"][str(period)]
+        expected_open = window[0]["open"]
+        expected_high = max(row["high"] for row in window)
+        expected_low = min(row["low"] for row in window)
+        expected_close = window[-1]["close"]
+        expected_volume = sum(row["volume"] for row in window)
+        assert actual == {
+            "open": round(expected_open, 4),
+            "high": round(expected_high, 4),
+            "low": round(expected_low, 4),
+            "close": round(expected_close, 4),
+            "volume_total": round(expected_volume, 4),
+            "volume_average": round(expected_volume / period, 4),
+            "change_pct": round((expected_close - expected_open) / expected_open * 100, 4),
+            "range_pct": round((expected_high - expected_low) / expected_low * 100, 4),
+            "ma": result["latest"]["ma"].get(str(period)),
+            "availability": {"status": "AVAILABLE", "required_candles": period,
+                             "available_candles": 260},
+        }
+    assert result["latest"]["window_summary"]["240"]["ma"] is not None
+    assert result["latest"]["window_summary"]["260"]["ma"] is None
+
+
+def test_window_summary_boundary_missing_and_non_finite_inputs_fail_closed():
+    candles = _candles(6)
+    result = build_technical_indicators(candles, "60M")
+    assert result["series"]["window_summary"]["5"][3]["availability"]["status"] == "NOT_VERIFIED"
+    assert result["series"]["window_summary"]["5"][4]["availability"]["status"] == "AVAILABLE"
+    candles[1]["volume"] = None
+    result = build_technical_indicators(candles, "60M")
+    blocked = result["series"]["window_summary"]["5"][4]
+    assert blocked["availability"]["status"] == "NOT_VERIFIED"
+    assert all(blocked[key] is None for key in (
+        "open", "high", "low", "close", "volume_total", "volume_average",
+        "change_pct", "range_pct", "ma"))
+    json.dumps(result, allow_nan=False)
+
+
+def test_window_summary_prefix_has_no_lookahead():
+    candles = _candles(280)
+    prefix = build_technical_indicators(candles[:270], "1D")
+    full = build_technical_indicators(candles, "1D")
+    for period in (str(value) for value in WINDOW_PERIODS):
+        assert full["series"]["window_summary"][period][:270] == prefix["series"]["window_summary"][period]
+
+
+def test_window_summary_provenance_distinguishes_daily_52_week_label():
+    daily = build_technical_indicators(_candles(), "1D")["provenance"]
+    hourly = build_technical_indicators(_candles(), "60M")["provenance"]
+    assert daily["window_summary"]["260_label"] == "52-week trading range (260 Daily candles)"
+    assert hourly["window_summary"]["260_label"] == "260 candles"
+    assert daily["window_summary"]["volume_semantics"] == "sum and arithmetic average of source candle volume"
 
 
 def test_sma_macd_rsi_and_atr_use_documented_seed_and_wilder_rules():
@@ -153,8 +217,10 @@ def test_insufficient_history_is_explicit_null_for_every_timeframe(timeframe):
     assert result["latest"]["rsi"] is None
     assert result["latest"]["atr"] is None
     assert result["latest"]["rolling_high_low"] == {
-        str(p): {"high": None, "low": None} for p in (5, 10, 20, 60, 120, 260)
+        str(p): {"high": None, "low": None} for p in WINDOW_PERIODS
     }
+    assert all(value["availability"]["status"] == "NOT_VERIFIED"
+               for value in result["latest"]["window_summary"].values())
     assert result["availability"]["ma_5"]["status"] == "NOT_VERIFIED"
     assert result["availability"]["atr"]["required_candles"] == 14
 
@@ -219,7 +285,10 @@ def test_chart_api_projection_exposes_canonical_schema_for_each_timeframe(monkey
         "low": min(row["low"] for row in candles[-20:]),
     }
     assert set(response["indicators"]["series"]["rolling_high"]) == {
-        "5", "10", "20", "60", "120", "260",
+        "5", "10", "20", "60", "120", "240", "260",
+    }
+    assert set(response["indicators"]["latest"]["window_summary"]) == {
+        "5", "10", "20", "60", "120", "240", "260",
     }
     json.dumps(response, allow_nan=False)
 

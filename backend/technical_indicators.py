@@ -1,8 +1,7 @@
 """Deterministic, no-lookahead technical indicators for aligned OHLCV candles.
 
 Policy ``technical-indicators-v1`` uses SMA over 5/10/20/60/120/240 candles
-and rolling High/Low over 5/10/20/60/120/260 candles (260 trading candles is
-the canonical 52-week window),
+and deterministic OHLCV windows over 5/10/20/60/120/240/260 candles,
 MACD(12,26,9) with each EMA seeded by the first period's SMA, Wilder RSI(14),
 and Wilder ATR(14).  True range is ``max(high-low, abs(high-prev_close),
 abs(low-prev_close))`` (the first candle uses ``high-low``).  Wilder RSI and
@@ -19,7 +18,9 @@ from typing import Any
 
 POLICY_VERSION = "technical-indicators-v1"
 MA_PERIODS = (5, 10, 20, 60, 120, 240)
-HIGH_LOW_PERIODS = (5, 10, 20, 60, 120, 260)
+WINDOW_PERIODS = (5, 10, 20, 60, 120, 240, 260)
+# Compatibility name for callers that imported the former rolling-only set.
+HIGH_LOW_PERIODS = WINDOW_PERIODS
 ROUND_DECIMALS = 4
 
 
@@ -141,16 +142,69 @@ def _availability(count: int, required: int) -> dict[str, Any]:
             "required_candles": required, "available_candles": count}
 
 
+def _window_summaries(
+    opens: list[float | None], highs: list[float | None], lows: list[float | None],
+    closes: list[float | None], volumes: list[float | None],
+    ma: dict[str, list[float | None]], period: int,
+) -> list[dict[str, Any]]:
+    """Build candle-aligned, fail-closed trailing OHLCV summaries."""
+    result: list[dict[str, Any]] = []
+    for index in range(len(closes)):
+        available = index + 1
+        start = available - period
+        status = "NOT_VERIFIED"
+        values: dict[str, float | None] = {
+            "open": None, "high": None, "low": None, "close": None,
+            "volume_total": None, "volume_average": None,
+            "change_pct": None, "range_pct": None, "ma": None,
+        }
+        if start >= 0:
+            window_inputs = (
+                opens[start:available] + highs[start:available] + lows[start:available]
+                + closes[start:available] + volumes[start:available]
+            )
+            window_open, window_low = opens[start], min(lows[start:available]) if all(
+                value is not None for value in lows[start:available]) else None
+            if (all(value is not None for value in window_inputs)
+                    and window_open != 0 and window_low != 0):
+                high = max(highs[start:available])  # type: ignore[type-var]
+                close = closes[index]
+                volume_total = sum(volumes[start:available])  # type: ignore[arg-type]
+                values = {
+                    "open": window_open,
+                    "high": high,
+                    "low": window_low,
+                    "close": close,
+                    "volume_total": volume_total,
+                    "volume_average": volume_total / period,
+                    "change_pct": (close - window_open) / window_open * 100,  # type: ignore[operator]
+                    "range_pct": (high - window_low) / window_low * 100,  # type: ignore[operator]
+                    "ma": ma[str(period)][index] if period in MA_PERIODS else None,
+                }
+                values = {key: round(value, ROUND_DECIMALS) if value is not None else None
+                          for key, value in values.items()}
+                status = "AVAILABLE"
+        values["availability"] = {
+            "status": status, "required_candles": period,
+            "available_candles": available,
+        }
+        result.append(values)
+    return result
+
+
 def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) -> dict[str, Any]:
     """Return one JSON-safe indicator payload aligned 1:1 to oldest-first candles.
 
-    A non-finite/missing High, Low, or Close makes calculated series fail closed;
-    raw finite High/Low context remains exposed without inventing replacements.
+    A non-finite/missing High, Low, or Close makes legacy calculated series fail
+    closed. Each OHLCV window independently requires finite Open, High, Low,
+    Close, and Volume inputs. Raw candle values are never mutated.
     """
     count = len(candles)
     closes = [_finite(candle.get("close")) for candle in candles]
     highs = [_finite(candle.get("high")) for candle in candles]
     lows = [_finite(candle.get("low")) for candle in candles]
+    opens = [_finite(candle.get("open")) for candle in candles]
+    volumes = [_finite(candle.get("volume")) for candle in candles]
     input_valid = count > 0 and all(value is not None for value in closes + highs + lows)
     nulls = [None] * count
     if input_valid:
@@ -160,21 +214,26 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
         ma = {str(period): _rounded(_sma(close_values, period)) for period in MA_PERIODS}
         rolling_high = {
             str(period): _rounded(_rolling_extreme(high_values, period, highest=True))
-            for period in HIGH_LOW_PERIODS
+            for period in WINDOW_PERIODS
         }
         rolling_low = {
             str(period): _rounded(_rolling_extreme(low_values, period, highest=False))
-            for period in HIGH_LOW_PERIODS
+            for period in WINDOW_PERIODS
         }
         macd = _macd(close_values)
         rsi = _rsi(close_values)
         atr = _atr(high_values, low_values, close_values)
     else:
         ma = {str(period): list(nulls) for period in MA_PERIODS}
-        rolling_high = {str(period): list(nulls) for period in HIGH_LOW_PERIODS}
-        rolling_low = {str(period): list(nulls) for period in HIGH_LOW_PERIODS}
+        rolling_high = {str(period): list(nulls) for period in WINDOW_PERIODS}
+        rolling_low = {str(period): list(nulls) for period in WINDOW_PERIODS}
         macd = {key: list(nulls) for key in ("line", "signal", "histogram")}
         rsi, atr = list(nulls), list(nulls)
+
+    window_summary = {
+        str(period): _window_summaries(opens, highs, lows, closes, volumes, ma, period)
+        for period in WINDOW_PERIODS
+    }
 
     def last(values: list[float | None]) -> float | None:
         return values[-1] if values else None
@@ -183,7 +242,7 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
                                "required_fields": ["high", "low", "close"]}}
     for period in MA_PERIODS:
         availability[f"ma_{period}"] = _availability(count if input_valid else 0, period)
-    for period in HIGH_LOW_PERIODS:
+    for period in WINDOW_PERIODS:
         availability[f"rolling_high_{period}"] = _availability(
             count if input_valid else 0, period)
         availability[f"rolling_low_{period}"] = _availability(
@@ -199,14 +258,25 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
         "alignment": "candle_index",
         "series": {"ma": ma, "rolling_high": rolling_high,
                    "rolling_low": rolling_low, "macd": macd, "rsi": rsi, "atr": atr,
-                   "high": highs, "low": lows},
+                   "high": highs, "low": lows, "window_summary": window_summary},
         "latest": {
             "high": last(highs), "low": last(lows), "close": last(closes),
             "ma": {period: last(values) for period, values in ma.items()},
             "rolling_high_low": {
                 period: {"high": last(rolling_high[period]),
                          "low": last(rolling_low[period])}
-                for period in (str(value) for value in HIGH_LOW_PERIODS)
+                for period in (str(value) for value in WINDOW_PERIODS)
+            },
+            "window_summary": {
+                period: values[-1] if values else {
+                    "open": None, "high": None, "low": None, "close": None,
+                    "volume_total": None, "volume_average": None,
+                    "change_pct": None, "range_pct": None, "ma": None,
+                    "availability": {"status": "NOT_VERIFIED",
+                                     "required_candles": int(period),
+                                     "available_candles": 0},
+                }
+                for period, values in window_summary.items()
             },
             "macd": {key: last(values) for key, values in macd.items()},
             "rsi": last(rsi), "atr": last(atr),
@@ -214,11 +284,26 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
         "availability": availability,
         "provenance": {
             "input": "ordered OHLCV candles through response as_of",
+            "timeframe": str(timeframe).upper(),
+            "as_of": "response as_of (latest included candle)",
             "no_lookahead": True,
+            "units": {"open_high_low_close_ma": "source price units",
+                      "volume_total_volume_average": "source candle volume units",
+                      "change_pct_range_pct": "percent"},
+            "window_summary": {
+                "periods": list(WINDOW_PERIODS),
+                "alignment": "trailing window ending at each candle index",
+                "first_available_index": "N-1",
+                "volume_semantics": "sum and arithmetic average of source candle volume",
+                "260_label": ("52-week trading range (260 Daily candles)"
+                              if str(timeframe).upper() == "1D" else "260 candles"),
+                "missing_input": "null values with NOT_VERIFIED availability",
+            },
             "rounding_decimal_places": ROUND_DECIMALS,
             "formulas": {
                 "ma": "SMA(5,10,20,60,120,240)",
-                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,60,120,260 candles; 260 trading candles = 52 weeks",
+                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,60,120,240,260 candles",
+                "window_summary": "Open=first Open; High=max High; Low=min Low; Close=latest Close; volume_total=sum Volume; volume_average=volume_total/N; change_pct=(Close-Open)/Open*100; range_pct=(High-Low)/Low*100",
                 "macd": "EMA(12)-EMA(26), signal EMA(9), SMA-seeded",
                 "rsi": "Wilder RSI(14), first value after 14 close changes",
                 "atr": "Wilder ATR(14), TR=max(H-L,abs(H-prevC),abs(L-prevC))",
