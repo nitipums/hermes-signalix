@@ -137,7 +137,6 @@
     drawerChartContext: $("#drawer-chart-context"),
     drawerChartLegend: $("#drawer-chart-legend"),
     technicalHighLow: $("#technical-high-low"),
-    technicalMa: $("#technical-ma"),
     technicalMacd: $("#technical-macd"),
     technicalRsi: $("#technical-rsi"),
     technicalAtr: $("#technical-atr"),
@@ -840,7 +839,6 @@
     var latest = chart && chart.indicators && chart.indicators.latest;
     var display = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Number(value).toFixed(2); };
     if (dom.technicalHighLow) dom.technicalHighLow.textContent = latest ? display(latest.high) + " / " + display(latest.low) : "Not verified";
-    if (dom.technicalMa) dom.technicalMa.textContent = latest && latest.ma ? Object.keys(latest.ma).map(function(period){ return "MA" + period + " " + display(latest.ma[period]); }).join(" · ") : "Not verified";
     if (dom.technicalMacd) dom.technicalMacd.textContent = latest && latest.macd ? display(latest.macd.line) + " / " + display(latest.macd.signal) + " / " + display(latest.macd.histogram) : "Not verified";
     if (dom.technicalRsi) dom.technicalRsi.textContent = latest ? display(latest.rsi) : "Not verified";
     if (dom.technicalAtr) dom.technicalAtr.textContent = latest ? display(latest.atr) : "Not verified";
@@ -848,8 +846,9 @@
     if (dom.rollingHighLow) dom.rollingHighLow.querySelectorAll("[data-rolling-period]").forEach(function(row) {
       var period = row.dataset.rollingPeriod;
       var values = rollingHighLow && rollingHighLow[period];
-      row.children[1].textContent = display(values && values.high);
-      row.children[2].textContent = display(values && values.low);
+      row.children[1].textContent = period === "260" ? "—" : display(latest && latest.ma && latest.ma[period]);
+      row.children[2].textContent = period === "240" ? "—" : display(values && values.high);
+      row.children[3].textContent = period === "240" ? "—" : display(values && values.low);
     });
   }
 

@@ -323,8 +323,10 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
                    'id="technical-rsi"', 'id="technical-atr"',
                    'id="rolling-high-low"'):
         assert marker in html
-    assert "Rolling High / Low (candles)" in html
-    for period in (5, 10, 20, 60, 120, 240):
+    assert 'id="technical-ma"' not in html
+    assert "Moving Average / Rolling High / Low (candles)" in html
+    assert "<th scope=\"col\">MA</th>" in html
+    for period in (5, 10, 20, 60, 120, 240, 260):
         assert f'data-rolling-period="{period}"' in html
     assert "chart.indicators.series.ma" in js
     assert "chart.indicators.series.macd" in js
@@ -344,11 +346,12 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
 def test_rolling_high_low_table_consumes_only_canonical_latest_values():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     render = _extract_function(js, "renderTechnicalSummary")
-    expression = "(function(){renderTechnicalSummary({indicators:{latest:{rolling_high_low:{'5':{high:12.345,low:8},'10':{high:null,low:null}}}}});return {fiveHigh:rows[0].children[1].textContent,fiveLow:rows[0].children[2].textContent,tenHigh:rows[1].children[1].textContent,tenLow:rows[1].children[2].textContent};})()"
-    setup = "var rows=[{dataset:{rollingPeriod:'5'},children:[{}, {}, {}]},{dataset:{rollingPeriod:'10'},children:[{}, {}, {}]}]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMa:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
+    expression = "(function(){renderTechnicalSummary({indicators:{latest:{ma:{'5':10.125,'240':9},rolling_high_low:{'5':{high:12.345,low:8},'260':{high:null,low:null}}}}});return {fiveMa:rows[0].children[1].textContent,fiveHigh:rows[0].children[2].textContent,fiveLow:rows[0].children[3].textContent,ma240:rows[1].children[1].textContent,high240:rows[1].children[2].textContent,low240:rows[1].children[3].textContent,ma260:rows[2].children[1].textContent,high260:rows[2].children[2].textContent,low260:rows[2].children[3].textContent};})()"
+    setup = "var rows=[{dataset:{rollingPeriod:'5'},children:[{}, {}, {}, {}]},{dataset:{rollingPeriod:'240'},children:[{}, {}, {}, {}]},{dataset:{rollingPeriod:'260'},children:[{}, {}, {}, {}]}]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
     assert _run_node([setup, render], expression) == {
-        "fiveHigh": "12.35", "fiveLow": "8.00",
-        "tenHigh": "Not verified", "tenLow": "Not verified",
+        "fiveMa": "10.13", "fiveHigh": "12.35", "fiveLow": "8.00",
+        "ma240": "9.00", "high240": "—", "low240": "—",
+        "ma260": "—", "high260": "Not verified", "low260": "Not verified",
     }
     assert "chart.candles" not in render
 

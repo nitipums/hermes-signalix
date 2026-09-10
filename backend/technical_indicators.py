@@ -1,7 +1,8 @@
 """Deterministic, no-lookahead technical indicators for aligned OHLCV candles.
 
-Policy ``technical-indicators-v1`` uses SMA and rolling High/Low over
-5/10/20/60/120/240 candles,
+Policy ``technical-indicators-v1`` uses SMA over 5/10/20/60/120/240 candles
+and rolling High/Low over 5/10/20/60/120/260 candles (260 trading candles is
+the canonical 52-week window),
 MACD(12,26,9) with each EMA seeded by the first period's SMA, Wilder RSI(14),
 and Wilder ATR(14).  True range is ``max(high-low, abs(high-prev_close),
 abs(low-prev_close))`` (the first candle uses ``high-low``).  Wilder RSI and
@@ -18,6 +19,7 @@ from typing import Any
 
 POLICY_VERSION = "technical-indicators-v1"
 MA_PERIODS = (5, 10, 20, 60, 120, 240)
+HIGH_LOW_PERIODS = (5, 10, 20, 60, 120, 260)
 ROUND_DECIMALS = 4
 
 
@@ -158,19 +160,19 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
         ma = {str(period): _rounded(_sma(close_values, period)) for period in MA_PERIODS}
         rolling_high = {
             str(period): _rounded(_rolling_extreme(high_values, period, highest=True))
-            for period in MA_PERIODS
+            for period in HIGH_LOW_PERIODS
         }
         rolling_low = {
             str(period): _rounded(_rolling_extreme(low_values, period, highest=False))
-            for period in MA_PERIODS
+            for period in HIGH_LOW_PERIODS
         }
         macd = _macd(close_values)
         rsi = _rsi(close_values)
         atr = _atr(high_values, low_values, close_values)
     else:
         ma = {str(period): list(nulls) for period in MA_PERIODS}
-        rolling_high = {str(period): list(nulls) for period in MA_PERIODS}
-        rolling_low = {str(period): list(nulls) for period in MA_PERIODS}
+        rolling_high = {str(period): list(nulls) for period in HIGH_LOW_PERIODS}
+        rolling_low = {str(period): list(nulls) for period in HIGH_LOW_PERIODS}
         macd = {key: list(nulls) for key in ("line", "signal", "histogram")}
         rsi, atr = list(nulls), list(nulls)
 
@@ -181,6 +183,7 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
                                "required_fields": ["high", "low", "close"]}}
     for period in MA_PERIODS:
         availability[f"ma_{period}"] = _availability(count if input_valid else 0, period)
+    for period in HIGH_LOW_PERIODS:
         availability[f"rolling_high_{period}"] = _availability(
             count if input_valid else 0, period)
         availability[f"rolling_low_{period}"] = _availability(
@@ -203,7 +206,7 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
             "rolling_high_low": {
                 period: {"high": last(rolling_high[period]),
                          "low": last(rolling_low[period])}
-                for period in (str(value) for value in MA_PERIODS)
+                for period in (str(value) for value in HIGH_LOW_PERIODS)
             },
             "macd": {key: last(values) for key, values in macd.items()},
             "rsi": last(rsi), "atr": last(atr),
@@ -215,7 +218,7 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
             "rounding_decimal_places": ROUND_DECIMALS,
             "formulas": {
                 "ma": "SMA(5,10,20,60,120,240)",
-                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,60,120,240 candles",
+                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,60,120,260 candles; 260 trading candles = 52 weeks",
                 "macd": "EMA(12)-EMA(26), signal EMA(9), SMA-seeded",
                 "rsi": "Wilder RSI(14), first value after 14 close changes",
                 "atr": "Wilder ATR(14), TR=max(H-L,abs(H-prevC),abs(L-prevC))",
