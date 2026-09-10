@@ -18,6 +18,14 @@ The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `si
 
 `marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
+### Current Team Facts policy and runtime — 2026-09-10
+
+Owner decision: Team Facts is a public, unauthenticated, read-only facts feed. It does not expose setup, Wave, lane, trigger, risk, target, alert, order, or broker execution semantics. `/api/setup-candidates` remains the separate canonical setup surface.
+
+Release `28f7947` removed only the dedicated Team Facts API-key guard; protected routes were not changed. After `docker compose up -d --force-recreate backend dashboard`, readiness returned `status=ok`, `db=up`, `redis=up`. Public `GET /api/team/setup-candidates` returned `team-facts-v1`, `marginable_long`, `base_active_ord_count=932`, `eligible_count=237`, `excluded_count=695`, and views `momentum=16`, `near_high=13`, `pullback=58`. Freshness was `partial` because `3BBIF`, `COM7`, and `PR9` lacked Daily baselines; intraday freshness was `fresh`. This is explicit data completeness, not a trading signal.
+
+The implementation uses bounded read-only queries and preserves Daily/60m source separation. Rate limiting and HTTPS/TLS remain separate hardening items. Alerts, auto-trading, broker execution, and evaluator auto-caller remain OFF/PENDING.
+
 ### 2026-09-02 promotion evidence
 
 - Source/release: `/root/signalix`, branch `release/signalix-mvp-stable`, local and remote SHA `5bf3d9ac3e77b9f139ce2f84e0d6e27546a95fa4`.
@@ -40,7 +48,105 @@ Stable commit `9669e2e` groups main-list cards by `wave.daily_structure.phase` i
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.
 
-## Deferred features — 2026-09-01
+### Team Facts API production promotion — 2026-09-03 19:38 ICT
+
+Owner-authorized promotion of the read-only Team Facts API was applied to the
+canonical dashboard service. `TEAM_SCAN_API_KEY` was provisioned in
+`/root/signalix/.env` without recording its value in documentation, and
+`docker compose up -d --force-recreate dashboard` recreated the dependent
+backend/dashboard services. Production services were healthy after recreate.
+
+Public verification via `http://91.98.72.120:3001`:
+
+- no/invalid `X-Signalix-Team-Key` → HTTP 401;
+- authenticated `GET /api/team/setup-candidates` → HTTP 200, compact response
+  66,666 bytes, views `momentum=11`, `near_high=6`, `pullback=44`;
+- authenticated Daily history detail for `IRPC`, limit 5 → HTTP 200, 5
+  `price_data` / `1D` candles;
+- authenticated 60m history detail for `IRPC`, limit 5 → HTTP 200, 5
+  completed `intraday_price_data` / `60m` candles;
+- unknown symbol → HTTP 404; invalid timeframe/limit → HTTP 400;
+- backend, dashboard, PostgreSQL, and Redis containers healthy;
+- container confirmed `TEAM_SCAN_API_KEY` loaded.
+
+Ploy production read-only challenge returned `REVISE`: facts-only contract,
+auth, source/timeframe separation, thresholds, and volume-ratio exclusion of
+the current bar passed. Remaining blockers are (a) aggregate freshness showing
+`stale` while Daily/60m components are fresh with 3 unavailable symbols, (b)
+threshold metadata not being directly exposed for independent reproduction, and
+(c) public HTTPS/TLS not configured (`https` probe failed; HTTP remains the live
+route). This is usable as a controlled HTTP team feed, not a production-ready
+secure external integration. Alerts, auto-trading, and broker execution remain
+OFF/PENDING.
+
+### Team Facts API remediation promotion — 2026-09-03 20:23 ICT
+
+The owner-authorized Ploy feedback remediation was promoted from the current
+canonical bind-mounted source with `docker compose up -d --force-recreate dashboard`; no ingestion, migration, or database write was performed. The
+Dashboard and backend services are healthy after promotion.
+
+Public read-back via `http://91.98.72.120:3001`:
+
+- unauthenticated Team Facts list → HTTP 401;
+- authenticated list → HTTP 200, `team-facts-list-v1`, 96,509 bytes;
+- views: `momentum=11`, `near_high=6`, `pullback=44`;
+- freshness: `overall_status=partial`, `daily_status=partial`,
+  `intraday_status=fresh`, 3 unavailable Daily symbols;
+- `filter_version=team-facts-filters-v1` and thresholds for all views present;
+- authenticated IRPC 60m history → HTTP 200, 5 completed candles plus
+  Daily-baseline metadata-only;
+- `/mvp` → HTTP 200; `/health/readiness` → HTTP 200;
+- all Compose services healthy and Team API key loaded in dashboard.
+
+Ploy A2A re-review after this source remediation: contract items passed in
+principle, but production authenticated validation remains `NOT VERIFIED` from
+Ploy's environment because the production key was deliberately not sent over
+A2A. HTTPS/TLS remains a separate hardening blocker; the current controlled
+feed is HTTP only. Alerts, auto-trading, and broker execution remain OFF/PENDING.
+
+### Team Facts public no-auth promotion — 2026-09-03 20:43 ICT
+
+Per Arm's decision, `TEAM_SCAN_API_KEY` was removed from `/root/signalix/.env`
+and the dashboard was recreated with `docker compose up -d --force-recreate dashboard`. Team Facts list/history routes are now public read-only routes;
+other protected routes remain unchanged.
+
+Public read-back:
+
+- Team Facts list without headers → HTTP 200, `team-facts-list-v1`, 96,509 bytes;
+- views: `momentum=11`, `near_high=6`, `pullback=44`;
+- 60m IRPC history without headers → HTTP 200, 5 completed candles plus
+  Daily-baseline metadata-only;
+- dashboard container has no `TEAM_SCAN_API_KEY` loaded;
+- `/webhook` without its secret remains HTTP 401;
+- all Compose services healthy, `/mvp` HTTP 200, readiness HTTP 200.
+
+Ploy's final A2A handoff/read-back task `task-51ca73d65f974fa8` confirmed public
+route, facts-only boundary, thresholds, history limits, and volume-ratio basis.
+Ploy still reports `REVISE / NOT VERIFIED` for freshness propagation: the
+aggregate/source status and symbol/facts status can disagree (for example
+`source_status=stale` while a component says fresh). This remains an explicit
+contract hardening item; the feed is usable for public read-only facts, but
+freshness must be interpreted carefully and is not a buy signal.
+
+### Team Facts final freshness re-gate — 2026-09-03 21:02 ICT
+
+Ploy's final A2A re-review after the source-metadata remediation returned
+`PASS` for the public facts-only feed. Production read-back confirmed
+`overall_status=partial`, `daily_status=partial`, and `intraday_status=fresh`,
+with exactly 3 missing Daily symbols explicitly reported; symbol-level list and
+history freshness for IRPC matched (`fresh`) across list item, facts, Daily
+baseline, and history run. Source producer values are retained only under
+`source_metadata.scope=published_read_model_report`, `authoritative=false`,
+`reported`, so they cannot override the Team Facts freshness envelope.
+
+Ploy also confirmed public list/detail routes, facts-only boundary, thresholds,
+completed-bar/timeframe separation, and previous-20 volume-ratio basis. Final
+status for the intended use is `PASS — public facts-only scan feed for 3–4
+rounds/day`, not a buy or trading-action API. The three Daily-missing symbols
+remain explicit partial coverage and must not be treated as full 237-symbol
+Daily coverage.
+
+### Deferred features — 2026-09-01
 
 - Alerts/delivery: `PENDING / FUTURE FEATURE`, OFF.
 - Automatic trading/broker execution: `PENDING / FUTURE FEATURE`, OFF and not authorized.

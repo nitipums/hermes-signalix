@@ -100,6 +100,59 @@ The primary owner-only surface is the Elliott/Trend/Trade-Setup decision spine:
 
 `/api/setup-candidates` is the canonical API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted. The narrow public 390px failure→Retry→recovery journey is PASS; broader desktop/drawer/chart semantic acceptance and evaluator auto-caller remain separate/not verified. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
 
+### Deterministic chart and OHLCV window summary — 2026-09-10
+
+`GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` is a read-only chart adapter over `price_data`/`intraday_price_data`. It returns source OHLCV candles plus canonical `indicators` under policy `technical-indicators-v1`: MA5/10/20/60/120/240, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and aligned rolling/window data.
+
+`indicators.latest.window_summary` contains rows for 5/10/20/60/120/240/260 candles with Open, High, Low, Close, total/average volume, Change %, Range %, MA when applicable, availability, and provenance. The 260-candle Daily window is the 52-week trading range; other timeframes label it `260 candles`. The adapter fetches at least 260 candles so the 52-week value can be verified when source history exists. The UI consumes this payload without recalculating financial values in JavaScript. Missing/invalid/insufficient input is `NOT_VERIFIED`.
+
+### Team Facts Read API v1 (2026-09-03)
+
+`GET /api/team/setup-candidates` is a public, unauthenticated, read-only
+market-data feed over the published canonical `marginable_long` universe. It
+contains no secrets or private fields. The feed is facts-only and has no buy,
+order, or other trading-action semantics.
+
+Team item identity derives `can_buy=true` from membership in that validated
+canonical universe; this is universe membership, not an inferred stock signal.
+An explicit per-item `can_buy` value must agree, and non-canonical or unknown
+universes fail closed.
+
+The `team-facts-v1` response contains top-level deterministic `momentum`,
+`near_high`, and `pullback` views. Items contain only identity, current facts
+from the actual latest price timeframe, neutral indicators, the latest
+completed 60m bar when available, and provenance; historical arrays are not
+included.
+`GET /api/team/setup-candidates/{symbol}/history?timeframe=1D|60m&limit=...`
+returns one canonical symbol's bounded candles for only the requested
+timeframe. Root freshness metadata is preserved,
+but freshness and completeness are evaluated per symbol; a partial root status
+does not globally exclude valid symbols. It does not expose setup, wave, lane,
+trigger, risk, target, mapped labels, or buy
+instructions. Daily and 60m sources/timeframes are explicit. Each view is
+bounded to 400 Daily and 200 60m rows per symbol; exclusion counts and reasons
+are returned for missing, stale, or incomplete data; every applicable view
+requires a completed 60m row. `volume_ratio_20` is explicitly
+`current_daily_volume / mean(previous_20_daily_volumes)` and is null when 20
+prior Daily volume observations are unavailable. Freshness is classified once per symbol from these same rows and response
+`now`: item provenance, facts, the 60m detail Daily baseline, and aggregate
+envelopes all reuse that result. `overall_status` is authoritative; producer
+values are retained only under the explicitly non-authoritative
+`source_metadata` shape `{scope: "published_read_model_report", authoritative:
+false, reported: {...}}`. Raw producer freshness keys therefore remain
+available for audit under `source_metadata.reported` and are never status
+aliases at the `source_metadata` top level.
+Fresh Daily is required for every view. A Daily date remains a date, while
+60m `as_of` is an actual completed candle timestamp; list and detail responses
+use the latest timestamp appropriate to their requested source. The handler loads and
+validates only the current published read model and performs bounded read-only
+OHLCV queries; it does not rebuild/scan, load legacy snapshots, write
+PostgreSQL, send alerts, or execute broker/auto-trading actions. Unavailable
+data/model is 503. The response states
+that values are facts and deterministic indicators for independent review, not
+trading truth or orders. Alerts, auto-trading, and broker execution remain
+`PENDING / FUTURE FEATURE` and OFF.
+
 ### Implementation spine history — 2026-08-31 (T1–T9 promoted; current acceptance split above)
 
 - **T1 universe + contract scaffolding: DONE** — commit `8573b9d` (`resolve_universe` 931/237/694, canonical 11-group envelope, session-aware freshness, fail-closed `DATA_BLOCKED`).

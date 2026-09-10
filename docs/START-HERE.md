@@ -28,6 +28,10 @@ Canonical product surface:
 
 ## 2. Choose the smallest reading path
 
+For the boundary between durable Signalix contracts and repeatable Lite procedures, read `docs/current/2026-09-03-signalix-skill-document-boundary.md`. Specs/vault notes own the contract; skills own the execution/checklist.
+
+For the current deterministic chart/OHLCV window contract and cleanup evidence, read `docs/current/2026-09-10-1332-ohlcv-window-summary-handoff.md`. For isolated Wave/AutoResearch governance, read `../vault/Research-Index.md` and `../vault/Research-Playbook-Bible.md`; those remain research-only and do not change production screening or execution.
+
 | If the task is about… | Read first | Then read only if needed |
 |---|---|---|
 | Product thesis / roadmap / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
