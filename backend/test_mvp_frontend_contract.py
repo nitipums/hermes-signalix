@@ -307,10 +307,28 @@ def test_explorer_filters_are_sent_to_api():
 def test_chart_timeframes_are_real_controls_not_labels_only():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for timeframe in ("1D", "1W", "60M"):
+    for timeframe in ("1D", "1W", "60M", "1M"):
         assert f'data-timeframe="{timeframe}"' in html
     assert "?timeframe=" in js
     assert "chart-timeframe" in js
+
+
+def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    for period in (5, 10, 20, 60, 120, 240):
+        assert f'data-ma-period="{period}"' in html
+    for marker in ('id="technical-latest"', 'id="technical-macd"',
+                   'id="technical-rsi"', 'id="technical-atr"'):
+        assert marker in html
+    assert "chart.indicators.series.ma" in js
+    assert "chart.indicators.series.macd" in js
+    assert "chart.indicators.series.rsi" in js
+    assert "latest.atr" in js
+    assert "renderTechnicalSummary" in js
+    assert ".technical-summary" in css
+    assert "overflow-x:auto" not in css[css.index(".technical-summary"):css.index(".technical-summary") + 500]
     assert 'let chartTimeframe = "1D"' in js
     assert 'var requestedTimeframe = chartTimeframe;' in js
     assert "setChartTimeframeButtons(requestedTimeframe)" in js

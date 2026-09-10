@@ -155,7 +155,7 @@
 
           <!-- chart area: overlays are supplied by the real API contract -->
           <div id="drawer-chart" class="drawer-chart">
-            <canvas id="drawer-canvas" width="720" height="420"></canvas>
+            <canvas id="drawer-canvas" width="720" height="440"></canvas>
             <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
           </div>
           <p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p>
@@ -166,7 +166,24 @@
             <button type="button" class="chart-timeframe" data-timeframe="60M">60m</button>
             <button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button>
             <button type="button" class="chart-timeframe" data-timeframe="1W">1W</button>
+            <button type="button" class="chart-timeframe" data-timeframe="1M">1M</button>
           </div>
+          <div class="ma-controls" aria-label="Moving average overlays">
+            <span class="chart-control-label">Moving averages</span>
+            <label><input type="checkbox" data-ma-period="5" checked> MA5</label>
+            <label><input type="checkbox" data-ma-period="10" checked> MA10</label>
+            <label><input type="checkbox" data-ma-period="20" checked> MA20</label>
+            <label><input type="checkbox" data-ma-period="60" checked> MA60</label>
+            <label><input type="checkbox" data-ma-period="120"> MA120</label>
+            <label><input type="checkbox" data-ma-period="240"> MA240</label>
+          </div>
+          <section id="technical-latest" class="technical-summary" aria-label="Latest deterministic technical values" aria-live="polite">
+            <div><span>High / Low</span><strong id="technical-high-low">Not verified</strong></div>
+            <div><span>Moving averages</span><strong id="technical-ma">Not verified</strong></div>
+            <div><span>MACD / Signal / Hist</span><strong id="technical-macd">Not verified</strong></div>
+            <div><span>RSI 14</span><strong id="technical-rsi">Not verified</strong></div>
+            <div><span>ATR 14</span><strong id="technical-atr">Not verified</strong></div>
+          </section>
           <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
           <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">
             <span>Wave evidence details are in the Method / Evidence Guide.</span>

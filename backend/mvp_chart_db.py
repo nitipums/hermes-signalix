@@ -28,6 +28,7 @@ from canonical_chart_read import ChartReadResult, read_chart_result
 from chart_wave_evidence import (build_legacy_chart_wave_evidence,
                                  canonical_chart_wave_evidence,
                                  neutral_chart_wave_evidence)
+from technical_indicators import build_technical_indicators
 
 
 _POOL = None
@@ -233,7 +234,9 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
     if pg is None:
         return {
             "symbol": symbol.upper(),
+            "timeframe": timeframe,
             "candles": None,
+            "indicators": build_technical_indicators([], timeframe),
             "ma20": None,
             "ma50": None,
             "ma200": None,
@@ -265,7 +268,9 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
             pass
         return {
             "symbol": symbol.upper(),
+            "timeframe": timeframe,
             "candles": None,
+            "indicators": build_technical_indicators([], timeframe),
             "ma20": None,
             "ma50": None,
             "ma200": None,
@@ -294,6 +299,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
                 "symbol": symbol.upper(),
                 "timeframe": timeframe,
                 "candles": [],
+                "indicators": build_technical_indicators([], timeframe),
                 "ma20": None,
                 "ma50": None,
                 "ma200": None,
@@ -323,25 +329,34 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
         or as_of
     )
 
-    # Build NOT_VERIFIED notes
+    indicators = build_technical_indicators(candles, timeframe)
+    input_available = indicators["availability"]["input"]["status"] == "AVAILABLE"
+    # Build compatibility notes while reporting every canonical requirement.
     notes: list[str] = []
-    if len(closes) < 20:
-        notes.append("MA20 NOT_VERIFIED: insufficient data (< 20 candles)")
-    if len(closes) < 50:
-        notes.append("MA50 NOT_VERIFIED: insufficient data (< 50 candles)")
-    if len(closes) < 200:
-        notes.append("MA200 NOT_VERIFIED: insufficient data (< 200 candles)")
-    if len(closes) < 35:
-        notes.append("MACD NOT_VERIFIED: insufficient data (< 35 candles)")
+    if not input_available:
+        notes.append("Indicators NOT_VERIFIED: missing or non-finite High/Low/Close input")
+    for period in (5, 10, 20, 60, 120, 240):
+        if len(closes) < period:
+            notes.append(f"MA{period} NOT_VERIFIED: insufficient data (< {period} candles)")
+    if len(closes) < 34:
+        notes.append("MACD signal NOT_VERIFIED: insufficient data (< 34 candles)")
     if len(closes) < 15:
         notes.append("RSI NOT_VERIFIED: insufficient data (< 15 candles)")
+    if len(closes) < 14:
+        notes.append("ATR NOT_VERIFIED: insufficient data (< 14 candles)")
 
-    # Compute indicators if enough data
-    ma20 = _compute_sma(closes, 20) if len(closes) >= 20 else ([None] * len(closes))
-    ma50 = _compute_sma(closes, 50) if len(closes) >= 50 else ([None] * len(closes))
-    ma200 = _compute_sma(closes, 200) if len(closes) >= 200 else ([None] * len(closes))
-    macd = _compute_macd(closes) if len(closes) >= 35 else None
-    rsi = _compute_rsi(closes, 14) if len(closes) >= 15 else None
+    # Compatibility/audit aliases. The canonical UI contract is ``indicators``.
+    ma20 = indicators["series"]["ma"]["20"]
+    ma50 = (_compute_sma(closes, 50) if input_available and len(closes) >= 50
+            else [None] * len(candles))
+    ma200 = (_compute_sma(closes, 200) if input_available and len(closes) >= 200
+             else [None] * len(candles))
+    canonical_macd = indicators["series"]["macd"]
+    macd = ({"macd_line": canonical_macd["line"],
+             "signal_line": canonical_macd["signal"],
+             "histogram": canonical_macd["histogram"]}
+            if input_available and len(closes) >= 35 else None)
+    rsi = indicators["series"]["rsi"] if input_available and len(closes) >= 15 else None
 
     provisional_note = ("Current session is represented by provisional 60m aggregation; "
                         "Daily EOD decision data is unchanged. "
@@ -365,6 +380,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
         "symbol": symbol.upper(),
         "timeframe": timeframe,
         "candles": candles,
+        "indicators": indicators,
         "ma20": ma20,
         "ma50": ma50,
         "ma200": ma200,
@@ -377,6 +393,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
         "provenance": {
             "source": chart_source,
             "as_of": as_of,
+            "indicator_policy_version": indicators["policy_version"],
             "note": note,
         },
     }

@@ -270,6 +270,18 @@ setup_candidate_contract.py
 
 Existing risk/Fib utilities and validated data loaders may be adapted behind these boundaries. Legacy classifiers, queues, and VCP lanes must not silently create a second primary decision.
 
+### 3.1.1 Deterministic chart technical payload
+
+The read-only chart response for 1D, 1W, 60M, and 1M exposes aligned OHLCV
+candles plus one canonical `indicators` object. Policy
+`technical-indicators-v1` calculates SMA 5/10/20/60/120/240,
+SMA-seeded MACD(12,26,9), Wilder RSI(14), and Wilder ATR(14) from bars through
+the response `as_of` only. Series align one-to-one with candles; insufficient
+history and invalid input remain explicit null / `NOT_VERIFIED`. Candle High
+and Low remain source values and are also projected into latest technical
+context. Historical MA20/50/200, MACD, and RSI fields are compatibility/audit
+aliases rather than the primary UI contract.
+
 ### 3.2 Data flow
 
 ```text

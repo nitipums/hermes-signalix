@@ -136,6 +136,11 @@
     drawerChartStatus: $("#drawer-chart-status"),
     drawerChartContext: $("#drawer-chart-context"),
     drawerChartLegend: $("#drawer-chart-legend"),
+    technicalHighLow: $("#technical-high-low"),
+    technicalMa: $("#technical-ma"),
+    technicalMacd: $("#technical-macd"),
+    technicalRsi: $("#technical-rsi"),
+    technicalAtr: $("#technical-atr"),
     chartWaveEvidence: $("#chart-wave-evidence"),
     chartWaveExplanation: $("#chart-wave-explanation"),
     methodGuide: $("#method-guide"),
@@ -174,7 +179,8 @@
   let shortlistData = null;
   let vcpResultsBySymbol = {};
   let vcpRunMeta = {};
-  const chartLayers = { candles: true, volume: true, ma: true, rsi: true, waveEvidence: true };
+  const chartLayers = { candles: true, volume: true, ma: true, rsi: true, macd: true,
+    maPeriods: {"5":true,"10":true,"20":true,"60":true,"120":false,"240":false}, waveEvidence: true };
   let chartTimeframe = "1D";
   let chartSymbol = null;
   let drawerSymbols = [];
@@ -824,14 +830,26 @@
     }).length;
     var markerState = isDaily ? (dailyMarkerCount ? String(dailyMarkerCount) : "none") : "Day only";
     var timeframe = chart && chart.timeframe || chartTimeframe;
-    dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA20 is blue solid; MA50 is blue dashed; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
-    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>OHLC</span><span><i class="legend-line legend-line--ma20"></i>MA20</span><span><i class="legend-line legend-line--ma50"></i>MA50</span><span><i class="legend-dot legend-dot--wave"></i>markers (' + escapeHTML(markerState) + ') <button type="button" class="legend-info" aria-label="Show full chart legend">(i)</button></span>';
+    dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA20 and MA50 plus selected moving averages use distinct neutral colors; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
+    var selectedMa = Object.keys(chartLayers.maPeriods).filter(function(period){ return chartLayers.maPeriods[period]; }).map(function(period){ return "MA" + period; }).join(" · ");
+    dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>OHLC High/Low</span><span><i class="legend-line legend-line--ma20"></i>' + escapeHTML(selectedMa || "MA hidden") + '</span><span><i class="legend-dot legend-dot--wave"></i>markers (' + escapeHTML(markerState) + ') <button type="button" class="legend-info" aria-label="Show full chart legend">(i)</button></span>';
+  }
+
+  function renderTechnicalSummary(chart) {
+    var latest = chart && chart.indicators && chart.indicators.latest;
+    var display = function(value) { return value == null || !Number.isFinite(Number(value)) ? "Not verified" : Number(value).toFixed(2); };
+    if (dom.technicalHighLow) dom.technicalHighLow.textContent = latest ? display(latest.high) + " / " + display(latest.low) : "Not verified";
+    if (dom.technicalMa) dom.technicalMa.textContent = latest && latest.ma ? Object.keys(latest.ma).map(function(period){ return "MA" + period + " " + display(latest.ma[period]); }).join(" · ") : "Not verified";
+    if (dom.technicalMacd) dom.technicalMacd.textContent = latest && latest.macd ? display(latest.macd.line) + " / " + display(latest.macd.signal) + " / " + display(latest.macd.histogram) : "Not verified";
+    if (dom.technicalRsi) dom.technicalRsi.textContent = latest ? display(latest.rsi) : "Not verified";
+    if (dom.technicalAtr) dom.technicalAtr.textContent = latest ? display(latest.atr) : "Not verified";
   }
 
   function renderDrawerChart(chart) {
     window.__signalixLastChart = chart;
     renderChartStatus(chart);
     renderChartLegend(chart);
+    renderTechnicalSummary(chart);
     if (chart.candles && chart.candles.length > 0) {
       // A real OHLCV series is present — draw it (basic canvas line render).
       dom.drawerChartPH.style.display = "none";
@@ -858,7 +876,7 @@
     ctx.clearRect(0, 0, w, h);
     var candles = chart.candles.slice(-120);
     var start = chart.candles.length - candles.length;
-    var left = 34, right = 8, top = 28, priceH = 205, volH = 62, rsiH = 62;
+    var left = 38, right = 8, top = 22, priceH = 205, volH = 48, macdH = 68, rsiH = 62;
     var plotW = w - left - right;
     var closes = candles.map(function(c) { return Number(c.close); });
     var highs = candles.map(function(c) { return Number(c.high); });
@@ -873,11 +891,12 @@
     var yPrice = function(v) { return top + priceH - ((v - min) / range) * priceH; };
     // Green/red communicate candle and volume direction only. All other
     // chart evidence uses neutral/blue annotation colors.
-    var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#93c5fd", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#93c5fd" };
+    var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#93c5fd", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#93c5fd",
+      ma: {"5":"#d8bc65","10":"#7dd3fc","20":"#93c5fd","60":"#60a5fa","120":"#a78bfa","240":"#c4b5fd"}, macd:"#93c5fd", signal:"#a78bfa" };
     ctx.font = "11px sans-serif";
     ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
-    [top, top + priceH, top + priceH + volH, top + priceH + volH + rsiH].forEach(function(y){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});
-    ctx.fillStyle = colors.text; ctx.fillText("PRICE", 4, top + 10); ctx.fillText("VOL", 8, top + priceH + 16); ctx.fillText("RSI", 10, top + priceH + volH + 16);
+    [top, top + priceH, top + priceH + volH, top + priceH + volH + macdH, top + priceH + volH + macdH + rsiH].forEach(function(y){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});
+    ctx.fillStyle = colors.text; ctx.fillText("PRICE", 2, top + 10); ctx.fillText("VOL", 7, top + priceH + 16); ctx.fillText("MACD", 2, top + priceH + volH + 16); ctx.fillText("RSI", 8, top + priceH + volH + macdH + 16);
     if (chartLayers.candles) {
       var candleW = Math.max(2, Math.min(8, plotW / candles.length * 0.64));
       candles.forEach(function(c, i) {
@@ -896,16 +915,26 @@
       values.slice(start, start+candles.length).forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=yPrice(Number(v));if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);});
       if(started)ctx.stroke();
     }
-    if (chartLayers.ma) { overlay(chart.ma20, colors.ma20); overlay(chart.ma50, colors.ma50); overlay(chart.ma200, colors.ma200); }
+    var maSeries = chart.indicators && chart.indicators.series && chart.indicators.series.ma;
+    if (chartLayers.ma && maSeries) Object.keys(chartLayers.maPeriods).forEach(function(period) { if (chartLayers.maPeriods[period]) overlay(maSeries[period], colors.ma[period]); });
     if (chartLayers.volume) {
       var vols=candles.map(function(c){return Number(c.volume)||0;}), vmax=Math.max.apply(null,vols)||1;
       vols.forEach(function(v,i){ctx.fillStyle=Number(candles[i].close)>=Number(candles[i].open)?colors.up:colors.down;var bh=(v/vmax)*volH;ctx.fillRect(xFor(i)-2,top+priceH+volH-bh,4,bh);});
     }
+    if (chartLayers.macd && chart.indicators && chart.indicators.series.macd) {
+      var macd = chart.indicators.series.macd, macdValues = (macd.line || []).slice(start,start+candles.length).concat((macd.signal || []).slice(start,start+candles.length)).filter(function(v){return v!=null&&Number.isFinite(Number(v));});
+      var macdMax = Math.max.apply(null, macdValues.map(function(v){return Math.abs(Number(v));})) || 1;
+      var macdBase = top + priceH + volH + macdH / 2, yMacd = function(v){return macdBase - Number(v) / macdMax * (macdH / 2 - 5);};
+      var histogram = (macd.histogram || []).slice(start,start+candles.length);
+      histogram.forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;ctx.fillStyle=Number(v)>=0?colors.up:colors.down;ctx.fillRect(xFor(i)-2,Math.min(macdBase,yMacd(v)),4,Math.max(1,Math.abs(yMacd(v)-macdBase)));});
+      function oscillator(values,color,yMap){ctx.strokeStyle=color;ctx.lineWidth=1.25;ctx.beginPath();var begun=false;values.slice(start,start+candles.length).forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=yMap(v);if(!begun){ctx.moveTo(x,y);begun=true;}else ctx.lineTo(x,y);});if(begun)ctx.stroke();}
+      oscillator(macd.line || [], colors.macd, yMacd); oscillator(macd.signal || [], colors.signal, yMacd);
+    }
     if (chartLayers.rsi) {
-      var rsi=Array.isArray(chart.rsi)?chart.rsi.slice(start,start+candles.length):[];
+      var rsi=chart.indicators && Array.isArray(chart.indicators.series.rsi)?chart.indicators.series.rsi.slice(start,start+candles.length):[];
       ctx.strokeStyle=colors.rsi;ctx.lineWidth=1.5;ctx.beginPath();var rs=false;
-      rsi.forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=top+priceH+volH+rsiH-(Number(v)/100)*rsiH;if(!rs){ctx.moveTo(x,y);rs=true;}else ctx.lineTo(x,y);});if(rs)ctx.stroke();
-      ctx.strokeStyle=colors.grid;ctx.setLineDash([3,3]);[30,70].forEach(function(v){var y=top+priceH+volH+rsiH-(v/100)*rsiH;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});ctx.setLineDash([]);
+      rsi.forEach(function(v,i){if(v==null||!Number.isFinite(Number(v)))return;var x=xFor(i),y=top+priceH+volH+macdH+rsiH-(Number(v)/100)*rsiH;if(!rs){ctx.moveTo(x,y);rs=true;}else ctx.lineTo(x,y);});if(rs)ctx.stroke();
+      ctx.strokeStyle=colors.grid;ctx.setLineDash([3,3]);[30,70].forEach(function(v){var y=top+priceH+volH+macdH+rsiH-(v/100)*rsiH;ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});ctx.setLineDash([]);
     }
     // Decision levels live on the price chart; no duplicate metric boxes below it.
     var decisionLabelYs = [];
@@ -1320,6 +1349,15 @@
     } else if (chartSymbol) {
       showWaveExplanation(waveEvidenceForItem(drawerItemForSymbol(chartSymbol)));
     }
+  });
+  $$('[data-ma-period]').forEach(function(input) {
+    input.addEventListener("change", function() {
+      chartLayers.maPeriods[input.getAttribute("data-ma-period")] = input.checked;
+      if (window.__signalixLastChart) {
+        renderChartLegend(window.__signalixLastChart);
+        drawChart(window.__signalixLastChart);
+      }
+    });
   });
   if (dom.drawerCanvas) dom.drawerCanvas.addEventListener("click", function(e) {
     if (!chartLayers.waveEvidence || !window.__signalixWaveMarkerHits) return;
