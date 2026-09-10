@@ -3,7 +3,7 @@ from datetime import date, datetime, timezone
 
 import mvp_routes
 import pytest
-from team_facts_api import build_response, _facts
+from team_facts_api import build_response, load_history, load_ohlcv, _facts
 
 
 class Handler:
@@ -44,17 +44,20 @@ def fresh_bars(close=100, volume=100):
 def response(h): return json.loads(h.body)
 
 
-def test_auth_header_only(monkeypatch):
-    monkeypatch.setenv("TEAM_SCAN_API_KEY", "secret")
+def test_public_team_list_ignores_auth_headers_and_query_secrets(monkeypatch):
+    monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model())
+    monkeypatch.setattr("team_facts_api.load_ohlcv", lambda pg, symbols: (
+        {"AAA": fresh_bars()}, {"AAA": intra()}))
+    monkeypatch.setattr(mvp_routes, "_acquire_setup_candidates_pg", lambda: (object(), lambda: None))
     for path, headers in (("/api/team/setup-candidates", {}),
-                          ("/api/team/setup-candidates?key=secret", {}),
+                          ("/api/team/setup-candidates?key=obsolete", {}),
                           ("/api/team/setup-candidates", {"X-Signalix-Team-Key": "wrong"})):
         h = Handler(headers); mvp_routes.handle_mvp_api(path, h)
-        assert h.status == 401
+        assert h.status == 200
+        assert response(h)["api_version"] == "team-facts-v1"
 
 
-def test_history_route_auth_validation_unknown_symbol_and_facts_only(monkeypatch):
-    monkeypatch.setenv("TEAM_SCAN_API_KEY", "secret")
+def test_public_history_validation_unknown_symbol_and_facts_only(monkeypatch):
     monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model())
     monkeypatch.setattr("team_facts_api.load_history", lambda pg, symbol, timeframe, limit: (
         [(date(2026, 9, 2), 100, 101, 99, 100, 100)] if timeframe == "1D" else
@@ -63,15 +66,16 @@ def test_history_route_auth_validation_unknown_symbol_and_facts_only(monkeypatch
     monkeypatch.setattr(mvp_routes, "_acquire_setup_candidates_pg", lambda: (object(), lambda: None))
     unauthenticated = Handler()
     mvp_routes.handle_mvp_api("/api/team/setup-candidates/AAA/history", unauthenticated)
-    assert unauthenticated.status == 401
-    unknown = Handler({"X-Signalix-Team-Key": "secret"})
+    assert unauthenticated.status == 200
+    assert response(unauthenticated)["history"]["timeframe"] == "1D"
+    unknown = Handler()
     mvp_routes.handle_mvp_api("/api/team/setup-candidates/MISSING/history", unknown)
     assert unknown.status == 404
     for suffix in ("?timeframe=5m", "?limit=0", "?limit=401"):
-        invalid = Handler({"X-Signalix-Team-Key": "secret"})
+        invalid = Handler()
         mvp_routes.handle_mvp_api("/api/team/setup-candidates/AAA/history" + suffix, invalid)
         assert invalid.status == 400
-    detail = Handler({"X-Signalix-Team-Key": "secret"})
+    detail = Handler()
     mvp_routes.handle_mvp_api("/api/team/setup-candidates/AAA/history?timeframe=1D&limit=1", detail)
     payload = response(detail)
     assert detail.status == 200
@@ -81,7 +85,7 @@ def test_history_route_auth_validation_unknown_symbol_and_facts_only(monkeypatch
     assert "completed_60m" not in payload["candles"]
     assert "setup" not in json.dumps(payload).lower()
 
-    detail_60m = Handler({"X-Signalix-Team-Key": "secret"})
+    detail_60m = Handler()
     mvp_routes.handle_mvp_api("/api/team/setup-candidates/AAA/history?timeframe=60m&limit=1", detail_60m)
     payload_60m = response(detail_60m)
     assert payload_60m["history"]["source"] == "intraday_price_data"
@@ -90,11 +94,10 @@ def test_history_route_auth_validation_unknown_symbol_and_facts_only(monkeypatch
 
 
 def test_route_is_facts_only_and_read_only(monkeypatch):
-    monkeypatch.setenv("TEAM_SCAN_API_KEY", "secret")
     monkeypatch.setattr("read_model_publisher.load_current_read_model", lambda: model())
     monkeypatch.setattr("team_facts_api.load_ohlcv", lambda pg, symbols: ({"AAA": bars()}, {"AAA": intra()}))
     monkeypatch.setattr(mvp_routes, "_acquire_setup_candidates_pg", lambda: (object(), lambda: None))
-    h = Handler({"X-Signalix-Team-Key": "secret"})
+    h = Handler()
     mvp_routes.handle_mvp_api("/api/team/setup-candidates", h)
     payload = response(h)
     assert h.status == 200 and payload["api_version"] == "team-facts-v1"
@@ -110,6 +113,36 @@ def test_route_is_facts_only_and_read_only(monkeypatch):
     list(walk(payload))
     assert payload["run"]["eligible_count"] == 237
     assert all(isinstance(view["items"], list) for view in payload["views"].values())
+
+
+def test_database_loaders_are_bounded_selects_only():
+    class Cursor:
+        def __init__(self):
+            self.calls = []
+        def execute(self, statement, params):
+            self.calls.append((statement, params))
+        def fetchall(self):
+            return []
+        def close(self):
+            pass
+
+    class Pg:
+        def __init__(self):
+            self.cursors = []
+        def cursor(self):
+            cursor = Cursor()
+            self.cursors.append(cursor)
+            return cursor
+
+    pg = Pg()
+    assert load_ohlcv(pg, ["AAA"], daily_limit=7, intraday_limit=5) == ({}, {})
+    assert load_history(pg, "AAA", "1D", 3) == []
+    assert load_history(pg, "AAA", "60m", 2) == []
+    calls = [call for cursor in pg.cursors for call in cursor.calls]
+    assert [params[-1] for _, params in calls] == [7, 5, 3, 2]
+    assert all(statement.lstrip().upper().startswith("SELECT") for statement, _ in calls)
+    assert not any(token in statement.upper() for statement, _ in calls
+                   for token in ("INSERT ", "UPDATE ", "DELETE ", "CALL "))
 
 
 def test_exact_view_thresholds_and_missing_data_are_fail_closed():

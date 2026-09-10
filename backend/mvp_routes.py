@@ -6,7 +6,6 @@ projection and chart DB access never run a scan or mutate PostgreSQL.
 from __future__ import annotations
 
 import json
-import hmac
 import os
 import sys
 import threading
@@ -385,16 +384,6 @@ def _validate_canonical_serving_model(model):
     return model
 
 
-def _team_scan_authorized(handler):
-    """Authenticate the dedicated read-only team consumer at request time."""
-    configured = os.getenv("TEAM_SCAN_API_KEY", "")
-    presented = ""
-    headers = getattr(handler, "headers", None)
-    if headers is not None:
-        presented = headers.get("X-Signalix-Team-Key", "") or ""
-    return bool(configured) and hmac.compare_digest(str(presented), str(configured))
-
-
 def _overlay_latest_intraday_metadata(payload):
     """Compatibility adapter for the canonical freshness-lineage seam."""
     from canonical_freshness_lineage import overlay_latest_intraday_metadata
@@ -409,9 +398,6 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
     """Handle canonical setup-candidate and symbol routes."""
     team_history_prefix = "/api/team/setup-candidates/"
     if route.startswith(team_history_prefix) and route.endswith("/history"):
-        if not _team_scan_authorized(handler):
-            json_response(handler, {"error": "team_scan_unauthorized"}, status=401)
-            return True
         symbol = route[len(team_history_prefix):-len("/history")].strip().strip("/").upper()
         if not symbol:
             json_response(handler, {"error": "symbol required"}, status=400)
@@ -455,9 +441,6 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
             json_response(handler, {"error": "team_facts_unavailable"}, status=503)
         return True
     if route in ("/api/team/setup-candidates", "/api/team/setup-candidates/"):
-        if not _team_scan_authorized(handler):
-            json_response(handler, {"error": "team_scan_unauthorized"}, status=401)
-            return True
         universe = (qs.get("universe", [_CANONICAL_UNIVERSE])[0]
                     or _CANONICAL_UNIVERSE).strip().lower()
         if universe != _CANONICAL_UNIVERSE:
