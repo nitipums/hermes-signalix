@@ -77,6 +77,12 @@ latest stored candle. Runtime promotion and public Day/Week verification
 completed 2026-09-02; request-time metadata caching and explicit audit-run
 universe identity remain bounded follow-up work.
 
+The `/mvp` drawer plots deterministic, source-linked Daily Wave markers only
+on `1D`, using the API's exact timestamp and price. It never derives missing
+positions, never projects Daily Wave markers onto `60m`, and keeps 60m setup
+levels separate. These non-LLM evidence annotations support chart review; they
+are not trade instructions.
+
 ## `mvp_server.py` — MVP static server (separate dashboard service)
 Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
 directory. The former `/dashboard.html` route returns 404. Runtime container is

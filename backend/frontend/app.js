@@ -532,6 +532,29 @@
     return raw.length > 10 && raw.charAt(10) === " " ? raw.slice(0, 10) + "T" + raw.slice(11) : raw;
   }
 
+  function selectChartWaveEvidence(chartEvidence, itemEvidence, timeframe) {
+    var chartEnvelope = chartEvidence && typeof chartEvidence === "object" && !Array.isArray(chartEvidence)
+      ? chartEvidence : {};
+    var sourceTimeframe = String(timeframe || "").toUpperCase();
+    // Daily Wave positions are a 1D-only layer. Setup trigger/stop/target
+    // remain separate chart fields on 60m and must never enter this envelope.
+    if (sourceTimeframe !== "1D") {
+      return Object.assign({}, chartEnvelope, {
+        timeframe: sourceTimeframe === "60M" ? "60m" : sourceTimeframe.toLowerCase(),
+        markers: []
+      });
+    }
+    var chartMarkers = Array.isArray(chartEnvelope.markers) ? chartEnvelope.markers : [];
+    // The chart response is authoritative for the current request. In
+    // particular, an empty/stale compact list projection must not erase a
+    // non-empty response assembled from the canonical full-detail model.
+    if (chartMarkers.length) return chartEnvelope;
+    var itemEnvelope = itemEvidence && typeof itemEvidence === "object" && !Array.isArray(itemEvidence)
+      ? itemEvidence : {};
+    if (Array.isArray(itemEnvelope.markers) && itemEnvelope.markers.length) return itemEnvelope;
+    return Object.assign({}, chartEnvelope, {timeframe: "daily", markers: []});
+  }
+
   function mergeChartDecisionOverlay(chart, item) {
     var overlay = item && item.decision_lane ? canonicalChartOverlay(item) : vcpChartOverlay(item);
     ["trigger", "stop", "target"].forEach(function(field) {
@@ -542,15 +565,14 @@
     // Keep the compatibility surface readable for older VCP drawer items;
     // canonical setup candidates use setup.chart_evidence above.
     if (!evidence && item) evidence = item.chart_evidence;
-    if (evidence) {
-      var bucket = timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null;
-      if (bucket) chart.wave_evidence = bucket;
-    }
+    var projectedEvidence = null;
+    if (evidence && timeframe === "1D") projectedEvidence = evidence.daily;
     if (timeframe === "1D" && item && item.decision_lane) {
       // Canonical Daily markers live under wave.evidence_markers. Use those
       // exact source coordinates; never derive marker points from chart bars.
-      chart.wave_evidence = waveEvidenceForItem(item);
+      projectedEvidence = waveEvidenceForItem(item);
     }
+    chart.wave_evidence = selectChartWaveEvidence(chart.wave_evidence, projectedEvidence, timeframe);
     return chart;
   }
 
@@ -710,6 +732,31 @@
     };
   }
 
+  function dailyWaveMarkerPresentation(kind) {
+    return ({
+      WAVE_1_LOW: {label: "Wave 1 low", shape: "circle", color: "#a78bfa"},
+      WAVE_1_HIGH: {label: "Wave 1 high", shape: "square", color: "#a78bfa"},
+      WAVE_2_PULLBACK_LOW: {label: "Wave 2 pullback low", shape: "diamond", color: "#60a5fa"},
+      WAVE_3_CLOSE_CONFIRMATION: {label: "Wave 3 close confirmation", shape: "triangle", color: "#93c5fd"},
+      TESTED_HIGH: {label: "Tested high", shape: "diamond", color: "#7dd3fc"},
+      STRUCTURE_BREAK: {label: "Structure break", shape: "cross", color: "#c4b5fd"},
+      THESIS_INVALIDATION: {label: "Thesis invalidation", shape: "cross", color: "#8896a6"},
+      TRIGGER: {label: "Trigger", shape: "triangle", color: "#60a5fa"},
+      TRADE_STOP: {label: "Trade stop", shape: "cross", color: "#8896a6"}
+    })[kind] || null;
+  }
+
+  function dailyWaveMarkersForChart(chart) {
+    if (!chart || chart.timeframe !== "1D" || !chart.wave_evidence ||
+        !Array.isArray(chart.wave_evidence.markers)) return [];
+    return chart.wave_evidence.markers.filter(function(marker) {
+      return marker && typeof marker === "object" && !Array.isArray(marker) &&
+        marker.timeframe === "daily" && marker.timestamp != null && String(marker.timestamp).trim() !== "" &&
+        marker.price != null && marker.price !== "" && Number.isFinite(Number(marker.price)) &&
+        dailyWaveMarkerPresentation(marker.kind) != null;
+    });
+  }
+
   function renderDrawerDetail(item) {
     if (item.vcp_result) {
       var vr = item.vcp_result;
@@ -825,10 +872,7 @@
   function renderChartLegend(chart) {
     if (!dom.drawerChartLegend) return;
     var isDaily = (chart && chart.timeframe || chartTimeframe) === "1D";
-    var markers = chart && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers) ? chart.wave_evidence.markers : [];
-    var dailyMarkerCount = markers.filter(function(marker) {
-      return marker && marker.timeframe === "daily" && marker.timestamp != null && Number.isFinite(Number(marker.price));
-    }).length;
+    var dailyMarkerCount = isDaily ? dailyWaveMarkersForChart(chart).length : 0;
     var markerState = isDaily ? (dailyMarkerCount ? String(dailyMarkerCount) : "none") : "Day only";
     var timeframe = chart && chart.timeframe || chartTimeframe;
     dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA20 and MA50 plus selected moving averages use distinct neutral colors; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
@@ -914,7 +958,14 @@
     var closes = candles.map(function(c) { return Number(c.close); });
     var highs = candles.map(function(c) { return Number(c.high); });
     var lows = candles.map(function(c) { return Number(c.low); });
-    var levels = [chart.trigger, chart.stop, chart.target].map(Number).filter(Number.isFinite);
+    var visibleCandleKeys = candles.map(function(c) { return chartTimestampKey(c.date); });
+    var dailyWaveMarkers = chartLayers.waveEvidence && chart.timeframe === "1D"
+      ? dailyWaveMarkersForChart(chart).filter(function(marker) {
+          return visibleCandleKeys.indexOf(chartTimestampKey(marker.timestamp)) >= 0;
+        }) : [];
+    var levels = chart.timeframe === "60M"
+      ? [chart.trigger, chart.stop, chart.target].map(Number).filter(Number.isFinite) : [];
+    levels = levels.concat(dailyWaveMarkers.map(function(marker) { return Number(marker.price); }));
     var allLows = lows.filter(function(v){return Number.isFinite(v);}).concat(levels);
     var allHighs = highs.filter(function(v){return Number.isFinite(v);}).concat(levels);
     var min = Math.min.apply(null, allLows);
@@ -993,24 +1044,19 @@
       decisionLine(chart.stop, "#8896a6", [2, 4], "Stop");
       decisionLine(chart.target, "#93c5fd", [11, 4, 2, 4], "Target");
     }
-    if (chartLayers.waveEvidence && chart.timeframe === "1D" && chart.wave_evidence && Array.isArray(chart.wave_evidence.markers)) {
-      var markerColors = {WAVE_1_LOW: "#a78bfa", WAVE_1_HIGH: "#a78bfa", WAVE_2_PULLBACK_LOW: "#60a5fa",
-        WAVE_3_CLOSE_CONFIRMATION: "#93c5fd", TESTED_HIGH: "#60a5fa", STRUCTURE_BREAK: "#8896a6",
-        THESIS_INVALIDATION: "#8896a6", TRIGGER: "#60a5fa", TRADE_STOP: "#8896a6"};
-      var markerShapes = {WAVE_1_LOW: "square", WAVE_1_HIGH: "square", WAVE_2_PULLBACK_LOW: "diamond",
-        WAVE_3_CLOSE_CONFIRMATION: "circle", TESTED_HIGH: "diamond", STRUCTURE_BREAK: "cross",
-        THESIS_INVALIDATION: "cross", TRIGGER: "triangle", TRADE_STOP: "cross"};
-      chart.wave_evidence.markers.forEach(function(marker) {
-        if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;
-        if (marker.timeframe !== "daily" || marker.timestamp == null || marker.price == null) return;
+    if (chartLayers.waveEvidence && chart.timeframe === "1D") {
+      var markerLabelBoxes = [];
+      dailyWaveMarkers.forEach(function(marker) {
         var sourceIndex = chart.candles.findIndex(function(c) { return chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp); });
         if (sourceIndex < start || sourceIndex >= start + candles.length || sourceIndex < 0) return;
         var price = Number(marker.price); if (!Number.isFinite(price)) return;
         var localIndex = sourceIndex - start, x = xFor(localIndex), y = yPrice(price);
-        ctx.strokeStyle = markerColors[marker.kind] || "#8896a6";
+        var presentation = dailyWaveMarkerPresentation(marker.kind);
+        if (!presentation) return;
+        ctx.strokeStyle = presentation.color;
         ctx.fillStyle = ctx.strokeStyle;
         ctx.lineWidth = 1.5;
-        var shape = markerShapes[marker.kind] || "circle";
+        var shape = presentation.shape;
         ctx.beginPath();
         if (shape === "square") ctx.rect(x - 4, y - 4, 8, 8);
         else if (shape === "diamond") { ctx.moveTo(x, y - 5); ctx.lineTo(x + 5, y); ctx.lineTo(x, y + 5); ctx.lineTo(x - 5, y); ctx.closePath(); }
@@ -1018,7 +1064,21 @@
         else if (shape === "cross") { ctx.moveTo(x - 4, y - 4); ctx.lineTo(x + 4, y + 4); ctx.moveTo(x + 4, y - 4); ctx.lineTo(x - 4, y + 4); }
         else ctx.arc(x, y, 4, 0, Math.PI * 2);
         shape === "cross" ? ctx.stroke() : ctx.fill();
-        ctx.fillText(waveEvidenceText(marker.label || marker.kind), Math.max(left, x - 24), Math.max(top + 10, y - 8));
+        var label = presentation.label;
+        var labelWidth = ctx.measureText(label).width;
+        var labelX = Math.max(left, Math.min(w - right - labelWidth, x - labelWidth / 2));
+        var labelY = Math.max(top + 11, Math.min(top + priceH - 2, y - 9));
+        var attempts = 0;
+        while (markerLabelBoxes.some(function(box) {
+          return labelX < box.right + 4 && labelX + labelWidth > box.left - 4 &&
+            labelY > box.top - 12 && labelY - 12 < box.bottom + 2;
+        }) && attempts < 12) {
+          labelY += 13;
+          if (labelY > top + priceH - 2) labelY = Math.max(top + 11, y - 22 - attempts * 4);
+          attempts += 1;
+        }
+        markerLabelBoxes.push({left: labelX, right: labelX + labelWidth, top: labelY - 12, bottom: labelY + 2});
+        ctx.fillText(label, labelX, labelY);
         window.__signalixWaveMarkerHits.push({x: x, y: y, marker: marker});
       });
     }

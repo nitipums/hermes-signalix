@@ -221,7 +221,8 @@ def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_directi
     assert 'ma20: "#93c5fd", ma50: "#60a5fa"' in draw
     assert 'decisionLine(chart.stop, "#8896a6", [2, 4], "Stop")' in draw
     assert 'decisionLine(chart.trigger, "#60a5fa", [7, 5], "Required close")' in draw
-    assert 'markerShapes' in draw and 'aria-label="Show full chart legend"' in legend
+    assert 'dailyWaveMarkerPresentation(marker.kind)' in draw
+    assert 'aria-label="Show full chart legend"' in legend
     assert '#f4c95d' not in draw and '#ffa726' not in draw
     assert '.freshness-dot--stale   { background: var(--text-3); }' in css
     assert '.setup-candidate__decision { color:var(--text-2);' in css
@@ -610,7 +611,8 @@ def test_wave_evidence_layer_is_toggleable_and_explains_payload_without_frontend
         assert field in js
     for label in ("How this wave was identified", "Supporting evidence", "Contradicting evidence", "Missing evidence", "Alternative state", "Snapshot identity"):
         assert label in js or label in html
-    assert 'timeframe === "1D" ? evidence.daily : timeframe === "60M" ? evidence["60m"] : null' in js
+    assert 'if (evidence && timeframe === "1D") projectedEvidence = evidence.daily;' in js
+    assert 'if (sourceTimeframe !== "1D")' in _extract_function(js, "selectChartWaveEvidence")
 
 
 def test_wave_drawer_projects_daily_contract_and_toggle_has_visible_fail_closed_state():
@@ -647,14 +649,19 @@ def test_setup_retry_recovers_from_transport_error_without_changing_contract():
 
 def test_wave_marker_window_alignment_uses_source_candle_index():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
+    projection = _extract_function(js, "dailyWaveMarkersForChart")
     assert "var candles = chart.candles.slice(-120);" in js
     assert "var start = chart.candles.length - candles.length;" in js
     assert "sourceIndex < start || sourceIndex >= start + candles.length" in js
     assert "sourceIndex - start" in js
-    assert 'if (!marker || typeof marker !== "object" || Array.isArray(marker)) return;' in js
+    assert 'marker && typeof marker === "object" && !Array.isArray(marker)' in projection
     assert "chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp)" in js
-    assert 'marker.timeframe !== "daily" || marker.timestamp == null || marker.price == null' in js
+    assert 'marker.timeframe === "daily"' in projection
+    assert 'marker.timestamp != null' in projection and 'marker.price != null' in projection
     assert 'chart.timeframe === "1D"' in js
+    draw = _extract_function(js, "drawChart")
+    assert 'visibleCandleKeys.indexOf(chartTimestampKey(marker.timestamp)) >= 0' in draw
+    assert 'levels = levels.concat(dailyWaveMarkers.map' in draw
 
 
 def test_wave_context_cards_and_drawer_consume_nested_contract_without_creating_review_lane():
@@ -705,13 +712,97 @@ def test_daily_marker_legend_and_60m_setup_levels_are_timeframe_separated():
     assert 'data-timeframe="60M">60m' in html
     assert 'if (chart.timeframe === "60M")' in _extract_function(js, "drawChart")
     legend = _extract_function(js, "renderChartLegend")
-    assert 'marker.timeframe === "daily"' in legend
+    assert 'dailyWaveMarkersForChart(chart).length' in legend
     assert "escapeHTML(markerState)" in legend
     assert "OHLC" in legend and "MA20" in legend and "MA50" in legend
     assert ".wave-chart-legend" in css and "flex-wrap:wrap" in css
     merge = _extract_function(js, "mergeChartDecisionOverlay")
-    assert 'chart.wave_evidence = waveEvidenceForItem(item)' in merge
+    assert 'projectedEvidence = waveEvidenceForItem(item)' in merge
+    assert 'selectChartWaveEvidence(chart.wave_evidence, projectedEvidence, timeframe)' in merge
     assert 'timeframe === "1D" && item && item.decision_lane' in merge
+
+
+def test_chart_wave_merge_preserves_nonempty_api_daily_markers_over_compact_item():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    vcp_overlay = _extract_function(js, "vcpChartOverlay")
+    item_evidence = _extract_function(js, "waveEvidenceForItem")
+    select_evidence = _extract_function(js, "selectChartWaveEvidence")
+    merge = _extract_function(js, "mergeChartDecisionOverlay")
+    api_markers = [
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "2026-08-01", "price": 10.0},
+        {"kind": "WAVE_1_HIGH", "timeframe": "daily", "timestamp": "2026-08-08", "price": 14.0},
+        {"kind": "WAVE_2_PULLBACK_LOW", "timeframe": "daily", "timestamp": "2026-08-15", "price": 11.5},
+        {"kind": "WAVE_3_CLOSE_CONFIRMATION", "timeframe": "daily", "timestamp": "2026-08-22", "price": 14.2},
+    ]
+    chart = {"timeframe": "1D", "wave_evidence": {"timeframe": "daily", "markers": api_markers}}
+    compact = {
+        "symbol": "AAA", "decision_lane": "REVIEW_NOW",
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
+        "setup": {"trigger": 14.2, "trade_stop": 11.5,
+                  "chart_evidence": {"daily": {"timeframe": "daily", "markers": []}}},
+        "provenance": {"source": "setup-candidates"},
+    }
+    result = _run_node(
+        [overlay, vcp_overlay, item_evidence, select_evidence, merge],
+        "mergeChartDecisionOverlay(" + json.dumps(chart) + ", " + json.dumps(compact) + ").wave_evidence.markers",
+    )
+    assert result == api_markers
+
+
+def test_chart_wave_merge_keeps_daily_markers_out_of_60m_and_setup_levels_separate():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    vcp_overlay = _extract_function(js, "vcpChartOverlay")
+    item_evidence = _extract_function(js, "waveEvidenceForItem")
+    select_evidence = _extract_function(js, "selectChartWaveEvidence")
+    merge = _extract_function(js, "mergeChartDecisionOverlay")
+    chart = {"timeframe": "60M", "wave_evidence": {"timeframe": "60m", "markers": []}}
+    compact = {
+        "decision_lane": "REVIEW_NOW",
+        "wave": {"markers": [
+            {"kind": "WAVE_1_HIGH", "timeframe": "daily", "timestamp": "2026-08-08", "price": 14.0}
+        ]},
+        "setup": {"trigger": 14.2, "trade_stop": 11.5, "target_1": 18.0,
+                  "chart_evidence": {"60m": {"timeframe": "60m", "markers": [
+                      {"kind": "TRIGGER", "timeframe": "60m", "timestamp": "2026-08-22T10:00:00+07:00", "price": 14.2}
+                  ]}}},
+    }
+    result = _run_node(
+        [overlay, vcp_overlay, item_evidence, select_evidence, merge],
+        "(function(chart){var value=mergeChartDecisionOverlay(chart," + json.dumps(compact) + ");return {markers:value.wave_evidence.markers,trigger:value.trigger,stop:value.stop,target:value.target};})(" + json.dumps(chart) + ")",
+    )
+    assert result == {"markers": [], "trigger": 14.2, "stop": 11.5, "target": 18.0}
+
+
+def test_daily_wave_marker_projection_supports_known_kinds_and_rejects_missing_coordinates():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    presentation = _extract_function(js, "dailyWaveMarkerPresentation")
+    markers_for_chart = _extract_function(js, "dailyWaveMarkersForChart")
+    kinds = ["WAVE_1_LOW", "WAVE_1_HIGH", "WAVE_2_PULLBACK_LOW",
+             "WAVE_3_CLOSE_CONFIRMATION", "TESTED_HIGH", "STRUCTURE_BREAK",
+             "THESIS_INVALIDATION", "TRIGGER", "TRADE_STOP"]
+    markers = [
+        {"kind": kind, "timeframe": "daily", "timestamp": "2026-08-01", "price": index + 10}
+        for index, kind in enumerate(kinds)
+    ]
+    markers.extend([
+        {"kind": "UNKNOWN", "timeframe": "daily", "timestamp": "2026-08-01", "price": 1},
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "", "price": 1},
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "2026-08-01", "price": ""},
+        {"kind": "WAVE_1_LOW", "timeframe": "60m", "timestamp": "2026-08-01", "price": 1},
+    ])
+    result = _run_node(
+        [presentation, markers_for_chart],
+        "(function(){var daily=dailyWaveMarkersForChart({timeframe:'1D',wave_evidence:{markers:" + json.dumps(markers) + "}});var hourly=dailyWaveMarkersForChart({timeframe:'60M',wave_evidence:{markers:" + json.dumps(markers) + "}});return {kinds:daily.map(function(marker){return marker.kind;}),labels:daily.map(function(marker){return dailyWaveMarkerPresentation(marker.kind).label;}),hourly:hourly};})()",
+    )
+    assert result["kinds"] == kinds
+    assert result["labels"][:4] == [
+        "Wave 1 low", "Wave 1 high", "Wave 2 pullback low",
+        "Wave 3 close confirmation",
+    ]
+    assert all(label and "_" not in label for label in result["labels"])
+    assert result["hourly"] == []
 
 
 def test_canonical_chart_overlay_selects_target_1_without_target_2_fallback():
