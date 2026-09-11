@@ -124,7 +124,24 @@ def test_daily_structure_phase_fails_closed_and_card_label_is_explicitly_non_act
     label = _extract_function(js, "compactDailyStructureLabel")
     states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     result = _run_node([states, phase, label], "({valid:dailyStructurePhase({wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_1_ADVANCE'}}}), missing:dailyStructurePhase({wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'WAVE_4_CORRECTION'}}}), invalid:dailyStructurePhase({wave:{daily_structure:{phase:'NOPE'}}}), label:compactDailyStructureLabel({wave:{daily_structure:{phase:'WAVE_4_CORRECTION'}}})})")
-    assert result == {"valid": "WAVE_1_ADVANCE", "missing": "UNKNOWN", "invalid": "UNKNOWN", "label": "Daily structure · WAVE_4_CORRECTION · non-actionable"}
+    assert result == {"valid": "WAVE_1_ADVANCE", "missing": "UNKNOWN", "invalid": "UNKNOWN", "label": "Daily structure · WAVE_4_CORRECTION"}
+
+
+def test_primary_card_projection_has_distinct_exact_labels_and_no_primary_daily_structure_alias():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    label = _extract_function(js, "compactDailyStructureLabel")
+    phase = _extract_function(js, "dailyStructurePhase")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    assert "Primary Daily Wave" in card
+    assert "compactDailyStructureLabel(item)" in card
+    assert 'data-actionability="NONE"' in card
+    assert "Primary Daily Structure" not in card
+    assert "Primary Daily Structure" not in js
+    assert _run_node(
+        [states, phase, label],
+        "compactDailyStructureLabel({wave:{daily_structure:{phase:'WAVE_2_FORMING'}}})",
+    ) == "Daily structure · WAVE_2_FORMING"
 
 
 def test_t08_grouping_has_canonical_phase_order_for_every_lane_and_preserves_lane_totals():
@@ -1320,7 +1337,7 @@ def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
       <main class="app"><article class="decision-card setup-candidate-card">
         <div class="decision-card__top"><strong>LONGSYMBOL</strong><b>DATA_BLOCKED</b></div>
         <p class="setup-candidate__evidence">Trend emerging_uptrend · 20D 18.4% · 60D 42.1% · RS 91 · 52W BREAKOUT · ATH NO BREAKOUT</p>
-        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span><span class="setup-candidate__structure-badge">Daily structure · WAVE_2_NEAR_COMPLETION · non-actionable</span></div>
+        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span><span class="setup-candidate__structure-badge" aria-label="Daily structure · WAVE_2_NEAR_COMPLETION · non-actionable" data-actionability="NONE">Daily structure · WAVE_2_NEAR_COMPLETION</span></div>
         <div class="setup-candidate__grid"><span>Wave <b>EARLY_WAVE_3 · structure intact</b></span><span>Setup <b>DATA_BLOCKED · trigger – · invalidation –</b></span><span>Targets <b>– / –</b></span><span>R:R <b>–</b></span><span>Market / sector <b>UNKNOWN · Electronic Components</b></span><span>Peers <b>6/10</b></span></div>
       </article></main>
     """

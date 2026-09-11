@@ -63,10 +63,10 @@ Add one explicitly non-actionable Daily evidence object:
 
 - Add `wave.daily_structure` as an additive nested field in the full canonical detail contract; include a bounded representation in list items only when required for a visible filter/summary.
 - Keep legacy `wave.context.mapped_state` as compatibility/audit input during migration; do not use it as primary.
-- `/mvp` cards show only `Primary Daily Wave` from `wave.primary_state` and the existing decision lane.
+- `/mvp` cards show `Primary Daily Wave` from `wave.primary_state` separately from the additive `Daily structure · <phase>` presentation label and the existing decision lane.
 - The drawer shows `Daily structural context` with phase, confidence, anchors, retracement, source/as-of, and missing/rejection evidence. Label it explicitly non-actionable.
 - On the main `/mvp` list, cards are grouped under every existing decision lane by `wave.daily_structure.phase` in stable canonical phase order. The phase filter uses this same Daily structural field across all lanes; both behaviors are presentation-only and must not change the server-side evaluated universe, lane totals, pagination, `wave.primary_state`, or decision lanes.
-- Main-list labels must keep `Primary Daily Wave`/decision lane separate from `Daily structure · <phase>` and identify the latter as non-actionable. `wave.context.mapped_state` is compatibility/audit evidence only and is not used for main grouping or filtering.
+- Main-list labels must keep `Primary Daily Wave`/decision lane separate from the exact visible label `Daily structure · <phase>` and identify the latter as non-actionable via the presentation metadata/accessibility label. `wave.context.mapped_state` is compatibility/audit evidence only and is not used for main grouping or filtering. `Primary Daily Structure` is not a user-facing label; any legacy field remains compatibility/audit-only.
 - No automatic trading, alerts, broker execution, evaluator auto-caller, or new database schema is in scope.
 
 ## Bounded implementation slice

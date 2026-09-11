@@ -614,9 +614,7 @@
   }
 
   function compactDailyStructureLabel(item) {
-    return dailyStructurePhase(item) === "UNKNOWN"
-      ? "Daily structure · UNKNOWN · non-actionable"
-      : "Daily structure · " + dailyStructurePhase(item) + " · non-actionable";
+    return "Daily structure · " + dailyStructurePhase(item);
   }
 
   function waveContextPresentation(item) {
@@ -1609,7 +1607,7 @@
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
-      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge">' + escapeHTML(compactDailyStructureLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
+      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge" aria-label="' + escapeHTML(compactDailyStructureLabel(item) + ' · non-actionable') + '" data-actionability="NONE">' + escapeHTML(compactDailyStructureLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
   }
