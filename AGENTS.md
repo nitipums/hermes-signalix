@@ -6,7 +6,7 @@
 
 ## Product identity
 
-Signalix is a setup-to-decision system for experienced, self-directed Thai swing traders. It finds and prepares candidate setups; **Arm reviews the evidence, checks the chart, and makes the final trade decision**. It is not a generic market-information portal, stock-tip list, or automatic trading system.
+Signalix is Arm's private setup-to-decision and actionable-signal system for Thai swing trading. It finds and prepares candidate setups and may emit deterministic market-only paper/shadow `BUY_NOW` signals under the owner-approved private signal policy; position-aware `SELL_NOW` remains a later contract. **Arm reviews the evidence, checks the chart, and makes the final execution decision**. It is not a generic market-information portal, public stock-tip list, or automatic trading system.
 
 The product flow is:
 
@@ -17,7 +17,8 @@ Verified Market View
 → 60m confirmation and entry timing
 → Trigger + invalidation + Fib target + R:R
 → VCP as bonus evidence
-→ Arm review and decision
+→ Private actionable signal policy (paper/shadow)
+→ Arm review and execution decision
 ```
 
 ## Current product direction — clean replacement
@@ -32,7 +33,7 @@ The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This 
 - Sector/industry and peer breadth/leadership are context and ranking evidence, not silent hard exclusions.
 - VCP, contraction, and breakout-volume evidence remain optional `bonus_evidence`; VCP must not remove a valid non-VCP candidate.
 - R:R is deterministic evidence, not a standalone reason to accept a setup. Trigger, technically meaningful invalidation, explicit target method, and sufficient/fresh data are also required.
-- `REVIEW` means worth chart review only. It is not permission, personalized advice, or an executable order.
+- Setup-layer `REVIEW_NOW` still means worth chart review only. Only the separate private signal policy may emit market-only shadow `BUY_NOW`; it is not an executable broker order. Portfolio data and an owner token must not block the local shadow UI.
 
 ### Decision and state boundaries
 
@@ -72,6 +73,7 @@ Before any task, Codex must:
 |---|---|---|
 | Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
 | Current setup-candidate direction and API contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if agent behavior changes |
+| Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
 | Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |
 | Current architecture/component behavior | `vault/Architecture.md`, `vault/Components.md` | The relevant architecture/component note |
@@ -94,8 +96,8 @@ Before any task, Codex must:
 - Do not create a second competing visible decision label by mixing legacy Stage/Phase/Daily/VCP labels into the new primary contract. Keep compatibility fields in an explicit audit/legacy namespace.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **931 active ORD**, **237 eligible**, **694 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
-- `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the current transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only actionable lane in that legacy/current transition contract; event evidence alone cannot create confirmation or actionability.
-- Alerts and auto-trading are `PENDING / FUTURE FEATURE` and remain OFF. Do not enable alerts, evaluator auto-caller persistence, broker execution, or expand beyond Thai ORD without explicit owner scope.
+- `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.
+- Private paper/shadow actionable signals are owner-approved. Alerts and auto-trading remain `PENDING / FUTURE FEATURE` and OFF. Do not enable alerts, evaluator auto-caller persistence, broker execution, or expand beyond Thai ORD without explicit owner scope.
 
 ## Agent roles
 

@@ -5,6 +5,7 @@
 > **Date:** 2026-08-30 · **Implementation:** 2026-08-31 (T1–T9 source) · **Promotion:** 2026-08-31 (release branch)
 > **Scope:** `marginable_long` stock setup discovery and preparation — active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true` (currently 237 symbols)
 > **Product role:** Signalix finds and prepares candidate trade setups; Arm reviews the chart and makes the final trade decision.
+> **2026-09-11 additive owner decision:** this setup contract remains the evidence source, while the separate market-only policy in `2026-09-11-private-actionable-signal-design.md` may project seven-day paper/shadow `BUY_NOW` signals without portfolio data or an owner token. Setup-layer `REVIEW_NOW` retains its existing meaning and is not itself a buy instruction; position-aware sells remain later work.
 
 ## 1. Problem and rationale
 
@@ -161,7 +162,10 @@ Owner-tuned 2026-08-31:
 
 ### 2.8 User decision boundary
 
-Signalix prepares a candidate and displays evidence. It does not issue an automatic BUY or create an executable order.
+This setup layer prepares a candidate and displays evidence. It does not itself
+issue `BUY_NOW` or create an executable order. The separate private signal
+policy may project paper/shadow market-buy labels from this
+evidence without portfolio state.
 
 User-facing decision values:
 
@@ -174,7 +178,8 @@ AVOID
 DATA_BLOCKED
 ```
 
-`REVIEW_NOW` means worth chart review, not permission or a personalized recommendation.
+`REVIEW_NOW` means worth chart review and is not a buy instruction. It is an
+input to, not an alias for, the private actionable-signal policy.
 
 ### 2.9 Session-aware freshness
 

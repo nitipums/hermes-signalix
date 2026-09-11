@@ -25,6 +25,9 @@
       <button id="tab-daily-vcp" class="nav-tab nav-tab--active" role="tab" aria-selected="true" aria-controls="panel-daily-vcp">
         Trend · Elliott · Trade Setup
       </button>
+      <button id="tab-shadow-buy" class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-shadow-buy">
+        Shadow Buy Signals · 7D
+      </button>
     </nav>
 
     <!-- ── Canonical setup-candidate panel ── -->
@@ -102,6 +105,20 @@
           <span id="daily-setup-page-info" class="page-info" aria-live="polite">Page 1 of –</span>
           <button id="daily-setup-next" class="btn btn--page" disabled aria-label="Next setup candidate page">Next →</button>
         </nav>
+      </section>
+    </main>
+
+    <!-- ── Private market-only shadow signal panel ── -->
+    <main id="panel-shadow-buy" class="panel panel--hidden" role="tabpanel" aria-labelledby="tab-shadow-buy">
+      <section class="shadow-signal-intro">
+        <p class="explorer-note"><strong>Paper shadow only.</strong> Point-in-time replay of the marginable-long market over the trailing seven calendar days. No portfolio, alert, or broker order is used.</p>
+        <button id="shadow-load" class="btn btn--filter" type="button">Run 7-day shadow replay</button>
+      </section>
+      <section id="shadow-loading" class="state state--hidden" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Replaying the last seven days without lookahead…</p></section>
+      <section id="shadow-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="shadow-error-message" class="state-text">Unable to load shadow signals.</p></section>
+      <section id="shadow-content" class="state--hidden">
+        <div id="shadow-meta" class="marginable-filter-meta"></div>
+        <div id="shadow-cards" class="shadow-signal-list"></div>
       </section>
     </main>
 

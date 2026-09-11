@@ -1,10 +1,17 @@
 # Signalix Product Strategy — Market View to Action
 
 > **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
-> **Current stock-setup surface (2026-09-01):** Trend + Daily Elliott candidate + 60m Trade Setup is primary. T1–T9 source is promoted; public 390px failure→Retry→recovery browser acceptance is PASS, with evaluator auto-caller and broader acceptance separate. VCP is bonus/compatibility evidence only.
-_Last updated: 2026-09-01; durable strategy retained below, with the current stock-setup replacement explicitly overriding older MVP surface sections._
+> **Current stock-setup surface (2026-09-11):** Trend + Daily Elliott candidate + 60m Trade Setup remains the evidence spine. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
+_Last updated: 2026-09-11; durable strategy retained below, with the private actionable-signal decision explicitly overriding the earlier prohibition on actionable labels._
 
 ## Product thesis
+
+Signalix is evolving from setup preparation into Arm's private actionable-signal
+provider. The new market-buy signal layer consumes the existing deterministic
+setup evidence without requiring portfolio data; it does not replace those
+calculations. Phase 1 is a visible token-free seven-day paper/shadow
+replay. See
+`../docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md`.
 
 Signalix should evolve from a technical signal broadcaster into a system that turns a verified market view into an asset-appropriate action:
 
@@ -940,6 +947,6 @@ Owner approved a product reset to a **Daily Shortlist** as Signalix's default de
 
 > **STATUS: CURRENT OVERRIDE** · This section reconciles the older strategy layers above with the owner-approved release direction.
 
-For Thai stock setup discovery, the current primary surface is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**, served by `/api/setup-candidates` and `/mvp`. T1–T9 source is promoted; public 390px failure→Retry→recovery acceptance is PASS, with Arm's manual Wave-identification review as the next validation loop. `marginable_long` is 237 eligible symbols, while 931 active ORD is audit/rollback coverage. VCP is bonus/compatibility evidence, not the primary candidate gate. Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain off. Evaluator auto-caller is a separate `PENDING / OWNER DECISION` for lifecycle evidence persistence only, not order execution.
+For Thai stock setup discovery, the evidence surface remains **Daily Trend/Strength + Elliott candidate → 60m Trade Setup**, served by `/api/setup-candidates` and `/mvp`. The 2026-09-11 owner decision adds a separate private seven-day market-buy shadow UI over point-in-time setup evidence; portfolio data is not required for discovery. Its focused authority is `../docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md`. T1–T9 source is promoted; public 390px failure→Retry→recovery acceptance is PASS for the setup surface only. `marginable_long` is 237 eligible symbols, while 931 active ORD is audit/rollback coverage. VCP is bonus/compatibility evidence, not the primary candidate gate. Position-aware sells, alerts, automatic trading, and broker execution remain later separately gated work.
 
 Sections describing Daily Shortlist, All Stocks Explorer, or VCP-first serving are preserved historical transition context and are superseded where they conflict with this override.

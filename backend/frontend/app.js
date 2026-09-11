@@ -25,6 +25,15 @@
     panelExplorer:   $("#panel-explorer"),
     tabDailyVcp:     $("#tab-daily-vcp"),
     panelDailyVcp:   $("#panel-daily-vcp"),
+    tabShadowBuy:    $("#tab-shadow-buy"),
+    panelShadowBuy:  $("#panel-shadow-buy"),
+    shadowLoad:      $("#shadow-load"),
+    shadowLoading:   $("#shadow-loading"),
+    shadowError:     $("#shadow-error"),
+    shadowErrorMessage: $("#shadow-error-message"),
+    shadowContent:   $("#shadow-content"),
+    shadowMeta:      $("#shadow-meta"),
+    shadowCards:     $("#shadow-cards"),
     dailyVcpLoading: $("#daily-vcp-loading"),
     dailyVcpError:   $("#daily-vcp-error"),
     dailyVcpErrorMsg: $("#daily-vcp-error-msg"),
@@ -195,6 +204,7 @@
   let liveRefreshEnabled = false;
   let liveRefreshTimer = null;
   let vcpRequestSeq = 0;
+  let shadowRequestSeq = 0;
   var dailyVcpRequests = SignalixRequestCache();
   var vcpRequests = SignalixRequestCache();
 
@@ -1903,6 +1913,65 @@
       });
   }
 
+  function shadowSignalCard(item) {
+    var plan = item && item.plan || {};
+    var confidence = item && item.confidence || {};
+    return '<article class="shadow-signal-card" data-symbol="' + escapeHTML(item.symbol || "") + '">' +
+      '<header><div><strong>' + escapeHTML(item.symbol || "Not verified") + '</strong><span>BUY NOW · PAPER SHADOW</span></div>' +
+      '<b class="shadow-signal-card__confidence">' + escapeHTML(confidence.label || "LOW") + ' evidence · ' + escapeHTML(valueOrUnavailable(confidence.score)) + '/100</b></header>' +
+      '<div class="shadow-signal-card__plan"><span>Signal price <b>' + escapeHTML(valueOrUnavailable(item.latest_signal_price)) + '</b></span>' +
+      '<span>Trigger <b>' + escapeHTML(valueOrUnavailable(plan.trigger)) + '</b></span>' +
+      '<span>Stop <b>' + escapeHTML(valueOrUnavailable(plan.trade_stop)) + '</b></span>' +
+      '<span>First target <b>' + escapeHTML(valueOrUnavailable(plan.target_1)) + '</b></span>' +
+      '<span>R:R <b>' + escapeHTML(valueOrUnavailable(plan.rr_to_target_1)) + '</b></span></div>' +
+      '<footer><span>First signal ' + escapeHTML(formatProvenance(item.first_signaled_at)) + '</span>' +
+      '<span>Latest signal ' + escapeHTML(formatProvenance(item.last_signaled_at)) + '</span>' +
+      '<span>' + escapeHTML(String(item.sessions_present || 1)) + ' session observation(s)</span></footer></article>';
+  }
+
+  function validateShadowSignalPayload(data) {
+    return !!data && data.schema_version === "shadow-market-buy-signals-v1" &&
+      data.mode === "PAPER_SHADOW" && data.scope === "MARKET_BUY_SCAN" &&
+      data.window_days === 7 && Array.isArray(data.items) &&
+      Number(data.signal_count) === data.items.length &&
+      data.items.every(function(item) {
+        return item && item.signal === "BUY_NOW" && item.execution &&
+          item.execution.authorized === false && item.confidence &&
+          item.confidence.calibration_status === "NOT_CALIBRATED";
+      }) && data.execution && data.execution.broker_execution_enabled === false;
+  }
+
+  function renderShadowSignals(data) {
+    hide(dom.shadowLoading); hide(dom.shadowError); show(dom.shadowContent);
+    if (!validateShadowSignalPayload(data)) {
+      dom.shadowMeta.textContent = "Shadow signal response inconsistent · DATA_BLOCKED";
+      dom.shadowCards.innerHTML = '<div class="state"><div class="state-icon">⚠️</div><p class="state-text">Shadow replay failed contract validation.</p></div>';
+      return;
+    }
+    dom.shadowMeta.textContent = "Trailing 7 calendar days · " + Number(data.session_count || 0) +
+      " completed market session(s) · " + Number(data.evaluated_observations || 0) +
+      " point-in-time evaluations · " + data.items.length + " BUY NOW signal(s) · " +
+      (data.policy_version || "private-actionable-signals-v0.1-shadow") +
+      " · confidence is evidence strength, not win probability";
+    dom.shadowCards.innerHTML = data.items.length ? data.items.map(shadowSignalCard).join("") :
+      '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No BUY NOW signal passed every gate in the trailing seven days.</p><p class="state-hint">This is an evaluated empty result, not an API failure.</p></div>';
+  }
+
+  function loadShadowSignals() {
+    var requestSeq = ++shadowRequestSeq;
+    show(dom.shadowLoading); hide(dom.shadowError); hide(dom.shadowContent);
+    fetch("/api/shadow-buy-signals?days=7").then(function(response) {
+      if (!response.ok) throw new Error("HTTP " + response.status);
+      return response.json();
+    }).then(function(data) {
+      if (requestSeq === shadowRequestSeq) renderShadowSignals(data);
+    }).catch(function(error) {
+      if (requestSeq !== shadowRequestSeq) return;
+      hide(dom.shadowLoading); hide(dom.shadowContent); show(dom.shadowError);
+      dom.shadowErrorMessage.textContent = "Unable to load 7-day shadow signals: " + error.message;
+    });
+  }
+
   function renderDailyVcpData(data) {
         hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
         vcpRunMeta = {run_id: data.run_id || "", as_of: data.as_of || "", fetch_completed_at: data.fetch_completed_at || ""};
@@ -2012,6 +2081,14 @@
     }
     dom.panelDailyVcp.classList.toggle("panel--active", tab === "daily-vcp");
     dom.panelDailyVcp.classList.toggle("panel--hidden", tab !== "daily-vcp");
+    if (dom.tabShadowBuy) {
+      dom.tabShadowBuy.classList.toggle("nav-tab--active", tab === "shadow-buy");
+      dom.tabShadowBuy.setAttribute("aria-selected", tab === "shadow-buy");
+    }
+    if (dom.panelShadowBuy) {
+      dom.panelShadowBuy.classList.toggle("panel--active", tab === "shadow-buy");
+      dom.panelShadowBuy.classList.toggle("panel--hidden", tab !== "shadow-buy");
+    }
     if (dom.panelVcp) {
       dom.panelVcp.classList.toggle("panel--active", tab === "vcp");
       dom.panelVcp.classList.toggle("panel--hidden", tab !== "vcp");
@@ -2021,6 +2098,8 @@
   }
 
   dom.tabDailyVcp.addEventListener("click", function() { switchTab("daily-vcp"); });
+  if (dom.tabShadowBuy) dom.tabShadowBuy.addEventListener("click", function() { switchTab("shadow-buy"); });
+  if (dom.shadowLoad) dom.shadowLoad.addEventListener("click", loadShadowSignals);
   if (dom.tabVcp) dom.tabVcp.addEventListener("click", function() { switchTab("vcp"); });
   if (dom.vcpState) {
     dom.vcpState.addEventListener("change", loadVcp);

@@ -5,6 +5,22 @@
 
 ## Current primary serving flow — 2026-09-01
 
+The 2026-09-11 private signal transition adds a read-only local shadow consumer
+after the canonical setup read model:
+
+```text
+trailing 7 calendar days of Daily + completed 60m market data
+→ point-in-time canonical setup rebuild (no lookahead)
+→ actionable_signal_policy.py market-buy projection
+→ /api/shadow-buy-signals?days=7
+→ /mvp Shadow Buy Signals · 7D tab
+→ Arm review and manual execution decision
+```
+
+This additive path does not require portfolio data, publish to Redis, send
+alerts, write signal state, or submit broker orders. The canonical
+`/api/setup-candidates` contract remains unchanged during shadow validation.
+
 ```text
 marginable_long (237)
 → Daily EOD trend/strength + Elliott evidence

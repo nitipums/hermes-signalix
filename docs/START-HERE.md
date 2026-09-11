@@ -5,7 +5,9 @@
 
 ## 1. Current product in one minute
 
-Signalix prepares evidence for an experienced, self-directed Thai swing trader. Arm reviews the chart and evidence and makes the final decision. It is not an automatic trading or order-execution system.
+Signalix prepares evidence and private paper/shadow actionable signals for Arm's
+Thai swing trading. Arm reviews the chart and makes the final execution
+decision. It is not an automatic trading or order-execution system.
 
 ```text
 Verified market view
@@ -25,6 +27,8 @@ Canonical product surface:
 - Primary lanes: `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`
 - Wave labels: machine-generated candidate evidence for Arm review, not truth or an order signal
 - Alerts, auto-trading, broker execution, and evaluator auto-caller: OFF/PENDING
+- Private actionable signals: owner-approved market-only 7-day shadow UI;
+  see `superpowers/specs/2026-09-11-private-actionable-signal-design.md`
 
 ## 2. Choose the smallest reading path
 
@@ -36,6 +40,7 @@ For the current deterministic chart/OHLCV window contract and cleanup evidence, 
 |---|---|---|
 | Product thesis / roadmap / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
 | Current setup-candidate contract | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | `backend/setup_candidate_contract.py`, relevant tests |
+| Private buy/sell signal contract | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `backend/actionable_signal_policy.py`, private route/tests |
 | Owner decision / policy | `../vault/Decisions.md` | `docs/current/2026-08-31-elliott-grill-decision-record.md` |
 | Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source files |
 | Daily / 60m pipeline and acceptance | `../vault/Execution-Pipeline.md` | relevant focused plan/spec |

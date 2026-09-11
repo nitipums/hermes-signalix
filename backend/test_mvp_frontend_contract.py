@@ -1545,3 +1545,41 @@ def test_t07_drawer_navigation_atomically_guards_stale_enrichment_and_chart_resp
     assert "requestSeq !== chartRequestSeq || chartSymbol !== symbol || chartTimeframe !== requestedTimeframe" in js
     assert "drawerItem = drawerItem.vcp_result ? mergeCanonicalDailyMetadata(item, fresh) : mergeCanonicalSetupDetail(item, fresh);" in js
     assert ".drawer-position" in css
+
+
+def test_private_shadow_buy_tab_is_visible_and_market_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    for marker in (
+        'id="tab-shadow-buy"', 'Shadow Buy Signals · 7D',
+        'id="panel-shadow-buy"',
+        'id="shadow-load"', 'id="shadow-cards"',
+    ):
+        assert marker in html
+    assert "No portfolio, alert, or broker order is used." in html
+    assert 'fetch("/api/shadow-buy-signals?days=7"' in js
+    assert "shadow-owner-token" not in html
+    assert "X-Portfolio-Token" not in js
+    assert 'tab === "shadow-buy"' in js
+
+
+def test_shadow_ui_validates_no_execution_and_uncalibrated_confidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateShadowSignalPayload")
+    assert 'data.schema_version === "shadow-market-buy-signals-v1"' in validator
+    assert 'item.signal === "BUY_NOW"' in validator
+    assert 'item.execution.authorized === false' in validator
+    assert 'item.confidence.calibration_status === "NOT_CALIBRATED"' in validator
+    assert 'data.execution.broker_execution_enabled === false' in validator
+    assert "confidence is evidence strength, not win probability" in js
+
+
+def test_shadow_cards_are_mobile_bounded_and_show_decision_levels():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    card = _extract_function(js, "shadowSignalCard")
+    for marker in ("BUY NOW · PAPER SHADOW", "First target", "plan.trigger", "plan.trade_stop",
+                   "plan.target_1", "plan.rr_to_target_1", "first_signaled_at"):
+        assert marker in card
+    assert ".shadow-signal-card { width:100%; max-width:100%; min-width:0;" in css
+    assert ".shadow-signal-card__plan { grid-template-columns:repeat(2,minmax(0,1fr)); }" in css

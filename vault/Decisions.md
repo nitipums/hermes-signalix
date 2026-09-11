@@ -4,6 +4,21 @@
 >
 > **Current reconciliation:** T1–T9 is promoted; `/api/setup-candidates` is primary; narrow 390px failure→Retry→recovery is PASS; broader UI semantics and evaluator auto-caller remain separate. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
 
+## 2026-09-11 — Private actionable buy/sell signals
+
+Decision: Signalix may emit deterministic `BUY_NOW` labels
+for Arm's private use. Phase 1 is a visible market-only paper/shadow UI that
+replays completed session boundaries in the trailing seven calendar days; it
+must not require portfolio data or an owner token. Confidence is an explainable evidence score
+and remains explicitly `NOT_CALIBRATED`, not a probability or guarantee.
+Portfolio-aware `SELL_NOW`, alerts, sizing, broker orders, and automatic
+execution remain later separately gated work.
+
+Reason: Arm wants Signalix to move from candidate preparation to a personal
+signal provider while preserving deterministic evidence, no-lookahead replay,
+fail-closed data handling, and human execution control. Focused authority:
+`../docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md`.
+
 ## 2026-09-02 — Session closeout: timestamp semantics and Kanban reconciliation
 
 Decision: The Signalix UI must show intraday ingestion completion (`fetch_completed_at`) separately from the latest completed 60m candle timestamp. A fetch round may run at 16:45 while the newest completed candle is 16:00; both values are valid and must remain labeled distinctly.

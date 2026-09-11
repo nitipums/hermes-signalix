@@ -5,6 +5,21 @@
 
 Every backend module, what it does, and its hard rules.
 
+## `actionable_signal_policy.py` — private paper/shadow signals
+
+Pure deterministic projection over canonical setup-candidate evidence. Its
+Phase 1 market-only seam emits `BUY_NOW`, `BUY_ON_TRIGGER`, `WAIT`, `AVOID`, or
+`DATA_BLOCKED` without portfolio input. Evidence score is explicitly not a
+calibrated probability. The module never writes, publishes, sizes, alerts, or
+submits an order. Position-aware states remain isolated for later work.
+
+`shadow_signal_replay.py` rebuilds canonical candidates at each completed
+session boundary in the trailing seven calendar days, projects `BUY_NOW`, and
+deduplicates repeated observations of the same unchanged setup plan while
+preserving first/latest timestamps. `mvp_routes.py` exposes it through the
+token-free `GET /api/shadow-buy-signals?days=7`; `/mvp` renders the
+shadow result without changing the canonical setup API.
+
 ## `update_data.py` — EOD ingestion
 Incremental, idempotent SET EOD updater. Fetches only trade days **strictly
 after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run.
