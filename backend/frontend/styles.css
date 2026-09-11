@@ -179,6 +179,8 @@ body {
 .setup-candidate__confidence--medium i { opacity:.55; }
 .setup-candidate__confidence--high i { opacity:1; }
 .setup-candidate__wave-badge { display:inline-flex; padding:3px 7px; border:1px solid rgba(38,166,154,.4); border-radius:999px; color:var(--green); font-weight:700; }
+.setup-candidate__deep-pullback-badge { display:inline-flex; flex-wrap:wrap; gap:2px 6px; max-width:100%; padding:3px 7px; border:1px dashed rgba(255,183,77,.55); border-radius:8px; color:#ffcc80; overflow-wrap:anywhere; }
+.setup-candidate__deep-pullback-badge small { width:100%; color:var(--text-3); font-weight:400; }
 .setup-candidate__structure-badge { display:inline-flex; padding:3px 7px; border:1px solid var(--border); border-radius:999px; color:var(--text-2); font-weight:600; }
 .setup-candidate__plan { grid-template-columns:repeat(5,minmax(0,1fr)); }
 .setup-candidate__plan span { min-width:0; color:var(--text-2); overflow-wrap:anywhere; }
@@ -421,6 +423,12 @@ body {
 .wave-context-detail dt, .wave-context-transitions > span { color:var(--text-3); }
 .wave-context-detail dd { color:var(--text); overflow-wrap:anywhere; }
 .wave-context-transitions { margin-top:8px; min-width:0; }
+.deep-pullback-evidence { min-width:0; margin:0 0 12px; padding:9px; border:1px dashed rgba(255,183,77,.55); border-radius:var(--radius); color:#ffcc80; font-size:12px; overflow:hidden; }
+.deep-pullback-evidence > strong, .deep-pullback-evidence > span { display:block; overflow-wrap:anywhere; }
+.deep-pullback-evidence > span { margin-top:3px; color:var(--text-3); }
+.deep-pullback-evidence dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px 12px; margin-top:8px; color:var(--text); }
+.deep-pullback-evidence dt { color:var(--text-3); }
+.deep-pullback-evidence dd { overflow-wrap:anywhere; }
 .wave-context-transitions ul { margin:4px 0 0 18px; overflow-wrap:anywhere; }
 .drawer-company-context { display:flex; flex-wrap:wrap; gap:4px 8px; font-size:12px; color:var(--text-2); }
 .drawer-company-context span { border:1px solid var(--border); border-radius:4px; padding:2px 5px; }
@@ -524,6 +532,7 @@ body {
   .setup-candidate__plan { grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; }
   .setup-candidate-card { width: 100%; max-width: 100%; }
   .wave-context-detail dl { grid-template-columns:1fr; }
+  .deep-pullback-evidence dl { grid-template-columns:1fr; }
   .wave-chart-legend { width:100%; max-width:100%; }
   .drawer-header { padding:10px; gap:4px; }
   .drawer-nav { margin-left:2px; }

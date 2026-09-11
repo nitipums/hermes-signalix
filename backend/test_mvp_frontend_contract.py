@@ -144,6 +144,31 @@ def test_primary_card_projection_has_distinct_exact_labels_and_no_primary_daily_
     ) == "Daily structure · WAVE_2_FORMING"
 
 
+def test_deep_pullback_badge_is_separate_non_actionable_and_uses_api_retracement():
+    app = (ROOT / "app.js").read_text()
+    active = "{wave:{primary_state:'NOT_VERIFIABLE',deep_pullback_evidence:{status:'DEEP_PULLBACK_W3_EVIDENCE',actionability:'NONE',source_timeframe:'daily',retracement:0.753846,anchors:{w1_low:{price:2.02},w1_high:{price:3.32},w2_low:{price:2.34}}}}}"
+    none = "{wave:{primary_state:'NOT_VERIFIABLE',deep_pullback_evidence:{status:'NONE',actionability:'NONE',source_timeframe:'daily',retracement:0.6,anchors:{}}}}"
+    result = _run_node([
+        "function escapeHTML(value) { return String(value); }",
+        _extract_function(app, "deepPullbackEvidence"),
+        _extract_function(app, "deepPullbackRetracementText"),
+        _extract_function(app, "deepPullbackBadge"),
+    ], "({active:deepPullbackBadge(" + active + "),none:deepPullbackBadge(" + none + ")})")
+    assert "Deep pullback evidence · 75.3846%" in result["active"]
+    assert "Non-actionable · Daily evidence" in result["active"]
+    assert result["none"] == ""
+    assert "Primary Daily Wave" in _extract_function(app, "setupCandidateCard")
+    assert "deepPullbackBadge(item)" in _extract_function(app, "setupCandidateCard")
+
+
+def test_deep_pullback_drawer_uses_exact_api_ratio_and_anchor_fields():
+    app = (ROOT / "app.js").read_text()
+    renderer = _extract_function(app, "renderDeepPullbackEvidence")
+    for token in ("evidence.retracement", "anchors.w1_low", "anchors.w1_high", "anchors.w2_low", "Non-actionable · Daily evidence"):
+        assert token in renderer
+    assert "drawer-deep-pullback" in (ROOT / "index.html").read_text()
+
+
 def test_t08_grouping_has_canonical_phase_order_for_every_lane_and_preserves_lane_totals():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "groupSetupCandidates")

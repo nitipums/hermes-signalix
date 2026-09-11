@@ -13,6 +13,7 @@ from freshness_assessment import (assess_projection_freshness as _resolve_freshn
                                   daily_eod_status as _daily_eod_status)
 from setup_candidate_contract import (
     CANONICAL_METADATA_FIELDS,
+    DEEP_PULLBACK_EVIDENCE_FIELDS,
     DAILY_STRUCTURE_FIELDS,
     QUOTE_FIELDS,
     WAVE_CONTEXT_FIELDS,
@@ -109,6 +110,33 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
         ):
             if not isinstance(daily_structure.get(evidence_field), list):
                 raise ValueError("canonical daily structure evidence is invalid")
+    deep_pullback = (item.get("wave") or {}).get("deep_pullback_evidence")
+    if deep_pullback is not None:
+        if not isinstance(deep_pullback, dict) or set(deep_pullback) != DEEP_PULLBACK_EVIDENCE_FIELDS:
+            raise ValueError("canonical deep pullback evidence is not an exact envelope")
+        if deep_pullback.get("status") not in {"NONE", "DEEP_PULLBACK_W3_EVIDENCE"}:
+            raise ValueError("canonical deep pullback evidence status is invalid")
+        if deep_pullback.get("actionability") != "NONE" or deep_pullback.get("source_timeframe") != "daily":
+            raise ValueError("canonical deep pullback evidence must be non-actionable Daily evidence")
+        if deep_pullback.get("policy_version") != "wave3-deep-pullback-shadow-v1":
+            raise ValueError("canonical deep pullback evidence policy is invalid")
+        active = deep_pullback.get("status") == "DEEP_PULLBACK_W3_EVIDENCE"
+        retracement = deep_pullback.get("retracement")
+        wave = item.get("wave") or {}
+        if (deep_pullback.get("lower_bound") != 0.60 or deep_pullback.get("upper_bound") != 0.786
+                or not isinstance(deep_pullback.get("anchors"), dict)
+                or (retracement is not None
+                    and (not isinstance(retracement, (int, float)) or isinstance(retracement, bool)
+                         or not math.isfinite(retracement)))
+                or (active and (not isinstance(retracement, (int, float)) or isinstance(retracement, bool)
+                                or not math.isfinite(retracement) or not 0.60 < retracement <= 0.786
+                                or deep_pullback.get("reason") != "retracement_gate_exceeded"
+                                or not deep_pullback.get("anchors")
+                                or wave.get("primary_state") != "NOT_VERIFIABLE"
+                                or "retracement_gate_exceeded" not in (wave.get("contradicting_evidence") or [])))
+                or (not active and (deep_pullback.get("reason") is not None
+                                    or deep_pullback.get("anchors") != {}))):
+            raise ValueError("canonical deep pullback evidence values are invalid")
     data_status = item.get("data_status") or {}
     freshness = str(data_status.get("freshness", "")).lower()
     if (data_status.get("sufficient") is False

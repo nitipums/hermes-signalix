@@ -68,6 +68,29 @@ def test_daily_structure_is_preserved_with_list_detail_parity_and_exact_validati
     assert detail["wave"]["daily_structure"] == listed["wave"]["daily_structure"]
 
 
+def test_deep_pullback_evidence_has_list_detail_parity_and_exact_validation():
+    row = candidate("DEEP")
+    row["wave"]["primary_state"] = row["wave"]["state"] = "NOT_VERIFIABLE"
+    row["wave"]["contradicting_evidence"] = ["retracement_gate_exceeded"]
+    row["wave"]["deep_pullback_evidence"] = {
+        "status": "DEEP_PULLBACK_W3_EVIDENCE", "actionability": "NONE",
+        "source_timeframe": "daily", "policy_version": "wave3-deep-pullback-shadow-v1",
+        "retracement": 0.753846, "lower_bound": 0.60, "upper_bound": 0.786,
+        "reason": "retracement_gate_exceeded",
+        "anchors": {"w1_low": {"price": 2.02}, "w1_high": {"price": 3.32}, "w2_low": {"price": 2.34}},
+    }
+    listed = project_setup_candidates_response([row])["items"][0]
+    from mvp_api import project_canonical_symbol_detail
+    detail = project_canonical_symbol_detail([row], "DEEP")
+    assert listed["wave"]["deep_pullback_evidence"] == row["wave"]["deep_pullback_evidence"]
+    assert detail["wave"]["deep_pullback_evidence"] == listed["wave"]["deep_pullback_evidence"]
+
+    malformed = candidate("BAD_DEEP")
+    malformed["wave"]["deep_pullback_evidence"] = dict(row["wave"]["deep_pullback_evidence"], actionability="REVIEW")
+    with pytest.raises(ValueError, match="non-actionable Daily"):
+        project_setup_candidates_response([malformed])
+
+
 def test_setup_candidates_route_returns_canonical_items(monkeypatch):
     row = candidate()
     model = {"items": [row], "universe": "marginable_long", "base_active_ord_count": 1, "eligible_count": 1,

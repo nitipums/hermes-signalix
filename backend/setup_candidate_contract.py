@@ -55,6 +55,10 @@ DAILY_STRUCTURE_FIELDS = {
     "as_of", "snapshot_id", "anchors", "retracement", "supporting_evidence",
     "contradicting_evidence", "missing_evidence", "alternative_phases",
 }
+DEEP_PULLBACK_EVIDENCE_FIELDS = {
+    "status", "actionability", "source_timeframe", "policy_version",
+    "retracement", "lower_bound", "upper_bound", "reason", "anchors",
+}
 
 
 @dataclass(frozen=True)
@@ -321,9 +325,37 @@ def _normalize_wave_evidence(wave: dict) -> dict:
         result["context"] = _normalize_wave_context(result.get("context"))
     if "daily_structure" in result:
         result["daily_structure"] = _normalize_daily_structure(result.get("daily_structure"))
+    if "deep_pullback_evidence" in result:
+        result["deep_pullback_evidence"] = _normalize_deep_pullback_evidence(
+            result.get("deep_pullback_evidence")
+        )
     if state != "UNKNOWN":
         return result
     return result
+
+
+def _normalize_deep_pullback_evidence(value: Any) -> dict:
+    """Fail malformed shadow evidence closed without changing decisions."""
+    source = value if isinstance(value, dict) else {}
+    retracement = _json_value(source.get("retracement"))
+    active = (
+        source.get("status") == "DEEP_PULLBACK_W3_EVIDENCE"
+        and source.get("reason") == "retracement_gate_exceeded"
+        and isinstance(retracement, (int, float)) and not isinstance(retracement, bool)
+        and 0.60 < retracement <= 0.786
+        and isinstance(source.get("anchors"), dict) and bool(source.get("anchors"))
+    )
+    return {
+        "status": "DEEP_PULLBACK_W3_EVIDENCE" if active else "NONE",
+        "actionability": "NONE",
+        "source_timeframe": "daily",
+        "policy_version": "wave3-deep-pullback-shadow-v1",
+        "retracement": retracement,
+        "lower_bound": 0.60,
+        "upper_bound": 0.786,
+        "reason": "retracement_gate_exceeded" if active else None,
+        "anchors": _json_value(source.get("anchors")) if active else {},
+    }
 
 
 def _normalize_daily_structure(value: Any) -> dict:
@@ -814,7 +846,7 @@ _LIST_NESTED_FIELDS = {
     ),
     "wave": (
         "timeframe", "primary_state", "state", "alternative_state", "confidence",
-        "context", "daily_structure",
+        "context", "daily_structure", "deep_pullback_evidence",
     ),
     "setup": (
         "timeframe", "state", "status", "minor_structure", "trigger",

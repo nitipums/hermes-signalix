@@ -88,6 +88,18 @@ envelope, and carried through list/detail parity with `actionability=NONE`.
 Focused source and contract tests pass; runtime reload/public API and browser
 evidence remain Lite acceptance work.
 
+### Deep-pullback Wave-3 shadow evidence — 2026-09-11
+
+The canonical `wave` object also exposes deterministic
+`deep_pullback_evidence` for a raw `EARLY_WAVE_3` or
+`WAVE_3_CONTINUATION` candidate rejected by `retracement_gate_exceeded` when
+`0.60 < retracement <= 0.786`. The exact envelope carries the raw ratio and
+candidate anchors, `source_timeframe=daily`, `actionability=NONE`, and policy
+`wave3-deep-pullback-shadow-v1`. Otherwise its status is `NONE`, reason is
+null, and anchors are empty. This is explanatory shadow evidence only: the
+production publication gate remains `retracement <= 0.60`, and primary wave,
+decision lane, setup/risk math, and chart markers remain unchanged.
+
 ## Acceptance criteria
 
 - [x] Every evaluated eligible row retains one canonical `wave.primary_state` and existing decision lane.

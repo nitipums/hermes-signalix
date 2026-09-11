@@ -125,6 +125,7 @@
     drawerWaveConfidence: $("#drawer-wave-confidence"),
     drawerWaveSource: $("#drawer-wave-source"),
     drawerWaveContext: $("#drawer-wave-context"),
+    drawerDeepPullback: $("#drawer-deep-pullback"),
     drawerSector:   $("#drawer-sector"),
     drawerIndustry: $("#drawer-industry"),
     drawerMarketCap: $("#drawer-market-cap"),
@@ -639,6 +640,42 @@
     return "Daily structure · " + dailyStructurePhase(item);
   }
 
+  function deepPullbackEvidence(item) {
+    var evidence = item && item.wave && item.wave.deep_pullback_evidence;
+    return evidence && evidence.status === "DEEP_PULLBACK_W3_EVIDENCE" &&
+      evidence.actionability === "NONE" && evidence.source_timeframe === "daily" ? evidence : null;
+  }
+
+  function deepPullbackRetracementText(evidence) {
+    if (!evidence || typeof evidence.retracement !== "number" || !Number.isFinite(evidence.retracement)) return "Not verified";
+    return (evidence.retracement * 100).toFixed(4).replace(/0+$/, "").replace(/\.$/, "") + "%";
+  }
+
+  function deepPullbackBadge(item) {
+    var evidence = deepPullbackEvidence(item);
+    if (!evidence) return "";
+    return '<span class="setup-candidate__deep-pullback-badge" data-actionability="NONE">Deep pullback evidence · ' +
+      escapeHTML(deepPullbackRetracementText(evidence)) + '<small>Non-actionable · Daily evidence</small></span>';
+  }
+
+  function renderDeepPullbackEvidence(item) {
+    if (!dom.drawerDeepPullback) return;
+    var evidence = deepPullbackEvidence(item);
+    dom.drawerDeepPullback.hidden = !evidence;
+    if (!evidence) { dom.drawerDeepPullback.innerHTML = ""; return; }
+    var anchors = evidence.anchors || {};
+    function anchorText(anchor) {
+      if (!anchor || anchor.price == null) return "Not verified";
+      return String(anchor.price) + (anchor.date ? " · " + anchor.date : "");
+    }
+    dom.drawerDeepPullback.innerHTML = '<strong>DEEP_PULLBACK_W3_EVIDENCE · ' + escapeHTML(deepPullbackRetracementText(evidence)) + '</strong>' +
+      '<span>Non-actionable · Daily evidence</span><dl>' +
+      '<div><dt>Exact retracement</dt><dd>' + escapeHTML(String(evidence.retracement)) + ' (' + escapeHTML(deepPullbackRetracementText(evidence)) + ')</dd></div>' +
+      '<div><dt>W1 low</dt><dd>' + escapeHTML(anchorText(anchors.w1_low)) + '</dd></div>' +
+      '<div><dt>W1 high</dt><dd>' + escapeHTML(anchorText(anchors.w1_high)) + '</dd></div>' +
+      '<div><dt>W2 low</dt><dd>' + escapeHTML(anchorText(anchors.w2_low)) + '</dd></div></dl>';
+  }
+
   function waveContextPresentation(item) {
     var context = waveContextForItem(item);
     var daily = item && item.wave && item.wave.daily_structure;
@@ -791,6 +828,7 @@
     if (dom.drawerEvidenceDetails) dom.drawerEvidenceDetails.open = false;
     if (dom.drawerContextInfo) dom.drawerContextInfo.setAttribute("aria-expanded", "false");
     renderWaveContextDetail(item);
+    renderDeepPullbackEvidence(item);
     if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
     if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
     var companyContext = item.context || {};
@@ -1667,7 +1705,7 @@
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
-      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge" aria-label="' + escapeHTML(compactDailyStructureLabel(item) + ' · non-actionable') + '" data-actionability="NONE">' + escapeHTML(compactDailyStructureLabel(item)) + '</span><span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
+      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge" aria-label="' + escapeHTML(compactDailyStructureLabel(item) + ' · non-actionable') + '" data-actionability="NONE">' + escapeHTML(compactDailyStructureLabel(item)) + '</span>' + deepPullbackBadge(item) + '<span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
   }

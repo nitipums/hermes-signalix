@@ -104,6 +104,28 @@ def test_daily_structure_is_non_actionable_and_cannot_change_lane():
     assert context["setup"]["timeframe"] == "60m"
 
 
+def test_deep_pullback_evidence_is_non_actionable_and_cannot_change_lane():
+    inputs = sample_inputs()
+    base = build_setup_candidate(**inputs)
+    inputs["wave"] = {
+        **inputs["wave"],
+        "deep_pullback_evidence": {
+            "status": "DEEP_PULLBACK_W3_EVIDENCE", "actionability": "REVIEW",
+            "source_timeframe": "60m", "policy_version": "wrong",
+            "retracement": 0.753846, "lower_bound": 0, "upper_bound": 1,
+            "reason": "retracement_gate_exceeded",
+            "anchors": {"w1_low": {"price": 2.02}, "w1_high": {"price": 3.32}, "w2_low": {"price": 2.34}},
+        },
+    }
+    row = build_setup_candidate(**inputs)
+    evidence = row["wave"]["deep_pullback_evidence"]
+    assert row["decision_lane"] == base["decision_lane"]
+    assert row["setup"] == base["setup"]
+    assert evidence["status"] == "DEEP_PULLBACK_W3_EVIDENCE"
+    assert evidence["actionability"] == "NONE"
+    assert evidence["source_timeframe"] == "daily"
+
+
 def test_quote_is_optional_and_has_explicit_source_boundary():
     inputs = sample_inputs()
     inputs["provenance"] = {

@@ -120,6 +120,41 @@ def test_unknown_contract_still_exposes_arrays_and_low_confidence():
     json.dumps(contract)
 
 
+@pytest.mark.parametrize(
+    "raw_state,retracement,reasons,expected",
+    [
+        ("WAVE_3_CONTINUATION", 0.753846, ["retracement_gate_exceeded"], "DEEP_PULLBACK_W3_EVIDENCE"),
+        ("EARLY_WAVE_3", 0.60, [], "NONE"),
+        ("EARLY_WAVE_3", 0.786, ["retracement_gate_exceeded"], "DEEP_PULLBACK_W3_EVIDENCE"),
+        ("WAVE_3_CONTINUATION", 0.786001, ["retracement_gate_exceeded"], "NONE"),
+        ("WAVE_2_NEAR_COMPLETION", 0.75, ["retracement_gate_exceeded"], "NONE"),
+    ],
+)
+def test_deep_pullback_shadow_boundaries_do_not_promote_primary(monkeypatch, raw_state, retracement, reasons, expected):
+    import elliott_structure_engine as engine
+
+    anchors = {
+        "w1_low": {"date": "2026-01-01", "price": 2.02},
+        "w1_high": {"date": "2026-03-01", "price": 3.32},
+        "w2_low": {"date": "2026-04-01", "price": 2.34},
+    }
+    monkeypatch.setattr(engine, "classify_wave3_candidate", lambda *_args, **_kwargs: {
+        "raw_state": raw_state, "published_state": "NOT_VERIFIABLE", "confidence": "HIGH",
+        "retracement": retracement, "anchors": anchors, "rejection_reasons": reasons,
+        "evidence": {}, "close_vs_wick_confirmation": "CLOSE", "follow_through": {"status": "PASS"},
+    })
+    contract = engine.build_wave_contract(None)
+    evidence = contract["deep_pullback_evidence"]
+    assert evidence == {
+        "status": expected, "actionability": "NONE", "source_timeframe": "daily",
+        "policy_version": "wave3-deep-pullback-shadow-v1", "retracement": retracement,
+        "lower_bound": 0.60, "upper_bound": 0.786,
+        "reason": "retracement_gate_exceeded" if expected != "NONE" else None,
+        "anchors": anchors if expected != "NONE" else {},
+    }
+    assert contract["primary_state"] == "NOT_VERIFIABLE"
+
+
 @pytest.mark.parametrize("state", sorted(WAVE_ENUM))
 def test_wave_context_maps_full_wave_engine_without_competing_primary_state(monkeypatch, state):
     import elliott_structure_engine as engine

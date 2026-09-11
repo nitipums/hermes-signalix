@@ -1111,6 +1111,38 @@ _CONFIDENCE_ORDER = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 _WAVE_CONTEXT_RULE_VERSION = "elliott-full-wave-context-v1"
 _WAVE_CONTEXT_SECONDARY_MARKERS = {"WAVE_3_EXTENDED"}
 _DAILY_STRUCTURE_POLICY_VERSION = "daily-structure-evidence-v1"
+_DEEP_PULLBACK_POLICY_VERSION = "wave3-deep-pullback-shadow-v1"
+
+
+def _build_deep_pullback_evidence(candidate: dict) -> dict:
+    """Expose rejected deep Wave-3 pullbacks without promoting them."""
+    source = candidate if isinstance(candidate, dict) else {}
+    raw_state = source.get("raw_state")
+    reasons = list(source.get("rejection_reasons") or [])
+    retracement = source.get("retracement")
+    try:
+        retracement = float(retracement)
+    except (TypeError, ValueError):
+        retracement = None
+    if retracement is not None and not math.isfinite(retracement):
+        retracement = None
+    active = (
+        raw_state in {"EARLY_WAVE_3", "WAVE_3_CONTINUATION"}
+        and retracement is not None
+        and 0.60 < retracement <= 0.786
+        and "retracement_gate_exceeded" in reasons
+    )
+    return {
+        "status": "DEEP_PULLBACK_W3_EVIDENCE" if active else "NONE",
+        "actionability": "NONE",
+        "source_timeframe": "daily",
+        "policy_version": _DEEP_PULLBACK_POLICY_VERSION,
+        "retracement": _json_value(retracement),
+        "lower_bound": 0.60,
+        "upper_bound": 0.786,
+        "reason": "retracement_gate_exceeded" if active else None,
+        "anchors": _json_value(source.get("anchors") or {}) if active else {},
+    }
 
 
 def _build_daily_structure(legacy_raw: dict, daily_df, snapshot_id: str | None,
@@ -1482,6 +1514,7 @@ def build_wave_contract(daily_df, swing_evidence: dict | None = None, *, snapsho
         "missing_evidence": missing,
         "evidence": evidence,
         "policy": "wave3-confirmed-pivots-v1",
+        "deep_pullback_evidence": _build_deep_pullback_evidence(candidate),
         "context": _build_wave_context(legacy_raw, swing_evidence),
         "audit_compatibility": {
             "legacy_full_wave": _json_value(legacy_raw),

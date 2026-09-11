@@ -83,6 +83,13 @@ positions, never projects Daily Wave markers onto `60m`, and keeps 60m setup
 levels separate. These non-LLM evidence annotations support chart review; they
 are not trade instructions.
 
+The same canonical Wave producer exposes `wave.deep_pullback_evidence` as a
+source-generated, non-actionable Daily shadow envelope for rejected raw W3
+candidates in the `0.60 < retracement <= 0.786` band. Cards and the drawer may
+display its exact API ratio and anchors separately from Primary Daily Wave;
+the frontend does not derive them. It cannot change publication, decision
+lanes, setup/risk math, or chart markers.
+
 ## `mvp_server.py` — MVP static server (separate dashboard service)
 Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
 directory. The former `/dashboard.html` route returns 404. Runtime container is
