@@ -57,6 +57,19 @@ Evidence after `docker restart signalix_dashboard`:
 - real public 390px rendered journey via `agent-browser`: visible separate labels on IRPC/SSP cards, no old label, no obvious horizontal overflow; screenshot `/tmp/sx_mvp_390.png`;
 - source and focused contract/API tests passed independently; broader browser/served acceptance outside this label slice remains governed by the existing dashboard gates.
 
+### Daily Wave marker drawer promotion — 2026-09-11 08:43 ICT
+
+Owner-authorized local promotion `1ed784b` (Codex Sol slice `ea9919d`) fixes the drawer merge path that replaced populated `/api/chart-db/{symbol}?timeframe=1D` marker evidence with an empty compact-item projection. The drawer now preserves exact API `timestamp`/`price` coordinates for Daily Wave markers, renders readable source-linked labels, and keeps Daily markers 1D-only. No Elliott calculation, marker coordinate, decision lane, setup/risk math, database, ingestion, or read-model behavior changed.
+
+Evidence after `docker restart signalix_dashboard`:
+
+- `signalix_dashboard`: `running healthy`;
+- public `app.js`: HTTP 200, 124,346 bytes, includes the chart evidence selection/presentation helpers;
+- public IRPC Daily chart API: HTTP 200, 574,821 bytes, 4 markers: W1 low, W1 high, W2 pullback low, W3 close confirmation;
+- public 390px IRPC drawer: rendered Daily chart and legend `markers (4)`; screenshot `/tmp/sx_irpc_wavefix_390.png` inspected with no obvious clipping/overflow;
+- switching drawer to 60m: legend `markers (Day only)` and source `intraday_price_data`; Daily Wave markers are not projected onto 60m;
+- local focused frontend/chart/Wave tests: PASS; `node --check`: PASS; `git diff --check`: PASS; no console errors reported by the browser check.
+
 ## Daily structural evidence integration milestone — 2026-09-03
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.
