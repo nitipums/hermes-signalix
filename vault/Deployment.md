@@ -70,6 +70,19 @@ Evidence after `docker restart signalix_dashboard`:
 - switching drawer to 60m: legend `markers (Day only)` and source `intraday_price_data`; Daily Wave markers are not projected onto 60m;
 - local focused frontend/chart/Wave tests: PASS; `node --check`: PASS; `git diff --check`: PASS; no console errors reported by the browser check.
 
+### Deep-pullback W3 shadow evidence promotion — 2026-09-11 13:06 ICT
+
+Owner-authorized promotion `3443621` adds the canonical source-generated `wave.deep_pullback_evidence` envelope for raw W3 candidates in the shadow band `0.60 < retracement <= 0.786` when the existing publication rejection is `retracement_gate_exceeded`. Release metadata revision `163a192` bumped the immutable read-model representation to `9`; no publication gate, primary state, lane, setup/risk math, chart marker, database schema, or ingestion behavior changed.
+
+Evidence after `docker compose up -d --force-recreate backend dashboard` and canonical read-model republish:
+
+- backend/dashboard: healthy;
+- `READ_MODEL_PUBLISHED`, count `237`, source version `read-model-7a93ecdbd615fea7`;
+- public `/api/setup-candidates`: HTTP 200, `237/237` evaluated/returned;
+- public ERW read-back: `primary_state=NOT_VERIFIABLE`, `decision_lane=WAIT`; `deep_pullback_evidence.status=DEEP_PULLBACK_W3_EVIDENCE`, retracement `0.7538461538461539`, actionability `NONE`, Daily source, exact W1/W2 anchors;
+- public 390px ERW drawer: visible `Primary Daily Wave · Wave · Not verified` plus separate `DEEP_PULLBACK_W3_EVIDENCE · 75.3846%` / `Non-actionable · Daily evidence`; exact anchors visible; `scrollWidth=390`, `clientWidth=390`; screenshot `/tmp/erw_deep_pullback_390.png`;
+- focused backend/frontend tests, Python compile, JS syntax, and diff checks: PASS; one pre-existing unrelated mobile test excluded as documented by the Codex/Lite run.
+
 ## Daily structural evidence integration milestone — 2026-09-03
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.
