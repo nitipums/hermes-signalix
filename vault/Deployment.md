@@ -44,6 +44,19 @@ The narrow canonical detector intentionally publishes only `EARLY_WAVE_3`, `WAVE
 
 Stable commit `9669e2e` groups main-list cards by `wave.daily_structure.phase` inside each existing decision lane and makes the phase filter presentation-only across all lanes. Public `/mvp` browser verification passed with W1/W2/W4/W5 phase headings visible, primary/lane separation intact, and 390px no-overflow. No read-model republish was needed because the backend contract was unchanged; dashboard reload served the new frontend.
 
+### Daily structure label separation fix — 2026-09-11 08:04 ICT
+
+Owner-authorized local promotion `a78f7a0` (Codex slice commit `d4b8b30`) removes the competing user-facing `Primary Daily Structure` label contract. The card now keeps `Primary Daily Wave` separate from the exact visible `Daily structure · <phase>` label; non-actionable semantics remain in `aria-label` and `data-actionability="NONE"`. No Daily/60m calculation, decision lane, read-model, database, or ingestion behavior changed.
+
+Evidence after `docker restart signalix_dashboard`:
+
+- `signalix_dashboard`: healthy;
+- local and public `/mvp`: HTTP 200, 17,327 bytes;
+- local and public `app.js`: HTTP 200, 121,342 bytes; contains `Primary Daily Wave`, `Daily structure ·`, and `data-actionability="NONE"`; contains no `Primary Daily Structure`;
+- local and public `/api/setup-candidates`: HTTP 200, 184,122 bytes, 50 returned items from 237 evaluated;
+- real public 390px rendered journey via `agent-browser`: visible separate labels on IRPC/SSP cards, no old label, no obvious horizontal overflow; screenshot `/tmp/sx_mvp_390.png`;
+- source and focused contract/API tests passed independently; broader browser/served acceptance outside this label slice remains governed by the existing dashboard gates.
+
 ## Daily structural evidence integration milestone — 2026-09-03
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.
