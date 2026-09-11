@@ -95,53 +95,41 @@ def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
     assert 'compactWaveLabel' in js and 'Confidence' in js
 
 
-def test_daily_wave_bucket_consumes_all_primary_states_and_collapses_unmapped_values():
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
-    helper = _extract_function(js, "setupCandidateWaveBucket")
-    states = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"]
-    declaration = 'var canonicalDailyWaveStates = ' + json.dumps(states) + ';'
-    context = _extract_function(js, "waveContextForItem")
-    result = _run_node([declaration, context, helper], "[" + ",".join(
-        "setupCandidateWaveBucket({wave:{primary_state:" + json.dumps(state) + ",context:{mapped_state:'WAVE_1_ADVANCE'}}})" for state in states
-    ) + ", setupCandidateWaveBucket({wave:{primary_state:'WAVE_5_ADVANCE'}}), setupCandidateWaveBucket({})]")
-    assert result == states + ["WAVE_5_ADVANCE", "UNKNOWN"]
-
-
-def test_t08_wave_filter_composes_with_search_and_lane_without_inference():
+def test_mvp_toolbar_composes_search_and_lane_without_daily_structure_filter():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "setupCandidateMatchesToolbar")
-    phase = _extract_function(js, "dailyStructurePhase")
-    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     context = _extract_function(js, "waveContextForItem")
-    dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}, dailySetupWave:{value:"EARLY_WAVE_3"}};'
-    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'WAVE_2_FORMING'}}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'},daily_structure:{phase:'EARLY_WAVE_3'}}})]"
-    assert _run_node([states, context, phase, dom, helper], expression) == [False, True, False]
+    dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}};'
+    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'WAIT',wave:{primary_state:'EARLY_WAVE_3'}})]"
+    assert _run_node([context, dom, helper], expression) == [True, False, False]
+    assert "dailyStructurePhase" not in js and "daily-setup-wave" not in js
 
 
-def test_daily_structure_phase_fails_closed_and_card_label_is_explicitly_non_actionable():
+def test_lane_filter_is_sent_to_server_and_resets_to_first_page():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    phase = _extract_function(js, "dailyStructurePhase")
-    label = _extract_function(js, "compactDailyStructureLabel")
-    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
-    result = _run_node([states, phase, label], "({valid:dailyStructurePhase({wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_1_ADVANCE'}}}), missing:dailyStructurePhase({wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'WAVE_4_CORRECTION'}}}), invalid:dailyStructurePhase({wave:{daily_structure:{phase:'NOPE'}}}), label:compactDailyStructureLabel({wave:{daily_structure:{phase:'WAVE_4_CORRECTION'}}})})")
-    assert result == {"valid": "WAVE_1_ADVANCE", "missing": "UNKNOWN", "invalid": "UNKNOWN", "label": "Daily structure · WAVE_4_CORRECTION"}
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    assert 'requestOptions.decision_lane = dom.dailySetupLane.value' in js
+    assert 'params.set("decision_lane", options.decision_lane)' in client
+    assert 'dailySetupPage = 1;' in js
+    assert 'loadDailyVcp(true, 1);' in js
+
+
+def test_daily_structure_phase_is_hidden_from_mvp_surface():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8")
+    for forbidden in ("dailyStructurePhase", "compactDailyStructureLabel", "Daily structure phase", "daily-setup-wave", "structure-badge", "Daily structural context", "drawer-context-info", "drawer-daily-context"):
+        assert forbidden not in js and forbidden not in html
 
 
 def test_primary_card_projection_has_distinct_exact_labels_and_no_primary_daily_structure_alias():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     card = _extract_function(js, "setupCandidateCard")
-    label = _extract_function(js, "compactDailyStructureLabel")
-    phase = _extract_function(js, "dailyStructurePhase")
-    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
     assert "Primary Daily Wave" in card
-    assert "compactDailyStructureLabel(item)" in card
-    assert 'data-actionability="NONE"' in card
+    assert "deepPullbackBadge(item)" in card
+    assert "compactDailyStructureLabel(item)" not in card
+    assert "setup-candidate__structure-badge" not in card
     assert "Primary Daily Structure" not in card
     assert "Primary Daily Structure" not in js
-    assert _run_node(
-        [states, phase, label],
-        "compactDailyStructureLabel({wave:{daily_structure:{phase:'WAVE_2_FORMING'}}})",
-    ) == "Daily structure · WAVE_2_FORMING"
 
 
 def test_deep_pullback_badge_is_separate_non_actionable_and_uses_api_retracement():
@@ -169,32 +157,24 @@ def test_deep_pullback_drawer_uses_exact_api_ratio_and_anchor_fields():
     assert "drawer-deep-pullback" in (ROOT / "index.html").read_text()
 
 
-def test_t08_grouping_has_canonical_phase_order_for_every_lane_and_preserves_lane_totals():
+def test_mvp_grouping_uses_decision_lane_only_and_preserves_lane_totals():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     helper = _extract_function(js, "groupSetupCandidates")
-    phase = _extract_function(js, "dailyStructurePhase")
     stable = _extract_function(js, "stableSetupCandidateOrder")
-    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
-    context = _extract_function(js, "waveContextForItem")
-    items = "[{symbol:'ZZZ',decision_lane:'WAIT',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_2_FORMING'}}},{symbol:'AAA',decision_lane:'REVIEW_NOW',setup:{status:'TRIGGERED'},wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'WAVE_1_ADVANCE'},daily_structure:{phase:'WAVE_1_ADVANCE'}}},{symbol:'ONE',decision_lane:'AVOID',wave:{primary_state:'WAVE_1_ADVANCE',context:{mapped_state:'NOPE'},daily_structure:{phase:'WAVE_5_ADVANCE'}}},{symbol:'BAD',decision_lane:'DATA_BLOCKED',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'}}}]"
-    result = _run_node([states, context, phase, stable, helper], "(function(g){return {order:g.phaseOrder, wait:g.phaseGroups.WAIT.WAVE_2_FORMING[0].symbol, review:g.phaseGroups.REVIEW_NOW.WAVE_1_ADVANCE[0].symbol, avoid:g.phaseGroups.AVOID.WAVE_5_ADVANCE[0].symbol, unknown:g.phaseGroups.DATA_BLOCKED.UNKNOWN[0].symbol, laneCounts:g.order.map(function(lane){return g.groups[lane].length;})};})(groupSetupCandidates(" + items + "))")
-    assert result == {"order": ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE", "UNKNOWN"], "wait": "ZZZ", "review": "AAA", "avoid": "ONE", "unknown": "BAD", "laneCounts": [1, 0, 0, 1, 1, 1]}
+    items = "[{symbol:'ZZZ',decision_lane:'WAIT'},{symbol:'AAA',decision_lane:'REVIEW_NOW',setup:{status:'TRIGGERED'}},{symbol:'ONE',decision_lane:'AVOID'},{symbol:'BAD',decision_lane:'DATA_BLOCKED'}]"
+    result = _run_node([stable, helper], "(function(g){return {order:g.order, wait:g.groups.WAIT[0].symbol, review:g.groups.REVIEW_NOW[0].symbol, avoid:g.groups.AVOID[0].symbol, blocked:g.groups.DATA_BLOCKED[0].symbol, laneCounts:g.order.map(function(lane){return g.groups[lane].length;})};})(groupSetupCandidates(" + items + "))")
+    assert result == {"order": ["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"], "wait": "ZZZ", "review": "AAA", "avoid": "ONE", "blocked": "BAD", "laneCounts": [1, 0, 0, 1, 1, 1]}
+    assert "phaseGroups" not in js and "DAILY STRUCTURE · " not in js
 
 
 def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_reconciliation():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'id="daily-setup-wave"' in html
-    assert "Daily structure phase" in html
-    assert "Filter setup candidates by Daily structural phase" in html
-    assert "Unknown / Not verified" in html and "Unknown / Not verified" in js
-    assert html.count('value="EARLY_WAVE_3"') == 1
-    assert html.count('value="WAVE_3_CONTINUATION"') == 1
-    for context_state in ("WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"):
-        assert html.count('value="' + context_state + '"') == 1
+    assert 'id="daily-setup-wave"' not in html
+    assert "Daily structure phase" not in html
+    assert "dailySetupWave" not in js
     assert "laneItems.length + ' / ' + Number(laneTotals[lane] || 0)" in js
     assert "No setup candidates matched the current presentation filters." in js
-    assert 'dom.dailySetupWave.addEventListener("change"' in js
     assert "reconcileDailyDrawerNavigation();" in js
     assert '#panel-daily-vcp' in js and '[data-symbol].setup-candidate-card' in js
 
@@ -205,15 +185,15 @@ def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact
     toolbar = html[html.index('id="daily-setup-toolbar"'):html.index('</div>', html.index('id="daily-setup-toolbar"')) + 6]
     assert 'id="daily-setup-search"' not in toolbar
     assert 'id="daily-setup-refresh"' not in toolbar
-    assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' in toolbar
+    assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' not in toolbar
     assert 'summary>More filters</summary>' in html
     card = _extract_function(js, "setupCandidateCard")
-    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__structure-badge", "setup-candidate__confidence", "setupLaneLabel"):
+    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
         assert token in card
     for forbidden in ("Daily context", "Secondary", "Trigger readiness"):
         assert forbidden not in card
     assert "compactWaveLabel(item)" in card
-    assert "Primary Daily Wave" in card and "compactDailyStructureLabel(item)" in card
+    assert "Primary Daily Wave" in card and "compactDailyStructureLabel(item)" not in card
     assert 'id="drawer-chart-context"' in html
     assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
 
@@ -231,10 +211,11 @@ def test_review_cockpit_drawer_follows_identity_price_chart_setup_evidence_hiera
     company = html.index('id="drawer-company-title"')
     details = html.index('class="drawer-details"')
     assert identity < lane < price < action < chart < timeframes < setup < company < details
-    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-wave-context"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"', 'id="drawer-context-info"', 'id="drawer-evidence-details"', 'id="drawer-market-cap"', 'id="drawer-sector"', 'id="drawer-industry"'):
+    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"', 'id="drawer-evidence-details"', 'id="drawer-market-cap"', 'id="drawer-sector"', 'id="drawer-industry"'):
         assert marker in html
     assert 'dom.drawerLane' in js and 'dom.drawerCurrent' in js
-    assert 'dom.drawerDailyContext' in js and 'compactWaveLabel(item)' in js
+    assert 'dom.drawerDailyContext' not in js and 'compactWaveLabel(item)' in js
+    assert 'id="drawer-context-info"' not in html and 'id="drawer-daily-context"' not in html
 
 
 def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_direction_evidence_neutral():
@@ -304,8 +285,8 @@ def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_fr
     drawer = _extract_function(js, "renderDrawerDetail")
     assert 'dom.drawerWave.textContent = compactWaveLabel(item)' in drawer
     assert 'dom.drawerWaveSource.textContent = waveContextPresentation(item).source' in drawer
-    assert "Primary Daily Wave" in html and "Daily structural context" in html
-    assert "compactDailyStructureLabel(item)" in drawer
+    assert "Primary Daily Wave" in html and "Daily structural context" not in html
+    assert "compactDailyStructureLabel(item)" not in drawer
     assert 'setup.minor_structure' not in drawer
     assert '60m' in js
 
@@ -340,6 +321,65 @@ def test_mobile_freshness_stays_inside_viewport_and_ellipsizes():
     assert "padding-right: 4px" in mobile
     assert "overflow: hidden" in mobile
     assert "text-overflow: ellipsis" in css
+
+
+def test_desktop_drawer_matches_shell_and_mobile_remains_a_bottom_sheet():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    desktop = css[css.index("@media (min-width: 601px)"):css.index("@media (max-width: 767px)")]
+    mobile = css[css.index("@media (max-width: 600px)"):css.index("/* ── reduced motion")]
+    assert "position: fixed; inset: 0; z-index: 1000" in css
+    assert "justify-content:center" in desktop
+    assert "align-items:center" in desktop
+    assert "width:min(calc(100% - 32px), 960px)" in desktop
+    assert "max-width:960px" in desktop
+    assert "height:min(calc(100dvh - 32px), 1100px)" in desktop
+    assert "max-height:calc(100dvh - 32px)" in desktop
+    assert "overflow-y:auto" in css
+    assert "drawer-body { padding:16px; overflow-y:auto" in css
+    assert ".drawer-chart { height:min(560px, 58dvh); min-height:400px; aspect-ratio:auto; }" in desktop
+    assert ".drawer-body { padding:24px 28px 40px; font-size:15px; }" in desktop
+    assert "align-items:flex-end" in mobile
+    assert "max-height:88dvh" in mobile and "border-radius:var(--radius) var(--radius) 0 0" in mobile
+
+
+def test_filter_refresh_keeps_existing_content_and_guards_stale_responses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    load = _extract_function(js, "loadDailyVcp")
+    assert "setDailySetupRefreshing(true)" in load
+    assert "if (!hasRenderedContent)" in load
+    assert "hide(dom.dailyVcpContent)" in load
+    assert "requestSeq !== dailyVcpRequestSeq" in load
+    assert "dailySetupPage = 1;" in js
+    assert "loadDailyVcp(true, 1);" in js
+    assert "daily-vcp-content--refreshing" in js
+    assert 'id="daily-vcp-content" class="state--hidden" aria-busy="false"' in (ROOT / "index.html").read_text(encoding="utf-8")
+
+
+def test_drawer_chart_uses_available_width_with_useful_aspect_and_mobile_minimum():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    chart = css[css.index(".drawer-chart {"):css.index(".drawer-chart .drawer-indicator-legend")]
+    mobile = css[css.index("@media (max-width: 600px)"):css.index("/* ── reduced motion")]
+    assert "width: 100%" in chart
+    assert "min-height: 360px" in chart
+    assert "aspect-ratio: 16 / 10" in chart
+    assert ".drawer-chart { height:min(360px, 54dvh); min-height:280px" in mobile
+
+
+def test_chart_canvas_resizes_backing_store_and_draws_in_logical_pixels():
+    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "resizeCanvasToDisplaySize")
+    result = _run_node(
+        [helper],
+        "(function(){window.devicePixelRatio=2;var context={setTransform:function(){this.transform=Array.from(arguments);}};var canvas={width:720,height:440,clientWidth:0,clientHeight:0,getBoundingClientRect:function(){return {width:900,height:500};},getContext:function(){return context;}};var size=resizeCanvasToDisplaySize(canvas);return {size:size,width:canvas.width,height:canvas.height,transform:context.transform};})()",
+    )
+    assert result == {
+        "size": {"width": 900, "height": 500, "pixelRatio": 2},
+        "width": 1800,
+        "height": 1000,
+        "transform": [2, 0, 0, 2, 0, 0],
+    }
+    assert "var displaySize = resizeCanvasToDisplaySize(canvas);" in _extract_function(js, "drawChart")
+    assert "window.addEventListener(\"resize\"" in js
 
 
 def test_explorer_filters_are_sent_to_api():
@@ -596,7 +636,7 @@ def test_setup_candidate_freshness_prefers_full_universe_aggregate_statuses():
 def test_canonical_setup_refresh_failure_clears_cached_rows_and_retry_is_forced():
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert "dailyVcpRequests.clear(endpoint);" in js
-    assert "hide(dom.dailyVcpContent); show(dom.dailyVcpError);" in js
+    assert "if (hasRenderedContent) show(dom.dailyVcpContent);" in js
     assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message' in js
     assert 'dom.dailyVcpRetry.addEventListener("click", function() { loadDailyVcp(true); });' in js
     assert "}, !!force);" in js
@@ -705,8 +745,8 @@ def test_wave_context_cards_and_drawer_consume_nested_contract_without_creating_
     assert result["supporting"] == ["pullback"]
     assert result["contextState"] == "WAVE_1_ADVANCE"
     assert "firstDate" not in result and result["transitions"] == []
-    assert 'id="drawer-wave-context"' in html
-    assert "first_context_date" in js and "Unavailable · no source-linked transition history" in js
+    assert 'id="drawer-wave-context"' not in html
+    assert "first_context_date" in js
     assert 'item.decision_lane === "REVIEW_NOW"' in presentation
     assert "primary_state" in wave_state
     assert "context.mapped_state" in presentation
@@ -1168,7 +1208,7 @@ def test_review_cockpit_card_and_drawer_use_compact_plan_and_company_context():
     card = _extract_function(js, "setupCandidateCard")
     assert all(label in card for label in ("Trigger", "Stop", "Target", "R:R"))
     assert "valueOrUnavailable(target1)" in card
-    assert 'class="drawer-info"' in html and 'aria-controls="drawer-evidence-details"' in html
+    assert 'class="drawer-info"' not in html and 'aria-controls="drawer-evidence-details"' not in html
     assert "Company context" in html and "market_cap" in js and "companyContext.market_cap" in js
     assert '"market_cap"' in js
     assert "isInvalidationNear" in js
@@ -1178,7 +1218,7 @@ def test_drawer_info_preserves_not_verified_honesty_and_collapsed_evidence():
     html = (ROOT / "index.html").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8")
     assert 'id="drawer-evidence-details" class="drawer-details"' in html
-    assert 'id="drawer-context-info"' in html
+    assert 'id="drawer-context-info"' not in html
     assert 'dom.drawerEvidenceDetails.open = false' in js
     assert '"Not ready"' in js and '"Not verified"' in js and '"Unavailable"' in js
 
@@ -1243,7 +1283,7 @@ def test_mobile_review_surface_uses_fullscreen_drawer_guide_and_state_aware_copy
     assert 'id="method-guide"' in html
     assert 'id="drawer-method-link"' in html
     assert "@media (max-width: 600px)" in css
-    assert ".drawer-panel { max-width:none; max-height:none; height:100dvh;" in css
+    assert ".drawer-panel { width:100%; max-width:512px; max-height:88dvh; height:88dvh;" in css
     assert "methodGuideContent" in js and "drawerMethodLink" in js
     assert "Awaiting 60m structure" in js and "Setup forming" in js
     helper = _extract_function(js, "setupReadinessLabel")
@@ -1436,8 +1476,8 @@ def test_setup_candidates_group_in_canonical_lane_order_and_block_unknown_lanes(
     assert "function groupSetupCandidates(items)" in js
     assert 'var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED"' in js
     assert "groups.REVIEW_NOW" in js and '"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"' in js
-    assert "phaseItems.map(setupCandidateCard).join(\"\")" in js
-    assert "DAILY STRUCTURE · " in js
+    assert "laneItems.map(setupCandidateCard).join(\"\")" in js
+    assert "DAILY STRUCTURE · " not in js
 
 
 def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
@@ -1453,7 +1493,7 @@ def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
       <main class="app"><article class="decision-card setup-candidate-card">
         <div class="decision-card__top"><strong>LONGSYMBOL</strong><b>DATA_BLOCKED</b></div>
         <p class="setup-candidate__evidence">Trend emerging_uptrend · 20D 18.4% · 60D 42.1% · RS 91 · 52W BREAKOUT · ATH NO BREAKOUT</p>
-        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span><span class="setup-candidate__structure-badge" aria-label="Daily structure · WAVE_2_NEAR_COMPLETION · non-actionable" data-actionability="NONE">Daily structure · WAVE_2_NEAR_COMPLETION</span></div>
+        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span></div>
         <div class="setup-candidate__grid"><span>Wave <b>EARLY_WAVE_3 · structure intact</b></span><span>Setup <b>DATA_BLOCKED · trigger – · invalidation –</b></span><span>Targets <b>– / –</b></span><span>R:R <b>–</b></span><span>Market / sector <b>UNKNOWN · Electronic Components</b></span><span>Peers <b>6/10</b></span></div>
       </article></main>
     """
@@ -1479,7 +1519,6 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
     collection = _extract_function(js, "setupDrawerCollection")
     grouping = _extract_function(js, "groupSetupCandidates")
     stable = _extract_function(js, "stableSetupCandidateOrder")
-    phase = _extract_function(js, "dailyStructurePhase")
     context = _extract_function(js, "waveContextForItem")
     navigation = _extract_function(js, "drawerNavigationState")
     items = [
@@ -1489,7 +1528,7 @@ def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_bounda
         {"symbol": "MID", "decision_lane": "SETUP_FORMING"},
     ]
     states = 'var canonicalDailyWaveStates = ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"];'
-    assert _run_node([states, context, phase, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
+    assert _run_node([states, context, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 0)") == {"index": 0, "count": 3, "position": "1 of 3", "previousDisabled": True, "nextDisabled": False}
     assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 2)") == {"index": 2, "count": 3, "position": "3 of 3", "previousDisabled": False, "nextDisabled": True}
     assert 'id="drawer-position"' in html

@@ -83,6 +83,21 @@ Evidence after `docker compose up -d --force-recreate backend dashboard` and can
 - public 390px ERW drawer: visible `Primary Daily Wave · Wave · Not verified` plus separate `DEEP_PULLBACK_W3_EVIDENCE · 75.3846%` / `Non-actionable · Daily evidence`; exact anchors visible; `scrollWidth=390`, `clientWidth=390`; screenshot `/tmp/erw_deep_pullback_390.png`;
 - focused backend/frontend tests, Python compile, JS syntax, and diff checks: PASS; one pre-existing unrelated mobile test excluded as documented by the Codex/Lite run.
 
+### Primary-wave UI, server-side lane filtering, and responsive drawer closeout — 2026-09-11 18:25 ICT
+
+Owner-authorized UI/API presentation changes were reloaded with `docker compose up -d --force-recreate backend dashboard`. The canonical setup-candidate contract remains unchanged; `decision_lane` is now applied server-side before pagination, while the `/mvp` surface keeps `Primary Daily Wave` as the visible Wave hierarchy and hides `Daily structure` presentation fields.
+
+Evidence after reload:
+
+- `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis healthy; backend `/health` returned `status=ok`, `db=up`, `redis=up`.
+- Public `/mvp`: HTTP 200; served `app.js` contains the in-place refresh marker and server-side lane request path; Daily structure control is absent.
+- Public `/api/setup-candidates?universe=marginable_long&page=1&page_size=50&decision_lane=AVOID`: HTTP 200, `total_items=31`, `total_pages=1`, `returned_count=31`, every returned item `decision_lane=AVOID`, while `evaluated_count=237` remains explicit.
+- Public desktop browser at `1440×1000`: drawer panel `960px` wide, centered at `left=240px`, body scroll is independent, body text `15px`, chart CSS/backing size `902×560`.
+- Public mobile browser at `390×844`: drawer `390×743`, chart `366×360`, `scrollWidth=390`, `bodyScrollWidth=390`; no horizontal overflow.
+- Focused frontend/ranking tests: PASS; `node --check backend/frontend/app.js`: PASS; `git diff --check`: PASS. No database migration or read-model republish was required.
+
+The drawer is a review surface for machine-generated evidence only; it is not an automatic trading signal or order interface. Search remains a client-side filter and is intentionally a separate follow-up for server-side pagination semantics.
+
 ## Daily structural evidence integration milestone — 2026-09-03
 
 Stable local commit `9ec9e20` adds `wave.daily_structure` as an additive non-actionable Daily evidence object projected from the existing full-wave result. After dashboard reload and republish, `read-model-fb71255aa17e8e3b` served `237` rows; every row contained `actionability=NONE`. Primary W3/NOT_VERIFIABLE distribution remained unchanged while Daily phase evidence exposed W1/W2/W4/W5. Public `/mvp` drawer and 390px containment were verified. W2 lane promotion and W4/W5 primary promotion remain deferred.

@@ -34,7 +34,6 @@
     dailyVcpMeta:    $("#daily-vcp-meta"),
     dailySetupSearch: $("#daily-setup-search"),
     dailySetupLane: $("#daily-setup-lane"),
-    dailySetupWave: $("#daily-setup-wave"),
     dailySetupRefresh: $("#daily-setup-refresh"),
     dailySetupUpdated: $("#daily-setup-updated"),
     dailySetupLiveRefresh: $("#daily-setup-live-refresh"),
@@ -119,12 +118,9 @@
     drawerTrend:    $("#drawer-trend"),
     drawerAction:   $("#drawer-action"),
     drawerWave:     $("#drawer-wave"),
-    drawerDailyContext: $("#drawer-daily-context"),
-    drawerContextInfo: $("#drawer-context-info"),
     drawerEvidenceDetails: $("#drawer-evidence-details"),
     drawerWaveConfidence: $("#drawer-wave-confidence"),
     drawerWaveSource: $("#drawer-wave-source"),
-    drawerWaveContext: $("#drawer-wave-context"),
     drawerDeepPullback: $("#drawer-deep-pullback"),
     drawerSector:   $("#drawer-sector"),
     drawerIndustry: $("#drawer-industry"),
@@ -617,27 +613,11 @@
     return labels[canonicalWaveState(item)] || "Wave · Not verified";
   }
 
-  function setupCandidateWaveBucket(item) {
-    var wave = item && item.wave;
-    var state = wave && wave.primary_state;
-    return canonicalDailyWaveStates.indexOf(state) >= 0 ? state : "UNKNOWN";
-  }
-
-  function dailyStructurePhase(item) {
-    var daily = item && item.wave && item.wave.daily_structure;
-    var phase = daily && typeof daily === "object" && !Array.isArray(daily) ? daily.phase : null;
-    return canonicalDailyWaveStates.indexOf(phase) >= 0 ? phase : "UNKNOWN";
-  }
-
   function compactWaveConfidence(item) {
     var wave = item && item.wave;
     var confidence = wave && wave.confidence;
     confidence = confidence == null ? "" : String(confidence).toUpperCase();
     return ["LOW", "MEDIUM", "HIGH"].indexOf(confidence) >= 0 ? confidence : "NOT_VERIFIED";
-  }
-
-  function compactDailyStructureLabel(item) {
-    return "Daily structure · " + dailyStructurePhase(item);
   }
 
   function deepPullbackEvidence(item) {
@@ -678,45 +658,24 @@
 
   function waveContextPresentation(item) {
     var context = waveContextForItem(item);
-    var daily = item && item.wave && item.wave.daily_structure;
-    var hasDaily = daily && typeof daily === "object" && !Array.isArray(daily);
-    if (!hasDaily) daily = context;
     var state = canonicalWaveState(item);
-    var secondary = hasDaily && Array.isArray(daily.alternative_phases)
-      ? daily.alternative_phases : context && Array.isArray(context.secondary_markers)
+    var secondary = context && Array.isArray(context.secondary_markers)
         ? context.secondary_markers.filter(function(value) { return value === "WAVE_3_EXTENDED"; }) : [];
     var nonActionable = ["WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "WAVE_4_CORRECTION", "Unknown / Not verified"].indexOf(state) >= 0;
     return {
       state: state, secondary: secondary, confidence: compactWaveConfidence(item),
-      contextState: hasDaily ? daily.phase : context.mapped_state,
-      rule: daily && (daily.policy_version || daily.rule_version),
-      source: daily && daily.source_timeframe === "daily" ? (hasDaily ? "Daily structural context · daily" : "Daily structural · daily") : "Daily structural context · source unavailable",
-      supporting: daily && daily.supporting_evidence, contradicting: daily && daily.contradicting_evidence,
-      missing: daily && daily.missing_evidence, rationale: hasDaily ? "Evidence context only; it cannot change the Primary Daily Wave or decision lane." : context && context.rationale,
-      firstDate: hasDaily ? daily.as_of : context && context.first_context_date,
-      lastDate: hasDaily ? daily.snapshot_id : context && context.last_context_date,
-      transitions: hasDaily ? [] : context && Array.isArray(context.transitions) ? context.transitions : [],
-      actionability: hasDaily ? "Non-actionable Daily context · actionability NONE" : item && item.decision_lane === "REVIEW_NOW" ? "Review eligible · backend REVIEW_NOW" :
+      contextState: context && context.mapped_state,
+      rule: context && context.rule_version,
+      source: context && context.source_timeframe === "daily" ? "Daily structural · daily" : "Daily structural · source unavailable",
+      supporting: context && context.supporting_evidence, contradicting: context && context.contradicting_evidence,
+      missing: context && context.missing_evidence, rationale: context && context.rationale,
+      firstDate: context && context.first_context_date,
+      lastDate: context && context.last_context_date,
+      transitions: context && Array.isArray(context.transitions) ? context.transitions : [],
+      actionability: item && item.decision_lane === "REVIEW_NOW" ? "Review eligible · backend REVIEW_NOW" :
         nonActionable ? "Non-actionable context · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED") :
         "Not review eligible · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED")
     };
-  }
-
-  function renderWaveContextDetail(item) {
-    if (!dom.drawerWaveContext) return;
-    var view = waveContextPresentation(item);
-    var evidenceRow = function(label, value) {
-      return '<div><dt>' + label + '</dt><dd>' + escapeHTML(waveEvidenceText(value)) + '</dd></div>';
-    };
-    var transitions = view.transitions.length ? view.transitions.map(function(entry) {
-      return '<li>' + escapeHTML(waveEvidenceText(entry)) + '</li>';
-    }).join("") : '<li>Unavailable · no source-linked transition history</li>';
-    dom.drawerWaveContext.innerHTML = '<strong class="wave-context-detail__status">' + escapeHTML(view.actionability) + '</strong>' +
-      '<dl>' + evidenceRow("Daily structural phase", view.contextState) + evidenceRow("Alternative phases", view.secondary) + evidenceRow("Policy", view.rule) +
-      evidenceRow("As-of / snapshot", view.firstDate && view.lastDate ? view.firstDate + " / " + view.lastDate : null) +
-      evidenceRow("Supporting", view.supporting) + evidenceRow("Contradicting", view.contradicting) +
-      evidenceRow("Missing", view.missing) + evidenceRow("Rationale", view.rationale) + '</dl>' +
-      '<div class="wave-context-transitions"><span>Source transitions</span><ul>' + transitions + '</ul></div>';
   }
 
   function showWaveExplanation(marker) {
@@ -824,10 +783,7 @@
     if (dom.drawerWave) dom.drawerWave.textContent = compactWaveLabel(item);
     if (dom.drawerWaveConfidence) dom.drawerWaveConfidence.textContent = compactWaveConfidence(item);
     if (dom.drawerWaveSource) dom.drawerWaveSource.textContent = waveContextPresentation(item).source;
-    if (dom.drawerDailyContext) dom.drawerDailyContext.textContent = compactDailyStructureLabel(item);
     if (dom.drawerEvidenceDetails) dom.drawerEvidenceDetails.open = false;
-    if (dom.drawerContextInfo) dom.drawerContextInfo.setAttribute("aria-expanded", "false");
-    renderWaveContextDetail(item);
     renderDeepPullbackEvidence(item);
     if (dom.drawerV2Decision) setOptionalDrawerField(dom.drawerV2Decision, item.vcp_result ? vcpPrimaryStatus(item.vcp_result) : null);
     if (dom.drawerRawState) setOptionalDrawerField(dom.drawerRawState, item.vcp_result ? (item.vcp_result.state || "NOT_VERIFIED") : null);
@@ -980,6 +936,27 @@
     }
   }
 
+  function resizeCanvasToDisplaySize(canvas) {
+    if (!canvas) return {width: 1, height: 1, pixelRatio: 1};
+    var rect = canvas.getBoundingClientRect ? canvas.getBoundingClientRect() : null;
+    var width = Math.max(1, Math.round((rect && rect.width) || canvas.clientWidth || canvas.width || 1));
+    var height = Math.max(1, Math.round((rect && rect.height) || canvas.clientHeight || canvas.height || 1));
+    var pixelRatio = Math.max(1, Number(window.devicePixelRatio) || 1);
+    var pixelWidth = Math.max(1, Math.round(width * pixelRatio));
+    var pixelHeight = Math.max(1, Math.round(height * pixelRatio));
+    if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+    if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+    var ctx = canvas.getContext && canvas.getContext("2d");
+    if (ctx) {
+      if (typeof ctx.setTransform === "function") ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      else {
+        if (typeof ctx.resetTransform === "function") ctx.resetTransform();
+        if (typeof ctx.scale === "function") ctx.scale(pixelRatio, pixelRatio);
+      }
+    }
+    return {width: width, height: height, pixelRatio: pixelRatio};
+  }
+
   function drawChart(chart) {
     var canvas = dom.drawerCanvas;
     // Clear hit targets before validating optional chart evidence so malformed
@@ -987,7 +964,8 @@
     window.__signalixWaveMarkerHits = [];
     if (!canvas || !chart || !chart.candles || chart.candles.length < 2) return;
     var ctx = canvas.getContext("2d");
-    var w = canvas.width, h = canvas.height;
+    var displaySize = resizeCanvasToDisplaySize(canvas);
+    var w = displaySize.width, h = displaySize.height;
     ctx.clearRect(0, 0, w, h);
     var candles = chart.candles.slice(-120);
     var start = chart.candles.length - candles.length;
@@ -1293,6 +1271,8 @@
     if (item.vcp_result) item._canonicalMetadataPending = true;
     drawerItem = item;
     renderDrawerDetail(drawerItem);
+    dom.drawer.classList.remove("drawer--hidden");
+    document.body.style.overflow = "hidden";
 
     var cachedChart = chartCache[chartKey];
     if (cachedChart) {
@@ -1302,9 +1282,6 @@
       dom.drawerChartPH.textContent = "Chart loading…";
       if (dom.drawerCanvas) dom.drawerCanvas.style.display = "none";
     }
-
-    dom.drawer.classList.remove("drawer--hidden");
-    document.body.style.overflow = "hidden";
 
     // VCP owns intraday decision fields; canonical Daily detail fills metadata.
     fetch("/api/symbol/" + encodeURIComponent(symbol), {signal: chartController.signal})
@@ -1453,12 +1430,7 @@
     if (dom.methodGuide) dom.methodGuide.open = true;
     if (dom.methodGuide) dom.methodGuide.scrollIntoView({behavior:"smooth", block:"start"});
   });
-  if (dom.drawerContextInfo) dom.drawerContextInfo.addEventListener("click", function() {
-    if (!dom.drawerEvidenceDetails) return;
-    dom.drawerEvidenceDetails.open = !dom.drawerEvidenceDetails.open;
-    dom.drawerContextInfo.setAttribute("aria-expanded", String(dom.drawerEvidenceDetails.open));
-    if (dom.drawerEvidenceDetails.open) dom.drawerEvidenceDetails.scrollIntoView({behavior:"smooth", block:"nearest"});
-  });
+
   if (dom.drawer) dom.drawer.addEventListener("touchstart", function(e) {
     if (e.touches && e.touches.length === 1) drawerTouchStartX = e.touches[0].clientX;
   }, {passive: true});
@@ -1499,6 +1471,10 @@
       return Math.hypot(candidate.x - x, candidate.y - y) <= 12;
     });
     showWaveExplanation(hit && hit.marker);
+  });
+  window.addEventListener("resize", function() {
+    if (!dom.drawer || dom.drawer.classList.contains("drawer--hidden") || !window.__signalixLastChart) return;
+    drawChart(window.__signalixLastChart);
   });
   document.addEventListener("keydown", function(e) {
     if (!dom.drawer) return;
@@ -1705,7 +1681,7 @@
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
       '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
-      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span><span class="setup-candidate__structure-badge" aria-label="' + escapeHTML(compactDailyStructureLabel(item) + ' · non-actionable') + '" data-actionability="NONE">' + escapeHTML(compactDailyStructureLabel(item)) + '</span>' + deepPullbackBadge(item) + '<span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
+      '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span>' + deepPullbackBadge(item) + '<span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
   }
@@ -1729,10 +1705,8 @@
   function setupCandidateMatchesToolbar(item) {
     var search = dom.dailySetupSearch ? dom.dailySetupSearch.value.trim().toLowerCase() : "";
     var lane = dom.dailySetupLane ? dom.dailySetupLane.value : "ALL";
-    var wave = dom.dailySetupWave ? dom.dailySetupWave.value : "ALL";
     var haystack = ((item.symbol || "") + " " + (item.name || "")).toLowerCase();
-    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane) &&
-      (wave === "ALL" || dailyStructurePhase(item) === wave);
+    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane);
   }
 
   function stableSetupCandidateOrder(items) {
@@ -1765,14 +1739,7 @@
         return result.concat(reviewGroups[status]);
       }, []).concat(reviewUnknown);
     }
-    var phaseOrder = canonicalDailyWaveStates.concat(["UNKNOWN"]);
-    var phaseGroups = {};
-    laneOrder.forEach(function(lane) {
-      phaseGroups[lane] = {};
-      phaseOrder.forEach(function(phase) { phaseGroups[lane][phase] = []; });
-      groups[lane].forEach(function(item) { phaseGroups[lane][dailyStructurePhase(item)].push(item); });
-    });
-    return {order: laneOrder, groups: groups, phaseOrder: phaseOrder, phaseGroups: phaseGroups};
+    return {order: laneOrder, groups: groups};
   }
 
   function reconcileDailyDrawerNavigation() {
@@ -1786,6 +1753,13 @@
     drawerSymbols = symbols;
     drawerIndex = index;
     updateDrawerNav();
+  }
+
+  function setDailySetupRefreshing(refreshing) {
+    if (!dom.dailyVcpContent) return;
+    dom.dailyVcpContent.classList.toggle("daily-vcp-content--refreshing", !!refreshing);
+    dom.dailyVcpContent.setAttribute("aria-busy", refreshing ? "true" : "false");
+    if (refreshing && dom.dailySetupUpdated) dom.dailySetupUpdated.textContent = "Updating setup candidates…";
   }
 
   function setupDrawerCollection(items) {
@@ -1826,7 +1800,9 @@
   function renderSetupCandidates(data) {
     data = data || {};
     dailySetupData = data;
+    setDailySetupRefreshing(false);
     hide(dom.dailyVcpLoading); show(dom.dailyVcpContent);
+    hide(dom.dailyVcpError);
     var items = data && Array.isArray(data.items) ? data.items : [];
     var returnedCount = Number(data.returned_count);
     var evaluatedCount = Number(data.evaluated_count);
@@ -1878,12 +1854,7 @@
     var groupedHTML = grouped.order.reduce(function(html, lane) {
       var laneItems = grouped.groups[lane];
       if (!laneItems.length) return html;
-      var content = grouped.phaseOrder.reduce(function(phaseHTML, phase) {
-        var phaseItems = grouped.phaseGroups[lane][phase];
-        if (!phaseItems.length) return phaseHTML;
-        return phaseHTML + '<section class="setup-candidate-wave-group"><h3 class="section-head">DAILY STRUCTURE · ' + escapeHTML(phase) + ' <span class="section-subhead">' + phaseItems.length + '</span></h3>' + phaseItems.map(setupCandidateCard).join("") + '</section>';
-      }, "");
-      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + content + '</section>';
+      return html + '<section class="setup-candidate-lane"><h2 class="section-head">' + escapeHTML(lane) + ' <span class="section-subhead">' + laneItems.length + ' / ' + Number(laneTotals[lane] || 0) + '</span></h2>' + laneItems.map(setupCandidateCard).join("") + '</section>';
     }, "");
     dom.dailyVcpCards.innerHTML = groupedHTML ||
       '<div class="state"><div class="state-icon">⌛</div><p class="state-text">No setup candidates matched the current presentation filters.</p><p class="state-hint">The universe loaded successfully; this is an empty result, not an API failure.</p></div>';
@@ -1897,10 +1868,13 @@
     if (page != null) dailySetupPage = Math.max(1, Number(page) || 1);
     var requestOptions = {};
     if (dom.dailySetupSector && dom.dailySetupSector.value.trim()) requestOptions.sector = dom.dailySetupSector.value.trim();
+    if (dom.dailySetupLane && dom.dailySetupLane.value !== "ALL") requestOptions.decision_lane = dom.dailySetupLane.value;
     var endpoint = SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions);
     var request = dailyVcpRequests.load(endpoint, function(signal) {
       return SignalixCanonicalClient.fetchSetupCandidatesPage(dailySetupPage, 50, signal, requestOptions);
     }, !!force);
+    var hasRenderedContent = dailySetupData && dom.dailyVcpContent && !dom.dailyVcpContent.classList.contains("state--hidden");
+    setDailySetupRefreshing(true);
     if (request.cached) {
       var cachedRequestSeq = ++dailyVcpRequestSeq;
       request.promise.then(function(data) { if (cachedRequestSeq === dailyVcpRequestSeq) renderSetupCandidates(data); });
@@ -1908,7 +1882,11 @@
     }
     if (request.pending) return;
     var requestSeq = ++dailyVcpRequestSeq;
-    show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
+    if (!hasRenderedContent) {
+      show(dom.dailyVcpLoading); hide(dom.dailyVcpError); hide(dom.dailyVcpContent);
+    } else {
+      hide(dom.dailyVcpLoading); hide(dom.dailyVcpError); show(dom.dailyVcpContent);
+    }
     request.promise.then(function(data){
         if (requestSeq !== dailyVcpRequestSeq) return;
         renderSetupCandidates(data);
@@ -1916,7 +1894,10 @@
       .catch(function(err){
         if (err.name === "AbortError" || requestSeq !== dailyVcpRequestSeq) return;
         dailyVcpRequests.clear(endpoint);
-        hide(dom.dailyVcpLoading); hide(dom.dailyVcpContent); show(dom.dailyVcpError);
+        setDailySetupRefreshing(false);
+        hide(dom.dailyVcpLoading); show(dom.dailyVcpError);
+        if (hasRenderedContent) show(dom.dailyVcpContent);
+        else hide(dom.dailyVcpContent);
         setFreshness("error", null, null, "unknown", "unknown");
         dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message;
       });
@@ -2005,10 +1986,8 @@
     if (dailySetupData) renderSetupCandidates(dailySetupData);
   });
   if (dom.dailySetupLane) dom.dailySetupLane.addEventListener("change", function() {
-    if (dailySetupData) renderSetupCandidates(dailySetupData);
-  });
-  if (dom.dailySetupWave) dom.dailySetupWave.addEventListener("change", function() {
-    if (dailySetupData) renderSetupCandidates(dailySetupData);
+    dailySetupPage = 1;
+    loadDailyVcp(true, 1);
   });
   function scheduleLiveRefresh() {
     if (liveRefreshTimer) clearTimeout(liveRefreshTimer);

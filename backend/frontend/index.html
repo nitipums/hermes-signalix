@@ -31,7 +31,7 @@
     <main id="panel-daily-vcp" class="panel panel--active" role="tabpanel" aria-labelledby="tab-daily-vcp">
       <section id="daily-vcp-loading" class="state" aria-live="polite"><div class="state-icon">⌛</div><p class="state-text">Loading setup candidates…</p></section>
       <section id="daily-vcp-error" class="state state--hidden" aria-live="assertive"><div class="state-icon">⚠️</div><p id="daily-vcp-error-msg" class="state-text">Unable to load setup candidates.</p><button id="daily-vcp-retry" class="btn btn--retry">Retry</button></section>
-      <section id="daily-vcp-content" class="state--hidden">
+      <section id="daily-vcp-content" class="state--hidden" aria-busy="false">
         <p class="explorer-note">Marginable long universe · Daily trend/wave + 60m setup · review evidence, not an automatic buy signal.</p>
         <details id="method-guide" class="method-guide">
           <summary>Method / Evidence Guide</summary>
@@ -50,19 +50,6 @@
               <option value="WAIT">Wait</option>
               <option value="AVOID">Avoid</option>
               <option value="DATA_BLOCKED">Data blocked</option>
-            </select>
-          </label>
-          <label>Daily structure phase
-            <select id="daily-setup-wave" aria-label="Filter setup candidates by Daily structural phase">
-              <option value="ALL" selected>All Daily phases</option>
-              <option value="WAVE_1_ADVANCE">Wave 1 advance</option>
-              <option value="WAVE_2_FORMING">Wave 2 forming</option>
-              <option value="WAVE_2_NEAR_COMPLETION">Wave 2 near completion</option>
-              <option value="EARLY_WAVE_3">Early Wave 3</option>
-              <option value="WAVE_3_CONTINUATION">Wave 3 continuation</option>
-              <option value="WAVE_4_CORRECTION">Wave 4 correction</option>
-              <option value="WAVE_5_ADVANCE">Wave 5 advance</option>
-              <option value="UNKNOWN">Unknown / Not verified</option>
             </select>
           </label>
         </div>
@@ -209,7 +196,6 @@
             <h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2>
             <dl class="drawer-setup-grid">
               <div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div>
-              <div class="drawer-setup-field"><dt>Daily structural context <button id="drawer-context-info" class="drawer-info" type="button" aria-expanded="false" aria-controls="drawer-evidence-details" aria-label="Show Daily structural context evidence">(i)</button></dt><dd id="drawer-daily-context">Not actionable · unavailable</dd></div>
               <div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div>
               <div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div>
               <div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div>
@@ -224,7 +210,6 @@
           </section>
           <details id="drawer-evidence-details" class="drawer-details">
             <summary>Evidence details and provenance</summary>
-            <div id="drawer-wave-context" class="wave-context-detail" aria-label="Daily Wave context evidence"></div>
             <p id="drawer-description" class="drawer-description">–</p>
             <dl class="drawer-fields">
             <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>

@@ -493,6 +493,7 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
                 items, snapshot_meta=payload,
                 lifecycle=(qs.get("lifecycle", [None])[0] or None),
                 state=(qs.get("state", [None])[0] or None),
+                decision_lane=(qs.get("decision_lane", [None])[0] or None),
                 sector=(qs.get("sector", [None])[0] or None),
                 search=(qs.get("search", [None])[0] or None),
                 page=page, page_size=page_size,

@@ -7,6 +7,7 @@
     params.set("universe", (options && options.universe) || DEFAULT_UNIVERSE);
     params.set("page", String(page)); params.set("page_size", String(pageSize));
     if (options && options.sector) params.set("sector", options.sector);
+    if (options && options.decision_lane) params.set("decision_lane", options.decision_lane);
     return "/api/setup-candidates?" + params.toString();
   }
   function setupCandidatesRequestKey(page, pageSize, options) {

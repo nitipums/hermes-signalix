@@ -71,6 +71,16 @@ def test_presentation_filters_do_not_change_full_universe_counts():
     assert result["counts"] == {lane: 1 for lane in LANES}
 
 
+def test_decision_lane_filter_is_applied_before_pagination():
+    rows = [canonical_candidate(f"S{index}", lane) for index, lane in enumerate(LANES)]
+    result = project_setup_candidates_response(rows, decision_lane="AVOID", page_size=1)
+    assert [item["decision_lane"] for item in result["items"]] == ["AVOID"]
+    assert result["total_items"] == 1
+    assert result["total_pages"] == 1
+    assert result["evaluated_count"] == len(LANES)
+    assert result["counts"] == {lane: 1 for lane in LANES}
+
+
 def test_unrecognized_lane_is_not_counted_as_positive():
     row = canonical_candidate("UNKNOWN", "UNRECOGNIZED")
 

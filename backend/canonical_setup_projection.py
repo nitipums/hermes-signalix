@@ -149,6 +149,7 @@ def _validate_canonical_setup_candidate(item: dict) -> dict:
 
 def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict | None = None,
                                       lifecycle: str | None = None, state: str | None = None,
+                                      decision_lane: str | None = None,
                                       sector: str | None = None, search: str | None = None,
                                       page: int = 1, page_size: int = 50) -> dict:
     """Project validated canonical candidates with presentation filters only."""
@@ -162,6 +163,9 @@ def project_setup_candidates_response(items: list[dict], *, snapshot_meta: dict 
         token = state.upper()
         filtered = [x for x in filtered if str((x.get("wave") or {}).get("state", "")).upper() == token
                     or str((x.get("setup") or {}).get("state", "")).upper() == token]
+    if decision_lane:
+        token = decision_lane.strip().upper()
+        filtered = [x for x in filtered if str(x.get("decision_lane", "")).upper() == token]
     if sector:
         token = sector.strip().casefold()
         filtered = [x for x in filtered if token in str((x.get("context") or {}).get("sector", "")).casefold()]
