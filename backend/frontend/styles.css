@@ -464,7 +464,8 @@ body {
 .technical-summary strong { margin-top:3px; color:var(--text); font-size:11px; }
 .rolling-high-low { min-width:0; margin:8px 0; padding:8px; border:1px solid var(--border); border-radius:5px; background:var(--surface-2); }
 .rolling-high-low h2 { margin:0 0 6px; color:var(--text); font-size:11px; }
-.rolling-high-low table { width:100%; table-layout:fixed; border-collapse:collapse; font-size:9px; }
+.rolling-high-low__table-wrap { width:100%; max-width:100%; min-width:0; overflow-x:auto; }
+.rolling-high-low table { width:100%; min-width:560px; table-layout:fixed; border-collapse:collapse; font-size:9px; }
 .rolling-high-low th, .rolling-high-low td { min-width:0; padding:4px 2px; border-top:1px solid var(--border); text-align:right; overflow-wrap:anywhere; }
 .rolling-high-low th:first-child { text-align:left; }
 .rolling-high-low thead th { color:var(--text-3); font-size:9px; text-transform:uppercase; letter-spacing:.04em; }

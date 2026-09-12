@@ -1317,10 +1317,50 @@ def run_vcp_after_ingestion(pg, summary):
         cur.close()
 
 
+SHADOW_TREND_MAP_PUBLISH_FAILURES = 0
+
+
 def _finish_successful_run(args):
-    """Publish once, after the complete daily/intraday canonical build."""
+    """Publish read models only after a successful bounded update path."""
     if args.scan and not args.dry_run:
         publish_canonical_read_model()
+        # The shadow publisher is independent of the canonical setup read
+        # model.  It is deliberately EOD-only and fail-closed; intraday-only
+        # runs never set args.scan and therefore never publish it.
+        try:
+            from shadow_read_model_publisher import publish_shadow_read_model
+            result = publish_shadow_read_model()
+            print("SHADOW_TREND_MAP_PUBLISHED " + json.dumps(result, sort_keys=True))
+        except Exception as exc:
+            # A stale prior artifact remains readable; a failed/partial build
+            # must not move current.json or make the ingestion job fail.
+            global SHADOW_TREND_MAP_PUBLISH_FAILURES
+            SHADOW_TREND_MAP_PUBLISH_FAILURES += 1
+            import shadow_read_model_publisher as shadow_publisher
+            read_current = getattr(shadow_publisher, "read_current_shadow_report", None)
+            prior = read_current() if callable(read_current) else {"verification_status": "NOT_VERIFIED"}
+            preserved = prior.get("verification_status") == "VERIFIED"
+            record_failure = getattr(shadow_publisher, "record_publish_failure", None)
+            try:
+                metadata = (record_failure(
+                    None, exc, SHADOW_TREND_MAP_PUBLISH_FAILURES, preserved,
+                    "VERIFIED" if preserved else "NOT_VERIFIED") if callable(record_failure) else {
+                        "error_type": type(exc).__name__, "message": str(exc)[:240],
+                        "failure_count": SHADOW_TREND_MAP_PUBLISH_FAILURES,
+                        "pointer_preserved": preserved,
+                        "pointer_verification": "VERIFIED" if preserved else "NOT_VERIFIED"})
+            except Exception as observability_error:
+                # Failure telemetry must never turn a successful ingestion into
+                # a failed run. The structured stdout event remains available.
+                metadata = {"error_type": type(exc).__name__, "message": str(exc)[:240],
+                            "failure_count": SHADOW_TREND_MAP_PUBLISH_FAILURES,
+                            "pointer_preserved": preserved,
+                            "pointer_verification": "VERIFIED" if preserved else "NOT_VERIFIED",
+                            "observability_error_type": type(observability_error).__name__}
+            print("SHADOW_TREND_MAP_PUBLISH_FAILURE " + json.dumps({
+                "event": "shadow_trend_map_publish_failure",
+                **metadata,
+            }, sort_keys=True))
     return 0
 
 

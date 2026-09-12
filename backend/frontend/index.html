@@ -123,129 +123,14 @@
     </main>
 
 
-    <!-- ── Detail Drawer ── -->
-    <aside id="drawer" class="drawer drawer--hidden" role="dialog" aria-modal="true" aria-label="Stock detail" data-detail-source="canonical-setup-candidate">
-      <div class="drawer-overlay" id="drawer-overlay"></div>
-      <div class="drawer-panel">
-        <header class="drawer-header">
-          <div class="drawer-identity">
-            <a id="drawer-symbol" class="drawer-title drawer-symbol-link" target="_blank" rel="noopener noreferrer"></a>
-            <span id="drawer-name" class="drawer-name"></span>
-            <span id="drawer-lane" class="drawer-lane">Not verified</span>
-          </div>
-          <div class="drawer-nav" aria-label="Navigate stocks">
-            <button id="drawer-prev" class="drawer-nav-button" type="button" aria-label="Previous stock">←</button>
-            <span id="drawer-position" class="drawer-position" aria-live="polite">– of –</span>
-            <button id="drawer-next" class="drawer-nav-button" type="button" aria-label="Next stock">→</button>
-          </div>
-          <button id="drawer-close" class="drawer-close" aria-label="Close detail">&times;</button>
-        </header>
-        <div id="drawer-body" class="drawer-body">
-          <div class="drawer-price-row">
-            <strong id="drawer-price">–</strong>
-            <span id="drawer-change" class="drawer-change">–</span>
-            <span id="drawer-trade-value" class="drawer-trade-value">Trade value –</span>
-          </div>
-          <div id="drawer-quote-source" class="drawer-quote-source">Quote · Not verified</div>
-          <div class="drawer-decision">
-            <span id="drawer-trend" class="drawer-trend">–</span>
-            <strong id="drawer-action" class="drawer-action">–</strong>
-          </div>
-          <div class="drawer-wave-summary" aria-label="Primary Daily Wave">
-            <span>Primary Daily Wave <strong id="drawer-wave">Not verified</strong></span>
-            <span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span>
-            <span id="drawer-wave-source">Daily structural · source unavailable</span>
-          </div>
-          <div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div>
-
-          <!-- chart area: overlays are supplied by the real API contract -->
-          <div id="drawer-chart" class="drawer-chart">
-            <canvas id="drawer-canvas" width="720" height="440"></canvas>
-            <p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p>
-          </div>
-          <p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p>
-          <p id="drawer-chart-context" class="chart-context" aria-live="polite">Timeframe: 1D · Source: Daily price data</p>
-          <div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>
-          <div class="chart-timeframe-controls" aria-label="Chart timeframe">
-            <span class="chart-control-label">Timeframe</span>
-            <button type="button" class="chart-timeframe" data-timeframe="60M">60m</button>
-            <button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button>
-            <button type="button" class="chart-timeframe" data-timeframe="1W">1W</button>
-            <button type="button" class="chart-timeframe" data-timeframe="1M">1M</button>
-          </div>
-          <div class="ma-controls" aria-label="Moving average overlays">
-            <span class="chart-control-label">Moving averages</span>
-            <label><input type="checkbox" data-ma-period="5" checked> MA5</label>
-            <label><input type="checkbox" data-ma-period="10" checked> MA10</label>
-            <label><input type="checkbox" data-ma-period="20" checked> MA20</label>
-            <label><input type="checkbox" data-ma-period="60" checked> MA60</label>
-            <label><input type="checkbox" data-ma-period="120"> MA120</label>
-            <label><input type="checkbox" data-ma-period="240"> MA240</label>
-          </div>
-          <section id="technical-latest" class="technical-summary" aria-label="Latest deterministic technical values" aria-live="polite">
-            <div><span>High / Low</span><strong id="technical-high-low">Not verified</strong></div>
-            <div><span>MACD / Signal / Hist</span><strong id="technical-macd">Not verified</strong></div>
-            <div><span>RSI 14</span><strong id="technical-rsi">Not verified</strong></div>
-            <div><span>ATR 14</span><strong id="technical-atr">Not verified</strong></div>
-          </section>
-          <section id="rolling-high-low" class="rolling-high-low" aria-labelledby="rolling-high-low-title" aria-live="polite">
-            <h2 id="rolling-high-low-title">OHLCV Window Summary (candles)</h2>
-            <table>
-              <thead><tr><th scope="col">Candles</th><th scope="col">Open</th><th scope="col">High</th><th scope="col">Low</th><th scope="col">Close</th><th scope="col">Avg Vol</th><th scope="col">MA</th></tr></thead>
-              <tbody>
-                <tr data-rolling-period="5"><th scope="row">5<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="10"><th scope="row">10<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="20"><th scope="row">20<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="60"><th scope="row">60<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="120"><th scope="row">120<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="240"><th scope="row">240<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-                <tr data-rolling-period="260"><th scope="row">260<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>
-              </tbody>
-            </table>
-          </section>
-          <label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>
-          <section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite">
-            <span>Wave evidence details are in the Method / Evidence Guide.</span>
-            <button id="drawer-method-link" class="btn btn--guide" type="button">Open guide</button>
-          </section>
-
-          <section class="drawer-section drawer-section--setup" aria-labelledby="drawer-setup-title">
-            <h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2>
-            <dl class="drawer-setup-grid">
-              <div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div>
-              <div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div>
-              <div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div>
-              <div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div>
-              <div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div>
-            </dl>
-          </section>
-          <section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title">
-            <h2 id="drawer-company-title" class="drawer-section-title">Company context</h2>
-            <div class="drawer-company-context">
-              <span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span>
-            </div>
-          </section>
-          <details id="drawer-evidence-details" class="drawer-details">
-            <summary>Evidence details and provenance</summary>
-            <p id="drawer-description" class="drawer-description">–</p>
-            <dl class="drawer-fields">
-            <div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div>
-            <div class="drawer-field"><dt>Raw V1 state</dt><dd id="drawer-raw-state">–</dd></div>
-            <div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div>
-            <div class="drawer-field"><dt>Marginable</dt><dd id="drawer-margin">–</dd></div>
-            <div class="drawer-field"><dt>52W High / Low</dt><dd id="drawer-52w">–</dd></div>
-            <div class="drawer-field"><dt>ATH High / Low</dt><dd id="drawer-ath">–</dd></div>
-            <div class="drawer-field"><dt>Provenance</dt><dd id="drawer-provenance">–</dd></div>
-            </dl>
-          </details>
-        </div>
-      </div>
-    </aside>
+    <!-- Shared drawer mount; controller/markup lives in shared-drawer.js. -->
+    <div id="drawer-mount"></div>
 
   </div>
 
   <script src="request_cache.js"></script>
   <script src="canonical-client.js"></script>
+  <script src="shared-drawer.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
