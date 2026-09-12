@@ -21,28 +21,24 @@
       '<div id="drawer-quote-source" class="drawer-quote-source">Quote · Not verified</div><div class="drawer-decision"><span id="drawer-trend" class="drawer-trend">–</span><strong id="drawer-action" class="drawer-action">–</strong></div>' +
       '<div class="drawer-wave-summary" aria-label="Primary Daily Wave"><span>Primary Daily Wave <strong id="drawer-wave">Not verified</strong></span><span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span><span id="drawer-wave-source">Daily structural · source unavailable</span></div>' +
       '<div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div><div id="drawer-chart" class="drawer-chart"><canvas id="drawer-canvas" width="720" height="440"></canvas><p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p></div>' +
-      '<p id="drawer-chart-status" class="chart-status" aria-live="polite">Chart status: Loading…</p><p id="drawer-chart-context" class="chart-context" aria-live="polite">Timeframe: 1D · Source: Daily price data</p><div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>' +
+      '<div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>' +
       '<div class="chart-timeframe-controls" aria-label="Chart timeframe"><span class="chart-control-label">Timeframe</span><button type="button" class="chart-timeframe" data-timeframe="60M">60m</button><button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button><button type="button" class="chart-timeframe" data-timeframe="1W">1W</button><button type="button" class="chart-timeframe" data-timeframe="1M">1M</button></div>' +
       '<div class="ma-controls" aria-label="Moving average overlays"><span class="chart-control-label">Moving averages</span><label><input type="checkbox" data-ma-period="5" checked> MA5</label><label><input type="checkbox" data-ma-period="10" checked> MA10</label><label><input type="checkbox" data-ma-period="20" checked> MA20</label><label><input type="checkbox" data-ma-period="60" checked> MA60</label><label><input type="checkbox" data-ma-period="120"> MA120</label><label><input type="checkbox" data-ma-period="240"> MA240</label></div>' +
       '<section id="technical-latest" class="technical-summary" aria-label="Latest deterministic technical values" aria-live="polite"><div><span>High / Low</span><strong id="technical-high-low">Not verified</strong></div><div><span>MACD / Signal / Hist</span><strong id="technical-macd">Not verified</strong></div><div><span>RSI 14</span><strong id="technical-rsi">Not verified</strong></div><div><span>ATR 14</span><strong id="technical-atr">Not verified</strong></div></section>' +
       '<section id="rolling-high-low" class="rolling-high-low" aria-labelledby="rolling-high-low-title" aria-live="polite"><h2 id="rolling-high-low-title">OHLCV Window Summary (candles)</h2><div class="rolling-high-low__table-wrap"><table><thead><tr><th>Candles</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Avg Vol</th><th>MA</th></tr></thead><tbody>' +
       ["5","10","20","60","120","240","260"].map(function (p) { return '<tr data-rolling-period="' + p + '"><th>' + p + '<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>'; }).join("") +
-      '</tbody></table></div></section><label class="chart-evidence-toggle"><input id="chart-wave-evidence" type="checkbox" checked> Wave Evidence</label>' +
-      '<section id="chart-wave-explanation" class="chart-wave-explanation" aria-live="polite"><span>Wave evidence details are in the Method / Evidence Guide.</span><button id="drawer-method-link" class="btn btn--guide" type="button">Open guide</button></section>' +
+      '</tbody></table></div></section>' +
       '<section class="drawer-section drawer-section--setup" aria-labelledby="drawer-setup-title"><h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2><dl class="drawer-setup-grid"><div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div><div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div><div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div><div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div><div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div></dl></section>' +
-      '<section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title"><h2 id="drawer-company-title" class="drawer-section-title">Company context</h2><div class="drawer-company-context"><span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span></div></section>' +
-      '<details id="drawer-evidence-details" class="drawer-details"><summary>Evidence details and provenance</summary><p id="drawer-description" class="drawer-description">–</p><dl class="drawer-fields"><div class="drawer-field"><dt>V2 decision</dt><dd id="drawer-v2-decision">–</dd></div><div class="drawer-field"><dt>Raw V1 state</dt><dd id="drawer-raw-state">–</dd></div><div class="drawer-field"><dt>Index</dt><dd id="drawer-membership">–</dd></div><div class="drawer-field"><dt>Marginable</dt><dd id="drawer-margin">–</dd></div><div class="drawer-field"><dt>52W High / Low</dt><dd id="drawer-52w">–</dd></div><div class="drawer-field"><dt>ATH High / Low</dt><dd id="drawer-ath">–</dd></div><div class="drawer-field"><dt>Provenance</dt><dd id="drawer-provenance">–</dd></div></dl></details></div></div></aside>';
+      '<section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title"><h2 id="drawer-company-title" class="drawer-section-title">Company context</h2><div class="drawer-company-context"><span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span></div></section></div></div></aside>';
   }
 
   function bindDom() {
     var mount = document.querySelector("#drawer-mount");
     if (mount && !document.querySelector("#drawer")) mount.innerHTML = drawerMarkup();
-    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerEvidenceDetails","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerDescription","drawerCanvas","drawerChartPH","drawerChartStatus","drawerChartContext","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","chartWaveEvidence","chartWaveExplanation","drawerMethodLink","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerV2Decision","drawerRawState","drawerMembership","drawerMargin","drawer52W","drawerATH","drawerProv"].forEach(function (key) {
+    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR"].forEach(function (key) {
       var ids = {
         drawerChartPH:"drawer-chart-placeholder",
-        drawer52W:"drawer-52w",
-        drawerATH:"drawer-ath",
-        drawerProv:"drawer-provenance"
+        drawerRR:"drawer-rr"
       };
       var id = ids[key] || key.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); });
       if (key === "drawer") id = "drawer";
@@ -128,35 +124,21 @@
     };
   }
 
-  function showWaveExplanation(marker) {
-    var panel = dom.chartWaveExplanation;
-    var guide = dom.methodGuideContent;
-    if (!panel) return;
-    if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
-      if (guide) guide.textContent = "No wave evidence is available for this candidate.";
-      // Legacy drawer reset shape retained as a compatibility comment:
-      // panel.hidden = true; panel.textContent = ""; return;
-      return;
+  function normalizeDrawerTrendDisplay(item, trend) {
+    var itemTrend = item && item.trend;
+    var candidate = itemTrend && typeof itemTrend === "object" && !Array.isArray(itemTrend)
+      ? (itemTrend.state != null ? itemTrend.state : itemTrend.primary_state)
+      : itemTrend;
+    if (candidate == null || candidate === "") {
+      candidate = item && item.stage;
     }
-    var valid = marker;
-    var details = marker.explanation && typeof marker.explanation === "object" && !Array.isArray(marker.explanation)
-      ? marker.explanation : valid;
-    function text(value) { return waveEvidenceText(value); }
-    var refs = Array.isArray(marker.evidence_refs) ? marker.evidence_refs.map(text).filter(function(ref) {
-      return ref !== "Unavailable";
-    }) : [];
-    var snapshot = marker.snapshot_identity || marker.snapshot_id;
-    if (guide) guide.innerHTML = "<strong>How this wave was identified</strong>" +
-      "<div>Timeframe: " + escapeHTML(text(marker.timeframe)) + " · Source: " + escapeHTML(text(marker.source)) + "</div>" +
-      "<div>Confidence: " + escapeHTML(text(marker.confidence)) + "</div>" +
-      "<div>Rule: " + escapeHTML(text(details.rule)) + "</div>" +
-      "<div>Supporting evidence: " + escapeHTML(text(details.supporting_evidence != null ? details.supporting_evidence : details.evidence)) + "</div>" +
-      "<div>Contradicting evidence: " + escapeHTML(text(details.contradicting_evidence)) + "</div>" +
-      "<div>Missing evidence: " + escapeHTML(text(details.missing_evidence != null ? details.missing_evidence : details.missing)) + "</div>" +
-      "<div>Alternative state: " + escapeHTML(text(details.alternative_state != null ? details.alternative_state : details.alternative)) + " · Policy: " + escapeHTML(text(details.policy)) + "</div>" +
-      "<div>Evidence refs: " + escapeHTML(refs.length ? refs.join(" · ") : "Unavailable") + "</div>" +
-      "<div>Snapshot: " + escapeHTML(text(snapshot)) + " · identity</div>";
-    panel.hidden = false;
+    if (candidate == null || candidate === "") {
+      candidate = trend && typeof trend === "object" && !Array.isArray(trend)
+        ? (trend.state != null ? trend.state : trend.primary_state)
+        : trend;
+    }
+    return candidate != null && candidate !== "" && typeof candidate !== "object"
+      ? String(candidate) : "Not verified";
   }
 
   function mergeCanonicalDailyMetadata(item, canonical) {
@@ -236,12 +218,16 @@
 
   function renderSharedDetail(envelope) {
     var item = envelope.item || {}, shadow = envelope.source === "trend-map-shadow";
+    dom.drawer.classList.toggle("drawer--shadow", shadow);
+    var waveSummary = dom.drawer.querySelector(".drawer-wave-summary");
+    if (waveSummary) waveSummary.hidden = shadow;
+    if (dom.drawerChartLegend) dom.drawerChartLegend.hidden = shadow;
     dom.drawerSymbol.textContent = item.symbol || "–";
     dom.drawerSymbol.href = "https://www.tradingview.com/symbols/" + encodeURIComponent(item.symbol || "") + "/?exchange=SET";
-    dom.drawerName.textContent = item.name || item.symbol || "–";
+    dom.drawerName.textContent = item.name && String(item.name).toUpperCase() !== String(item.symbol || "").toUpperCase() ? item.name : "";
+    dom.drawerName.hidden = !dom.drawerName.textContent;
     dom.drawerLane.textContent = envelope.lane || "Not verified";
-    dom.drawerTrend.textContent = envelope.trend || "Not verified";
-    if (dom.drawerEvidenceDetails) dom.drawerEvidenceDetails.open = false;
+    dom.drawerTrend.textContent = normalizeDrawerTrendDisplay(item, envelope.trend);
     dom.drawerAction.textContent = shadow ? "" : (item.action || item.decision || "Not verified");
     dom.drawerAction.hidden = shadow;
     if (dom.drawerAction.parentElement) dom.drawerAction.parentElement.hidden = shadow;
@@ -259,8 +245,6 @@
     dom.drawerPrice.className = "drawer-price drawer-price--" + changeText[1];
     dom.drawerQuoteSource.textContent = quote.source === "intraday_price_data" ? "Quote · 60m provisional" : quote.source === "price_data" ? "Quote · Daily close" : "Quote · Not verified";
     dom.drawerTradeValue.textContent = shadow ? "Trade value Not applicable" : "Trade value " + fmtNum(item.trade_value);
-    dom.drawerDescription.textContent = shadow ? "Research only. No financial calculations, setup, order, or broker action is available from this surface." : (item.description || "");
-    dom.drawerDescription.hidden = !dom.drawerDescription.textContent;
     dom.drawerChartPH.textContent = "Chart loading…";
     dom.drawerChartPH.style.display = "block"; dom.drawerCanvas.style.display = "none";
     ["drawerTrigger","drawerStop","drawerTarget","drawerRR"].forEach(function (key) {
@@ -289,7 +273,6 @@
     dom.drawerSector.textContent = shadow ? "Sector Not applicable" : "Sector " + (item.sector || "Unknown");
     dom.drawerIndustry.textContent = shadow ? "Industry Not applicable" : "Industry " + (item.industry || "Unknown");
     dom.drawerMarketCap.textContent = shadow ? "Market cap Not applicable" : "Market cap " + fmtNum(item.market_cap);
-    dom.drawerProv.textContent = formatProvenance(item.as_of || (item.provenance || {}).scan_time);
     dom.drawer.classList.remove("drawer--hidden");
     document.body.style.overflow = "hidden";
   }
@@ -297,7 +280,13 @@
   function setChartTimeframeButtons(value) {
     $$(".chart-timeframe").forEach(function (button) { button.classList.toggle("is-active", button.getAttribute("data-timeframe") === value); });
   }
-  function updateSharedDrawerNavigation() {
+  function updateSharedDrawerNavigation(symbols, items) {
+    if (Array.isArray(symbols)) {
+      var currentSymbol = drawerSymbols[drawerIndex] || (drawerItem && drawerItem.symbol);
+      drawerSymbols = symbols.slice();
+      drawerItems = Array.isArray(items) ? items.slice() : drawerItems;
+      drawerIndex = drawerSymbols.indexOf(currentSymbol);
+    }
     var hasItems = drawerSymbols.length > 0 && drawerIndex >= 0;
     if (dom.drawerPrev) dom.drawerPrev.disabled = !hasItems || drawerIndex <= 0;
     if (dom.drawerNext) dom.drawerNext.disabled = !hasItems || drawerIndex >= drawerSymbols.length - 1;
@@ -354,7 +343,8 @@
   function navigateSharedDrawer(delta) {
     var next = drawerIndex + delta; if (next < 0 || next >= drawerSymbols.length) return;
     var item = drawerItems[next] || {symbol: drawerSymbols[next]};
-    openSharedDrawer({item:item, lane:item.decision_lane, trend:item.trend || item.stage, broad_state:item.broad_state, source:"canonical-mvp", actionability:item.actionability, navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
+    var envelope = drawerItem && drawerItem.__sharedEnvelope || {};
+    openSharedDrawer({item:item, lane:item.decision_lane || item.machine_lane, trend:item.trend || item.classifier_status || item.stage, broad_state:item.broad_state, source:envelope.source || "canonical-mvp", actionability:item.actionability, detailUrl:envelope.detailUrl || null, chartUrl:envelope.chartUrl || null, navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
   }
 
     function escapeHTML(str) {
@@ -405,22 +395,6 @@
   function formatRange(high, low, pending) {
     if (high == null && low == null) return pending ? "Loading…" : "Unavailable";
     return (high == null ? "–" : Number(high).toFixed(2)) + " / " + (low == null ? "–" : Number(low).toFixed(2));
-  }
-
-  function formatProvenance(iso) {
-    if (!iso) return "–";
-    try {
-      // A date-only value has no time-of-day. Never reinterpret it as UTC midnight.
-      if (/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) {
-        var dateOnly = new Date(String(iso) + "T00:00:00Z");
-        return dateOnly.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric", timeZone:"Asia/Bangkok"})
-          + " time unavailable (Bangkok)";
-      }
-      var d = new Date(iso);
-      return d.toLocaleDateString("en-GB", {day:"2-digit", month:"short", year:"numeric", timeZone:"Asia/Bangkok"})
-        + " " + d.toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false, timeZone:"Asia/Bangkok"})
-        + " ICT (Bangkok)";
-    } catch (e) { return "–"; }
   }
 
   function setOptionalDrawerField(el, value) {
@@ -509,24 +483,6 @@
       return candidate != null && Number.isFinite(Number(candidate)) ? Number(candidate) : null;
     }
     return value != null && Number.isFinite(Number(value)) ? Number(value) : null;
-  }
-
-  function renderChartStatus(chart) {
-    if (!dom.drawerChartStatus) return;
-    var candles = chart && Array.isArray(chart.candles) ? chart.candles : [];
-    var latest = candles.length ? candles[candles.length - 1] : null;
-    var provisional = chart && chart.provisional === true;
-    if (chart && chart.candles && chart.candles.length && chart.candles[chart.candles.length - 1].provisional === true) provisional = true;
-    var timestamp = chart && chart.latest_time || (latest && (latest.date || latest.time));
-    var label = provisional ? "Provisional · current candle" : "Confirmed candle";
-    dom.drawerChartStatus.textContent = "Chart status: " + label + (timestamp ? " · " + timestamp : "");
-    dom.drawerChartStatus.classList.toggle("chart-status--provisional", provisional);
-    if (dom.drawerChartContext) {
-      var timeframe = chart && chart.timeframe || chartTimeframe;
-      var source = chart && chart.provenance && (chart.provenance.source || chart.provenance.interval);
-      var sourceLabel = timeframe === "60M" ? "60m intraday price data" : timeframe === "1W" ? "Weekly price data" : "Daily price data";
-      dom.drawerChartContext.textContent = "Timeframe: " + timeframe + " · Source: " + (source || sourceLabel);
-    }
   }
 
   function renderChartLegend(chart) {
@@ -747,7 +703,7 @@
   }
 
   function renderDrawerChart(chart) {
-    window.__signalixLastChart = chart; renderChartStatus(chart); renderChartLegend(chart); renderTechnicalSummary(chart);
+    window.__signalixLastChart = chart; renderChartLegend(chart); renderTechnicalSummary(chart);
     if (chart && Array.isArray(chart.candles) && chart.candles.length) {
       dom.drawerChartPH.style.display = "none"; dom.drawerCanvas.style.display = "block"; drawChart(chart);
     } else {

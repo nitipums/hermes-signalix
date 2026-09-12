@@ -74,7 +74,7 @@ The Team Facts surface is public unauthenticated read-only by owner decision. It
 
 The release is handed to Arm for manual use. Elliott Wave output remains machine-generated candidate/evidence, not unquestionable truth. Review/confirm Wave identification from the rendered chart first; do not tune semantics from assumptions. Any confirmed product issue becomes a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle.
 
-- Lite preflight is `PASS` for the rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, Wave Evidence visibility after drawer scroll, TradingView link, and no overflow). Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
+- Lite preflight is `PASS` for the previously accepted rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, TradingView link, and no overflow). The 2026-09-12 owner UI feedback slice intentionally removes the drawer's Wave Evidence toggle/explanation and Evidence Details/provenance section, while retaining source-linked Daily chart markers and the primary Wave summary. The revised desktop/mobile drawer journey remains `NOT VERIFIED` until Lite rechecks it. Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
 
 ## Current session closeout — 2026-09-02 12:50 ICT
 

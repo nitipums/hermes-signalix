@@ -225,7 +225,7 @@ def test_template_has_lane_grouped_table_filters_drawer_chart_and_shadow_markers
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     html += shared.read_text()
-    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "quoteValue", "change_amount", "change_pct", "Search symbol", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states", "setOptions", "laneGroups", "class=\"lane-heading\"", "Machine lane", "row.machine_lane===lane", "!lane||row.machine_lane===lane", "!broad||row.broad_state===broad", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:item.machine_lane", "trend:item.classifier_status", "broad_state:item.broad_state", "source:\"trend-map-shadow\"", "actionability:\"NONE\"", "Research only", "No financial calculations", "/api/trend-map-shadow", "/api/chart-db/", "timeframe=1D", "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "machine_lane", "broad_state", "as_of", "bars_used", "drawChart", "chartRequestSeq", "Provenance"):
+    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Daily lane</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states", "setOptions", "laneGroups", "class=\"lane-heading\"", "Machine lane", "row.machine_lane===lane", "!lane||row.machine_lane===lane", "!broad||row.broad_state===broad", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:item.machine_lane", "trend:item.classifier_status", "broad_state:item.broad_state", "source:\"trend-map-shadow\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map-shadow", "/api/chart-db/", "timeframe=1D", "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "machine_lane", "broad_state", "drawChart", "chartRequestSeq"):
         assert marker in html
     assert 'id="status"' not in html
     assert '<th>Status</th>' not in html
@@ -234,15 +234,42 @@ def test_template_has_lane_grouped_table_filters_drawer_chart_and_shadow_markers
     assert 'r.status===s' not in html
 
 
-def test_shadow_page_declares_permanent_public_read_only_access_without_pending_auth_copy():
+def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_contract():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     normalized = html.lower()
-    assert "permanent public read-only research surface" in normalized
-    assert "no authentication required" in normalized
-    assert "research only" in normalized
-    assert "no financial calculations" in normalized
+    for removed in ("permanent public read-only research surface", "no authentication required", "research only", "no financial calculations"):
+        assert removed not in normalized
+    assert 'source:"trend-map-shadow"' in html
+    assert 'actionability:"NONE"' in html
     for forbidden in ("owner-only", "owner decision", "access control", "auth pending", "authentication pending"):
         assert forbidden not in normalized
+
+
+def test_shadow_table_contract_sorts_quotes_and_navigates_filtered_rendered_rows():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    assert "groups[lane].sort" in html
+    assert "return bv-av||String(a.symbol).localeCompare(String(b.symbol))" in html
+    assert 'typeof value==="number"&&Number.isFinite(value)' in html
+    assert 'var change=quoteChangePct(row),changeClass=change===null?"neutral":change>0?"positive":change<0?"negative":"neutral"' in html
+    assert 'navigation:{symbols:renderedRows.map(function(candidate){return candidate.symbol;}),items:renderedRows,index:renderedRows.indexOf(item)}' in html
+    assert 'window.SignalixSharedDrawer.updateNavigation(renderedRows.map(function(candidate){return candidate.symbol;}),renderedRows)' in html
+    assert '<th>Broad state</th>' not in html
+    assert '<th>Bars used</th>' not in html
+    assert '<th>As-of</th>' not in html
+    assert 'colspan="8"' not in html
+
+
+def test_shadow_drawer_removes_wave_evidence_and_chart_prose_but_preserves_markers_and_identity():
+    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
+    assert 'dom.drawer.classList.toggle("drawer--shadow", shadow)' in shared
+    assert 'if (waveSummary) waveSummary.hidden = shadow' in shared
+    assert 'if (dom.drawerChartLegend) dom.drawerChartLegend.hidden = shadow' in shared
+    assert 'marker.timestamp != null' in shared and 'marker.price != null' in shared
+    assert 'String(item.name).toUpperCase() !== String(item.symbol || "").toUpperCase()' in shared
+    assert "drawer-chart-status" not in (template + shared)
+    assert "drawer-chart-context" not in (template + shared)
+    assert "Evidence details" not in (template + shared)
 
 
 def test_shadow_adapter_uses_shared_drawer_and_suppresses_action_setup_semantics():
@@ -256,11 +283,10 @@ def test_shadow_adapter_uses_shared_drawer_and_suppresses_action_setup_semantics
     assert 'shadow ? "Not applicable · shadow classification"' in combined
 
 
-def test_shadow_shared_drawer_open_path_binds_all_explicit_metadata_nodes():
+def test_shadow_shared_drawer_does_not_restore_removed_evidence_metadata_nodes():
     shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
-    for mapping in ('drawer52W:"drawer-52w"', 'drawerATH:"drawer-ath"', 'drawerProv:"drawer-provenance"'):
-        assert mapping in shared
-    assert 'dom.drawerProv.textContent = formatProvenance(item.as_of || (item.provenance || {}).scan_time);' in shared
+    for removed in ('drawer-52w', 'drawer-ath', 'drawer-provenance', 'Evidence details and provenance'):
+        assert removed not in shared
     assert 'dom.drawer.classList.remove("drawer--hidden");' in shared
 
 
@@ -270,7 +296,8 @@ def test_shadow_shared_drawer_owns_ohlcv_table_overflow_without_page_overflow():
     assert '<div class="rolling-high-low__table-wrap"><table>' in shared
     assert '</tbody></table></div></section>' in shared
     assert ".rolling-high-low__table-wrap { width:100%; max-width:100%; min-width:0; overflow-x:auto; }" in css
-    assert ".rolling-high-low table { width:100%; min-width:560px;" in css
+    assert ".rolling-high-low table { width:100%; min-width:520px;" in css
+    assert "font-size:12px" in css
     assert "body {" in css and "overflow-x: hidden;" in css
 
 
@@ -279,7 +306,7 @@ def test_template_has_mobile_safe_table_overflow_strategy():
     assert ".table-wrap" in html
     assert "overflow-x:auto" in html
     assert "max-width:100%" in html
-    assert "min-width:980px" in html
+    assert "min-width:720px" in html
     assert "overflow-x:hidden" in html
 
 

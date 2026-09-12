@@ -43,20 +43,14 @@
     dailyVcpMeta:    $("#daily-vcp-meta"),
     dailySetupSearch: $("#daily-setup-search"),
     dailySetupLane: $("#daily-setup-lane"),
+    dailySetupReset: $("#daily-setup-reset"),
     dailySetupRefresh: $("#daily-setup-refresh"),
     dailySetupUpdated: $("#daily-setup-updated"),
-    dailySetupLiveRefresh: $("#daily-setup-live-refresh"),
     dailySetupPrev:  $("#daily-setup-prev"),
     dailySetupNext:  $("#daily-setup-next"),
     dailySetupPageInfo: $("#daily-setup-page-info"),
-    dailyFilterMarginable: $("#daily-filter-marginable"),
-    dailyFilterTradeValue: $("#daily-filter-trade-value"),
-    dailyFilterPrice: $("#daily-filter-price"),
     dailyVcpType:   $("#daily-vcp-type"),
     dailySetupSector: $("#daily-setup-sector"),
-    dailyVcpDecisionState: $("#daily-vcp-decision-state"),
-    dailyVcpDecision: $("#daily-vcp-decision"),
-    dailyVcpQuality: $("#daily-vcp-quality"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -127,7 +121,6 @@
     drawerTrend:    $("#drawer-trend"),
     drawerAction:   $("#drawer-action"),
     drawerWave:     $("#drawer-wave"),
-    drawerEvidenceDetails: $("#drawer-evidence-details"),
     drawerWaveConfidence: $("#drawer-wave-confidence"),
     drawerWaveSource: $("#drawer-wave-source"),
     drawerDeepPullback: $("#drawer-deep-pullback"),
@@ -135,23 +128,17 @@
     drawerIndustry: $("#drawer-industry"),
     drawerMarketCap: $("#drawer-market-cap"),
     drawerTradeValue: $("#drawer-trade-value"),
-    drawerDescription: $("#drawer-description"),
     drawerChart:    $("#drawer-chart"),
     drawerCanvas:  $("#drawer-canvas"),
     drawerChartPH: $("#drawer-chart-placeholder"),
-    drawerChartStatus: $("#drawer-chart-status"),
-    drawerChartContext: $("#drawer-chart-context"),
     drawerChartLegend: $("#drawer-chart-legend"),
     technicalHighLow: $("#technical-high-low"),
     technicalMacd: $("#technical-macd"),
     technicalRsi: $("#technical-rsi"),
     technicalAtr: $("#technical-atr"),
     rollingHighLow: $("#rolling-high-low"),
-    chartWaveEvidence: $("#chart-wave-evidence"),
-    chartWaveExplanation: $("#chart-wave-explanation"),
     methodGuide: $("#method-guide"),
     methodGuideContent: $("#method-guide-content"),
-    drawerMethodLink: $("#drawer-method-link"),
     indMa20:       $("#ind-ma20"),
     indMa50:       $("#ind-ma50"),
     indMa200:      $("#ind-ma200"),
@@ -164,13 +151,6 @@
     drawerTrigger:  $("#drawer-trigger"),
     drawerStop:     $("#drawer-stop"),
     drawerRR:       $("#drawer-rr"),
-    drawerV2Decision: $("#drawer-v2-decision"),
-    drawerRawState: $("#drawer-raw-state"),
-    drawerMembership: $("#drawer-membership"),
-    drawerMargin:   $("#drawer-margin"),
-    drawer52W:      $("#drawer-52w"),
-    drawerATH:      $("#drawer-ath"),
-    drawerProv:     $("#drawer-provenance"),
   };
 
   /* ── state ── */
@@ -201,8 +181,6 @@
   let dailySetupPage = 1;
   let dailySetupTotalPages = 1;
   let dailySetupData = null;
-  let liveRefreshEnabled = false;
-  let liveRefreshTimer = null;
   let vcpRequestSeq = 0;
   let shadowRequestSeq = 0;
   var dailyVcpRequests = SignalixRequestCache();
@@ -239,6 +217,12 @@
     if (value == null || value === "" || Number.isNaN(Number(value))) return "Not verified";
     var n = Number(value);
     return (n >= 0 ? "+" : "") + n.toFixed(2);
+  }
+
+  function identityName(item) {
+    var symbol = String(item && item.symbol || "").trim();
+    var name = String(item && item.name || "").trim();
+    return name && name.toUpperCase() !== symbol.toUpperCase() ? name : "";
   }
 
   function shortStage(value) {
@@ -489,7 +473,7 @@
       '<div class="explorer-card" data-symbol="' + escapeHTML(item.symbol) + '">' +
         '<div class="explorer-card__row">' +
           '<span class="explorer-card__symbol">' + escapeHTML(item.symbol) + '</span>' +
-          '<span class="explorer-card__name">' + escapeHTML(item.name || "") + '</span>' +
+          (identityName(item) ? '<span class="explorer-card__name">' + escapeHTML(identityName(item)) + '</span>' : '') +
           '<span class="explorer-card__stage explorer-card__stage--' + stageClass(item.stage) + '">' + escapeHTML(shortStage(item.stage)) + '</span>' +
           marginBadge(item) +
           '<span class="explorer-card__price ' + (chg[1] !== "flat" ? "decision-card__change--" + chg[1] : "") + '">' +
@@ -688,37 +672,6 @@
     };
   }
 
-  function showWaveExplanation(marker) {
-    var panel = dom.chartWaveExplanation;
-    var guide = dom.methodGuideContent;
-    if (!panel) return;
-    if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
-      if (guide) guide.textContent = "No wave evidence is available for this candidate.";
-      // Legacy drawer reset shape retained as a compatibility comment:
-      // panel.hidden = true; panel.textContent = ""; return;
-      return;
-    }
-    var valid = marker;
-    var details = marker.explanation && typeof marker.explanation === "object" && !Array.isArray(marker.explanation)
-      ? marker.explanation : valid;
-    function text(value) { return waveEvidenceText(value); }
-    var refs = Array.isArray(marker.evidence_refs) ? marker.evidence_refs.map(text).filter(function(ref) {
-      return ref !== "Unavailable";
-    }) : [];
-    var snapshot = marker.snapshot_identity || marker.snapshot_id;
-    if (guide) guide.innerHTML = "<strong>How this wave was identified</strong>" +
-      "<div>Timeframe: " + escapeHTML(text(marker.timeframe)) + " · Source: " + escapeHTML(text(marker.source)) + "</div>" +
-      "<div>Confidence: " + escapeHTML(text(marker.confidence)) + "</div>" +
-      "<div>Rule: " + escapeHTML(text(details.rule)) + "</div>" +
-      "<div>Supporting evidence: " + escapeHTML(text(details.supporting_evidence != null ? details.supporting_evidence : details.evidence)) + "</div>" +
-      "<div>Contradicting evidence: " + escapeHTML(text(details.contradicting_evidence)) + "</div>" +
-      "<div>Missing evidence: " + escapeHTML(text(details.missing_evidence != null ? details.missing_evidence : details.missing)) + "</div>" +
-      "<div>Alternative state: " + escapeHTML(text(details.alternative_state != null ? details.alternative_state : details.alternative)) + " · Policy: " + escapeHTML(text(details.policy)) + "</div>" +
-      "<div>Evidence refs: " + escapeHTML(refs.length ? refs.join(" · ") : "Unavailable") + "</div>" +
-      "<div>Snapshot: " + escapeHTML(text(snapshot)) + " · identity</div>";
-    panel.hidden = false;
-  }
-
   function waveEvidenceForItem(item) {
     var wave = item && item.wave;
     if (!wave || typeof wave !== "object" || Array.isArray(wave)) return {};
@@ -780,7 +733,9 @@
         market_cap: context.market_cap, trigger: setup.trigger, invalidation: setup.invalidation,
         risk_stop: setup.trade_stop, rr: (setup.rr || {}).to_target_1});
     }
-    var navigation = Array.isArray(navSymbols) ? {symbols: navSymbols, index: navIndex, items: navSymbols.map(drawerItemForSymbol)} : {};
+    var navigation = Array.isArray(navSymbols) ? {symbols: navSymbols, index: navIndex, items: navSymbols.map(function(navSymbol) {
+      return drawerItems.find(function(candidate) { return candidate && candidate.symbol === navSymbol; }) || drawerItemForSymbol(navSymbol);
+    })} : {};
     window.SignalixSharedDrawer.openSharedDrawer({
       item: item, lane: item.decision_lane, trend: item.trend || item.stage,
       broad_state: item.broad_state, source: "canonical-mvp", actionability: item.actionability,
@@ -1042,9 +997,8 @@
     // represented locally only for rendering the explicit Not verified state.
     var quote = quoteEnvelope(item) || {};
     var dailyChange = primaryDailyQuoteChange(quote);
-    var changeSource = quote.change_basis === "previous_daily_close" ? "Change vs previous Daily close" : "Daily change not verified";
-    var quoteSource = quote.source === "intraday_price_data" ? "60m provisional · " + changeSource
-      : quote.source === "price_data" ? "Daily close · " + changeSource : "Not verified";
+    var quoteSource = quote.source === "intraday_price_data" ? "60m provisional"
+      : quote.source === "price_data" ? "Daily close" : "Not verified";
     var confidence = compactWaveConfidence(item).toLowerCase().replace("_", "-");
     var dataStatus = item.data_status || {};
     var incomplete = decision === "DATA_BLOCKED" || [dataStatus.daily_freshness, dataStatus.intraday_60m_freshness].some(function(value) {
@@ -1052,7 +1006,7 @@
     });
     var direction = setupCandidateDirection(Object.assign({}, item, {quote: quote}), incomplete);
     return '<article class="decision-card setup-candidate-card setup-candidate-card--' + direction + '" data-symbol="' + escapeHTML(item.symbol || "") + '" tabindex="0">' +
-      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong><span class="setup-candidate__name">' + escapeHTML(item.name || "") + '</span></div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
+      '<div class="setup-candidate__header"><div><strong class="setup-candidate__symbol">' + escapeHTML(item.symbol || "–") + '</strong>' + (identityName(item) ? '<span class="setup-candidate__name">' + escapeHTML(identityName(item)) + '</span>' : '') + '</div><div class="setup-candidate__quote"><b class="setup-candidate__price setup-candidate__price--' + direction + '">' + escapeHTML(valueOrUnavailable(quote.price, "Not verified")) + '</b><span class="setup-candidate__change setup-candidate__change--' + direction + '">' + escapeHTML(fmtChange(dailyChange)[0]) + '</span><small class="setup-candidate__quote-source">' + escapeHTML(quoteSource) + '</small></div></div>' +
       '<div class="setup-candidate__wave"><span class="setup-candidate__wave-badge"><span>Primary Daily Wave · </span>' + escapeHTML(compactWaveLabel(item)) + '</span>' + deepPullbackBadge(item) + '<span class="setup-candidate__confidence setup-candidate__confidence--' + confidence + '"><i aria-hidden="true"></i><span>Confidence</span><b>' + escapeHTML(compactWaveConfidence(item).replace("NOT_VERIFIED", "Not verified")) + '</b></span></div>' +
       '<div class="setup-candidate__plan"><span>Trigger <b>' + escapeHTML(valueOrUnavailable(setup.trigger)) + '</b></span><span class="' + (isInvalidationNear(item, setup.invalidation || setup.trade_stop) ? 'setup-candidate__stop--warning' : '') + '">Stop <b>' + escapeHTML(valueOrUnavailable(setup.invalidation || setup.trade_stop)) + '</b></span><span>Target <b>' + escapeHTML(valueOrUnavailable(target1)) + '</b></span><span>R:R <b>' + escapeHTML(valueOrUnavailable(rr.to_target_1)) + '</b></span></div>' +
       '<p class="setup-candidate__readiness"><span>' + escapeHTML(setupLaneLabel(decision)) + ' · ' + escapeHTML(readiness) + '</span></p></article>';
@@ -1068,7 +1022,7 @@
   function setupCandidateDirection(item, incomplete) {
     var quote = item && item.quote && typeof item.quote === "object" ? item.quote : {};
     var quoteChange = primaryDailyQuoteChange(quote);
-    var changeValue = quoteChange != null ? quoteChange : (quote.change_basis ? null : item && item.change_pct);
+    var changeValue = quoteChange;
     if (incomplete || item == null || changeValue == null || changeValue === "") return "neutral";
     var change = Number(changeValue);
     return Number.isFinite(change) && change > 0 ? "bullish" : Number.isFinite(change) && change < 0 ? "bearish" : "neutral";
@@ -1083,6 +1037,18 @@
 
   function stableSetupCandidateOrder(items) {
     return (items || []).map(function(item, index) { return {item: item, index: index}; }).sort(function(a, b) {
+      function quoteChange(item) {
+        var quote = item && item.quote;
+        if (!quote || typeof quote !== "object" || quote.change_pct == null || quote.change_pct === "") return null;
+        if (quote.change_basis && quote.change_basis !== "previous_daily_close") return null;
+        var value = Number(quote.change_pct);
+        return Number.isFinite(value) ? value : null;
+      }
+      var leftChange = quoteChange(a.item);
+      var rightChange = quoteChange(b.item);
+      if (leftChange == null && rightChange != null) return 1;
+      if (leftChange != null && rightChange == null) return -1;
+      if (leftChange != null && rightChange != null && leftChange !== rightChange) return rightChange - leftChange;
       var left = String(a.item.symbol || "").toUpperCase();
       var right = String(b.item.symbol || "").toUpperCase();
       return left < right ? -1 : left > right ? 1 : a.index - b.index;
@@ -1115,7 +1081,7 @@
   }
 
   function reconcileDailyDrawerNavigation() {
-    if (window.SignalixSharedDrawer) window.SignalixSharedDrawer.updateNavigation();
+    if (window.SignalixSharedDrawer) window.SignalixSharedDrawer.updateNavigation(drawerSymbols, drawerItems);
   }
 
   function setDailySetupRefreshing(refreshing) {
@@ -1195,19 +1161,13 @@
     items.forEach(function(item) { vcpResultsBySymbol[item.symbol] = item; });
     var freshness = data.freshness || {};
     var intradayFetchedAt = freshness.intraday_fetched_at || null;
-    var intradayLatestBarAt = items.reduce(function(latest, item) {
-      var status = item && item.data_status || {}, provenance = item && item.provenance || {};
-      var candidate = status.intraday_60m_as_of || provenance.intraday_as_of;
-      return candidate && (!latest || String(candidate) > String(latest)) ? candidate : latest;
-    }, null);
     var dailyStatuses = items.map(function(item) { return (item.data_status || {}).daily_freshness; }).filter(Boolean);
     var intradayStatuses = items.map(function(item) { return (item.data_status || {}).intraday_60m_freshness; }).filter(Boolean);
     var dailyStatus = freshness.daily_status || (dailyStatuses.indexOf("stale") >= 0 ? "stale" : dailyStatuses.length && dailyStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
     var intradayStatus = freshness.intraday_status || (intradayStatuses.indexOf("stale") >= 0 ? "stale" : intradayStatuses.length && intradayStatuses.every(function(value) { return value === "fresh"; }) ? "fresh" : null);
     setFreshness(freshness.status || "unknown", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus, freshness.daily_unavailable_count);
     var universeLabel = data.universe_filter === "marginable_long" ? "Marginable long" : (data.universe_filter || "Signalix");
-    var provenanceSource = freshness.source || (items[0] && items[0].provenance && items[0].provenance.source) || "price_data+intraday_price_data";
-    dom.dailyVcpMeta.textContent = universeLabel + " · Daily EOD " + formatProvenance(freshness.data_fetched_at || data.as_of) + " · 60m fetched " + (intradayFetchedAt ? formatProvenance(intradayFetchedAt) : "Unavailable") + " · latest completed 60m candle " + (intradayLatestBarAt ? formatProvenance(intradayLatestBarAt) : "Unavailable") + " · source " + provenanceSource + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
+    dom.dailyVcpMeta.textContent = universeLabel + " · " + (data.returned_count || 0) + " shown / " + (data.evaluated_count || 0) + " evaluated · " + (data.policy_version || "setup-candidates-v1");
     dailySetupPage = data.page || 1;
     dailySetupTotalPages = totalPages;
     dom.dailySetupPageInfo.textContent = dailySetupTotalPages ? "Page " + dailySetupPage + " of " + dailySetupTotalPages : "Page 0 of 0";
@@ -1399,9 +1359,11 @@
   }
 
   if (dom.dailySetupRefresh) dom.dailySetupRefresh.addEventListener("click", function() { loadDailyVcp(true, 1); });
-  [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice,
-   dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
-    if (input) input.addEventListener("change", function() { loadDailyVcp(false, 1); });
+  if (dom.dailySetupReset) dom.dailySetupReset.addEventListener("click", function() {
+    if (dom.dailySetupSearch) dom.dailySetupSearch.value = "";
+    if (dom.dailySetupLane) dom.dailySetupLane.value = "ALL";
+    if (dom.dailySetupSector) dom.dailySetupSector.value = "";
+    loadDailyVcp(true, 1);
   });
   if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", function() { loadDailyVcp(false, 1); });
   if (dom.dailySetupSearch) dom.dailySetupSearch.addEventListener("input", function() {
@@ -1410,18 +1372,6 @@
   if (dom.dailySetupLane) dom.dailySetupLane.addEventListener("change", function() {
     dailySetupPage = 1;
     loadDailyVcp(true, 1);
-  });
-  function scheduleLiveRefresh() {
-    if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
-    liveRefreshTimer = liveRefreshEnabled ? setTimeout(function() {
-      liveRefreshTimer = null;
-      if (currentTab === "daily-vcp") loadDailyVcp(true);
-      scheduleLiveRefresh();
-    }, 60000) : null;
-  }
-  if (dom.dailySetupLiveRefresh) dom.dailySetupLiveRefresh.addEventListener("change", function() {
-    liveRefreshEnabled = dom.dailySetupLiveRefresh.checked;
-    scheduleLiveRefresh();
   });
   /* ── tab switching ── */
   function switchTab(tab) {
