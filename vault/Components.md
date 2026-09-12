@@ -105,6 +105,14 @@ display its exact API ratio and anchors separately from Primary Daily Wave;
 the frontend does not derive them. It cannot change publication, decision
 lanes, setup/risk math, or chart markers.
 
+### `/mvp` visible diagnostics — current UI decision, 2026-09-12
+
+Owner feedback intentionally removes chart status/timeframe/source diagnostic
+prose and the drawer's Wave Evidence/Evidence Details sections from the visible
+review surface. Deterministic API fields, source-linked chart markers, and
+provenance remain available for audit; this does not remove the underlying
+contract or data.
+
 ## `mvp_server.py` — MVP static server (separate dashboard service)
 Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
 directory. The former `/dashboard.html` route returns 404. Runtime container is

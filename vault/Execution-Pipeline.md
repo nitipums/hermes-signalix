@@ -76,6 +76,10 @@ The release is handed to Arm for manual use. Elliott Wave output remains machine
 
 - Lite preflight is `PASS` for the previously accepted rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, TradingView link, and no overflow). The 2026-09-12 owner UI feedback slice intentionally removes the drawer's Wave Evidence toggle/explanation and Evidence Details/provenance section, while retaining source-linked Daily chart markers and the primary Wave summary. The revised desktop/mobile drawer journey remains `NOT VERIFIED` until Lite rechecks it. Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
 
+## Current UI decision note — 2026-09-12
+
+- Owner feedback intentionally keeps chart status/timeframe/source diagnostic prose and the drawer's Wave Evidence/Evidence Details sections out of the visible `/mvp` review surface. Deterministic API fields, chart markers, and provenance remain available for audit and machine validation.
+
 ## Current session closeout — 2026-09-02 12:50 ICT
 
 - Code review found and remediated chart route scope, `/api/chart-db` bypass, and weekly reverse-order defects before final promotion. Focused and full backend tests passed; `compileall`, `git diff --check`, and `systemd-analyze verify` passed.

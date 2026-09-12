@@ -64,6 +64,42 @@
           <button id="daily-setup-refresh" class="btn btn--filter" type="button">Refresh</button>
           <span id="daily-setup-updated" class="setup-toolbar__updated" aria-live="polite">No update applied</span>
         </div>
+        <details id="daily-setup-advanced" class="setup-advanced">
+          <summary>Advanced filters</summary>
+          <div class="watchlist-default-filters" aria-label="Advanced setup candidate filters">
+            <label><input type="checkbox" id="daily-filter-marginable" checked> Marginable</label>
+            <label><input type="checkbox" id="daily-filter-trade-value" checked> Avg trade value &gt; 10M</label>
+            <label><input type="checkbox" id="daily-filter-price" checked> Price &gt; 0.60 THB</label>
+            <label>Decision state
+              <select id="daily-vcp-decision-state" aria-label="Filter setup candidates by canonical decision state">
+                <option value="ALL" selected>All decision states</option>
+                <option value="FORMING">Forming</option>
+                <option value="READY">Ready</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="EXTENDED">Extended</option>
+                <option value="INVALIDATED">Invalidated</option>
+              </select>
+            </label>
+            <label>Decision
+              <select id="daily-vcp-decision" aria-label="Filter setup candidates by canonical decision">
+                <option value="ALL" selected>All decisions</option>
+                <option value="REVIEW">Review</option>
+                <option value="WAIT">Wait</option>
+                <option value="AVOID">Avoid</option>
+              </select>
+            </label>
+            <label>Quality
+              <select id="daily-vcp-quality" aria-label="Filter setup candidates by canonical quality">
+                <option value="ALL" selected>All quality</option>
+                <option value="PASS">Pass</option>
+                <option value="PARTIAL">Partial</option>
+                <option value="FAIL">Fail</option>
+                <option value="UNKNOWN">Unknown</option>
+              </select>
+            </label>
+            <label><input type="checkbox" id="daily-setup-live-refresh"> Live refresh (opt in)</label>
+          </div>
+        </details>
         <div id="daily-vcp-meta" class="marginable-filter-meta"></div>
         <div id="daily-vcp-cards" class="card-list card-list--explorer"></div>
         <nav id="daily-setup-pagination" class="pagination" aria-label="Setup candidate pages">

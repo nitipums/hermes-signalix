@@ -43,14 +43,21 @@
     dailyVcpMeta:    $("#daily-vcp-meta"),
     dailySetupSearch: $("#daily-setup-search"),
     dailySetupLane: $("#daily-setup-lane"),
+    dailyFilterMarginable: $("#daily-filter-marginable"),
+    dailyFilterTradeValue: $("#daily-filter-trade-value"),
+    dailyFilterPrice: $("#daily-filter-price"),
     dailySetupReset: $("#daily-setup-reset"),
     dailySetupRefresh: $("#daily-setup-refresh"),
     dailySetupUpdated: $("#daily-setup-updated"),
+    dailySetupLiveRefresh: $("#daily-setup-live-refresh"),
     dailySetupPrev:  $("#daily-setup-prev"),
     dailySetupNext:  $("#daily-setup-next"),
     dailySetupPageInfo: $("#daily-setup-page-info"),
     dailyVcpType:   $("#daily-vcp-type"),
     dailySetupSector: $("#daily-setup-sector"),
+    dailyVcpDecisionState: $("#daily-vcp-decision-state"),
+    dailyVcpDecision: $("#daily-vcp-decision"),
+    dailyVcpQuality: $("#daily-vcp-quality"),
     tabVcp:          $("#tab-vcp"),
     panelVcp:        $("#panel-vcp"),
     vcpLoading:      $("#vcp-loading"),
@@ -181,6 +188,8 @@
   let dailySetupPage = 1;
   let dailySetupTotalPages = 1;
   let dailySetupData = null;
+  let liveRefreshEnabled = false;
+  let liveRefreshTimer = null;
   let vcpRequestSeq = 0;
   let shadowRequestSeq = 0;
   var dailyVcpRequests = SignalixRequestCache();
@@ -1032,7 +1041,19 @@
     var search = dom.dailySetupSearch ? dom.dailySetupSearch.value.trim().toLowerCase() : "";
     var lane = dom.dailySetupLane ? dom.dailySetupLane.value : "ALL";
     var haystack = ((item.symbol || "") + " " + (item.name || "")).toLowerCase();
-    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane);
+    return (!search || haystack.indexOf(search) >= 0) && (lane === "ALL" || item.decision_lane === lane)
+      && setupCandidateMatchesAdvanced(item);
+  }
+
+  function setupCandidateMatchesAdvanced(item) {
+    var marginable = item && item.marginable;
+    if (dom.dailyFilterMarginable && dom.dailyFilterMarginable.checked && marginable && marginable.is_marginable === false) return false;
+    var tradeValue = item && (item.trade_value != null ? item.trade_value : item.avgDailyValue20);
+    if (dom.dailyFilterTradeValue && dom.dailyFilterTradeValue.checked && tradeValue != null && Number(tradeValue) <= 10000000) return false;
+    var quote = quoteEnvelope(item) || {};
+    var price = quote.price != null ? quote.price : item && item.close;
+    if (dom.dailyFilterPrice && dom.dailyFilterPrice.checked && price != null && Number(price) <= 0.6) return false;
+    return canonicalFilterMatches(item, dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality);
   }
 
   function stableSetupCandidateOrder(items) {
@@ -1226,6 +1247,20 @@
       });
   }
 
+  function dailySetupHasActiveBoundary() {
+    var drawerOpen = dom.drawer && !dom.drawer.classList.contains("drawer--hidden");
+    var searchActive = dom.dailySetupSearch && dom.dailySetupSearch.value.trim();
+    var laneActive = dom.dailySetupLane && dom.dailySetupLane.value !== "ALL";
+    var sectorActive = dom.dailySetupSector && dom.dailySetupSector.value.trim();
+    var advancedActive = (dom.dailyFilterMarginable && !dom.dailyFilterMarginable.checked)
+      || (dom.dailyFilterTradeValue && !dom.dailyFilterTradeValue.checked)
+      || (dom.dailyFilterPrice && !dom.dailyFilterPrice.checked)
+      || (dom.dailyVcpDecisionState && dom.dailyVcpDecisionState.value !== "ALL")
+      || (dom.dailyVcpDecision && dom.dailyVcpDecision.value !== "ALL")
+      || (dom.dailyVcpQuality && dom.dailyVcpQuality.value !== "ALL");
+    return !!(drawerOpen || searchActive || laneActive || sectorActive || advancedActive);
+  }
+
   function shadowSignalCard(item) {
     var plan = item && item.plan || {};
     var confidence = item && item.confidence || {};
@@ -1297,10 +1332,10 @@
           (lanes[key] || []).forEach(function(r){
             var metrics = (r.data || {}).daily_metrics || {};
             if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }
-            if (dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return;
-            if (dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return;
-            if (dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return;
-            if (!vcpTypeMatches(r, dom.dailyVcpType.value)) return;
+            if (dom.dailyFilterMarginable && dom.dailyFilterMarginable.checked && !(r.marginable && r.marginable.is_marginable)) return;
+            if (dom.dailyFilterTradeValue && dom.dailyFilterTradeValue.checked && !(Number(metrics.avg_trade_value_20) > 10000000)) return;
+            if (dom.dailyFilterPrice && dom.dailyFilterPrice.checked && !(Number((r.price || {}).last_close) > 0.6)) return;
+            if (dom.dailyVcpType && !vcpTypeMatches(r, dom.dailyVcpType.value)) return;
             if (!canonicalFilterMatches(r, dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality)) return;
             filtered[key].push(r);
             vcpResultsBySymbol[r.symbol] = r;
@@ -1363,7 +1398,13 @@
     if (dom.dailySetupSearch) dom.dailySetupSearch.value = "";
     if (dom.dailySetupLane) dom.dailySetupLane.value = "ALL";
     if (dom.dailySetupSector) dom.dailySetupSector.value = "";
+    [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice].forEach(function(input) { if (input) input.checked = true; });
+    [dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) { if (input) input.value = "ALL"; });
     loadDailyVcp(true, 1);
+  });
+  [dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice,
+   dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality].forEach(function(input) {
+    if (input) input.addEventListener("change", function() { if (dailySetupData) renderSetupCandidates(dailySetupData); });
   });
   if (dom.dailySetupSector) dom.dailySetupSector.addEventListener("change", function() { loadDailyVcp(false, 1); });
   if (dom.dailySetupSearch) dom.dailySetupSearch.addEventListener("input", function() {
@@ -1372,6 +1413,18 @@
   if (dom.dailySetupLane) dom.dailySetupLane.addEventListener("change", function() {
     dailySetupPage = 1;
     loadDailyVcp(true, 1);
+  });
+  function scheduleLiveRefresh() {
+    if (liveRefreshTimer) clearTimeout(liveRefreshTimer);
+    liveRefreshTimer = liveRefreshEnabled ? setTimeout(function() {
+      liveRefreshTimer = null;
+      if (currentTab === "daily-vcp" && !dailySetupHasActiveBoundary()) loadDailyVcp(true, 1);
+      scheduleLiveRefresh();
+    }, 60000) : null;
+  }
+  if (dom.dailySetupLiveRefresh) dom.dailySetupLiveRefresh.addEventListener("change", function() {
+    liveRefreshEnabled = dom.dailySetupLiveRefresh.checked;
+    scheduleLiveRefresh();
   });
   /* ── tab switching ── */
   function switchTab(tab) {
@@ -1627,10 +1680,10 @@
   if (dom.slRetry) dom.slRetry.addEventListener("click", loadShortlist);
   if (dom.slStaleRetry) dom.slStaleRetry.addEventListener("click", loadShortlist);
   if (dom.exRetry) dom.exRetry.addEventListener("click", function() { loadExplorer(explorerPage); });
-  dom.dailySetupPrev.addEventListener("click", function() {
+  if (dom.dailySetupPrev) dom.dailySetupPrev.addEventListener("click", function() {
     if (dailySetupPage > 1) loadDailyVcp(false, dailySetupPage - 1);
   });
-  dom.dailySetupNext.addEventListener("click", function() {
+  if (dom.dailySetupNext) dom.dailySetupNext.addEventListener("click", function() {
     if (dailySetupPage < dailySetupTotalPages) loadDailyVcp(false, dailySetupPage + 1);
   });
 
