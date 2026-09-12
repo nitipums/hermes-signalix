@@ -1,87 +1,82 @@
 # Signalix — Start Here
 
-> **STATUS: CURRENT** · Navigation only; product and runtime authority remain in the linked documents.
-> **Last reconciled:** 2026-09-02 13:15 ICT
+> **STATUS: CURRENT** · Single entrypoint and routing map only.
+> **Last reconciled:** 2026-09-12 ICT
+> Product, contract, runtime, and research truth live in the linked authorities below.
 
-## 1. Current product in one minute
+## Signalix in one minute
 
-Signalix prepares evidence and private paper/shadow actionable signals for Arm's
-Thai swing trading. Arm reviews the chart and makes the final execution
-decision. It is not an automatic trading or order-execution system.
+Signalix prepares deterministic market evidence and private paper/shadow signals for Arm's review. Arm reviews the chart and makes the final decision. Wave output is machine-generated candidate/evidence, not truth, an order, or automatic trading.
 
 ```text
-Verified market view
-→ Daily trend / strength / 52W-ATH
-→ Daily Elliott candidate
-→ 60m confirmation and entry timing
-→ trigger + invalidation + target + R:R
-→ VCP as optional bonus evidence
+Daily market data
+→ Trend Mapping
+→ data quality / freshness review
+→ optional future setup integration
 → Arm review
 ```
 
-Canonical product surface:
+Canonical surfaces:
 
-- API: `/api/setup-candidates`
-- UI: `/mvp`
-- Product universe: `marginable_long` (`237` currently evaluated; counts are runtime data, not a permanent constant)
-- Primary lanes: `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`
-- Wave labels: machine-generated candidate evidence for Arm review, not truth or an order signal
-- Alerts, auto-trading, broker execution, and evaluator auto-caller: OFF/PENDING
-- Private actionable signals: owner-approved market-only 7-day shadow UI;
-  see `superpowers/specs/2026-09-11-private-actionable-signal-design.md`
+- **Current delivery focus:** `/trend-map-shadow`, `/api/trend-map-shadow`
+- Setup trial / future consumer: `/api/setup-candidates`, `/mvp`
+- Operational scope: `marginable_long` (runtime counts are not permanent constants)
+- Setup decision lanes remain available for the retained trial contract:
+  `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`
+- Elliott Wave: deferred research; not the current delivery gate
+- Alerts, broker execution, and auto-trading: `OFF / PENDING`
 
-## 2. Choose the smallest reading path
+## Read the smallest authority set
 
-For the boundary between durable Signalix contracts and repeatable Lite procedures, read `docs/current/2026-09-03-signalix-skill-document-boundary.md`. Specs/vault notes own the contract; skills own the execution/checklist.
-
-For the current deterministic chart/OHLCV window contract and cleanup evidence, read `docs/current/2026-09-10-1332-ohlcv-window-summary-handoff.md`. For isolated Wave/AutoResearch governance, read `../vault/Research-Index.md` and `../vault/Research-Playbook-Bible.md`; those remain research-only and do not change production screening or execution.
-
-| If the task is about… | Read first | Then read only if needed |
+| If the task is about… | Read first | Read next only if needed |
 |---|---|---|
-| Product thesis / roadmap / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
-| Current setup-candidate contract | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | `backend/setup_candidate_contract.py`, relevant tests |
-| Private buy/sell signal contract | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `backend/actionable_signal_policy.py`, private route/tests |
-| Owner decision / policy | `../vault/Decisions.md` | `docs/current/2026-08-31-elliott-grill-decision-record.md` |
-| Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source files |
-| Daily / 60m pipeline and acceptance | `../vault/Execution-Pipeline.md` | relevant focused plan/spec |
-| Runtime / timer / deployment | `../vault/Deployment.md` | `docker-compose.yml`, installed-unit evidence |
-| UI / browser / freshness | `../vault/Browser-and-Freshness-Verification.md` | `../vault/Execution-Pipeline.md`, public `/mvp` |
-| Lifecycle persistence | `superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` | lifecycle source/tests |
-| VCP / replay / migration history | `../vault/VCP-Finder-MVP.md` | `../vault/VCP-Replay-1M-2026-08-26.md`, `archive/` |
-| Historical incident / why a decision changed | `../vault/Postmortems/` or `archive/` | dated handoff named by the current note |
+| Product direction / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
+| Setup-candidate / Wave contract | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests |
+| Private seven-day shadow BUY policy | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `../vault/Decisions.md`, source + tests |
+| Owner decision | `../vault/Decisions.md` | relevant current decision record |
+| Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source |
+| Acceptance / evidence gate | `../vault/Execution-Pipeline.md` | focused acceptance evidence |
+| Runtime / timers / deployment | `../vault/Deployment.md` | live probes and installed units |
+| Research / AutoResearch | `../vault/Research-Index.md` | `../vault/Research-Playbook-Bible.md`, named project |
+| Current Trend Mapping focus | `../vault/Deployment.md` | `../vault/Execution-Pipeline.md`, shadow API/browser evidence |
+| Vocabulary | `../GLOSSARY.md` | focused contract, if semantics matter |
+| Vault navigation / cleanup | `../vault/INDEX.md`, `../vault/Documentation-Governance.md` | authority matrix |
 
-## 3. Authority rules
+## Authority boundaries
 
-- `AGENTS.md` is the worker safety contract and routing map, not a second product specification.
-- `vault/` owns durable product, architecture, deployment, acceptance, and governance notes.
-- `docs/superpowers/specs/` owns focused current contracts; `docs/current/` owns concise current decision records.
-- `docs/archive/`, `vault/archive/`, dated handoffs, and replay notes are historical evidence, not current direction.
-- Kanban owns active execution state only when explicitly used; current board was empty at the 2026-09-02 closeout. Do not mirror card state into docs.
-- Generated HTML/JSON, logs, snapshots, worktrees, and scratch directories are artifacts, not authorities.
+- `AGENTS.md` is the agent safety contract and routing layer; it is not a second product specification.
+- This file is the entrypoint; it is not a contract, decision ledger, runtime monitor, or changelog.
+- `../GLOSSARY.md` is the domain glossary; it is not an entrypoint, status ledger, or implementation history.
+- `../vault/INDEX.md` is the vault catalog; it is not a decision ledger, backlog, or runtime report.
+- Product/acceptance scope belongs to `../vault/Execution-Pipeline.md` and focused specs.
+- Runtime/deployment claims belong to `../vault/Deployment.md` and fresh probes.
+- Research notes are evidence only and cannot silently change production behavior.
+- Current delivery focus is not automatically product/action authority.
+- Dated handoffs, archive notes, generated HTML/JSON, logs, snapshots, worktrees, and Kanban history are non-authorities unless an authority explicitly points to them as evidence.
 
-## 4. Current verified baseline
+## Current baseline pointer
 
 - Release branch: `release/signalix-mvp-stable`
-- Current closeout commit: `fd915e8`
-- Local backend readiness: HTTP 200; DB/Redis up
-- Public setup API: HTTP 200; `237 evaluated`
-- Public `/mvp`: browser loads and renders candidate cards/controls
-- Current freshness boundary at 13:14 ICT: Daily EOD unavailable/unknown; 60m fresh from run `9d6c6c77e9ef4f7ca0422d15afd97bfd`
-- Known Daily gaps: `3BBIF`, `COM7`, `PR9`
+- Current source/release: verify with `git status`, `git log`, and the live route before making a new claim.
+- Current runtime/data freshness is not live telemetry in this page. Read `../vault/Deployment.md` and probe the relevant endpoint.
+- Missing, stale, partial, invalid, or empty data must be reported explicitly as `NOT VERIFIED`, not promoted by HTTP 200 alone.
 
-This section is a dated navigation snapshot. For a new runtime claim, probe the live route and update the appropriate deployment/acceptance record; do not treat this file as live telemetry.
+## Before changing anything
 
-## 5. Before changing anything
+1. Read this page and `../AGENTS.md`.
+2. Run `git status --short --branch` and inspect dirty/untracked ownership.
+3. Identify one authority for the concern; stop if current authorities conflict.
+4. Read source/tests/runtime relevant to the task.
+5. Keep source/tests, runtime/API, data freshness, and browser verdicts separate.
+6. Preserve owner artifacts and historical evidence; never read or include secrets.
 
-1. Read `AGENTS.md` and this page.
-2. Run `git status --short --branch`, `git worktree list`, and inspect dirty/untracked ownership.
-3. Identify the authority document for the concern; stop if two current authorities conflict.
-4. Keep source/tests/runtime/browser verdicts separate.
-5. Preserve owner artifacts and historical evidence. Never read or include secrets.
-
-## 6. Closeout path
+## Closeout shape
 
 ```text
-bounded scope → source/test gate → read-model/runtime/API gate → public UI/browser gate
-→ documentation sync → explicit PASS / FAIL / REVISE / NOT VERIFIED handoff
+bounded scope
+→ source/tests
+→ runtime/API/data
+→ browser/UI when applicable
+→ owning documentation sync
+→ PASS / FAIL / REVISE / NOT VERIFIED
 ```

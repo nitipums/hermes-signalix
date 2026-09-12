@@ -1,6 +1,6 @@
 # Signalix Wave Playbooks Research Project
 
-> **STATUS: CURRENT — RESEARCH PROJECT / PRODUCTION SEPARATE**
+> **STATUS: DEFERRED RESEARCH PROJECT / PRODUCTION SEPARATE**
 > **Date:** 2026-09-05 ICT
 > **Owner/final gate:** Lite → Arm review
 > **Index:** `../../vault/Research-Index.md`

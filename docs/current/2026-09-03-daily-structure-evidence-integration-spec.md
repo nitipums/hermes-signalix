@@ -1,6 +1,6 @@
 # Signalix Daily Structural Evidence Integration
 
-> **STATUS: CURRENT — OWNER APPROVED DESIGN FRONTIER** · 2026-09-03
+> **STATUS: RETAINED TRIAL DESIGN — DEFERRED / PRODUCTION SEPARATE** · 2026-09-03
 > **Owner:** Arm · **Final gate:** Lite
 > **Scope:** restore useful Daily Wave 1/2/4/5 visibility without weakening the canonical Wave-3 publication contract.
 > **Authority:** this focused spec extends `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`; it does not replace it.

@@ -30,7 +30,7 @@ This matrix makes the minimum reading path explicit. It separates current author
 
 1. `vault/INDEX.md` and `vault/Documentation-Governance.md` are useful catalogs but too large for first-read navigation.
 2. `AGENTS.md` correctly states it is a routing/safety contract, but it still repeats substantial product contract prose; future simplification should be bounded and owner-reviewed.
-3. `CONTEXT.md` contains valuable vocabulary but overlaps with the focused spec and AGENTS; it should become a compact glossary/pointer page, not a second decision record.
+3. `GLOSSARY.md` contains valuable vocabulary but overlaps with the focused spec and AGENTS; it should become a compact glossary/pointer page, not a second decision record.
 4. Runtime acceptance wording is split between the current closeouts and older specs/plans. A narrow 390px failure→Retry→recovery PASS must remain distinct from broader desktop/drawer/chart acceptance.
 5. `T9` is overloaded across lifecycle persistence, overall implementation history, and UI/browser work. Use domain-qualified labels in new work; preserve old identifiers in historical records.
 6. Legacy VCP/dashboard code and notes are compatibility/audit evidence. They are not safe delete candidates until callers, tests, timers, and rollback dependencies are proven absent.
@@ -51,7 +51,7 @@ This matrix makes the minimum reading path explicit. It separates current author
 - [x] Protected artifacts are recorded.
 - [x] Conflicting authority notes reconciled.
 - [x] Archive candidates reference-scanned and moved only if safe.
-- [x] `CONTEXT.md` compacted.
+- [x] `GLOSSARY.md` compacted.
 - [x] One bounded runtime refactor independently tested and served-verified.
 
 ## Final boundary

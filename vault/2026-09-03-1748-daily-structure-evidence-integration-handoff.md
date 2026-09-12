@@ -1,6 +1,6 @@
 # Signalix Handoff — 2026-09-03 17:48 ICT · Daily structural evidence integration
 
-> **STATUS: CURRENT MILESTONE — SOURCE/RUNTIME/UI VERIFIED**
+> **STATUS: HISTORICAL MILESTONE — SOURCE/RUNTIME/UI VERIFIED**
 > **Owner:** Arm · **Orchestrator/final gate:** Lite · **Worker:** Codex CLI `gpt-5.6-luna`
 > **Branch:** `release/signalix-mvp-stable` · **Commit:** `9ec9e20`
 > **Spec:** `docs/current/2026-09-03-daily-structure-evidence-integration-spec.md`

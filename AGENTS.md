@@ -179,6 +179,23 @@ Every Codex/Lite handoff must include:
 
 Lite delivers the final acceptance decision to Arm.
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `nitipums/hermes-signalix`.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo using `GLOSSARY.md` and `docs/adr/`.
+See `docs/agents/domain.md`.
+
 ## Canonical references
 
 Read only the smallest relevant set, in this order:

@@ -1,6 +1,6 @@
 # Signalix Wave Playbooks Research — Findings and Session Handoff
 
-> **STATUS: CURRENT RESEARCH HANDOFF — PRODUCTION SEPARATE**
+> **STATUS: DEFERRED RESEARCH HANDOFF — PRODUCTION SEPARATE**
 > **Date:** 2026-09-05 ICT
 > **Owner/final gate:** Lite → Arm review
 > **Project index:** `vault/Research-Index.md`

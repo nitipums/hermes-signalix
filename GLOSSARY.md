@@ -1,6 +1,6 @@
 # Signalix Setup Discovery
 
-This context defines the product language for discovering and preparing Thai swing-trade setups for Arm’s review. Signalix presents deterministic evidence; Arm interprets the chart and decides whether to trade.
+This file is the Signalix domain glossary for discovering and preparing Thai swing-trade setups. It defines vocabulary and preferred wording only. It is not the entrypoint, product contract, decision ledger, runtime status, changelog, or implementation history. Signalix presents deterministic evidence; Arm interprets the chart and decides whether to trade.
 
 ## Language
 

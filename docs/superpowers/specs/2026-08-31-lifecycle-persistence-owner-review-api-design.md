@@ -1,7 +1,7 @@
 # Signalix LIFECYCLE-T9 — Lifecycle Persistence + Owner-Review API
 
-> **STATUS: OWNER-APPROVED DESIGN — IMPLEMENTED + PROMOTED; RUNTIME ACCEPTANCE PARTIAL**
-> **Reconciled:** 2026-09-01 · Lifecycle source/DB integration is complete; evaluator auto-caller and public browser journey remain open.
+> **STATUS: OWNER-APPROVED DESIGN — IMPLEMENTED + PROMOTED; RETAINED TRIAL CONTRACT**
+> **Reconciled:** 2026-09-12 · Lifecycle source/DB integration is retained for the setup trial; evaluator auto-caller remains pending, and all named browser scopes are PASS by owner confirmation. Current delivery focus is Daily Trend Mapping.
 > **Date:** 2026-08-31
 > **Owner confirmation:** Q1–Q22 confirmed by Arm
 > **Scope:** PostgreSQL persistence and owner-only API integration for the already-verified pure lifecycle contract.

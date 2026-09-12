@@ -2,7 +2,37 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation:** T1–T9 is promoted; `/api/setup-candidates` is primary; narrow 390px failure→Retry→recovery is PASS; broader UI semantics and evaluator auto-caller remain separate. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation:** T1–T9 is promoted; `/api/setup-candidates` is primary; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for the three unavailable Daily baselines; evaluator auto-caller remains separate. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+
+## 2026-09-12 — Trend Mapping becomes the primary delivery focus
+
+Owner decision: make Daily Trend Mapping the primary Signalix workstream to
+complete, using `/trend-map-shadow` and `/api/trend-map-shadow` as the current
+focus surface. The surface remains public read-only research evidence and has
+no setup, alert, order, broker, BUY, or auto-trading semantics.
+
+The `/mvp` and `/api/setup-candidates` path remains retained as a trial and a
+possible future consumer for deterministic private `BUY_NOW` alerts. It is not
+the current delivery focus. Elliott Wave exploration is deferred to a later
+research phase after extended trials did not reach a satisfactory product
+outcome; it must not block Trend Mapping completion.
+
+This changes delivery priority, not the existing setup/API contract. Any future
+Trend Mapping → setup/`BUY_NOW` integration requires a separate owner-approved
+contract and acceptance gate.
+
+## 2026-09-12 — Browser acceptance scope reconciliation
+
+Owner confirmation: all named browser scopes are `PASS`, including the setup
+surface 390px failure→Retry→recovery journey, the shadow 390px drawer/chart
+journey, the shadow error→Retry→recovery journey, full `/mvp` desktop/mobile
+review, and the revised UI after the 2026-09-12 feedback slice. These browser
+verdicts do not promote data freshness: the current setup API still reports
+partial/stale coverage where Daily baselines are unavailable.
+
+This entry resolves the prior documentation conflict between
+`Execution-Pipeline.md` and `Deployment.md`; browser scope must remain named
+per journey rather than collapsed into an unqualified browser PASS.
 
 ## 2026-09-11 — Private actionable buy/sell signals
 

@@ -1,12 +1,32 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-02 12:50 ICT · release `5bf3d9a` promoted; intraday scope/metadata and provisional Day/Week chart display verified; Kanban stale R4/R5 graph archived; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-12 19:53 ICT · release `73bf3ed` aligned local/remote; setup, shadow, and named browser scopes reconciled; setup freshness remains partial/stale for three unavailable Daily baselines; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
 > Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused current specs under `../docs/superpowers/specs/` for contracts, and the Kanban board only for active named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
+
+## Current delivery focus
+
+The canonical working focus is Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`; see `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not the current delivery target.
+
+## Current acceptance reconciliation — 2026-09-12
+
+- **Current focus gate:** Complete Daily Trend Mapping before resuming broader setup or Elliott work.
+- **Source/release:** `PASS` — local and remote `release/signalix-mvp-stable` are `73bf3ed`.
+- **Runtime/API:** `PASS` for `/mvp`, `/api/setup-candidates`, `/api/trend-map-shadow`, and `/api/shadow-buy-signals?days=7` read-back.
+- **Data freshness/coverage:** `NOT VERIFIED` for complete fresh setup coverage; the setup API currently reports `stale/partial` coverage with three unavailable Daily baselines: `3BBIF`, `COM7`, and `PR9`.
+- **Browser/UI:** `PASS` by owner confirmation for the setup 390px failure→Retry→recovery journey, shadow 390px drawer/chart, shadow error→Retry→recovery, full `/mvp` desktop/mobile review, and the revised 2026-09-12 UI.
+- **Safety:** Wave remains machine-generated evidence for Arm review; shadow surfaces are read-only/non-actionable; alerts, broker execution, and auto-trading remain `OFF/PENDING`.
+
+The setup-candidate and `/mvp` path is retained as a trial/possible future
+consumer for `BUY_NOW`; it is not the current delivery target. Elliott Wave
+research is deferred and does not block Trend Mapping acceptance. A future
+integration must pass a separate owner-approved contract gate.
+
+Browser verdicts are named per journey. They do not promote partial/stale data to full freshness PASS.
 
 ## Product contract
 
@@ -32,7 +52,7 @@ The product must let a user answer, quickly and honestly:
 - The overview must be usable before detail/chart data load; unknown compact-card data must never cause all symbols to disappear.
 - Drawer metadata and decision evidence are separate contracts: genuine missing/insufficient VCP evidence remains `NOT_VERIFIED`; optional canonical metadata shows `Loading…` while `/api/symbol/{symbol}` is pending and `Unavailable` when that request fails. Chart unavailability is reported separately.
 
-## Current verified baseline — 2026-09-02
+## Historical runtime baseline — 2026-09-02
 
 - The primary product spine is **Daily Trend/Strength + Elliott candidate → 60m Trade Setup → Arm review**.
 - Intraday UI evidence distinguishes `60m fetched` (`fetch_completed_at`) from `latest completed 60m candle`; a fetch round at 16:45 may correctly expose a 16:00 candle.
@@ -74,7 +94,7 @@ The Team Facts surface is public unauthenticated read-only by owner decision. It
 
 The release is handed to Arm for manual use. Elliott Wave output remains machine-generated candidate/evidence, not unquestionable truth. Review/confirm Wave identification from the rendered chart first; do not tune semantics from assumptions. Any confirmed product issue becomes a new bounded `grill-with-docs → to-spec → to-tickets → implement` cycle.
 
-- Lite preflight is `PASS` for the previously accepted rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, TradingView link, and no overflow). The 2026-09-12 owner UI feedback slice intentionally removes the drawer's Wave Evidence toggle/explanation and Evidence Details/provenance section, while retaining source-linked Daily chart markers and the primary Wave summary. The revised desktop/mobile drawer journey remains `NOT VERIFIED` until Lite rechecks it. Semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
+- Lite preflight is `PASS` for the previously accepted rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, TradingView link, and no overflow). The 2026-09-12 owner UI feedback slice intentionally removes the drawer's Wave Evidence toggle/explanation and Evidence Details/provenance section, while retaining source-linked Daily chart markers and the primary Wave summary. The revised desktop/mobile drawer journey is `PASS` by owner confirmation; semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
 
 ## Current UI decision note — 2026-09-12
 

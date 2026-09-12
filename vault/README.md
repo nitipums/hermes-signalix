@@ -1,27 +1,29 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled 2026-09-01.
-> Runtime scope: T1–T9 Elliott/Trend/Trade-Setup release promotion. Served `/mvp` and `/api/setup-candidates` are verified for the public 390px failure→Retry→recovery journey; evaluator auto-caller remains separate.
+> **STATUS: CURRENT** · Reconciled 2026-09-12.
+> Current delivery focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are retained trial/future-integration surfaces; Elliott research is deferred.
 
-AI Trading-Agent SaaS for Thai SET retail traders. Trend-Following engine
-(Mark Minervini / VCP) that auto-screens the market and supports dashboard-based
-watchlist/explorer review. Alert delivery is currently paused.
+Signalix is Arm's deterministic Thai-market evidence system. The current work
+focus is Daily Trend Mapping: a public read-only research surface for market
+landscape, provenance, freshness, and data-quality review. It is not an order
+or auto-trading system.
 
 > Owner: Nitipum.s (collaborates with Arm). This vault is the canonical
 > knowledge base — keep it in sync after every structural change.
 
-## Status (updated 2026-09-01)
+## Status (updated 2026-09-12)
 
 | Layer | State | Notes |
 |-------|-------|-------|
 | Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
-| Dashboard (web) | 🟡 Partial acceptance | owner-only `/mvp`, port 3001; canonical `/api/setup-candidates`; 390px failure→Retry→recovery PASS, broader acceptance/evaluator decision separate |
+| Trend Mapping surface | ✅ Current focus | public read-only `/trend-map-shadow` and `/api/trend-map-shadow`; non-actionable research evidence |
+| Setup/MVP trial | 🟡 Retained trial | `/mvp` + `/api/setup-candidates`; possible future Trend Mapping → deterministic `BUY_NOW` integration |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ⏸ Paused | Docker `delivery` is gated under Compose profile `alerts`; source/routing retained |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |
 | **LINE** | ❌ Dropped | user decision; `notify-api.line.me` DNS-blocked on VPS |
-| LLM summarization (Phase 3) | ✅ Implemented, paused with alert delivery | Retained for future alert reactivation; no current alert push |
+| LLM summarization (Phase 3) | ⏸ Deferred | no current alert push; deterministic calculations remain in code |
 | Multi-tenant user routing + tier quota | ✅ Done | `users.py` + `TIER_LIMITS` enforced 2026-08-12 |
 | Portal frontend (self-service SPA) | ✅ Done | portal.html ↔ backend APIs; watchlist sync |
 | Subscription / payment billing | ⬜ Gap | tier field exists; no payment/subscription frontend |

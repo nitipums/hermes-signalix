@@ -1,6 +1,6 @@
 # Signalix Session Handoff — 2026-09-03 14:30 ICT · /mvp wave-badge fix
 
-> STATUS: CURRENT · Lite final-gate after /mvp bug investigation + bounded Codex repair.
+> STATUS: HISTORICAL · Lite final-gate after /mvp bug investigation + bounded Codex repair.
 > Owner: Arm · Orchestrator: Lite · Worker: Codex CLI gpt-5.6-luna (bounded)
 > Branch: release/signalix-mvp-stable · Supersedes vault/2026-09-03-Current-Session-Handoff.md for this slice.
 > Previous handoff: vault/2026-09-03-Current-Session-Handoff.md (rev 4, 11:15 ICT)

@@ -1,9 +1,27 @@
 # Architecture
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
-> **Reconciled:** 2026-09-02 · T1–T9 source promoted; canonical route/projection/chart/freshness seams extracted; served spine and 390px failure→Retry→recovery browser gate verified; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-12 · Daily Trend Mapping is the primary delivery focus; setup/Elliott paths are retained trial or deferred research; canonical shadow publisher/read-model/API route is deployed and browser scopes are owner-confirmed PASS.
 
-## Current primary serving flow — 2026-09-01
+## Current delivery focus — Daily Trend Mapping
+
+The current workstream is the public read-only Trend Mapping surface:
+
+```text
+Daily price_data
+→ bounded EOD publisher
+→ immutable shadow read-model artifact + current pointer
+→ GET /api/trend-map-shadow
+→ GET /trend-map-shadow
+→ shared /mvp drawer/chart for evidence review
+```
+
+Trend Mapping is research evidence only. It does not create setup decisions,
+BUY/alerts, orders, broker actions, or auto-trading. The publisher and API
+preserve Daily as-of, provenance, quote basis, data-quality states, and
+fail-closed behavior.
+
+## Retained setup/shadow trial flow — 2026-09-01
 
 The 2026-09-11 private signal transition adds a read-only local shadow consumer
 after the canonical setup read model:
@@ -99,9 +117,10 @@ logs in the non-TTY container).
 - `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
 - `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
-## Current MVP surface contract — 2026-09-01
+## Retained trial MVP surface contract — 2026-09-01
 
-The primary owner-only surface is the Elliott/Trend/Trade-Setup decision spine:
+The retained owner-only trial surface is the Elliott/Trend/Trade-Setup
+decision spine:
 
 ```text
 /mvp
@@ -114,7 +133,7 @@ The primary owner-only surface is the Elliott/Trend/Trade-Setup decision spine:
       └─ DATA_BLOCKED
 ```
 
-`/api/setup-candidates` is the canonical API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted. The narrow public 390px failure→Retry→recovery journey is PASS; broader desktop/drawer/chart semantic acceptance and evaluator auto-caller remain separate/not verified. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
+`/api/setup-candidates` remains the setup-trial API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted but is not the current delivery focus. Browser scopes are owner-confirmed PASS; complete fresh setup coverage remains separate/not verified. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
 
 ### Deterministic chart and OHLCV window summary — 2026-09-10
 

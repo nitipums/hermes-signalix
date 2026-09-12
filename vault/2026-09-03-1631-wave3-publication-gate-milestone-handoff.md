@@ -1,6 +1,6 @@
 # Signalix Milestone Handoff — 2026-09-03 16:31 ICT · W3 publication gate
 
-> **STATUS: CURRENT MILESTONE** · W3 publication contract promoted and served; tuning of other wave evidence is the next frontier.
+> **STATUS: HISTORICAL MILESTONE** · W3 publication contract promoted and served; tuning of other wave evidence was deferred after the 2026-09-12 focus decision.
 > **Owner:** Arm · **Orchestrator/final gate:** Lite · **Implementation worker:** Codex CLI `gpt-5.6-luna`
 > **Canonical branch:** `release/signalix-mvp-stable` · **Promoted commit:** `807cdde`
 > **Previous handoff:** `vault/2026-09-03-1430-mvp-wave-badge-fix-handoff.md`

@@ -1,6 +1,6 @@
 # Signalix Current Session Handoff — 2026-09-03 11:15 ICT
 
-> STATUS: CURRENT · Session closeout after owner-approved commit/push instruction.
+> STATUS: HISTORICAL HANDOFF · Session closeout after owner-approved commit/push instruction.
 > Owner: Arm · Orchestrator/Final gate: Lite · Implementation worker: Codex CLI (`gpt-5.6-luna`, 10 bounded runs)
 > Supersedes the interim `.scratch/2026-09-03-1005-ui-quote-completeness-handoff.md` (kept as audit evidence).
 

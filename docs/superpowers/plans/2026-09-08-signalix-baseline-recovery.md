@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python, pytest/unittest, deterministic Daily OHLCV replay, PostgreSQL read adapters, published JSON read models, vanilla JavaScript/CSS, Docker backend/dashboard, Git worktrees, browser network interception for isolated failure testing.
 
-**Spec:** Owner-approved six-step recovery sequence in the 2026-09-08 request; `AGENTS.md`; `CONTEXT.md`; `docs/START-HERE.md`; `vault/INDEX.md`; `vault/Execution-Pipeline.md`; `vault/Architecture.md`; `vault/Deployment.md`; `vault/Research-Index.md`; `vault/Research-Playbook-Bible.md`; `docs/current/2026-09-08-0915-52w-research-session-closeout.md`; advisory `/tmp/codex_astra_signalix_review_last.md`; product boundary `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`. The request overrides the older Luna worker default and the interrupted closeout's suggestion to continue folds before repairing timing.
+**Spec:** Owner-approved six-step recovery sequence in the 2026-09-08 request; `AGENTS.md`; `GLOSSARY.md`; `docs/START-HERE.md`; `vault/INDEX.md`; `vault/Execution-Pipeline.md`; `vault/Architecture.md`; `vault/Deployment.md`; `vault/Research-Index.md`; `vault/Research-Playbook-Bible.md`; `docs/current/2026-09-08-0915-52w-research-session-closeout.md`; advisory `/tmp/codex_astra_signalix_review_last.md`; product boundary `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`. The request overrides the older Luna worker default and the interrupted closeout's suggestion to continue folds before repairing timing.
 
 **Global Constraints:**
 

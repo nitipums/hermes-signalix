@@ -1,6 +1,6 @@
 # Signalix 52W Research Session Closeout — 2026-09-08 09:15 ICT
 
-> **STATUS: CURRENT SESSION CLOSEOUT — RESEARCH / PRODUCTION SEPARATE**
+> **STATUS: HISTORICAL SESSION CLOSEOUT — RESEARCH / PRODUCTION SEPARATE**
 > **Owner:** Arm · **Final gate:** Lite
 > **Authority:** `vault/Research-Playbook-Bible.md`, `vault/Research-Index.md`
 

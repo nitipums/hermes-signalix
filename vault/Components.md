@@ -1,9 +1,25 @@
 # Components
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
-> **Reconciled:** 2026-09-02 · Elliott/Trend/Trade-Setup is primary; VCP modules are compatibility/audit; canonical chart-read seam extracted with public contract preserved.
+> **Reconciled:** 2026-09-12 · Daily Trend Mapping is the primary delivery focus; publisher/read-model/shadow API are current; `/mvp` and setup components are retained trial/future integration; Elliott research is deferred.
 
 Every backend module, what it does, and its hard rules.
+
+## Daily Trend Mapping — current delivery surface
+
+The Trend Mapping surface is the current delivery target. Its publisher builds
+an immutable, versioned Daily read model; the shadow API reads and validates
+only the current pointer/artifact; the dashboard renders the public read-only
+research table and reuses the shared `/mvp` drawer/chart. It preserves Daily
+as-of, Daily-first quote provenance, data-quality states, and fail-closed
+behavior. It has no setup, BUY, alert, order, broker, or auto-trading meaning.
+
+Current route pair:
+
+```text
+GET /api/trend-map-shadow
+GET /trend-map-shadow
+```
 
 ## `actionable_signal_policy.py` — private paper/shadow signals
 
@@ -73,8 +89,8 @@ intraday-only; Daily/EOD membership and historical data remain intact. Cards
 Cards show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD`
 rather than relabelling an old Daily value as 60m.
 
-## MVP owner-only surface — current
-`mvp_server.py` serves `/mvp` from the bind-mounted release tree. `mvp_routes.py`
+## Retained MVP owner-only trial surface
+`mvp_server.py` serves the retained trial `/mvp` from the bind-mounted release tree. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
 `mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.

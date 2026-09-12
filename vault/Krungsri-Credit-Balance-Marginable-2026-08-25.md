@@ -20,8 +20,8 @@
 
 ## Product behavior
 
-- VCP Finder is the current primary surface and supports multi-select initial-margin rates with Select all/Clear/Apply; checkbox changes do not refresh until Apply.
-- Daily Shortlist is removed from visible MVP navigation; Explorer remains secondary research/audit.
+- Daily Trend Mapping is the current primary delivery focus. The marginability metadata remains available for the retained `/mvp` and setup trial/future-integration surfaces.
+- The former VCP Finder, Daily Shortlist, and Explorer presentation behavior is retained as historical compatibility/audit context, not current delivery direction.
 - VCP cards/tables show only a compact `%Margin X%` tag when the symbol is in the current list.
 - Drawer shows only the compact `Marginable: X%` field when present; missing margin data has no placeholder/tag.
 - Marginability is presentation/filter metadata only. It does not remove symbols from canonical scan history or mutate Daily state.

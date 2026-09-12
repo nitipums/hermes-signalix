@@ -1,8 +1,26 @@
 # Signalix Product Strategy — Market View to Action
 
 > **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
-> **Current stock-setup surface (2026-09-11):** Trend + Daily Elliott candidate + 60m Trade Setup remains the evidence spine. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
-_Last updated: 2026-09-11; durable strategy retained below, with the private actionable-signal decision explicitly overriding the earlier prohibition on actionable labels._
+> **Current stock-setup surface (2026-09-12):** Trend + Daily Elliott candidate + 60m Trade Setup remains the evidence spine. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
+_Last updated: 2026-09-12; durable strategy retained below, with the private actionable-signal decision explicitly overriding the earlier prohibition on actionable labels._
+
+## Current delivery focus — 2026-09-12
+
+Arm's current primary delivery focus is the **Daily Trend Mapping** surface:
+`/trend-map-shadow` and `/api/trend-map-shadow`. The immediate goal is to make
+Trend Mapping complete, reliable, and useful for reviewing the current Daily
+market landscape and data quality.
+
+The `/mvp` and `/api/setup-candidates` setup flow is retained as a trial and
+possible future consumer of Trend Mapping evidence for a deterministic private
+`BUY_NOW` alert. It is not the current delivery focus. The Elliott Wave line has
+been explored extensively without reaching a satisfactory product outcome and
+is deferred to a later research phase; it must not block Trend Mapping delivery.
+
+Trend Mapping remains public read-only, research evidence, and non-actionable.
+It does not create setup decisions, alerts, orders, broker actions, or
+auto-trading. Any future integration with `/mvp` or `BUY_NOW` requires a
+separate owner-approved contract and acceptance gate.
 
 ## Product thesis
 

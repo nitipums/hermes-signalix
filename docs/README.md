@@ -1,51 +1,35 @@
-# Signalix Documentation Map
+# Signalix Documentation
 
-> **STATUS: CURRENT** · File-system organization map, not product authority.
-> **Last organized:** 2026-09-02
+> **STATUS: CURRENT** · Directory map only; not product or runtime authority.
 > **First read:** [`START-HERE.md`](START-HERE.md)
-> **Cleanup matrix:** [`current/2026-09-02-documentation-authority-matrix.md`](current/2026-09-02-documentation-authority-matrix.md)
 
-## Layout
+## Where to start
+
+- [`START-HERE.md`](START-HERE.md) — the single Signalix entrypoint and task router.
+- [`../AGENTS.md`](../AGENTS.md) — agent safety contract and working rules.
+- [`../GLOSSARY.md`](../GLOSSARY.md) — domain vocabulary and preferred wording.
+
+## Directory map
 
 ```text
 docs/
-├── README.md                              ← this map
-├── Documentation-Cleanup-Review.html      ← visual inventory for review
-├── current/
-│   └── 2026-08-31-elliott-grill-decision-record.md ← consolidated grill + Opus record
+├── README.md                 ← this directory map
+├── START-HERE.md             ← Signalix entrypoint
+├── current/                  ← current decision records and evidence handoffs
 ├── superpowers/
-│   ├── specs/
-│   │   └── 2026-08-30-elliott-trend-trade-setup-design.md  ← active design
-│   └── plans/        ← historical implementation evidence; not current task state
-└── archive/
-    ├── reviews/     ← historical review packets
-    └── superpowers/ ← superseded plans/specs
+│   ├── specs/                ← focused current product/API/UI contracts
+│   └── plans/                ← historical implementation plans
+└── archive/                  ← historical reviews and superseded plans
 ```
 
-## Current decision record
+## Authority boundary
 
-The historical review packet is now under `archive/reviews/2026-09-01-signalix-independent-review.md`. It is evidence only; new work starts from `START-HERE.md` and the relevant current authority.
+- Product, acceptance, architecture, deployment, and governance authorities live in `../vault/` and focused specs.
+- `current/` contains bounded records that support those authorities; a dated record does not override them.
+- `superpowers/specs/` contains current focused contracts.
+- `archive/` contains historical evidence and is not current direction.
+- Generated HTML/JSON, logs, snapshots, scratch files, and research artifacts are evidence or outputs, not documentation authorities.
 
-## Authority routing
+## Maintenance
 
-- Product/decision direction: `../vault/Product-Strategy-Market-to-Action.md` and the owner-approved Elliott design.
-- Atomic decisions: `../vault/Decisions.md`.
-- Acceptance/evidence: `../vault/Execution-Pipeline.md`.
-- Architecture/runtime: `../vault/Architecture.md`, `../vault/Components.md`, `../vault/Deployment.md`.
-- Vault governance/index: `../vault/Documentation-Governance.md`, `../vault/INDEX.md`.
-- Historical implementation evidence: `archive/superpowers/` and `../vault/archive/`; never treat these as current direction.
-
-## Protected from this organization pass
-
-The following were deliberately untouched because they are owner changes, user research, runtime/generated data, or code:
-
-- `../AGENTS.md` (owner-modified)
-- `../CONTEXT.md`
-- `../Trade Reference/`
-- `../portfolio_monitor_log.txt`
-- `../backend/` and live containers/artifacts
-- ignored `.superpowers/sdd/` working evidence
-
-## Current reconciliation — 2026-09-01
-
-The semantic cleanup is complete for the canonical spine: T1–T9 Elliott/Trend/Trade-Setup is promoted, `/api/setup-candidates` is primary, and VCP documents are compatibility/audit history. Public 390px failure→Retry→recovery browser acceptance is PASS; broader desktop/drawer evidence and evaluator auto-caller remain separate. Do not use archived VCP notes or stale checklists as current direction.
+Keep this file structural. Update it only when the docs layout or first-read path changes. Put task routing in `START-HERE.md`, durable decisions in their owning authority, and historical rationale in dated records.

@@ -6,7 +6,15 @@
 >
 > Project map: `../docs/current/2026-09-05-wave-playbooks-research-project.md`
 
-## Active research project
+## Current delivery focus — 2026-09-12
+
+Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the
+current Signalix delivery focus. It is public read-only, non-actionable
+research evidence. The `/mvp` and `/api/setup-candidates` path is retained as a
+trial/future integration surface, and Elliott/Wave research is deferred until
+Trend Mapping is complete.
+
+## Deferred research projects
 
 ### Wave Playbooks and AutoResearch
 

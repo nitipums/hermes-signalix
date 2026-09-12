@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-02 13:08 ICT · release `1573d5c` promoted; intraday metadata sidecar/schema follow-ups verified; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-12 19:53 ICT · release `73bf3ed` is aligned local/remote; shadow hardening and named browser scopes reconciled; evaluator auto-caller separate.
 
 ## Stable release
 
@@ -12,9 +12,23 @@ MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
 
-## Current runtime scope — 2026-09-02
+## Current delivery focus — 2026-09-12
 
-The promoted Elliott/Trend/Trade-Setup spine is the current product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis are healthy at rebaseline; `/mvp` returns 200, `/api/setup-candidates` returns the live DB-built contract, `/health/readiness` is on backend `:8000`, and retired `/dashboard.html` returns 404. The public 390px failure→Retry→recovery journey is verified. The UI now shows `60m fetched` separately from `latest completed 60m candle`; session evidence was verified after runtime reload. Alerts, auto-trading, and broker execution remain off.
+The primary workstream is the public read-only Daily Trend Mapping surface:
+
+```text
+/trend-map-shadow
+/api/trend-map-shadow
+```
+
+This surface is research evidence only and is non-actionable. `/mvp` and
+`/api/setup-candidates` remain retained trial/future-integration surfaces;
+Elliott Wave work is deferred. Any future Trend Mapping to `BUY_NOW` path must
+be separately approved and gated.
+
+## Historical runtime scope — 2026-09-02
+
+At that 2026-09-02 baseline, the promoted Elliott/Trend/Trade-Setup spine was the product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis were healthy at rebaseline; `/mvp` returned 200, `/api/setup-candidates` returned the live DB-built contract, `/health/readiness` was on backend `:8000`, and retired `/dashboard.html` returned 404. The public 390px failure→Retry→recovery journey was verified. The UI showed `60m fetched` separately from `latest completed 60m candle`; session evidence was verified after runtime reload. Alerts, auto-trading, and broker execution remained off.
 
 `marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
@@ -295,7 +309,7 @@ after the restart; a successful restart alone is not acceptance evidence.
 - Intraday metadata seam — after a committed successful `marginable_long` ingestion run, the updater atomically publishes `intraday-latest.json` beside the canonical read model. `/api/setup-candidates` and symbol detail read this bounded sidecar without request-time PostgreSQL acquisition; absent, malformed, stale, `active_ord`, or legacy/null identity falls back to embedded read-model metadata. `intraday_ingestion_runs.fetch_universe` is added idempotently by `ensure_intraday_table`; `active_ord` remains audit/rollback-only and is never canonical product metadata.
 - MVP timestamp display — the setup-candidate metadata line reports both `60m fetched` from `intraday_ingestion_runs.fetch_completed_at` and `latest completed 60m candle` from the per-item stored candle timestamp; these must not be conflated.
 - MVP chart safety — timeframe requests are abortable/generation-guarded; unavailable 60m feeds show an explicit `60m unavailable · Daily EOD remains the decision source` state. Mobile chart/filter controls are at least 44px.
-- Daily trend-map shadow read model — `backend/shadow_read_model_publisher.py` writes immutable versioned JSON under `backend/shadow-read-model/` and atomically replaces `current.json`; the API reads only that pointer/artifact. The existing EOD updater invokes it after a successful `--scan` Daily update, while intraday-only runs do not. Deployed/public read-back on 2026-09-12 verified `229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`, 237 declared rows, `FRESH`, artifact content hash `02bd1d0dee037566`, measurement hash `0988111049785ae5`, persisted publisher timing, HTTP read latency `0.232s`, the failure sidecar, caller cap, and SQL guard. Full browser interaction/error-recovery remains `NOT VERIFIED`.
+|- Daily trend-map shadow read model — `backend/shadow_read_model_publisher.py` writes immutable versioned JSON under `backend/shadow-read-model/` and atomically replaces `current.json`; the API reads only that pointer/artifact. The existing EOD updater invokes it after a successful `--scan` Daily update, while intraday-only runs do not. Deployed/public read-back on 2026-09-12 verified `229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`, 237 declared rows, `FRESH`, artifact content hash `02bd1d0dee037566`, measurement hash `0988111049785ae5`, persisted publisher timing, HTTP read latency `0.232s`, the failure sidecar, caller cap, and SQL guard. Named shadow browser interaction/error-recovery scopes are `PASS` by owner confirmation; this does not promote setup data freshness.
 - Shadow hardening source contract: publisher retrieval is capped at 430 rows/symbol with explicit `cap_reached`/`cap` provenance. The single read-only batch query returns newest capped rows plus per-symbol `quality_scan`, `quality_established`, and exact `_valid`-equivalent `invalid_count` metadata over filtered Daily source rows; no unbounded history is transferred or claimed. A cap-hit `AVAILABLE` row is valid only with established quality and zero invalid rows; invalid rows remain `INVALID_DATA`, and unestablished quality is `DATA_BLOCKED`. Non-cap-hit rows retain max400/min30/prior10 behavior. Immutable artifacts persist numeric DB-read, classification, serialization/write-preparation, and total publisher timings with `measurement_scope=pre_immutable_write`; HTTP exposes separate read-path latency and validates the pointer/artifact on every request. Version identity includes content and measurement fingerprints, so changed measurement metadata cannot overwrite or falsely collide with an immutable artifact. HTTP returns read-path latency plus `published_at`, `age_seconds`, and configurable stale status; stale/corrupt/missing artifacts are visible `DATA_BLOCKED`/`NOT_VERIFIED` with zero rows. EOD publish exceptions emit structured failure events and preserve the prior pointer. The public shadow route is permanently public read-only with no authentication; it remains non-actionable research evidence and separate from `/mvp`'s owner-only/private signal policy.
 - The current SQL guard is source-only and fail-closed: only one `SELECT`/read-only `WITH` is admitted; mutating verbs (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`, `REVOKE`) anywhere in the statement, including data-modifying CTEs, are rejected. The database read-only transaction remains defense-in-depth. The public shadow route requires no credential or secret and has no action/order semantics.
 - Shadow quote-column source change (2026-09-12): the isolated table reads persisted `quote.price`, `quote.change_amount`, and `quote.change_pct` from the immutable Daily artifact, with `previous_daily_close` basis and explicit quote provenance. The quote representation revision is part of artifact and pointer identity, so an older same-as-of/policy/universe artifact without quote fields remains untouched and cannot be overwritten. Deployed/public read-back: HTTP 200, artifact `quote-envelope-v2`, 237 rows, sample quote `4.08`, `-0.04`, `-0.97%`, basis `previous_daily_close`; no `/mvp` frontend behavior or canonical read model changed.

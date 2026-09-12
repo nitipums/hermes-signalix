@@ -1,7 +1,7 @@
 # Signalix Canonical Source of Truth — 2026-08-25
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: repository/worktree/runtime source authority`
-> **Reconciled:** 2026-09-01 · branch HEAD `4311c37`; 390px failure→Retry→recovery browser gate verified separately.
+> **STATUS: HISTORICAL CUTOVER RECORD** · Records the 2026-08-25 source/worktree cutover; current repository/runtime authority is `AGENTS.md`, `vault/Deployment.md`, and fresh probes.
+> **Last historical reconciliation:** 2026-09-01 · current release has since advanced beyond this record.
 
 ## Authority
 
