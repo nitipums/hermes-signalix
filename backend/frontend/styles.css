@@ -455,7 +455,7 @@ body {
 .chart-timeframe { min-height:44px; min-width:44px; padding:0 10px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--text-2); font-size:11px; cursor:pointer; }
 .chart-timeframe.is-active { color:var(--accent); border-color:var(--accent); }
 .ma-controls { display:flex; flex-wrap:wrap; align-items:center; gap:5px 8px; min-width:0; margin:6px 0 8px; }
-.ma-controls label { display:inline-flex; align-items:center; gap:3px; min-height:32px; color:var(--text-2); font-size:10px; white-space:nowrap; }
+.ma-controls label { display:inline-flex; align-items:center; gap:3px; min-height:44px; color:var(--text-2); font-size:10px; white-space:nowrap; }
 .ma-controls input { accent-color:var(--accent); }
 .technical-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; min-width:0; margin:8px 0; }
 .technical-summary div { min-width:0; padding:7px 8px; border:1px solid var(--border); border-radius:5px; background:var(--surface-2); }

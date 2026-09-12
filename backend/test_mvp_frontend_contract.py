@@ -1004,6 +1004,7 @@ def test_chart_contract_has_real_layers_and_fail_closed_runtime():
 def test_mobile_interactive_targets_are_touch_safe():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
+    assert ".ma-controls label { display:inline-flex; align-items:center; gap:3px; min-height:44px;" in css
 
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
     assert ".vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }" in css

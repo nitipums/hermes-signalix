@@ -32,6 +32,32 @@ recommendation, alert, order, broker, BUY, or other action semantics. This is
 separate from `/mvp`, which remains governed by its owner-only/private signal
 policy. No credential or secret is recorded here.
 
+### Daily trend-map shadow hardening deployment read-back — 2026-09-12
+
+The bounded publisher, artifact/failure-sidecar validation, EOD hook, and
+fail-closed SQL guard were deployed and publicly read back. The public
+`GET /api/trend-map-shadow` returned HTTP 200 with 237 rows: `229 AVAILABLE`,
+`5 INVALID_DATA`, and `3 NO_DATA`; freshness was `FRESH`. Public `/mvp` also
+returned HTTP 200. The verified pointer targeted artifact
+`shadow-trend-map-quote-envelope-v2-2026-09-11-2851c3f13cbd8e39-e76ebcbf1637fac9-02bd1d0dee037566-0988111049785ae5`,
+with content hash `02bd1d0dee037566` and measurement hash
+`0988111049785ae5`. Persisted publisher timing was `db_read_ms=12454.587`,
+`classify_ms=37787.609`, `serialize_write_ms=41.139`, and `total_ms=51369.284`,
+with HTTP artifact-read latency `0.232s`.
+
+Generated `backend/shadow-read-model/` artifacts are intentionally tracked
+runtime inputs in commit `f18e48f`, not untracked research artifacts.
+Untracked `research/`, `docs/current/`, and `docs/agents/` remain preserved
+owner/research artifacts outside that commit. The next scheduled EOD freshness
+evidence remains ongoing; no post-commit EOD run is claimed here.
+
+The shadow route remains permanently public read-only and is research evidence
+only. It has no setup, recommendation, alert, order, broker, BUY, or other
+action semantics; this does not change `/mvp`'s separate owner-only/private
+signal policy. The unused `map_daily_trend` compatibility alias remains
+preserved because removing it would require editing outside this bounded file
+scope; no caller or test currently uses it.
+
 ### 2026-09-02 promotion evidence
 
 - Source/release: `/root/signalix`, branch `release/signalix-mvp-stable`, local and remote SHA `5bf3d9ac3e77b9f139ce2f84e0d6e27546a95fa4`.
@@ -269,13 +295,13 @@ after the restart; a successful restart alone is not acceptance evidence.
 - Intraday metadata seam — after a committed successful `marginable_long` ingestion run, the updater atomically publishes `intraday-latest.json` beside the canonical read model. `/api/setup-candidates` and symbol detail read this bounded sidecar without request-time PostgreSQL acquisition; absent, malformed, stale, `active_ord`, or legacy/null identity falls back to embedded read-model metadata. `intraday_ingestion_runs.fetch_universe` is added idempotently by `ensure_intraday_table`; `active_ord` remains audit/rollback-only and is never canonical product metadata.
 - MVP timestamp display — the setup-candidate metadata line reports both `60m fetched` from `intraday_ingestion_runs.fetch_completed_at` and `latest completed 60m candle` from the per-item stored candle timestamp; these must not be conflated.
 - MVP chart safety — timeframe requests are abortable/generation-guarded; unavailable 60m feeds show an explicit `60m unavailable · Daily EOD remains the decision source` state. Mobile chart/filter controls are at least 44px.
-- Daily trend-map shadow read model — `backend/shadow_read_model_publisher.py` writes immutable versioned JSON under `backend/shadow-read-model/` and atomically replaces `current.json`; the API reads only that pointer/artifact. The existing EOD updater invokes it after a successful `--scan` Daily update, while intraday-only runs do not. Prior runtime read-back on 2026-09-12 is historical evidence only (`229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`, 237 declared rows, as-of `2026-09-11`, policy prior10/max400/min30). This hardening source is not deployed; served/public verification of the new readback hashes, failure sidecar, caller cap, and SQL guard is `NOT VERIFIED`. Full browser interaction/error-recovery remains `NOT VERIFIED`.
+- Daily trend-map shadow read model — `backend/shadow_read_model_publisher.py` writes immutable versioned JSON under `backend/shadow-read-model/` and atomically replaces `current.json`; the API reads only that pointer/artifact. The existing EOD updater invokes it after a successful `--scan` Daily update, while intraday-only runs do not. Deployed/public read-back on 2026-09-12 verified `229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`, 237 declared rows, `FRESH`, artifact content hash `02bd1d0dee037566`, measurement hash `0988111049785ae5`, persisted publisher timing, HTTP read latency `0.232s`, the failure sidecar, caller cap, and SQL guard. Full browser interaction/error-recovery remains `NOT VERIFIED`.
 - Shadow hardening source contract: publisher retrieval is capped at 430 rows/symbol with explicit `cap_reached`/`cap` provenance. The single read-only batch query returns newest capped rows plus per-symbol `quality_scan`, `quality_established`, and exact `_valid`-equivalent `invalid_count` metadata over filtered Daily source rows; no unbounded history is transferred or claimed. A cap-hit `AVAILABLE` row is valid only with established quality and zero invalid rows; invalid rows remain `INVALID_DATA`, and unestablished quality is `DATA_BLOCKED`. Non-cap-hit rows retain max400/min30/prior10 behavior. Immutable artifacts persist numeric DB-read, classification, serialization/write-preparation, and total publisher timings with `measurement_scope=pre_immutable_write`; HTTP exposes separate read-path latency and validates the pointer/artifact on every request. Version identity includes content and measurement fingerprints, so changed measurement metadata cannot overwrite or falsely collide with an immutable artifact. HTTP returns read-path latency plus `published_at`, `age_seconds`, and configurable stale status; stale/corrupt/missing artifacts are visible `DATA_BLOCKED`/`NOT_VERIFIED` with zero rows. EOD publish exceptions emit structured failure events and preserve the prior pointer. The public shadow route is permanently public read-only with no authentication; it remains non-actionable research evidence and separate from `/mvp`'s owner-only/private signal policy.
 - The current SQL guard is source-only and fail-closed: only one `SELECT`/read-only `WITH` is admitted; mutating verbs (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`, `REVOKE`) anywhere in the statement, including data-modifying CTEs, are rejected. The database read-only transaction remains defense-in-depth. The public shadow route requires no credential or secret and has no action/order semantics.
 - Shadow quote-column source change (2026-09-12): the isolated table reads persisted `quote.price`, `quote.change_amount`, and `quote.change_pct` from the immutable Daily artifact, with `previous_daily_close` basis and explicit quote provenance. The quote representation revision is part of artifact and pointer identity, so an older same-as-of/policy/universe artifact without quote fields remains untouched and cannot be overwritten. Deployed/public read-back: HTTP 200, artifact `quote-envelope-v2`, 237 rows, sample quote `4.08`, `-0.04`, `-0.97%`, basis `previous_daily_close`; no `/mvp` frontend behavior or canonical read model changed.
 - Shared drawer DOM mapping regression (2026-09-12): explicit mappings align `renderSharedDetail` with shared markup IDs (`drawer-provenance`, `drawer-52w`, `drawer-ath`). After dashboard recreate, public `/trend-map-shadow` and `/mvp` returned HTTP 200; served `shared-drawer.js` contains one `openSharedDrawer` and one `drawChart`; real headless click test opened shadow drawer for `ADVICE` and reached `Chart status: Confirmed candle · 2026-09-11`. No API, database, ingestion, publisher, `/mvp` semantics, alerts, or broker behavior changed.
 - Shared drawer OHLCV table overflow fix (2026-09-12): the seven-column `OHLCV Window Summary` is now inside `.rolling-high-low__table-wrap`, which owns horizontal scrolling while the inner table keeps a readable minimum width; page-level horizontal overflow remains hidden. `/mvp` and shadow usage and product semantics are unchanged. Deployed and browser-verified at 390px: `innerWidth=390`, `bodyScrollWidth=390`, drawer visible, wrapper `clientWidth=348`, `scrollWidth=980`, `overflow-x=auto`.
-- Worktree note: untracked `research/`, `docs/current/` QA/session notes, and generated `backend/shadow-read-model/` artifacts are preserved owner/task artifacts, not part of the production code diff or deployment evidence. They remain untouched for owner review.
+- Worktree note: generated `backend/shadow-read-model/` artifacts are intentionally tracked runtime inputs in commit `f18e48f`, not untracked research artifacts. Untracked `research/`, `docs/current/`, and `docs/agents/` QA/session notes remain preserved owner/research artifacts outside that commit. The next scheduled EOD freshness evidence remains ongoing; no post-commit EOD run is claimed here.
 - `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
 
 ## Verify realtime push
