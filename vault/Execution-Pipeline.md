@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-13 ICT · current source/doc/generated files are dirty and Issue #22 commit/push is pending; production-served Trend Map remains read-only; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 ICT · Issue #22 is committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; production-served Trend Map remains read-only; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -14,8 +14,8 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 
 ### Fresh promotion evidence — 2026-09-13
 
-- Source/runtime baseline: the current worktree contains the Issue #22 source, tests, migration, docs, and generated files; local/remote equality and a clean working tree are not claimed. Commit/push is pending.
-- Focused source gate: `57 passed`; Python compile, JavaScript syntax, and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
+- Source/runtime baseline: the pushed release is `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; post-commit runtime/API evidence is recorded below.
+- Focused source gate: fallback/Trend Map command `pytest -q backend/test_derived_daily_fallback.py backend/test_shadow_trend_map.py` returned `52 passed`; publisher/intraday/artifact regressions also passed; Python compile and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
 - Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map-shadow` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
 - Browser: desktop 237 rows plus drawer/chart; 390px mobile no overflow (`scrollWidth=390`); failure → Retry showed zero rows and recovery returned 237 rows. Hermes `browser_exec` helper syntax was separately verified after restoring the managed Browser Use CLI path.
 - Rollback: `PASS`; isolated source-plus-artifact pairing read back the pre-promotion `6095346` + legacy artifact and the promoted source + artifact, each with 237 verified rows and matching status semantics. No production traffic was switched during the drill.
@@ -24,13 +24,13 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 
 - Issue [#22 — bounded derived-Daily fallback and lineage](https://github.com/nitipums/hermes-signalix/issues/22) adds an official-first, per-symbol/per-date fallback for the read-only Trend Map. `price_data` remains official; `derived_daily_price_data` is explicitly non-official Settrade 60m-derived evidence.
 - The bounded writer fetches only affected current-session symbols with Settrade 60m, requires complete Bangkok 09:00–16:00 coverage (8 bars), valid OHLCV, a completed cutoff, and writes only the derived table idempotently. It does not mutate `price_data` or enable action paths.
-- Prior served evidence: publisher/API read-back was `237/237`, `232 AVAILABLE`, `5 INVALID_DATA`, `0 NO_DATA`; `3BBIF`, `COM7`, and `PR9` exposed source run ID, source timestamps, source timeframe, bar count, and derivation method. This is not a verification of the current dirty worktree.
-- Current source verification (pending parent Issue #22 commit/closeout): exact focused fallback/adapter command `pytest -q backend/test_derived_daily_fallback.py backend/test_shadow_trend_map.py` — `52 passed` (11 fallback + 41 Trend Map tests); Python compile and `git diff --check` passed. Final runtime reload and public re-read are recorded below. Trend Map contract remains `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`.
+- Prior publication baseline: publisher/API read-back was `237/237`, `232 AVAILABLE`, `5 INVALID_DATA`, `0 NO_DATA`; the final post-commit read-back is recorded in `Deployment.md`.
+- Current source verification (Issue #22 commit `f99becb5d5d50a49331419bb8d878ae6b9f6d979`): exact focused fallback/adapter command `pytest -q backend/test_derived_daily_fallback.py backend/test_shadow_trend_map.py` — `52 passed` (11 fallback + 41 Trend Map tests); Python compile and `git diff --check` passed. Final runtime reload and public re-read are recorded below. Trend Map contract remains `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`.
 
 ### Current acceptance reconciliation — 2026-09-13
 
 - **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
-- **Source/release:** `NOT VERIFIED` for this remediation — current source/doc/generated files are dirty and commit/push is pending. Existing served-runtime evidence below is not evidence that these changes are deployed.
+- **Source/release:** `PASS` — Issue #22 is committed and pushed; local and remote `release/signalix-mvp-stable` were verified at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`.
 - **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` remain retained trial surfaces.
 - **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Official Daily remains unavailable for `3BBIF`, `COM7`, and `PR9`; their Trend Map rows use explicitly non-official derived Daily evidence from complete Settrade 60m sessions.
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
