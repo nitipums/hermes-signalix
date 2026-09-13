@@ -18,7 +18,7 @@ Daily market data
 
 Canonical surfaces:
 
-- **Current production-served focus:** `/trend-map-shadow`, `/api/trend-map-shadow`
+- **Current production-served focus:** `/trend-map-shadow`, `/api/trend-map-shadow` with canonical envelope `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`
 - **Active promotion/closeout:** GitHub [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17)
 - Setup trial / future consumer: `/api/setup-candidates`, `/mvp`
 - Operational scope: `marginable_long` (runtime counts are not permanent constants)

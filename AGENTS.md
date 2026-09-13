@@ -37,7 +37,7 @@ The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This 
 
 ## Current delivery focus and branch architecture — 2026-09-13
 
-Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and remains public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` remain retained trial/future-integration surfaces; Elliott/Wave research is deferred.
+Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current production-served focus. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it is public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` remain retained trial/future-integration surfaces; Elliott/Wave research is deferred.
 
 Wayfinder decision: “clean main” means a physically Trend-Mapping-only source/product line. The approved topology is a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD. The existing remote `main` is stale and is not the migration base. Keep the release branch intact for `/mvp`, compatibility, research, and rollback until the strict promotion gates pass. This is architecture planning only; it does not change current production checkout, default branch, runtime, or deployment.
 ### Decision and state boundaries
