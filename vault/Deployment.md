@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable` at `52b4383`; Trend Map production-served read-only closeout is complete; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable`; Trend Map production-served read-only closeout is complete; evaluator auto-caller remains separate.
 
 ## Stable release
 
@@ -18,7 +18,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Fresh promotion read-back — 2026-09-13
 
-- Source: local and remote `release/signalix-mvp-stable` at `2092965`; working tree clean after the scoped artifact commit.
+- Source: implementation commit `db481af` and artifact commit `159655d` are included in the release branch; local/remote branch equality was verified at final closeout and the working tree was clean.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
