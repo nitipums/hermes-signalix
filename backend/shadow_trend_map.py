@@ -708,9 +708,12 @@ def handle_shadow_trend_map_api(path: str, handler) -> bool:
     except Exception as error:  # fail closed with a visible envelope
         payload, status = unavailable_report(error), 200
     body = json.dumps(payload, default=str, separators=(",", ":")).encode()
-    handler.send_response(status)
-    handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Content-Length", str(len(body)))
-    handler.end_headers()
-    handler.wfile.write(body)
+    if hasattr(handler, "send_bytes"):
+        handler.send_bytes(body, content_type="application/json; charset=utf-8", status=status)
+    else:
+        handler.send_response(status)
+        handler.send_header("Content-Type", "application/json; charset=utf-8")
+        handler.send_header("Content-Length", str(len(body)))
+        handler.end_headers()
+        handler.wfile.write(body)
     return True

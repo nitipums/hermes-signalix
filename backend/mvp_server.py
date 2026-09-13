@@ -7,7 +7,9 @@ legacy_routes, legacy_server, portal.html, portfolio.html, or legacy snapshots.
 """
 from __future__ import annotations
 
+import gzip
 import http.server
+import math
 import os
 import socketserver
 from urllib.parse import urlsplit
@@ -28,6 +30,53 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
         # directory without mutating global module state.
         super().__init__(*args, directory=os.getenv("FRONTEND_DIR", DIR), **kwargs)
 
+    def _accepts_gzip(self):
+        headers = getattr(self, "headers", None)
+        if headers is not None and hasattr(headers, "get"):
+            value = headers.get("Accept-Encoding", "") or ""
+        else:
+            value = self.header_value("Accept-Encoding") or ""
+        wildcard_quality = None
+        gzip_quality = None
+        for item in value.lower().split(","):
+            encoding, _, parameters = item.strip().partition(";")
+            if encoding not in ("gzip", "*"):
+                continue
+            quality = 1.0
+            for parameter in parameters.split(";"):
+                name, separator, raw_value = parameter.strip().partition("=")
+                if name.strip() == "q":
+                    if not separator:
+                        quality = 0.0
+                    else:
+                        try:
+                            quality = float(raw_value.strip())
+                        except ValueError:
+                            quality = 0.0
+                    if not 0.0 <= quality <= 1.0 or not math.isfinite(quality):
+                        quality = 0.0
+            if encoding == "gzip":
+                gzip_quality = quality
+            else:
+                wildcard_quality = quality
+        if gzip_quality is not None:
+            return gzip_quality > 0
+        return wildcard_quality is not None and wildcard_quality > 0
+
+    def send_bytes(self, body, *, content_type, status=200, cache_control="no-store"):
+        """Send a complete response with HTTP/1.0-compatible byte framing."""
+        encoded = gzip.compress(body, mtime=0) if self._accepts_gzip() else body
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Vary", "Accept-Encoding")
+        if encoded is not body:
+            self.send_header("Content-Encoding", "gzip")
+        self.send_header("Cache-Control", cache_control)
+        self._cache_control_sent = True
+        self.end_headers()
+        self.wfile.write(encoded)
+
 
     def do_GET(self):
         parsed = urlsplit(self.path)
@@ -41,11 +90,7 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             except OSError:
                 self.send_error(404, "shadow trend-map template unavailable")
                 return
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
         if path.startswith("/api/"):
             if path == "/api/trend-map-shadow" and handle_shadow_trend_map_api(self.path, self):
@@ -72,7 +117,8 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Cache-Control", "no-store")
+        if not getattr(self, "_cache_control_sent", False):
+            self.send_header("Cache-Control", "no-store")
         super().end_headers()
 
 
