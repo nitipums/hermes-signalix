@@ -7,14 +7,16 @@ from canonical_chart_read import (
 )
 
 
-def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH"):
+def fetch_chart_rows(cur, symbol, timeframe, limit, market="TH", read_cutoff=None):
     """Compatibility import for canonical chart row retrieval."""
     rows, _label, _metadata = fetch_chart_rows_with_metadata(
-        cur, symbol, timeframe, limit, market=market
+        cur, symbol, timeframe, limit, market=market, read_cutoff=read_cutoff
     )
     return rows, _label
 
 
-def fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market="TH"):
+def fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market="TH", read_cutoff=None):
     """Compatibility import for canonical chart rows and read metadata."""
-    return _canonical_fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market=market)
+    return _canonical_fetch_chart_rows_with_metadata(
+        cur, symbol, timeframe, limit, market=market, read_cutoff=read_cutoff
+    )

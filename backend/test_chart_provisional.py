@@ -26,9 +26,10 @@ class _DailyAndIntradayCursor:
     def __init__(self, daily, intraday):
         self.responses = [daily, intraday]
         self.index = 0
+        self.queries = []
 
     def execute(self, query, params):
-        pass
+        self.queries.append((query, params))
 
     def fetchall(self):
         result = self.responses[self.index]
@@ -89,6 +90,156 @@ def test_day_without_current_session_data_keeps_daily_eod_provenance():
         [(datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False)], []), "SIS", "1D", 30)
     assert rows[-1][-1] is False
     assert "no current-session 60m data" in label
+
+
+def test_daily_chart_reads_valid_derived_rows_when_official_daily_is_absent():
+    cursor = _DailyAndIntradayCursor([
+        (datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False, "derived_daily_price_data"),
+    ], [])
+
+    result = read_chart_result(cursor, "PR9", "1D", 30)
+
+    assert result.source == "derived_daily_price_data"
+    assert result.as_of == "2026-08-27"
+    assert result.candles[-1]["source"] == "derived_daily_price_data"
+    assert "derived_daily_price_data" in cursor.queries[0][0]
+    assert "NOT EXISTS" in cursor.queries[0][0]
+
+
+def test_same_date_official_daily_remains_selected_over_derived_row():
+    cursor = _DailyAndIntradayCursor([
+        (datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False, "price_data"),
+        (datetime(2026, 8, 27), 10, 11, 9, 10.5, 800, False, "derived_daily_price_data"),
+    ], [])
+
+    result = read_chart_result(cursor, "PR9", "1D", 30)
+
+    assert len(result.candles) == 1
+    assert result.candles[0]["source"] == "price_data"
+    assert result.candles[0]["close"] == 9.5
+
+
+def test_derived_read_rejects_rows_after_explicit_read_cutoff():
+    cursor = _DailyAndIntradayCursor([], [])
+    cutoff = datetime(2026, 8, 27, 10, 0, tzinfo=timezone.utc)
+
+    read_chart_result(cursor, "PR9", "1D", 30, read_cutoff=cutoff)
+
+    query, params = cursor.queries[0]
+    assert "source_completion_cutoff <=" in query
+    assert cutoff in params
+
+
+def test_derived_read_requires_valid_ohlcv_geometry():
+    cursor = _DailyAndIntradayCursor([], [])
+
+    read_chart_result(cursor, "PR9", "1D", 30)
+
+    query = cursor.queries[0][0]
+    assert "high >= GREATEST(open, close, low)" in query
+    assert "low <= LEAST(open, close, high)" in query
+    assert "volume >= 0" in query
+    assert "open::text NOT IN ('NaN', 'Infinity', '-Infinity')" in query
+
+
+def test_derived_lineage_is_preserved_on_selected_candle():
+    lineage = (
+        "run-22", datetime(2026, 8, 27, 2, tzinfo=timezone.utc),
+        datetime(2026, 8, 27, 9, tzinfo=timezone.utc),
+        datetime(2026, 8, 27, 10, tzinfo=timezone.utc), "60m", 8,
+        "settrade_60m_complete_bangkok_session_ohlcv_v1",
+    )
+    cursor = _DailyAndIntradayCursor([(
+        datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False,
+        "derived_daily_price_data", *lineage,
+    )], [])
+
+    result = read_chart_result(cursor, "PR9", "1D", 30)
+
+    assert result.candles[0]["provenance"] == {
+        "source": "derived_daily_price_data", "source_run_id": "run-22",
+        "source_first_ts": "2026-08-27T02:00:00+00:00",
+        "source_last_ts": "2026-08-27T09:00:00+00:00",
+        "source_completion_cutoff": "2026-08-27T10:00:00+00:00",
+        "source_timeframe": "60m", "source_bar_count": 8,
+        "derivation_method": "settrade_60m_complete_bangkok_session_ohlcv_v1",
+    }
+
+
+def test_provisional_current_session_has_intraday_source_separate_from_daily_source():
+    cursor = _DailyAndIntradayCursor([
+        (datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False, "derived_daily_price_data"),
+    ], [(datetime(2026, 8, 27, 5, tzinfo=timezone.utc), 10, 12, 9, 11, 100)])
+
+    result = read_chart_result(cursor, "PR9", "1D", 30)
+
+    assert result.candles[-1]["provisional"] is True
+    assert result.candles[-1]["source"] == "intraday_price_data"
+    assert result.candles[-1]["provenance"]["source"] == "intraday_price_data"
+
+
+def test_mixed_weekly_sources_are_marked_mixed_with_constituent_provenance():
+    cursor = _DailyAndIntradayCursor([
+        (datetime(2026, 8, 24), 9, 10, 8, 9.5, 900, False, "price_data"),
+        (datetime(2026, 8, 25), 10, 11, 9, 10.5, 800, False, "derived_daily_price_data"),
+    ], [])
+
+    result = read_chart_result(cursor, "PR9", "1W", 30)
+
+    assert result.candles[0]["source"] == "mixed"
+    assert result.candles[0]["provenance"]["sources"] == [
+        "price_data", "derived_daily_price_data"
+    ]
+
+
+def test_chart_db_response_preserves_derived_daily_provenance(monkeypatch):
+    monkeypatch.setattr(
+        mvp_chart_db,
+        "_get_db_connection",
+        lambda: _Connection([
+            (datetime(2026, 8, 27), 9, 10, 8, 9.5, 900, False,
+             "derived_daily_price_data"),
+        ], []),
+    )
+
+    response = mvp_chart_db.project_chart_db_response("PR9", timeframe="1D")
+
+    assert response["source"] == "derived_daily_price_data"
+    assert response["provenance"]["source"] == "derived_daily_price_data"
+    assert response["as_of"] == "2026-08-27"
+
+
+def test_chart_view_is_trimmed_but_default_chart_remains_full(monkeypatch):
+    daily = [
+        (datetime(2025, 1, 1) + __import__("datetime").timedelta(days=index),
+         100 + index, 101 + index, 99 + index, 100.5 + index, 1000 + index, False)
+        for index in range(260)
+    ]
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: _Connection(daily, []))
+
+    full = mvp_chart_db.project_chart_db_response("TEAM", timeframe="1D")
+    compact = mvp_chart_db.compact_chart_db_response(full)
+
+    assert len(full["candles"]) == 260
+    assert len(full["indicators"]["series"]["ma"]["240"]) == 260
+    assert len(compact["candles"]) == 120
+    assert compact["candles"] == full["candles"][-120:]
+    for values in compact["indicators"]["series"]["ma"].values():
+        assert len(values) == 120
+    for values in compact["indicators"]["series"]["macd"].values():
+        assert len(values) == 120
+    assert len(compact["indicators"]["series"]["rsi"]) == 120
+    assert len(compact["indicators"]["series"]["atr"]) == 120
+    assert compact["indicators"]["latest"] == full["indicators"]["latest"]
+    assert compact["indicators"]["latest"]["ma"]["120"] == full["indicators"]["latest"]["ma"]["120"]
+    assert compact["indicators"]["latest"]["ma"]["240"] == full["indicators"]["latest"]["ma"]["240"]
+    assert compact["source"] == full["source"]
+    assert compact["as_of"] == full["as_of"]
+    assert compact["candles"][-1]["provenance"] == full["candles"][-1]["provenance"]
+    assert compact["provenance"]["representation"] == "chart_view"
+    assert compact["provenance"]["representation_authoritative"] is False
+    assert "ma20" not in compact and "ma50" not in compact and "ma200" not in compact
+    assert len(__import__("json").dumps(compact)) < len(__import__("json").dumps(full))
 
 
 @pytest.mark.parametrize("timeframe", ["1D", "1W"])
@@ -184,6 +335,33 @@ def test_chart_db_route_does_not_require_legacy_snapshot(monkeypatch):
     assert mvp_routes.handle_mvp_api("/api/chart-db/SIS?timeframe=1D", handler)
     assert handler.status == 200
     assert __import__("json").loads(handler.wfile.body)["candles"]
+
+
+def test_chart_db_route_view_chart_serves_compact_representation(monkeypatch):
+    daily = [
+        (datetime(2025, 1, 1) + __import__("datetime").timedelta(days=index),
+         100 + index, 101 + index, 99 + index, 100.5 + index, 1000 + index, False)
+        for index in range(260)
+    ]
+    connection = _Connection(daily, [])
+    monkeypatch.setattr(mvp_chart_db, "_get_db_connection", lambda: connection)
+    monkeypatch.setattr(mvp_chart_db, "_release_db_connection", lambda pg: None)
+    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": []})
+    handler = type("Handler", (), {
+        "wfile": type("Writer", (), {"write": lambda self, data: setattr(self, "body", data)})(),
+        "send_response": lambda self, status: setattr(self, "status", status),
+        "send_header": lambda self, *args: None,
+        "end_headers": lambda self: None,
+    })()
+
+    assert mvp_routes.handle_mvp_api("/api/chart-db/TEAM?timeframe=1D&view=chart", handler)
+    payload = __import__("json").loads(handler.wfile.body)
+    assert handler.status == 200
+    assert len(payload["candles"]) == 120
+    assert len(payload["indicators"]["series"]["high"]) == 120
+    assert payload["indicators"]["latest"]["window_summary"]
+    assert payload["provenance"]["representation"] == "chart_view"
+    assert "ma20" not in payload
 
 
 def test_chart_db_prefers_canonical_daily_wave_evidence(monkeypatch):

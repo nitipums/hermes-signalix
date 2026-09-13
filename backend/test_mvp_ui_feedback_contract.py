@@ -142,3 +142,12 @@ def test_shared_drawer_supports_horizontal_swipe_navigation_without_breaking_scr
     assert "Math.abs(deltaX)" in shared
     assert "Math.abs(deltaY)" in shared
     assert 'envelope.source === "trend-map-shadow" ? null' in shared
+
+
+def test_chart_layout_keeps_all_mobile_panels_inside_canvas():
+    shared = (ROOT / "shared-drawer.js").read_text()
+    layout = extract(shared, "chartLayout")
+    result = run([layout], "chartLayout(360)")
+    assert result["top"] + result["priceH"] + result["volH"] + result["macdH"] + result["rsiH"] <= 360
+    assert result["rsiLabelY"] <= 360
+    assert result["priceH"] < 205

@@ -87,7 +87,7 @@ def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH",
     """Fetch candles and preserve the latest stored intraday source timestamp."""
     result: ChartReadResult = read_chart_result(cur, symbol, timeframe, limit, market=market)
     return result.candles, {"latest_time": result.latest_time, "as_of": result.as_of,
-                            "provisional": result.provisional}
+                            "provisional": result.provisional, "source": result.source}
 
 
 def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
@@ -224,6 +224,56 @@ def _chart_source(timeframe: str) -> str:
     return "intraday_price_data" if str(timeframe).upper() == "60M" else "price_data"
 
 
+_CHART_VIEW_CANDLE_LIMIT = 120
+
+
+def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VIEW_CANDLE_LIMIT) -> Optional[dict]:
+    """Project the full chart contract into the drawer's bounded chart view.
+
+    Indicators are still calculated from the full source window. Only aligned
+    display series are trimmed, while ``indicators.latest`` and its window
+    summaries remain the full-window values required by the drawer.
+    """
+    if payload is None:
+        return None
+    # Published read-model overlays can contain read-only mapping wrappers;
+    # copy only the mutable containers this projection changes.
+    compact = dict(payload)
+    candles = compact.get("candles")
+    if isinstance(candles, list):
+        start = max(0, len(candles) - limit)
+        compact["candles"] = [dict(candle) if isinstance(candle, dict) else candle
+                               for candle in candles[start:]]
+    else:
+        start = 0
+
+    indicators = compact.get("indicators")
+    if isinstance(indicators, dict):
+        indicators = dict(indicators)
+        compact["indicators"] = indicators
+    series = indicators.get("series") if isinstance(indicators, dict) else None
+    if isinstance(series, dict):
+        series = dict(series)
+        indicators["series"] = series
+        for name, values in list(series.items()):
+            if isinstance(values, list):
+                series[name] = values[start:]
+            elif isinstance(values, dict):
+                values = dict(values)
+                series[name] = values
+                for key, aligned in values.items():
+                    if isinstance(aligned, list):
+                        values[key] = aligned[start:]
+
+    for key in ("ma20", "ma50", "ma200", "macd", "rsi"):
+        compact.pop(key, None)
+    provenance = dict(compact.get("provenance") or {})
+    provenance["representation"] = "chart_view"
+    provenance["representation_authoritative"] = False
+    compact["provenance"] = provenance
+    return compact
+
+
 def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
@@ -325,6 +375,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
 
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
+    chart_source = chart_metadata.get("source") or chart_source
     latest_time = (
         chart_metadata.get("latest_time")
         or _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")

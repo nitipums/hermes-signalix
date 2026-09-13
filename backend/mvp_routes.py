@@ -614,6 +614,7 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
             json_response(handler, {"error": "symbol required"}, status=400); return True
         import mvp_chart_db
         timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
+        chart_view = (qs.get("view", [""])[0] or "").lower() == "chart"
         canonical_item = None
         try:
             from read_model_publisher import load_current_read_model
@@ -634,7 +635,10 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
         except ValueError as exc:
             json_response(handler, {"error": "invalid_request"}, status=400); return True
         if result is None: _not_found(handler, symbol)
-        else: json_response(handler, _legacy_response(result))
+        else:
+            if chart_view:
+                result = mvp_chart_db.compact_chart_db_response(result)
+            json_response(handler, _legacy_response(result))
         return True
 
     try:

@@ -88,6 +88,23 @@ def test_shared_drawer_resets_shadow_setup_fields_and_guards_stale_requests():
     assert 'chartRequestSeq += 1; if (chartAbort) chartAbort.abort()' in shared
 
 
+def test_shared_drawer_selects_custom_initial_chart_url_only_for_daily():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(shared, "chartRequestUrl")
+    envelope = {"chartUrl": "/custom/TEAM?timeframe=1D"}
+    assert _run_node([helper], "[chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '1D'), chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '60M'), chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '1W')]") == [
+        "/custom/TEAM?timeframe=1D&view=chart",
+        "/api/chart-db/TEAM?timeframe=60M&view=chart",
+        "/api/chart-db/TEAM?timeframe=1W&view=chart",
+    ]
+
+
+def test_shared_drawer_chart_cache_is_scoped_to_chart_view():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'var key = symbol + "|" + timeframe + "|chart";' in shared
+    assert "view=chart" in shared
+
+
 def test_shared_drawer_explicit_metadata_ids_and_open_path_are_bound():
     shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     assert 'drawer52W:"drawer-52w"' in shared
@@ -530,7 +547,7 @@ def test_drawer_timeframe_switch_preserves_surface_item_and_discards_stale_chart
     js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     assert "var chartTimeframe = \"1D\", chartSymbol = null, drawerItem = null" in js
     assert "requestChart(envelope, chartSymbol, chartTimeframe, chartRequestSeq)" in js
-    assert "var chartRequestSeq = 0, chartAbort = null, chartCache = {};" in js
+    assert "var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null;" in js
     assert "chartCache[key]" in js
     assert "seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe" in js
     assert "if (cached) { renderDrawerChart(cached); return; }" in js

@@ -297,12 +297,18 @@
     if (dom.drawer) dom.drawer.classList.add("drawer--hidden");
     document.body.style.overflow = "";
   }
+  function chartRequestUrl(envelope, symbol, timeframe) {
+    var base = timeframe === "1D" && envelope && envelope.chartUrl
+      ? envelope.chartUrl
+      : "/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(timeframe);
+    return base + (base.indexOf("?") >= 0 ? "&" : "?") + "view=chart";
+  }
   function requestChart(envelope, symbol, timeframe, seq) {
-    var key = symbol + "|" + timeframe;
+    var key = symbol + "|" + timeframe + "|chart";
     var cached = chartCache[key];
     if (cached) { renderDrawerChart(cached); return; }
     dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = "Chart loading…"; dom.drawerCanvas.style.display = "none";
-    fetch((envelope.chartUrl || "/api/chart-db/" + encodeURIComponent(symbol) + "?timeframe=" + encodeURIComponent(timeframe)), {signal: chartAbort.signal, cache:"no-store"})
+    fetch(chartRequestUrl(envelope, symbol, timeframe), {signal: chartAbort.signal, cache:"no-store"})
       .then(function (response) { if (!response.ok) throw new Error("Chart HTTP " + response.status); return response.json(); })
       .then(function (chart) {
         if (seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe) return;
@@ -559,6 +565,21 @@
     return {width: width, height: height, pixelRatio: pixelRatio};
   }
 
+  function chartLayout(h) {
+    var top = 22, fixed = {priceH: 205, volH: 48, macdH: 68, rsiH: 62};
+    var available = Math.max(0, h - top - 8);
+    var total = fixed.priceH + fixed.volH + fixed.macdH + fixed.rsiH;
+    if (available < total) {
+      fixed.priceH = available * 0.52;
+      fixed.volH = available * 0.12;
+      fixed.macdH = available * 0.18;
+      fixed.rsiH = available * 0.18;
+    }
+    fixed.top = top;
+    fixed.rsiLabelY = top + fixed.priceH + fixed.volH + fixed.macdH + 16;
+    return fixed;
+  }
+
   function drawChart(chart) {
     var canvas = dom.drawerCanvas;
     // Clear hit targets before validating optional chart evidence so malformed
@@ -571,7 +592,8 @@
     ctx.clearRect(0, 0, w, h);
     var candles = chart.candles.slice(-120);
     var start = chart.candles.length - candles.length;
-    var left = 38, right = 8, top = 22, priceH = 205, volH = 48, macdH = 68, rsiH = 62;
+    var left = 38, right = 8, layout = chartLayout(h), top = layout.top;
+    var priceH = layout.priceH, volH = layout.volH, macdH = layout.macdH, rsiH = layout.rsiH;
     var plotW = w - left - right;
     var closes = candles.map(function(c) { return Number(c.close); });
     var highs = candles.map(function(c) { return Number(c.high); });
