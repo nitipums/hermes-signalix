@@ -23,7 +23,7 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 ## Current acceptance reconciliation — 2026-09-13
 
 - **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
-- **Source/release:** `PASS` — local and remote `release/signalix-mvp-stable` match at `52b4383`; working tree clean.
+- **Source/release:** `PASS` — local and remote `release/signalix-mvp-stable` were equal at final closeout; working tree was clean. The immutable implementation and artifact commits are recorded in the fresh promotion evidence above.
 - **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` remain retained trial surfaces.
 - **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Setup coverage remains separately partial/stale for unavailable Daily baselines: `3BBIF`, `COM7`, and `PR9`.
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
