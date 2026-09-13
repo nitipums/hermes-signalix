@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable` at commit `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; Issue #22 derived-Daily fallback is committed, pushed, and served; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable` at commit `8ae4b5559082ff9fd93e4700071200684306d194`; Issue #22 implementation is at `f99becb5d5d50a49331419bb8d878ae6b9f6d979` and remains committed, pushed, and served; evaluator auto-caller remains separate.
 
 ## Stable release
 
@@ -18,7 +18,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Fresh promotion read-back — 2026-09-13
 
-- Source/runtime baseline: commit `f99becb5d5d50a49331419bb8d878ae6b9f6d979` is the pushed release; the post-commit publisher read-back below verifies the served artifact.
+- Source/runtime baseline: current pushed release is commit `8ae4b5559082ff9fd93e4700071200684306d194`; the Issue #22 implementation baseline is `f99becb5d5d50a49331419bb8d878ae6b9f6d979`. The post-commit publisher read-back below verifies the served artifact.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
