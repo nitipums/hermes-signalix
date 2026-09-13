@@ -17,7 +17,9 @@ possible future consumer of Trend Mapping evidence for a deterministic private
 been explored extensively without reaching a satisfactory product outcome and
 is deferred to a later research phase; it must not block Trend Mapping delivery.
 
-Trend Mapping remains public read-only, research evidence, and non-actionable.
+Trend Mapping is production-served public read-only Daily evidence and
+non-actionable (`status=PRODUCTION_READ_ONLY`, `research_only=false`,
+`actionability=NONE`).
 It does not create setup decisions, alerts, orders, broker actions, or
 auto-trading. Any future integration with `/mvp` or `BUY_NOW` requires a
 separate owner-approved contract and acceptance gate.

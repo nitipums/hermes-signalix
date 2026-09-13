@@ -1,4 +1,4 @@
-"""Immutable, file-backed publisher for the isolated Daily trend-map shadow.
+"""Immutable, file-backed publisher for the production-read-only Daily Trend Map.
 
 The publisher is the only path that may classify Daily history.  HTTP reads
 only ``current.json`` and its referenced immutable version artifact.
@@ -93,8 +93,11 @@ def _iso(value: Any) -> str:
 
 
 def _validate_report(report: Mapping[str, Any]) -> dict[str, int]:
-    if report.get("research_only") is not True or report.get("universe", {}).get("scope") != trend_map.UNIVERSE:
-        raise ValueError("shadow report policy or universe is invalid")
+    if (report.get("status") not in {trend_map.PRODUCTION_READ_ONLY, "DATA_BLOCKED"}
+            or report.get("research_only") is not False
+            or report.get("actionability") != trend_map.ACTIONABILITY
+            or report.get("universe", {}).get("scope") != trend_map.UNIVERSE):
+        raise ValueError("production read-only report policy or universe is invalid")
     if report.get("provenance", {}).get("source") != "price_data" or report.get("provenance", {}).get("query_mode") != "SELECT_ONLY":
         raise ValueError("shadow report provenance is invalid")
     if report.get("policy", {}).get("representation_revision") != trend_map.REPRESENTATION_REVISION:
@@ -288,7 +291,10 @@ def publish_shadow_read_model(*, adapter=None, conn=None, as_of=None, root: str 
     root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
     started = time.perf_counter()
     report = trend_map.build_shadow_report(adapter=adapter, conn=conn, as_of=as_of, source="publisher")
-    if report.get("status") != "READ_ONLY_SHADOW" or report.get("verification_status") != "VERIFIED":
+    if (report.get("status") != trend_map.PRODUCTION_READ_ONLY
+            or report.get("research_only") is not False
+            or report.get("actionability") != trend_map.ACTIONABILITY
+            or report.get("verification_status") != "VERIFIED"):
         raise RuntimeError("shadow report is not fully verified")
     serialize_started = time.perf_counter()
     published_at_value = _iso(published_at)

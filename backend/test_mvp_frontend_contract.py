@@ -78,7 +78,7 @@ def test_shadow_surface_has_explicit_freshness_and_retry_error_contract():
     shadow = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
     assert 'id="error"' in shadow and 'id="retry"' in shadow
     assert 'data.freshness.status!=="FRESH"' in shadow
-    assert 'DATA_BLOCKED · shadow data unavailable' in shadow
+    assert 'DATA_BLOCKED · production read-only Daily Trend Map unavailable' in shadow
 
 
 def test_shared_drawer_resets_shadow_setup_fields_and_guards_stale_requests():
@@ -358,8 +358,8 @@ def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_fr
     assert 'compactWaveLabel(item)' in card
     assert 'compactWaveConfidence(item)' in card
     drawer = _extract_function(js, "renderSharedDetail")
-    assert 'dom.drawerWave.textContent = shadow ? "Not applicable · shadow classification"' in drawer
-    assert 'dom.drawerWaveSource.textContent = shadow ? "Research-only shadow evidence · Daily"' in drawer
+    assert 'dom.drawerWave.textContent = shadow ? "Not applicable · Daily classification"' in drawer
+    assert 'dom.drawerWaveSource.textContent = shadow ? "Production read-only Daily evidence"' in drawer
     assert "Primary Daily Wave" in html and "Daily structural context" not in html
     assert "compactDailyStructureLabel(item)" not in drawer
     assert 'setup.minor_structure' not in drawer

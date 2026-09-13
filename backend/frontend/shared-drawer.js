@@ -231,9 +231,9 @@
     dom.drawerAction.textContent = shadow ? "" : (item.action || item.decision || "Not verified");
     dom.drawerAction.hidden = shadow;
     if (dom.drawerAction.parentElement) dom.drawerAction.parentElement.hidden = shadow;
-    dom.drawerWave.textContent = shadow ? "Not applicable · shadow classification" : (typeof window.compactWaveLabel === "function" ? window.compactWaveLabel(item) : ((item.wave || {}).primary_state || "Not verified"));
+    dom.drawerWave.textContent = shadow ? "Not applicable · Daily classification" : (typeof window.compactWaveLabel === "function" ? window.compactWaveLabel(item) : ((item.wave || {}).primary_state || "Not verified"));
     dom.drawerWaveConfidence.textContent = shadow ? "NOT_APPLICABLE" : (typeof window.compactWaveConfidence === "function" ? window.compactWaveConfidence(item) : "NOT_VERIFIED");
-    dom.drawerWaveSource.textContent = shadow ? "Research-only shadow evidence · Daily" : "Daily structural · source unavailable";
+    dom.drawerWaveSource.textContent = shadow ? "Production read-only Daily evidence" : "Daily structural · source unavailable";
     var quote = item.quote || {};
     var price = quote.price != null ? quote.price : item.close;
     dom.drawerPrice.textContent = price != null ? Number(price).toFixed(2) : "Not verified";

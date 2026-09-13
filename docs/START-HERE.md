@@ -19,6 +19,7 @@ Daily market data
 Canonical surfaces:
 
 - **Current delivery focus:** `/trend-map-shadow`, `/api/trend-map-shadow`
+- **Canonical Trend Map contract:** production-served, public, read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`)
 - **Active focused closeout:** GitHub [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17)
 - Setup trial / future consumer: `/api/setup-candidates`, `/mvp`
 - Operational scope: `marginable_long` (runtime counts are not permanent constants)
@@ -70,6 +71,7 @@ Canonical surfaces:
 4. Read source/tests/runtime relevant to the task.
 5. Keep source/tests, runtime/API, data freshness, and browser verdicts separate.
 6. Preserve owner artifacts and historical evidence; never read or include secrets.
+7. Follow the strict Matt loop in `../AGENTS.md`: issue/spec → bounded brief → isolated worktree → test-first where practical → implementation → Standards/Spec review → runtime/data/browser verification → owning-doc sync → scoped closeout.
 
 ## Closeout shape
 

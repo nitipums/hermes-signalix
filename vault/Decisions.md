@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and permanently public read-only research evidence. `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for unavailable Daily baselines. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and permanently public, production-served, read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`). `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for unavailable Daily baselines. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
 
 ## 2026-09-13 — Trend Mapping mainline architecture
 
@@ -20,8 +20,9 @@ The six promotion gates are: dependency isolation; focused/relevant full tests; 
 
 Owner decision: make Daily Trend Mapping the primary Signalix workstream to
 complete, using `/trend-map-shadow` and `/api/trend-map-shadow` as the current
-focus surface. The surface remains public read-only research evidence and has
-no setup, alert, order, broker, BUY, or auto-trading semantics.
+focus surface. The surface is production-served public read-only Daily evidence
+(`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`)
+and has no setup, alert, order, broker, BUY, or auto-trading semantics.
 
 The `/mvp` and `/api/setup-candidates` path remains retained as a trial and a
 possible future consumer for deterministic private `BUY_NOW` alerts. It is not

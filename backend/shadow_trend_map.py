@@ -1,4 +1,4 @@
-"""Isolated, read-only Daily trend-map shadow surface.
+"""Production-read-only Daily Trend Map evidence surface.
 
 This module deliberately sits outside the canonical setup API.  It uses a
 backend-local SELECT-only point-in-time adapter and the pure Daily trend
@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ADAPTER_PATH = ROOT / "prototypes" / "elliott-state-replay" / "replay_lab.py"
 REPORT_VERSION = "daily-trend-map-shadow-v2-quotes"
 REPRESENTATION_REVISION = "quote-envelope-v2"
+PRODUCTION_READ_ONLY = "PRODUCTION_READ_ONLY"
+ACTIONABILITY = "NONE"
 UNIVERSE = "marginable_long"
 MIN_VALID_BARS = 30
 MAX_VALID_BARS = 400
@@ -487,8 +489,9 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                 row["provenance"] = {**PROVENANCE, "adapter": type(adapter).__name__, "availability": "NOT_VERIFIED",
                                      "error_type": type(error).__name__}
             output.append(row)
-    return {"report": REPORT_VERSION, "research_only": True,
-            "status": "DATA_BLOCKED" if batch_error or retrieval_error else "READ_ONLY_SHADOW",
+    return {"report": REPORT_VERSION, "research_only": False,
+            "status": "DATA_BLOCKED" if batch_error or retrieval_error else PRODUCTION_READ_ONLY,
+            "actionability": ACTIONABILITY,
             "verification_status": "NOT_VERIFIED" if batch_error or retrieval_error else "VERIFIED",
             "as_of": str(as_of), "universe": {**manifest, "scope": UNIVERSE,
             "declared_symbols": symbols, "declared_count": len(symbols), "symbol_hash": _hash(symbols)},
@@ -502,7 +505,7 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                        "classify_ms": round(classify_ms, 3),
                        "total_ms": round((time.perf_counter() - started) * 1000, 3)},
             "cache": _report_cache_metadata("cold", as_of, policy),
-            "limitations": ["Research-only shadow surface; no signal, order, alert, broker, or production mutation."]}
+            "limitations": ["Production-served read-only Daily evidence; no setup, signal, order, alert, broker, or production mutation."]}
 
 
 def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> dict[str, Any]:
@@ -541,7 +544,7 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
                     cached["cache"] = _report_cache_metadata("warm", as_of, policy)
                     return cached
         report = _build_shadow_report(adapter, conn, symbols, manifest, as_of)
-        if use_cache and report["status"] == "READ_ONLY_SHADOW":
+        if use_cache and report["status"] == PRODUCTION_READ_ONLY:
             with _report_cache_lock:
                 _report_cache = (time.monotonic() + REPORT_CACHE_TTL_SECONDS, key, report)
         return deepcopy(report)
@@ -551,7 +554,8 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
 
 
 def unavailable_report(error: Exception) -> dict[str, Any]:
-    return {"report": REPORT_VERSION, "research_only": True, "status": "DATA_BLOCKED", "as_of": None,
+    return {"report": REPORT_VERSION, "research_only": False, "status": "DATA_BLOCKED",
+            "actionability": ACTIONABILITY, "as_of": None,
             "universe": {"scope": UNIVERSE, "declared_symbols": [], "declared_count": 0},
             "policy": {"classifier": POLICY_VERSION, "report": REPORT_VERSION,
                        "representation_revision": REPRESENTATION_REVISION,
