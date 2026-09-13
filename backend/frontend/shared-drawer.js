@@ -6,7 +6,7 @@
   var chartLayers = {candles:true, volume:true, ma:true, rsi:true, macd:true,
     maPeriods: {"5":true,"10":true,"20":true,"60":true,"120":false,"240":false}, waveEvidence:true};
   var chartTimeframe = "1D", chartSymbol = null, drawerItem = null, drawerItems = [], drawerSymbols = [], drawerIndex = -1;
-  var chartRequestSeq = 0, chartAbort = null, chartCache = {};
+  var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null;
   var dom = {};
 
   function drawerMarkup() {
@@ -35,7 +35,7 @@
   function bindDom() {
     var mount = document.querySelector("#drawer-mount");
     if (mount && !document.querySelector("#drawer")) mount.innerHTML = drawerMarkup();
-    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR"].forEach(function (key) {
+    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
       var ids = {
         drawerChartPH:"drawer-chart-placeholder",
         drawerRR:"drawer-rr"
@@ -344,7 +344,7 @@
     var next = drawerIndex + delta; if (next < 0 || next >= drawerSymbols.length) return;
     var item = drawerItems[next] || {symbol: drawerSymbols[next]};
     var envelope = drawerItem && drawerItem.__sharedEnvelope || {};
-    openSharedDrawer({item:item, lane:item.decision_lane || item.machine_lane, trend:item.trend || item.classifier_status || item.stage, broad_state:item.broad_state, source:envelope.source || "canonical-mvp", actionability:item.actionability, detailUrl:envelope.detailUrl || null, chartUrl:envelope.chartUrl || null, navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
+    openSharedDrawer({item:item, lane:item.decision_lane || item.machine_lane, trend:item.trend || item.classifier_status || item.stage, broad_state:item.broad_state, source:envelope.source || "canonical-mvp", actionability:item.actionability, detailUrl:envelope.detailUrl || null, chartUrl:envelope.source === "trend-map-shadow" ? null : (envelope.chartUrl || null), navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
   }
 
     function escapeHTML(str) {
@@ -718,6 +718,19 @@
     dom.drawerOverlay.addEventListener("click", closeSharedDrawer);
     dom.drawerPrev.addEventListener("click", function () { navigateSharedDrawer(-1); });
     dom.drawerNext.addEventListener("click", function () { navigateSharedDrawer(1); });
+    dom.drawerBody.addEventListener("touchstart", function (event) {
+      if (!event.touches || event.touches.length !== 1) return;
+      swipeStart = {x: event.touches[0].clientX, y: event.touches[0].clientY};
+    }, {passive: true});
+    dom.drawerBody.addEventListener("touchend", function (event) {
+      if (!swipeStart || !event.changedTouches || event.changedTouches.length !== 1) { swipeStart = null; return; }
+      var touch = event.changedTouches[0], deltaX = touch.clientX - swipeStart.x, deltaY = touch.clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(deltaX) < 50 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+      var target = event.target;
+      if (target && typeof target.closest === "function" && target.closest("button, input, select, a")) return;
+      navigateSharedDrawer(deltaX < 0 ? 1 : -1);
+    }, {passive: true});
     $$(".chart-timeframe").forEach(function (button) { button.addEventListener("click", function () {
       chartTimeframe = button.getAttribute("data-timeframe") || "1D";
       var envelope = drawerItem && drawerItem.__sharedEnvelope; if (envelope) requestChart(envelope, chartSymbol, chartTimeframe, chartRequestSeq);

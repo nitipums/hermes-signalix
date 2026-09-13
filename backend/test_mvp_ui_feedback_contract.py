@@ -131,3 +131,14 @@ def test_chart_markers_remain_source_linked_and_are_not_derived_in_browser():
     assert "chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp)" in draw
     for forbidden in ("marker.date", "marker.close", "marker.high", "marker.low"):
         assert forbidden not in draw
+
+
+def test_shared_drawer_supports_horizontal_swipe_navigation_without_breaking_scroll():
+    shared = (ROOT / "shared-drawer.js").read_text()
+    assert "touchstart" in shared
+    assert "touchend" in shared
+    assert "navigateSharedDrawer(1)" in shared
+    assert "navigateSharedDrawer(-1)" in shared
+    assert "Math.abs(deltaX)" in shared
+    assert "Math.abs(deltaY)" in shared
+    assert 'envelope.source === "trend-map-shadow" ? null' in shared
