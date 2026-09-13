@@ -161,6 +161,30 @@ Codex may report a missing `bubblewrap` binary while using its bundled fallback;
 7. For runtime work, distinguish source, container, database, served artifact, and public ingress. A build or local API response does not prove deployment.
 8. Report exact commands/results, warnings, untested paths, and `PASS` / `FAIL` / `REVISE` / `NOT VERIFIED` honestly.
 
+### Strict Matt Pocock delivery loop
+
+Every Signalix development slice follows one bounded, traceable path:
+
+```text
+issue/spec
+→ exact files/tests/endpoints/no-go brief
+→ isolated branch/worktree
+→ test-first where practical
+→ smallest implementation
+→ focused + relevant full tests
+→ Standards + Spec review
+→ runtime/API/data/browser verification
+→ owning-doc sync
+→ scoped commit/PR
+→ exact closeout with remote SHA and dirty-file report
+```
+
+- One issue has one authority and one bounded concern; split code/tests, deployment, and browser/runtime work when side effects differ.
+- No drive-by cleanup, broad refactor, generated-artifact churn, or unrelated formatting; every changed line must trace to the issue/spec.
+- Codex is the bounded implementation/review tool; Lite independently verifies source, tests, runtime, data, browser, and acceptance.
+- A clean implementation is not a clean repository: preserve owner-owned dirty files, stage only scoped paths, and report untouched/untracked artifacts explicitly.
+- Do not close an issue from a green test or worker report alone. Missing runtime, freshness, browser, rollback, or remote evidence is `NOT VERIFIED`.
+
 ## Acceptance gates owned by Lite
 
 - **Contract:** one primary setup-candidate contract; no competing legacy primary label.

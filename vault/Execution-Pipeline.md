@@ -10,7 +10,7 @@
 
 ## Current delivery focus
 
-The canonical working focus is Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not the current delivery target.
+The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not this delivery target.
 
 ## Current acceptance reconciliation — 2026-09-13
 

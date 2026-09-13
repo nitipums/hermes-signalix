@@ -14,7 +14,7 @@ legacy routes: quarantined/404
 
 ## Current delivery focus — 2026-09-12
 
-The primary workstream is the public read-only Daily Trend Mapping surface. Its active bounded closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
+The primary workstream is the production-served, public, read-only Daily Trend Mapping surface. Its active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
 
 ```text
 /trend-map-shadow

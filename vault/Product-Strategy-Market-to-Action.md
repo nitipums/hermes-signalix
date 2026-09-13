@@ -1,26 +1,25 @@
 # Signalix Product Strategy — Market View to Action
 
 > **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
-> **Current stock-setup surface (2026-09-12):** Trend + Daily Elliott candidate + 60m Trade Setup remains the evidence spine. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
-_Last updated: 2026-09-12; durable strategy retained below, with the private actionable-signal decision explicitly overriding the earlier prohibition on actionable labels._
+> **Current stock-setup surface (2026-09-13):** Trend + Daily Elliott candidate + 60m Trade Setup remains the evidence spine. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
+_Last updated: 2026-09-13; the owner-approved Daily Trend Map promotion is production-served read-only evidence, while private BUY and execution remain separately gated._
 
-## Current delivery focus — 2026-09-12
+## Current delivery focus — 2026-09-13
 
-Arm's current primary delivery focus is the **Daily Trend Mapping** surface:
-`/trend-map-shadow` and `/api/trend-map-shadow`. The immediate goal is to make
-Trend Mapping complete, reliable, and useful for reviewing the current Daily
-market landscape and data quality.
+The **Daily Trend Mapping** surface is now an owner-approved production-served,
+public, read-only human-review evidence surface:
+`/trend-map-shadow` and `/api/trend-map-shadow`. It exposes deterministic Daily
+trend classifications, quotes, freshness, provenance, and data-quality states.
 
-The `/mvp` and `/api/setup-candidates` setup flow is retained as a trial and
-possible future consumer of Trend Mapping evidence for a deterministic private
-`BUY_NOW` alert. It is not the current delivery focus. The Elliott Wave line has
-been explored extensively without reaching a satisfactory product outcome and
-is deferred to a later research phase; it must not block Trend Mapping delivery.
+The `/mvp` and `/api/setup-candidates` setup flow remains a separate retained
+trial/future consumer. Trend Mapping does not create setup decisions or action
+semantics. The Elliott Wave line remains deferred and must not block Trend Mapping
+promotion.
 
-Trend Mapping remains public read-only, research evidence, and non-actionable.
-It does not create setup decisions, alerts, orders, broker actions, or
-auto-trading. Any future integration with `/mvp` or `BUY_NOW` requires a
-separate owner-approved contract and acceptance gate.
+The Trend Map is production-served read-only, non-actionable evidence. It must
+not create `BUY_NOW`/`SELL_NOW`, `REVIEW_NOW`, alerts, orders, broker actions,
+portfolio actions, or auto-trading. Any decision, alert, or execution integration
+requires a separate owner-approved contract and acceptance gate.
 
 ## Product thesis
 

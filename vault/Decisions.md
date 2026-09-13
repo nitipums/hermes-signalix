@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and permanently public read-only research evidence. `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for unavailable Daily baselines. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation (2026-09-13):** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the owner-approved production-served, public, read-only human-review evidence surface. It exposes deterministic Daily trend classifications, quotes, freshness, provenance, and data-quality states; it remains non-actionable and must not create setup decisions, BUY/SELL, alerts, orders, broker actions, portfolio actions, or auto-trading. `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
 
 ## 2026-09-13 — Trend Mapping mainline architecture
 
