@@ -12,7 +12,7 @@ A durable, evidence-gated Research-to-Promotion system that identifies playbook-
 - Product authority remains `vault/Product-Strategy-Market-to-Action.md`, `vault/Decisions.md`, and the current Elliott/Trend/Trade-Setup spec.
 - Skills: wayfinder, grilling, domain-modeling, Signalix acceptance/data-lineage rules.
 - Owner: พี่อาร์ม decides product scope and promotion; Lite is final quality gate.
-- Local tracker: child tickets are in `tickets/`; `blocked_by` in ticket bodies represents dependencies because no native issue tracker is configured.
+- Tracker: GitHub Issues for `nitipums/hermes-signalix`; child tickets should be published there with explicit blocking relationships. The existing local `tickets/` files remain planning history/evidence until migrated deliberately.
 
 ## Decisions so far
 
