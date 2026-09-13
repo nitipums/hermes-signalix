@@ -12,6 +12,8 @@
 
 The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup-candidate and `/mvp` contracts are **DROPPED / PAUSED** by owner decision, not this delivery target. Preserve their source/history as retained audit/future-integration evidence, but do not spend work or route tasks there until Arm explicitly resumes them.
 
+The owner-approved Main Trend calibration is a separate bounded diagnostic/classifier specification in `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` (Issue #32). Its first slice uses Daily Close plus SMA5/10/20/60/120/240 and 20 completed Daily bars for slope, defines Main Trend 1–4 only, and does not add action lanes or change the current read-only/non-actionable boundary until implementation and acceptance gates pass.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Acceptance contract: opening a Trend Map row and moving to the next/previous row must refresh the chart for the newly selected symbol; horizontal swipe is supported while vertical drawer scrolling remains available.

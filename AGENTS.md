@@ -77,7 +77,7 @@ Before any task, Codex must:
 | Task concern | Read first | Update when the contract changes |
 |---|---|---|
 | Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
-| Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
+| Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + `docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
 | Current setup-candidate direction and API contract (only if explicitly resumed) | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if Arm resumes the paused path |
 | Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |

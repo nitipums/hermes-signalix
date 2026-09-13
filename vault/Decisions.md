@@ -4,6 +4,28 @@
 >
 > **Current reconciliation (2026-09-13):** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the owner-approved production-served, public, read-only human-review evidence surface. It exposes deterministic Daily trend classifications, quotes, freshness, provenance, and data-quality states; it remains non-actionable and must not create setup decisions, BUY/SELL, alerts, orders, broker actions, portfolio actions, or auto-trading. `/api/setup-candidates` and `/mvp` are **DROPPED / PAUSED** by owner decision; preserve their source/history as retained audit/future-integration material and do not route work there until Arm explicitly resumes them. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
 
+## 2026-09-13 — Main Trend 1–4 multiple-MA taxonomy
+
+Arm approved the focused Main Trend calibration spec
+`../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` and Issue
+[#32](https://github.com/nitipums/hermes-signalix/issues/32).
+
+- Main Trend is a deterministic Daily visual-evidence taxonomy using Daily
+  Close plus SMA5/10/20/60/120/240 and 20 completed Daily bars for slope.
+- Main 1 is base/weak/damaged; Main 2 combines recovery and bullish advance;
+  Main 3 covers pullback/weakening/distribution while long-term structure is
+  intact and subsumes former 4.1; Main 4 is sustained deterioration/breakdown
+  and is similar to former 4.2.
+- Subtypes are deferred. Partial MA inputs may classify only with explicit
+  `PARTIAL` evidence quality. The first slice has no action lane or BUY/SELL
+  semantics.
+- Current Trend Map remains public, read-only, and non-actionable until a
+  separate implementation and source/API/data/browser acceptance gate passes.
+
+This decision authorizes the bounded diagnostic/classifier implementation
+defined by Issue #32; it does not authorize chart fixes, deployment, alerts,
+broker actions, or auto-trading.
+
 ## 2026-09-13 — Trend Mapping mainline architecture
 
 Owner decision from Wayfinder map #10:

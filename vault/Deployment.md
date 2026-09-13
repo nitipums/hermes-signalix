@@ -78,6 +78,67 @@ recommendation, alert, order, broker, BUY, or other action semantics. This is
 separate from `/mvp`, which remains governed by its owner-only/private signal
 policy. No credential or secret is recorded here.
 
+### Chart fallback and mobile RSI read-back — 2026-09-13 18:23 ICT
+
+- Owner-authorized runtime action: `docker compose restart dashboard`; no
+  migration, database write, commit, or push was performed.
+- Dashboard health transitioned from `starting` to `healthy`; readiness returned
+  `{"status":"ok","db":"up","redis":"up"}`.
+- Public `/api/chart-db/PR9?timeframe=1D` returned HTTP 200 with 62 candles,
+  `source=derived_daily_price_data`, `as_of=2026-09-11`, RSI `66.177`, and
+  complete derived lineage including source run/timestamps, cutoff, timeframe,
+  bar count, and derivation method.
+- Public `/api/chart-db/3BBIF?timeframe=1D` returned HTTP 200 with 62 candles,
+  `source=derived_daily_price_data`, `as_of=2026-09-11`, RSI `47.6568`, and
+  the same complete lineage fields.
+- Public 500px browser read-back opened both PR9 and 3BBIF at the Trend Map
+  drawer. Each showed the Daily chart, RSI summary/panel, 62 candles, derived
+  source, and canvas `461x360`; page `bodyScrollWidth=500` matched
+  `clientWidth=500`.
+- Source/tests remain separate: focused chart/UI/fallback suite passed, JS
+  syntax and Python compile passed, and `git diff --check` passed. The source
+  changes remain uncommitted; release promotion is not claimed here.
+
+### Drawer timeframe routing read-back — 2026-09-13 18:34 ICT
+
+- Public diagnosis measured TEAM chart responses at approximately 604KB/184ms
+  for 1D, 589KB/104ms for 60M, 652KB/204ms for 1W, and 760KB/379ms for 1M.
+  The main switching defect was stale URL routing, not a proven backend latency
+  regression.
+- Owner-authorized source change makes custom `chartUrl` valid only for the
+  initial 1D request; 60M/1W/1M construct the same-origin chart-db URL for the
+  selected timeframe. Trend Map now passes `chartUrl:null`.
+- Public browser read-back at the Trend Map drawer for TEAM verified:
+  `1D → 60M` requested `/api/chart-db/TEAM?timeframe=60M` and rendered
+  `chart.timeframe=60M`; `60M → 1W` requested
+  `/api/chart-db/TEAM?timeframe=1W` and rendered `chart.timeframe=1W`.
+- Focused URL-selection, UI feedback, and Trend Map tests passed; `node
+  --check backend/frontend/shared-drawer.js` and `git diff --check` passed.
+  No additional restart was required after the earlier dashboard restart;
+  source changes remain uncommitted and release promotion is not claimed.
+
+### Compact chart payload optimization read-back — 2026-09-13 18:48 ICT
+
+- Added explicit `view=chart` for the drawer only. The default chart API
+  contract remains full-size and unchanged for existing callers.
+- Compact responses preserve `indicators.latest`, window summaries, aligned
+  indicator series, candle source/provenance, derived lineage, provisional
+  flags, and read-only semantics while trimming display arrays to 120 candles.
+- Public TEAM measurements after dashboard reload:
+  `1D` compact `280,326` bytes vs default `603,857`; `60M` compact `270,769`;
+  `1W` compact `302,229`; `1M` compact `353,230`. These are payload-size and
+  request measurements, not a universal latency claim.
+- Public mobile browser verified `TEAM` initial `1D`, then `60M`, then `1W`:
+  each request included `view=chart`, rendered the requested timeframe, used
+  120 candles, and kept `bodyScrollWidth=500` equal to `clientWidth=500`.
+- Screenshot inspection verified PRICE/VOL/MACD/RSI panels and the RSI line
+  remain visible inside the compact chart without clipping.
+- Focused compact/default/route/timeframe tests passed; Python compile,
+  `node --check`, and `git diff --check` passed. Legacy `/mvp` frontend
+  contract failures remain pre-existing and outside this Trend Map slice.
+- Source changes remain uncommitted; no commit, push, or release promotion is
+  claimed.
+
 ### Historical deployment evidence — 2026-09-12 (superseded; not current runtime)
 
 The bounded publisher, artifact/failure-sidecar validation, EOD hook, and
