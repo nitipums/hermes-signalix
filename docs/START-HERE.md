@@ -1,7 +1,7 @@
 # Signalix — Start Here
 
 > **STATUS: CURRENT** · Single entrypoint and routing map only.
-> **Last reconciled:** 2026-09-12 ICT
+> **Last reconciled:** 2026-09-13 ICT
 > Product, contract, runtime, and research truth live in the linked authorities below.
 
 ## Signalix in one minute
@@ -19,6 +19,7 @@ Daily market data
 Canonical surfaces:
 
 - **Current delivery focus:** `/trend-map-shadow`, `/api/trend-map-shadow`
+- **Active focused closeout:** GitHub [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17)
 - Setup trial / future consumer: `/api/setup-candidates`, `/mvp`
 - Operational scope: `marginable_long` (runtime counts are not permanent constants)
 - Setup decision lanes remain available for the retained trial contract:

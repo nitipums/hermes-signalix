@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-12 19:53 ICT · release `73bf3ed` aligned local/remote; setup, shadow, and named browser scopes reconciled; setup freshness remains partial/stale for three unavailable Daily baselines; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 09:56 ICT · local `release/signalix-mvp-stable` is `29b671e`; remote remains `391ada1` until the bounded docs commit is pushed; setup, shadow, and named browser scopes reconciled; setup freshness remains partial/stale for three unavailable Daily baselines; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -10,13 +10,13 @@
 
 ## Current delivery focus
 
-The canonical working focus is Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`; see `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not the current delivery target.
+The canonical working focus is Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not the current delivery target.
 
-## Current acceptance reconciliation — 2026-09-12
+## Current acceptance reconciliation — 2026-09-13
 
-- **Current focus gate:** Complete Daily Trend Mapping before resuming broader setup or Elliott work.
-- **Source/release:** `PASS` — local and remote `release/signalix-mvp-stable` are `73bf3ed`.
-- **Runtime/API:** `PASS` for `/mvp`, `/api/setup-candidates`, `/api/trend-map-shadow`, and `/api/shadow-buy-signals?days=7` read-back.
+- **Current focus gate:** Complete the bounded Daily Trend Mapping closeout in GitHub Issue #17 before resuming broader setup or Elliott work.
+- **Source/release:** `PASS` — local `release/signalix-mvp-stable` contains the unpushed Wave 0 documentation reconciliation; remote remains at `391ada1` until publication.
+- **Runtime/API:** `PASS` for the currently served `/mvp`, `/api/setup-candidates`, and `/api/trend-map-shadow` read-back.
 - **Data freshness/coverage:** `NOT VERIFIED` for complete fresh setup coverage; the setup API currently reports `stale/partial` coverage with three unavailable Daily baselines: `3BBIF`, `COM7`, and `PR9`.
 - **Browser/UI:** `PASS` by owner confirmation for the setup 390px failure→Retry→recovery journey, shadow 390px drawer/chart, shadow error→Retry→recovery, full `/mvp` desktop/mobile review, and the revised 2026-09-12 UI.
 - **Safety:** Wave remains machine-generated evidence for Arm review; shadow surfaces are read-only/non-actionable; alerts, broker execution, and auto-trading remain `OFF/PENDING`.
