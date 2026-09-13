@@ -122,6 +122,20 @@ def test_report_policy_has_explicit_quote_representation_revision():
     assert result["representation_revision"] == subject.REPRESENTATION_REVISION
 
 
+def test_report_uses_canonical_production_read_only_envelope():
+    class Adapter:
+        def resolve_universe(self, conn, value):
+            return ["AAA"], {"universe_filter": value}
+        def _exec_select(self, conn, sql, params=None):
+            return [("2026-09-11",)], ["max_date"]
+        def load_daily_pit(self, conn, symbol, as_of):
+            return bars(75), as_of
+    report = subject.build_shadow_report(Adapter(), object())
+    assert report["status"] == subject.PRODUCTION_READ_ONLY
+    assert report["research_only"] is False
+    assert report["actionability"] == "NONE"
+
+
 def test_explicit_error_states():
     no_data = subject.evaluate_symbol("A", [], "2026-09-11")
     assert no_data["status"] == "DATA_BLOCKED"
@@ -280,7 +294,8 @@ def test_shadow_adapter_uses_shared_drawer_and_suppresses_action_setup_semantics
     assert 'actionability:"NONE"' in combined
     assert 'dom.drawerAction.hidden = shadow' in combined
     assert 'if (setupSection) setupSection.hidden = shadow' in combined
-    assert 'shadow ? "Not applicable · shadow classification"' in combined
+    assert 'shadow ? "Not applicable · Daily classification"' in combined
+    assert 'shadow ? "Production read-only Daily evidence"' in combined
 
 
 def test_shadow_shared_drawer_does_not_restore_removed_evidence_metadata_nodes():
@@ -517,7 +532,10 @@ def test_api_route_is_same_origin_read_only_envelope(monkeypatch):
         def write(self, body):
             self.body.extend(body)
     handler = Handler()
-    monkeypatch.setattr(subject, "build_shadow_report", lambda: {"research_only": True, "rows": []})
+    monkeypatch.setattr(subject, "build_shadow_report", lambda: {"status": subject.PRODUCTION_READ_ONLY, "research_only": False, "actionability": "NONE", "rows": []})
     assert subject.handle_shadow_trend_map_api("/api/trend-map-shadow", handler)
     assert handler.status == 200
-    assert json.loads(bytes(handler.body))["research_only"] is True
+    payload = json.loads(bytes(handler.body))
+    assert payload["status"] == subject.PRODUCTION_READ_ONLY
+    assert payload["research_only"] is False
+    assert payload["actionability"] == "NONE"

@@ -21,7 +21,9 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 /api/trend-map-shadow
 ```
 
-This surface is research evidence only and is non-actionable. `/mvp` and
+This surface is production-served public read-only Daily evidence
+(`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`)
+and is non-actionable. `/mvp` and
 `/api/setup-candidates` remain retained trial/future-integration surfaces;
 Elliott Wave work is deferred. Any future Trend Mapping to `BUY_NOW` path must
 be separately approved and gated.
@@ -40,8 +42,8 @@ Release `28f7947` removed only the dedicated Team Facts API-key guard; protected
 
 The implementation uses bounded read-only queries and preserves Daily/60m source separation. Rate limiting and HTTPS/TLS remain separate hardening items. Alerts, auto-trading, broker execution, and evaluator auto-caller remain OFF/PENDING.
 
-The Daily trend-map route is permanently public read-only by owner decision and
-requires no authentication. It is research evidence only and has no setup,
+The Daily Trend Map route is permanently production-served public read-only by
+owner decision and requires no authentication. It has no setup,
 recommendation, alert, order, broker, BUY, or other action semantics. This is
 separate from `/mvp`, which remains governed by its owner-only/private signal
 policy. No credential or secret is recorded here.

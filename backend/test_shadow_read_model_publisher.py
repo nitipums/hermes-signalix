@@ -38,6 +38,9 @@ def test_publisher_writes_version_pointer_and_full_counts(tmp_path):
     artifact = json.loads((tmp_path / pointer["artifact_path"]).read_text())
     assert pointer["artifact_id"] == artifact["artifact_id"]
     assert artifact["identity"]["as_of"] == "2026-09-11"
+    assert artifact["status"] == trend_map.PRODUCTION_READ_ONLY
+    assert artifact["research_only"] is False
+    assert artifact["actionability"] == "NONE"
     assert artifact["identity"]["policy_hash"] == artifact["policy"]["hash"]
     assert artifact["universe"]["scope"] == "marginable_long"
     assert artifact["provenance"]["query_mode"] == "SELECT_ONLY"
@@ -108,6 +111,24 @@ def test_publisher_rejects_invalid_quote_envelope_and_basis(tmp_path):
     finally:
         monkeypatch.undo()
     assert not (tmp_path / "current.json").exists()
+
+
+@pytest.mark.parametrize("field,value", [
+    ("status", "READ_ONLY_SHADOW"),
+    ("research_only", True),
+    ("actionability", "BUY_NOW"),
+])
+def test_publisher_rejects_legacy_or_actionable_report_semantics(tmp_path, monkeypatch, field, value):
+    original = trend_map.build_shadow_report
+
+    def invalid_report(**kwargs):
+        report = original(adapter=Adapter(), conn=object(), as_of="2026-09-11", source="publisher")
+        report[field] = value
+        return report
+
+    monkeypatch.setattr(trend_map, "build_shadow_report", invalid_report)
+    with pytest.raises((ValueError, RuntimeError), match="(policy|fully verified)"):
+        publisher.publish_shadow_read_model(root=tmp_path)
 
 
 def test_publisher_rejects_cap_hit_positive_classification(tmp_path, monkeypatch):
