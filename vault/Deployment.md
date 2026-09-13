@@ -18,7 +18,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Fresh promotion read-back — 2026-09-13
 
-- Source: local and remote `release/signalix-mvp-stable` at `52b4383`; working tree clean after the scoped artifact commit.
+- Source: local and remote `release/signalix-mvp-stable` at `2092965`; working tree clean after the scoped artifact commit.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.

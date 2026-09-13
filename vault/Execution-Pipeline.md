@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-13 11:10 ICT · local and remote `release/signalix-mvp-stable` are `52b4383`; production-served Trend Map closeout is complete; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 11:10 ICT · local and remote `release/signalix-mvp-stable` are `2092965`; production-served Trend Map closeout is complete; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -14,7 +14,7 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 
 ### Fresh promotion evidence — 2026-09-13
 
-- Source/release: local and remote `release/signalix-mvp-stable` at `52b4383`; working tree clean after the scoped artifact commit.
+- Source/release: local and remote `release/signalix-mvp-stable` at `2092965`; working tree clean after the scoped artifact commit.
 - Focused source gate: `57 passed`; Python compile, JavaScript syntax, and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
 - Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map-shadow` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
 - Browser: desktop 237 rows plus drawer/chart; 390px mobile no overflow (`scrollWidth=390`); failure → Retry showed zero rows and recovery returned 237 rows. Hermes `browser_exec` helper syntax was separately verified after restoring the managed Browser Use CLI path.
