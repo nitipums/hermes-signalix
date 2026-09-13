@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 · current production source checkout is `release/signalix-mvp-stable` at commit `45095b320fba6bde72ff3af553ffdaa366426bac`; the served Trend Map artifact and runtime evidence below remain the current read-model evidence; Issue #22 implementation is at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 16:34 ICT · current release HEAD is `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004`; the checkout also carries uncommitted owner/working-tree changes, including the bounded Trend Map drawer navigation fix recorded below. The served Trend Map artifact and runtime evidence below remain the current read-model evidence; Issue #22 implementation is at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; evaluator auto-caller remains separate.
 
 ## Stable release
 
@@ -16,9 +16,18 @@ legacy routes: quarantined/404
 
 The primary workstream is the production-served, public, read-only Daily Trend Mapping surface. Its active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
 
+### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
+
+- Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.
+- Root cause: drawer navigation retained the first symbol's `chartUrl`, so the header/position advanced while the chart fetched the old symbol; the shared drawer also had no touch gesture handlers.
+- Fix: Trend Map navigation now derives the chart request from the current symbol; the drawer body supports horizontal touch swipe (50px threshold), rejects predominantly vertical movement, and ignores controls/links.
+- Source/tests: the regression test was RED before the fix and GREEN after it. `pytest -q backend/test_mvp_ui_feedback_contract.py backend/test_shadow_trend_map.py -rA` returned `51 passed`; `node --check backend/frontend/shared-drawer.js` and `git diff --check` passed.
+- Served browser read-back through `http://91.98.72.120:3001/trend-map-shadow` at 390px: `TEAM` → `RJH` (`2 of 237`) → `KCG` (`3 of 237`); observed chart requests changed respectively to `/api/chart-db/TEAM?timeframe=1D`, `/api/chart-db/RJH?timeframe=1D`, and `/api/chart-db/KCG?timeframe=1D`. Synthetic touch swipe was also verified.
+- Runtime boundary: no restart, migration, database write, commit, or push was performed. The served JS matched the current dirty worktree; release promotion remains pending scoped closeout.
+
 ### Fresh promotion read-back — 2026-09-13
 
-- Source/runtime baseline: current source checkout is commit `45095b320fba6bde72ff3af553ffdaa366426bac`; the Issue #22 implementation baseline is `f99becb5d5d50a49331419bb8d878ae6b9f6d979`. The post-commit publisher read-back below verifies the served artifact.
+- Prior source/runtime baseline for the promotion evidence below was commit `45095b320fba6bde72ff3af553ffdaa366426bac`; the Issue #22 implementation baseline is `f99becb5d5d50a49331419bb8d878ae6b9f6d979`. The bounded drawer working-tree verification is recorded above; no new release promotion is claimed here.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
