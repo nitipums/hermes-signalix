@@ -10,9 +10,10 @@
 
 Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the
 current Signalix delivery focus. It is public read-only, non-actionable
-research evidence. The `/mvp` and `/api/setup-candidates` path is retained as a
-trial/future integration surface, and Elliott/Wave research is deferred until
-Trend Mapping is complete.
+research evidence. The `/mvp` and `/api/setup-candidates` path is **DROPPED /
+PAUSED** by owner decision; preserve source/history for retained audit/future
+integration only and do not route work there until Arm explicitly resumes it.
+Elliott/Wave research is deferred until separately resumed.
 
 ## Deferred research projects
 

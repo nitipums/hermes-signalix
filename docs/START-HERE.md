@@ -12,18 +12,18 @@ Signalix prepares deterministic market evidence and private paper/shadow signals
 Daily market data
 → Trend Mapping
 → data quality / freshness review
-→ optional future setup integration
 → Arm review
+
+Setup integration is explicitly paused and is not part of the current delivery sequence.
 ```
 
 Canonical surfaces:
 
 - **Current production-served focus:** `/trend-map-shadow`, `/api/trend-map-shadow` with canonical envelope `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`
 - **Active promotion/closeout:** GitHub [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17)
-- Setup trial / future consumer: `/api/setup-candidates`, `/mvp`
-- Operational scope: `marginable_long` (runtime counts are not permanent constants)
-- Setup decision lanes remain available for the retained trial contract:
-  `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`
+- `/api/setup-candidates`, `/mvp`: **DROPPED / PAUSED** by owner decision; do not route work there until explicitly resumed
+- Operational scope for the current Trend Map: `marginable_long` (runtime counts are not permanent constants)
+- Setup decision lanes and Wave contract are preserved as retained audit/future-integration history only
 - Elliott Wave: deferred research; not the current delivery gate
 - Alerts, broker execution, and auto-trading: `OFF / PENDING`
 
@@ -32,7 +32,7 @@ Canonical surfaces:
 | If the task is about… | Read first | Read next only if needed |
 |---|---|---|
 | Product direction / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
-| Setup-candidate / Wave contract | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests |
+| Setup-candidate / Wave contract (only if explicitly resumed) | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests |
 | Private seven-day shadow BUY policy | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `../vault/Decisions.md`, source + tests |
 | Owner decision | `../vault/Decisions.md` | relevant current decision record |
 | Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source |

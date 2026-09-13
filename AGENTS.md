@@ -37,9 +37,9 @@ The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This 
 
 ## Current delivery focus and branch architecture — 2026-09-13
 
-Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current production-served focus. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it is public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` remain retained trial/future-integration surfaces; Elliott/Wave research is deferred.
+Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current production-served focus. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it is public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` are **DROPPED / PAUSED** by owner decision; preserve their source/history as retained audit/future-integration material, but do not route work there until Arm explicitly resumes them. Elliott/Wave research is deferred.
 
-Wayfinder decision: “clean main” means a physically Trend-Mapping-only source/product line. The approved topology is a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD. The existing remote `main` is stale and is not the migration base. Keep the release branch intact for `/mvp`, compatibility, research, and rollback until the strict promotion gates pass. This is architecture planning only; it does not change current production checkout, default branch, runtime, or deployment.
+Wayfinder decision: “clean main” means a physically Trend-Mapping-only source/product line. The approved topology is a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD. The existing remote `main` is stale and is not the migration base. Keep the release branch intact for compatibility, audit, research, and rollback evidence; do not perform active `/mvp` or setup-candidate work until Arm explicitly resumes it. This is architecture planning only; it does not change current production checkout, default branch, runtime, or deployment.
 ### Decision and state boundaries
 
 Structural `wave.state` uses only:
@@ -78,7 +78,7 @@ Before any task, Codex must:
 |---|---|---|
 | Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
 | Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
-| Current setup-candidate direction and API contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if agent behavior changes |
+| Current setup-candidate direction and API contract (only if explicitly resumed) | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if Arm resumes the paused path |
 | Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
 | Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |

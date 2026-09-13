@@ -10,7 +10,7 @@
 
 ## Current delivery focus
 
-The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not this delivery target.
+The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup-candidate and `/mvp` contracts are **DROPPED / PAUSED** by owner decision, not this delivery target. Preserve their source/history as retained audit/future-integration evidence, but do not spend work or route tasks there until Arm explicitly resumes them.
 
 ### Fresh promotion evidence — 2026-09-13
 
@@ -30,8 +30,8 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 ### Current acceptance reconciliation — 2026-09-13
 
 - **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
-- **Source/release:** `PASS` — Issue #22 is committed and pushed; local and remote `release/signalix-mvp-stable` are currently verified at `8ae4b5559082ff9fd93e4700071200684306d194`.
-- **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` remain retained trial surfaces.
+- **Source/release:** `PASS` — current local/remote release pointer is `45095b320fba6bde72ff3af553ffdaa366426bac`; Issue #22 implementation is committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`.
+- **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` are dropped/paused and are not current acceptance targets.
 - **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Official Daily remains unavailable for `3BBIF`, `COM7`, and `PR9`; their Trend Map rows use explicitly non-official derived Daily evidence from complete Settrade 60m sessions.
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
 - **Safety:** Wave remains machine-generated evidence for Arm review; the Trend Map is production-served public read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`); alerts, broker execution, and auto-trading remain `OFF/PENDING`.

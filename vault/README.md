@@ -1,7 +1,7 @@
 # Signalix — Project Vault
 
 > **STATUS: CURRENT** · Reconciled 2026-09-13.
-> Current production-served focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are retained trial/future-integration surfaces; Elliott research is deferred.
+> Current production-served focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are **DROPPED / PAUSED** by owner decision; preserve source/history as retained audit/future-integration material and do not route work there until Arm explicitly resumes it. Elliott research is deferred.
 
 Signalix is Arm's deterministic Thai-market evidence system. The current
 production-served focus is Daily Trend Mapping: public read-only Daily evidence

@@ -34,8 +34,9 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 This surface is production-served public read-only Daily evidence
 (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`)
 and is non-actionable. `/mvp` and
-`/api/setup-candidates` remain retained trial/future-integration surfaces;
-Elliott Wave work is deferred. Any future Trend Mapping to `BUY_NOW` path must
+`/api/setup-candidates` are **DROPPED / PAUSED** by owner decision;
+their source/history remains retained for audit/future integration only.
+Do not route work there until Arm explicitly resumes it; Elliott Wave work is deferred. Any future Trend Mapping to `BUY_NOW` path must
 be separately approved and gated.
 
 ### Derived Daily fallback runtime read-back — 2026-09-13

@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation (2026-09-13):** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the owner-approved production-served, public, read-only human-review evidence surface. It exposes deterministic Daily trend classifications, quotes, freshness, provenance, and data-quality states; it remains non-actionable and must not create setup decisions, BUY/SELL, alerts, orders, broker actions, portfolio actions, or auto-trading. `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation (2026-09-13):** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the owner-approved production-served, public, read-only human-review evidence surface. It exposes deterministic Daily trend classifications, quotes, freshness, provenance, and data-quality states; it remains non-actionable and must not create setup decisions, BUY/SELL, alerts, orders, broker actions, portfolio actions, or auto-trading. `/api/setup-candidates` and `/mvp` are **DROPPED / PAUSED** by owner decision; preserve their source/history as retained audit/future-integration material and do not route work there until Arm explicitly resumes them. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
 
 ## 2026-09-13 — Trend Mapping mainline architecture
 
@@ -10,7 +10,7 @@ Owner decision from Wayfinder map #10:
 
 - “Clean main” means a physically Trend-Mapping-only source/product line.
 - Use a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD; do not use the stale remote `main` as the migration base.
-- Keep `release/signalix-mvp-stable` intact for retained `/mvp`, `/api/setup-candidates`, compatibility, research, and rollback evidence.
+- Keep `release/signalix-mvp-stable` intact for audit, compatibility, research, and rollback evidence; `/mvp` and `/api/setup-candidates` are paused and are not active workstreams.
 - Do not change GitHub default branch, production checkout, systemd paths, or deployment until the strict six-gate acceptance/rollback decision is independently evidenced.
 - Shared deterministic modules may remain on the Trend Mapping line only when the dependency map proves that the current Trend Mapping path needs them. A separate repository/package remains a future evaluation, not the current decision.
 
