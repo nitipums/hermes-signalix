@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-13 09:56 ICT · local `release/signalix-mvp-stable` is `29b671e`; remote remains `391ada1` until the bounded docs commit is pushed; setup, shadow, and named browser scopes reconciled; setup freshness remains partial/stale for three unavailable Daily baselines; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 11:10 ICT · local and remote `release/signalix-mvp-stable` are `52b4383`; production-served Trend Map closeout is complete; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -14,7 +14,7 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 
 ### Fresh promotion evidence — 2026-09-13
 
-- Source/release: local and remote `release/signalix-mvp-stable` at `6ddc72f`; working tree clean after the scoped artifact commit.
+- Source/release: local and remote `release/signalix-mvp-stable` at `52b4383`; working tree clean after the scoped artifact commit.
 - Focused source gate: `57 passed`; Python compile, JavaScript syntax, and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
 - Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map-shadow` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
 - Browser: desktop 237 rows plus drawer/chart; 390px mobile no overflow (`scrollWidth=390`); failure → Retry showed zero rows and recovery returned 237 rows. Hermes `browser_exec` helper syntax was separately verified after restoring the managed Browser Use CLI path.
@@ -22,11 +22,11 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 
 ## Current acceptance reconciliation — 2026-09-13
 
-- **Current focus gate:** Complete the bounded Daily Trend Mapping closeout in GitHub Issue #17 before resuming broader setup or Elliott work.
-- **Source/release:** `PASS` — local `release/signalix-mvp-stable` contains the unpushed Wave 0 documentation reconciliation; remote remains at `391ada1` until publication.
-- **Runtime/API:** `PASS` for the currently served `/mvp`, `/api/setup-candidates`, and `/api/trend-map-shadow` read-back.
-- **Data freshness/coverage:** `NOT VERIFIED` for complete fresh setup coverage; the setup API currently reports `stale/partial` coverage with three unavailable Daily baselines: `3BBIF`, `COM7`, and `PR9`.
-- **Browser/UI:** `PASS` by owner confirmation for the setup 390px failure→Retry→recovery journey, shadow 390px drawer/chart, shadow error→Retry→recovery, full `/mvp` desktop/mobile review, and the revised 2026-09-12 UI.
+- **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
+- **Source/release:** `PASS` — local and remote `release/signalix-mvp-stable` match at `52b4383`; working tree clean.
+- **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` remain retained trial surfaces.
+- **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Setup coverage remains separately partial/stale for unavailable Daily baselines: `3BBIF`, `COM7`, and `PR9`.
+- **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
 - **Safety:** Wave remains machine-generated evidence for Arm review; the Trend Map is production-served public read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`); alerts, broker execution, and auto-trading remain `OFF/PENDING`.
 
 The setup-candidate and `/mvp` path is retained as a trial/possible future
@@ -215,7 +215,7 @@ Before a row above can be marked complete in this document, record:
 6. Bee final-gate verdict.
 7. For any `daily_shortlist.py` change, also record `curl :8000` live probe vs source diff (stale-runtime check) and resource-gate result.
 
-## Daily trend-map shadow surface — 2026-09-12
+## Historical deployment evidence — 2026-09-12 (superseded by 2026-09-13 closeout)
 
 - Previously deployed shadow/UI slices remain historical evidence only: the shared-drawer OHLCV containment and DOM-mapping changes were deployed and browser-verified on 2026-09-12, with no `/mvp` semantic, API, database, ingestion, alert, or broker change. They do not prove the current backend hardening source is served.
 - Owner decision (2026-09-12): the Daily Trend Map is permanently production-served public read-only. `GET /trend-map-shadow` and same-origin `GET /api/trend-map-shadow` require no authentication. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it has no setup, recommendation, alert, order, broker, BUY, or other action semantics, and this decision does not change `/mvp`'s separate owner-only/private signal policy.
@@ -231,6 +231,6 @@ Before a row above can be marked complete in this document, record:
 - The shadow table quote columns are source projections: `Price`, `Change`, and `% Change` come from each row's persisted canonical `quote` envelope. `price` is the latest completed Daily close; `change_amount` and `change_pct` compare it with the previous completed Daily close and carry `change_basis=previous_daily_close` (or explicit `NOT_VERIFIED`/null fields when unavailable). Quote provenance remains `price_data` / `1D` / non-provisional. The browser only renders these artifact values and passes the complete row to the shared drawer; it does not calculate financial values.
 - The existing successful EOD updater calls the bounded publisher only after the Daily update path succeeds and only when `--scan` is enabled; intraday-only runs do not publish. Publication errors leave the previous pointer untouched. The hardening hook is deployed and covered by source tests; next scheduled EOD freshness evidence remains ongoing, and no post-commit EOD run is claimed here.
 - EOD publication failures emit a structured `SHADOW_TREND_MAP_PUBLISH_FAILURE` event containing error type/message, failure count, and pointer-preserved status. The ingestion/update path remains successful unless its pre-existing contract fails; the shadow failure is observable and non-fatal.
-- Status: source implementation, focused tests, deployed/public artifact read-back, and `/mvp` preservation are `PASS`. The Daily trend-map shadow route is permanently public read-only with no authentication required; owner-confirmed named browser scopes are `PASS`, with Wave 0 fresh evidence for public normal desktop/mobile and 390px drawer paths. Error→Retry→recovery was not independently rerun by Lite in Wave 0 and is retained as owner-confirmed evidence, not fresh Lite evidence. Shadow remains non-actionable research evidence; no production decision/action path changed.
-- Closeout release: commits `f18e48f` and `15701ef` are pushed to `release/signalix-mvp-stable`, remote SHA `15701effad9d6549687740bf65af422a909d38af`. The production shadow surface is public read-only by owner decision; alerts, broker, and auto-trading remain OFF. Next scheduled EOD post-commit read-back remains ongoing and is not claimed here.
+- Historical status superseded by the 2026-09-13 production-served read-only closeout above: source implementation, focused tests, deployed/public artifact read-back, `/mvp` preservation, and named browser journeys were verified; the Trend Map is non-actionable and no production decision/action path changed.
+- Historical closeout release references remain preserved for audit only. The current release and artifact identity are recorded in the fresh promotion evidence above.
 - Worktree note: generated `backend/shadow-read-model/` artifacts are intentionally tracked runtime inputs in commit `f18e48f`, not untracked research artifacts. Untracked `research/`, `docs/current/`, and `docs/agents/` QA/session notes remain preserved owner/research artifacts outside that commit and must not be cleaned, reset, or treated as deployment evidence. The unused `map_daily_trend` compatibility alias remains preserved because removing it would require editing outside this bounded file scope; no caller or test currently uses it.

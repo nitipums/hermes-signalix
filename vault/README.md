@@ -1,12 +1,12 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled 2026-09-12.
-> Current delivery focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are retained trial/future-integration surfaces; Elliott research is deferred.
+> **STATUS: CURRENT** · Reconciled 2026-09-13.
+> Current production-served focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are retained trial/future-integration surfaces; Elliott research is deferred.
 
-Signalix is Arm's deterministic Thai-market evidence system. The current work
-focus is Daily Trend Mapping: a public read-only research surface for market
-landscape, provenance, freshness, and data-quality review. It is not an order
-or auto-trading system.
+Signalix is Arm's deterministic Thai-market evidence system. The current
+production-served focus is Daily Trend Mapping: public read-only Daily evidence
+for market landscape, provenance, freshness, and data-quality review. It is not
+an order or auto-trading system.
 
 > Owner: Nitipum.s (collaborates with Arm). This vault is the canonical
 > knowledge base — keep it in sync after every structural change.
@@ -17,7 +17,7 @@ or auto-trading system.
 |-------|-------|-------|
 | Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
-| Trend Mapping surface | ✅ Current focus | public read-only `/trend-map-shadow` and `/api/trend-map-shadow`; non-actionable research evidence |
+| Trend Mapping surface | ✅ Production-served | public read-only `/trend-map-shadow` and `/api/trend-map-shadow`; `PRODUCTION_READ_ONLY`, non-actionable |
 | Setup/MVP trial | 🟡 Retained trial | `/mvp` + `/api/setup-candidates`; possible future Trend Mapping → deterministic `BUY_NOW` integration |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ⏸ Paused | Docker `delivery` is gated under Compose profile `alerts`; source/routing retained |

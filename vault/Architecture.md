@@ -1,11 +1,11 @@
 # Architecture
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
-> **Reconciled:** 2026-09-12 · Daily Trend Mapping is the primary delivery focus; setup/Elliott paths are retained trial or deferred research; canonical shadow publisher/read-model/API route is deployed and browser scopes are owner-confirmed PASS.
+> **Reconciled:** 2026-09-13 · Daily Trend Mapping is production-served read-only; setup/Elliott paths are retained trial or deferred research; canonical publisher/read-model/API route is deployed and browser/rollback gates are verified.
 
-## Current delivery focus — Daily Trend Mapping
+## Production-served Daily Trend Mapping
 
-The current workstream is the public read-only Trend Mapping surface:
+The current architecture is:
 
 ```text
 Daily price_data
@@ -16,10 +16,10 @@ Daily price_data
 → shared /mvp drawer/chart for evidence review
 ```
 
-Trend Mapping is research evidence only. It does not create setup decisions,
-BUY/alerts, orders, broker actions, or auto-trading. The publisher and API
-preserve Daily as-of, provenance, quote basis, data-quality states, and
-fail-closed behavior.
+Trend Mapping is production-served read-only Daily evidence. It does not create
+setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
+publisher and API preserve Daily as-of, provenance, quote basis, data-quality
+states, and fail-closed behavior.
 
 ## Retained setup/shadow trial flow — 2026-09-01
 

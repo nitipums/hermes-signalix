@@ -16,12 +16,16 @@ Owner decision from Wayfinder map #10:
 
 The six promotion gates are: dependency isolation; focused/relevant full tests; artifact/pointer/hash/freshness/universe evidence; public API contract; desktop/mobile browser including drawer/chart and error→Retry→recovery; and tested source-plus-artifact rollback. Missing evidence is `NOT VERIFIED` and blocks promotion. This decision changes branch architecture planning, not current production/runtime behavior.
 
-## 2026-09-12 — Trend Mapping becomes the primary delivery focus
+## Historical decision — 2026-09-12 — Trend Mapping becomes the primary delivery focus
+
+This decision's research-only wording is superseded by the owner-approved
+2026-09-13 production-served read-only promotion recorded at the top of this
+ledger.
 
 Owner decision: make Daily Trend Mapping the primary Signalix workstream to
 complete, using `/trend-map-shadow` and `/api/trend-map-shadow` as the current
-focus surface. The surface remains public read-only research evidence and has
-no setup, alert, order, broker, BUY, or auto-trading semantics.
+focus surface. The surface is public read-only Daily evidence and has no setup,
+alert, order, broker, BUY, or auto-trading semantics.
 
 The `/mvp` and `/api/setup-candidates` path remains retained as a trial and a
 possible future consumer for deterministic private `BUY_NOW` alerts. It is not

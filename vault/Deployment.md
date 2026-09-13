@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 · current production remains on `release/signalix-mvp-stable`; Wayfinder-approved Trend-Mapping-only `main` is a planning candidate, not yet promoted. Shadow route/artifact/browser evidence remains governed separately; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable` at `52b4383`; Trend Map production-served read-only closeout is complete; evaluator auto-caller remains separate.
 
 ## Stable release
 
@@ -18,7 +18,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Fresh promotion read-back — 2026-09-13
 
-- Source: local and remote `release/signalix-mvp-stable` at `6ddc72f`; working tree clean after the scoped artifact commit.
+- Source: local and remote `release/signalix-mvp-stable` at `52b4383`; working tree clean after the scoped artifact commit.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
@@ -77,12 +77,7 @@ Untracked `research/`, `docs/current/`, and `docs/agents/` remain preserved
 owner/research artifacts outside that commit. The next scheduled EOD freshness
 evidence remains ongoing; no post-commit EOD run is claimed here.
 
-The shadow route remains permanently public read-only and is research evidence
-only. It has no setup, recommendation, alert, order, broker, BUY, or other
-action semantics; this does not change `/mvp`'s separate owner-only/private
-signal policy. The unused `map_daily_trend` compatibility alias remains
-preserved because removing it would require editing outside this bounded file
-scope; no caller or test currently uses it.
+The shadow route remains permanently production-served public read-only Daily evidence. It has no setup, recommendation, alert, order, broker, BUY, or other action semantics; this does not change `/mvp`'s separate owner-only/private signal policy. The unused `map_daily_trend` compatibility alias remains preserved because removing it would require editing outside this bounded file scope; no caller or test currently uses it.
 
 ### 2026-09-02 promotion evidence
 
