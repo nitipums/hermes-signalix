@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 
 import pytest
 
@@ -246,6 +247,68 @@ def test_template_has_lane_grouped_table_filters_drawer_chart_and_shadow_markers
     assert '<th>Data quality</th>' not in html
     assert 'r.data_quality_status' not in html
     assert 'r.status===s' not in html
+
+
+def test_trend_map_lazy_drawer_is_single_flight_and_opens_after_script_load():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert '<script src="/shared-drawer.js"></script>' not in html
+    inline = html.split("<script>", 1)[1].split("</script>", 1)[0]
+    harness = r'''
+const vm = require("vm");
+function Element(id) {
+  this.id = id; this.value = ""; this.hidden = false; this.textContent = "";
+  this.innerHTML = ""; this.dataset = {}; this.onclick = null; this.onkeydown = null;
+  this.classList = {contains: function () { return true; }};
+}
+const elements = {};
+["search", "lane", "broad-state", "summary", "error", "retry", "reload", "rows"].forEach(function (id) {
+  elements[id] = new Element(id);
+});
+Object.defineProperty(elements.rows, "innerHTML", {
+  get: function () { return this._html || ""; },
+  set: function (value) {
+    this._html = value;
+    this.rendered = [];
+    const matches = value.matchAll(/data-symbol="([^"]+)"/g);
+    for (const match of matches) { const row = new Element("row"); row.dataset.symbol = match[1]; this.rendered.push(row); }
+  }
+});
+const scripts = [];
+const document = {
+  head: {appendChild: function (script) { scripts.push(script); }},
+  querySelector: function (selector) { return elements[selector.slice(1)] || null; },
+  querySelectorAll: function (selector) { return selector === "#rows tr[data-symbol]" ? elements.rows.rendered : []; },
+  createElement: function () { return {}; }
+};
+let opens = [];
+const responseData = {
+  status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
+  verification_status: "VERIFIED", freshness: {status: "FRESH"}, as_of: "2026-09-11",
+  universe: {declared_count: 1}, policy: {classifier: "trend-map-v1"},
+  rows: [{symbol: "AAA", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", classifier_status: "UPTREND", quote: {price: 10, change_amount: 1, change_pct: 10}}]
+};
+const context = {
+  window: {}, document: document,
+  fetch: function () { return Promise.resolve({ok: true, json: function () { return Promise.resolve(responseData); }}); },
+  console: console, Promise: Promise, encodeURIComponent: encodeURIComponent
+};
+vm.runInNewContext(%s, context);
+setImmediate(function () {
+  const row = elements.rows.rendered[0];
+  row.onclick(); row.onclick();
+  if (scripts.length !== 1 || opens.length !== 0) process.exit(1);
+  context.window.SignalixSharedDrawer = {openSharedDrawer: function (payload) { opens.push(payload); }};
+  scripts[0].onload();
+  setImmediate(function () {
+    if (opens.length !== 2 || opens[0].item.symbol !== "AAA" || opens[0].source !== "trend-map-shadow") process.exit(2);
+    process.stdout.write("ok");
+  });
+});
+''' % json.dumps(inline)
+    result = subprocess.run(["node", "-e", harness], check=False, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "ok"
+    assert "Drawer unavailable" in inline
 
 
 def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_contract():
