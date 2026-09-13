@@ -36,10 +36,7 @@ The canonical working focus is the production-served Daily Trend Mapping surface
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
 - **Safety:** Wave remains machine-generated evidence for Arm review; the Trend Map is production-served public read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`); alerts, broker execution, and auto-trading remain `OFF/PENDING`.
 
-The setup-candidate and `/mvp` path is retained as a trial/possible future
-consumer for `BUY_NOW`; it is not the current delivery target. Elliott Wave
-research is deferred and does not block Trend Mapping acceptance. A future
-integration must pass a separate owner-approved contract gate.
+The setup-candidate and `/mvp` path is **DROPPED / PAUSED** by owner decision; it is not a current delivery target. Preserve it as audit/future-integration history and require an explicit owner resume decision before work restarts.
 
 Browser verdicts are named per journey. They do not promote partial/stale data to full freshness PASS.
 
