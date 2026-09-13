@@ -200,8 +200,8 @@ def test_report_preserves_canonical_universe_and_as_of():
     assert report["policy"]["min_valid_bars"] == 30
     assert report["policy"]["max_valid_bars"] == 400
     assert report["policy"]["prior_10d_low"]["prior_bars"] == 10
-    assert report["provenance"]["source"] == "price_data"
-    assert report["provenance"]["table"] == "price_data"
+    assert report["provenance"]["source"] == "price_data+derived_daily_price_data"
+    assert report["provenance"]["tables"] == ["price_data", "derived_daily_price_data"]
     assert report["provenance"]["timeframe"] == "1D"
     assert report["provenance"]["query_mode"] == "SELECT_ONLY"
     assert report["provenance"]["point_in_time_filter"] == "date <= as_of"
@@ -359,9 +359,111 @@ def test_backend_local_adapter_uses_select_only_pit_query_and_filters_as_of():
     rows, latest = subject.BackendDailyAdapter().load_daily_pit(conn, "AAA", "2026-09-11")
     assert rows[0]["close"] == 100
     assert latest == "2026-09-10"
-    assert conn.cursor_instance.sql.lstrip().upper().startswith("SELECT")
+    assert conn.cursor_instance.sql.lstrip().upper().startswith("WITH")
     assert "date <= %s" in conn.cursor_instance.sql
-    assert conn.cursor_instance.params == ("AAA", "2026-09-11")
+    assert conn.cursor_instance.params == ("AAA", "2026-09-11", "AAA", "2026-09-11", "2026-09-11")
+
+
+class _ResultSetCursor:
+    def __init__(self, rows):
+        self.rows = rows
+        self.description = [(f"column_{index}",) for index in range(len(rows[0]))] if rows else []
+        self.calls = []
+
+    def execute(self, sql, params):
+        self.sql = sql
+        self.calls.append((sql, params))
+
+    def fetchall(self):
+        if "source_completion_cutoff >=" not in self.sql:
+            return self.rows
+        official_dates = {row[0] for row in self.rows if row[6] == "price_data"}
+        return [row for row in self.rows
+                if row[6] == "price_data"
+                or (row[0] not in official_dates
+                    and row[8] == subject.DERIVED_DAILY_METHOD
+                    and "2026-09-11T10:00:00+00:00" <= row[12] <= "2026-09-11T10:00:00+00:00")]
+
+    def close(self):
+        pass
+
+
+class _ResultSetConnection:
+    def __init__(self, rows):
+        self.cursor_instance = _ResultSetCursor(rows)
+
+    def cursor(self):
+        return self.cursor_instance
+
+
+def _official_row(date, close):
+    return (date, close - 1, close + 1, close - 2, close, 1000,
+            "price_data", None, None, None, None, None, None)
+
+
+def _derived_row(date, close, run_id="run-derived"):
+    return (date, close - 1, close + 1, close - 2, close, 8000,
+            "derived_daily_price_data", "60m", "settrade_60m_complete_bangkok_session_ohlcv_v1",
+            run_id, "2026-09-11T02:00:00+00:00", "2026-09-11T09:00:00+00:00",
+            "2026-09-11T10:00:00+00:00", 8)
+
+
+def test_backend_adapter_rejects_pre_completion_and_accepts_17_00_completion():
+    before = list(_derived_row("2026-09-11", 109, "run-before"))
+    before[12] = "2026-09-11T09:59:59+00:00"
+    after = _derived_row("2026-09-11", 110, "run-after")
+    late = list(_derived_row("2026-09-11", 111, "run-late"))
+    late[12] = "2026-09-11T11:00:00+00:00"
+    rows, latest = subject.BackendDailyAdapter().load_daily_pit(
+        _ResultSetConnection([tuple(before), after, tuple(late)]), "AAA", "2026-09-11")
+    assert [(row["close"], row["source_run_id"]) for row in rows] == [(110, "run-after")]
+    assert latest == "2026-09-11"
+
+
+def test_backend_adapter_selects_official_first_and_fills_missing_dates_from_fake_result_set():
+    # The fake result set models PostgreSQL's already-resolved official-first
+    # UNION result; assertions below exercise the adapter mapping, not SQL text.
+    conn = _ResultSetConnection([
+        _official_row("2026-09-10", 100),
+        _derived_row("2026-09-11", 110),
+    ])
+    rows, latest = subject.BackendDailyAdapter().load_daily_pit(
+        conn, "AAA", "2026-09-11")
+    assert [(row["date"], row["source"]) for row in rows] == [
+        ("2026-09-10", "price_data"),
+        ("2026-09-11", "derived_daily_price_data"),
+    ]
+    assert latest == "2026-09-11"
+    assert rows[0]["source_run_id"] is None
+    assert rows[1]["source_run_id"] == "run-derived"
+
+
+def test_backend_adapter_official_same_date_wins_in_fake_result_set():
+    conn = _ResultSetConnection([
+        _official_row("2026-09-11", 100),
+        _derived_row("2026-09-11", 110),
+    ])
+    rows, latest = subject.BackendDailyAdapter().load_daily_pit(
+        conn, "AAA", "2026-09-11")
+    assert len(rows) == 1
+    assert rows[0]["source"] == "price_data"
+    assert rows[0]["close"] == 100
+    assert latest == "2026-09-11"
+
+
+def test_backend_adapter_preserves_complete_derived_lineage_from_fake_result_set():
+    conn = _ResultSetConnection([_derived_row("2026-09-11", 110, "run-22")])
+    rows, _ = subject.BackendDailyAdapter().load_daily_pit(
+        conn, "AAA", "2026-09-11")
+    assert rows[0] == {
+        "date": "2026-09-11", "open": 109, "high": 111, "low": 108,
+        "close": 110, "volume": 8000,
+        "source": "derived_daily_price_data", "source_timeframe": "60m",
+        "derivation_method": "settrade_60m_complete_bangkok_session_ohlcv_v1",
+        "source_run_id": "run-22", "source_first_ts": "2026-09-11T02:00:00+00:00",
+        "source_last_ts": "2026-09-11T09:00:00+00:00",
+        "source_completion_cutoff": "2026-09-11T10:00:00+00:00", "source_bar_count": 8,
+    }
 
 
 def test_backend_local_adapter_batches_symbols_with_exact_as_of_filter():
@@ -400,7 +502,7 @@ def test_backend_local_adapter_batches_symbols_with_exact_as_of_filter():
     assert "market='TH'" in conn.cursor_instance.sql
     assert "date <= %s" in conn.cursor_instance.sql
     assert "ORDER BY symbol ASC, date ASC" in conn.cursor_instance.sql
-    assert conn.cursor_instance.params == (["AAA", "BBB"], "2026-09-11", subject.RETRIEVAL_CAP)
+    assert conn.cursor_instance.params == (["AAA", "BBB"], "2026-09-11", ["AAA", "BBB"], "2026-09-11", "2026-09-11", subject.RETRIEVAL_CAP)
     assert "row_number() OVER (PARTITION BY filtered.symbol ORDER BY filtered.date DESC)" in conn.cursor_instance.sql
     assert "invalid_count" in conn.cursor_instance.sql
 

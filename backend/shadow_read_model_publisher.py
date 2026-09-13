@@ -98,7 +98,8 @@ def _validate_report(report: Mapping[str, Any]) -> dict[str, int]:
             or report.get("actionability") != trend_map.ACTIONABILITY
             or report.get("universe", {}).get("scope") != trend_map.UNIVERSE):
         raise ValueError("production read-only report policy or universe is invalid")
-    if report.get("provenance", {}).get("source") != "price_data" or report.get("provenance", {}).get("query_mode") != "SELECT_ONLY":
+    if (report.get("provenance", {}).get("source") != "price_data+derived_daily_price_data"
+            or report.get("provenance", {}).get("query_mode") != "SELECT_ONLY"):
         raise ValueError("shadow report provenance is invalid")
     if report.get("policy", {}).get("representation_revision") != trend_map.REPRESENTATION_REVISION:
         raise ValueError("shadow report representation revision is invalid")
@@ -123,15 +124,27 @@ def _validate_report(report: Mapping[str, Any]) -> dict[str, int]:
         quote = row.get("quote")
         if not isinstance(quote, Mapping):
             raise ValueError("shadow row quote envelope is invalid")
-        if quote.get("source") != "price_data" or quote.get("provisional") is not False:
+        if quote.get("source") not in {"price_data", "derived_daily_price_data"} or quote.get("provisional") is not False:
             raise ValueError("shadow row quote provenance is invalid")
         quote_provenance = quote.get("provenance")
         if (not isinstance(quote_provenance, Mapping)
-                or quote_provenance.get("source") != "price_data"
-                or quote_provenance.get("table") != "price_data"
+                or quote_provenance.get("source") not in {"price_data", "derived_daily_price_data"}
+                or quote_provenance.get("table") != quote.get("source")
                 or quote_provenance.get("timeframe") != "1D"
                 or quote_provenance.get("latest_completed_daily_close") is not True):
             raise ValueError("shadow row quote provenance is invalid")
+        if quote.get("source") == "derived_daily_price_data":
+            lineage = quote_provenance.get("lineage")
+            required_lineage = ("source", "source_timeframe", "source_run_id",
+                                "source_first_ts", "source_last_ts", "source_bar_count",
+                                "source_completion_cutoff", "derivation_method")
+            if (not isinstance(lineage, Mapping)
+                    or any(not lineage.get(key) for key in required_lineage)
+                    or lineage.get("source") != "derived_daily_price_data"
+                    or lineage.get("source_timeframe") != "60m"
+                    or lineage.get("source_bar_count") != 8
+                    or lineage.get("derivation_method") != trend_map.DERIVED_DAILY_METHOD):
+                raise ValueError("derived shadow quote lineage is invalid")
         if quote.get("change_basis") not in {"previous_daily_close", "NOT_VERIFIED"} or quote.get("change_amount_basis") not in {"previous_daily_close", "NOT_VERIFIED"}:
             raise ValueError("shadow row quote change basis is invalid")
         price = quote.get("price")

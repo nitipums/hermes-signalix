@@ -25,7 +25,7 @@ Verified Market View
 
 The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This replaces VCP-first serving as the product authority; it does not delete valid historical VCP data or old observations.
 
-- **Daily** is authoritative for big-picture trend, strength, 52W/ATH, and Elliott structural candidates.
+- **Daily** is authoritative for big-picture trend, strength, 52W/ATH, and Elliott structural candidates. If official Daily is missing for a symbol/date, the read-only Trend Map may use a separately stored, explicitly non-official `derived_daily_price_data` row built from a complete Settrade 60m session; it must preserve source lineage and never be presented as official Daily.
 - **60m** is for early Wave 3 confirmation, lower-timeframe structure, trigger, and entry timing.
 - Daily and 60m evidence must stay explicitly separated. Never label 60m-derived values as Daily evidence.
 - Primary candidates cover the observable progression around **Wave 1 advance → Wave 2 pullback/near completion → early Wave 3 / continuation**. Elliott output is a conservative machine-generated evidence interpretation, not an objectively confirmed count.
@@ -77,6 +77,7 @@ Before any task, Codex must:
 | Task concern | Read first | Update when the contract changes |
 |---|---|---|
 | Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
+| Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
 | Current setup-candidate direction and API contract | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if agent behavior changes |
 | Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |

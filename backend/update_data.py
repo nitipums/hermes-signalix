@@ -41,6 +41,7 @@ import signal
 import random
 import uuid
 import concurrent.futures
+import math
 from contextlib import contextmanager
 
 import psycopg2
@@ -541,6 +542,171 @@ def _parse_settrade_intraday(sym, interval, res, stats):
         except (TypeError, ValueError, OverflowError):
             stats["bad_row"] += 1
     return rows
+
+
+DERIVED_DAILY_METHOD = "settrade_60m_complete_bangkok_session_ohlcv_v1"
+DERIVED_DAILY_SESSION_HOURS = tuple(range(9, 17))
+
+
+def _as_bangkok_datetime(value):
+    """Normalize a candle timestamp for the bounded Daily aggregation."""
+    if isinstance(value, dt.datetime):
+        stamp = value
+    else:
+        stamp = dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if stamp.tzinfo is None:
+        return stamp.replace(tzinfo=BANGKOK_TZ)
+    return stamp.astimezone(BANGKOK_TZ)
+
+
+def aggregate_complete_derived_daily(symbol, rows, session_date, cutoff, source_run_id):
+    """Aggregate exactly one complete, completed Bangkok 60m session.
+
+    This is intentionally strict: a partial or provisional session is not a
+    Daily row, and the caller can safely retry it after the session completes.
+    """
+    cutoff_bkk = _as_bangkok_datetime(cutoff)
+    # The 16:00 ICT candle completes at 17:00 ICT.
+    if cutoff_bkk.time() < dt.time(17, 0):
+        return None
+    session = dt.date.fromisoformat(str(session_date)) if not isinstance(session_date, dt.date) else session_date
+    normalized = []
+    expected = {dt.datetime.combine(session, dt.time(hour), BANGKOK_TZ) for hour in DERIVED_DAILY_SESSION_HOURS}
+    for row in rows or []:
+        try:
+            stamp = _as_bangkok_datetime(row.get("ts") if isinstance(row, dict) else row[2])
+            values = row if isinstance(row, dict) else {
+                "open": row[3], "high": row[4], "low": row[5],
+                "close": row[6], "volume": row[7],
+            }
+            if stamp.date() != session or stamp not in expected or stamp > cutoff_bkk:
+                continue
+            o, h, low, close, volume = (float(values[key]) for key in ("open", "high", "low", "close", "volume"))
+            if not all(math.isfinite(value) for value in (o, h, low, close, volume)):
+                return None
+            if volume < 0 or h < max(o, close) or low > min(o, close) or low > h:
+                return None
+            normalized.append((stamp, o, h, low, close, volume))
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return None
+    if len(normalized) != len(expected) or {row[0] for row in normalized} != expected:
+        return None
+    normalized.sort(key=lambda row: row[0])
+    first, last = normalized[0][0], normalized[-1][0]
+    if last > cutoff_bkk:
+        return None
+    return {
+        "symbol": symbol,
+        "session_date": session,
+        "open": normalized[0][1],
+        "high": max(row[2] for row in normalized),
+        "low": min(row[3] for row in normalized),
+        "close": normalized[-1][4],
+        "volume": sum(row[5] for row in normalized),
+        "source": "settrade",
+        "source_timeframe": "60m",
+        "derivation_method": DERIVED_DAILY_METHOD,
+        "source_run_id": source_run_id,
+        "source_first_ts": first.astimezone(dt.timezone.utc),
+        "source_last_ts": last.astimezone(dt.timezone.utc),
+        "source_completion_cutoff": dt.datetime.combine(
+            session, dt.time(17, 0), BANGKOK_TZ).astimezone(dt.timezone.utc),
+        "source_bar_count": len(normalized),
+        "is_official": False,
+    }
+
+
+def _current_daily_missing_symbols(pg, session_date, universe="marginable_long"):
+    from mvp_api import resolve_universe
+    symbols, _manifest = resolve_universe(pg, universe)
+    cur = pg.cursor()
+    try:
+        cur.execute(
+            "SELECT symbol FROM price_data WHERE market='TH' AND date=%s AND symbol=ANY(%s)",
+            (session_date, list(symbols)),
+        )
+        official = {row[0] for row in cur.fetchall()}
+    finally:
+        cur.close()
+    return [symbol for symbol in symbols if symbol not in official]
+
+
+def _upsert_derived_daily_rows(pg, rows):
+    if not rows:
+        return 0
+    cur = pg.cursor()
+    try:
+        for row in rows:
+            cur.execute(
+                """INSERT INTO derived_daily_price_data(
+                    symbol, session_date, open, high, low, close, volume, source,
+                    source_timeframe, derivation_method, source_run_id,
+                    source_first_ts, source_last_ts, source_completion_cutoff,
+                    source_bar_count, is_official)
+                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,FALSE)
+                ON CONFLICT(symbol, session_date, source, source_timeframe)
+                DO UPDATE SET open=EXCLUDED.open, high=EXCLUDED.high,
+                    low=EXCLUDED.low, close=EXCLUDED.close, volume=EXCLUDED.volume,
+                    derivation_method=EXCLUDED.derivation_method,
+                    source_run_id=EXCLUDED.source_run_id,
+                    source_first_ts=EXCLUDED.source_first_ts,
+                    source_last_ts=EXCLUDED.source_last_ts,
+                    source_completion_cutoff=EXCLUDED.source_completion_cutoff,
+                    source_bar_count=EXCLUDED.source_bar_count,
+                    is_official=FALSE, updated_at=NOW()""",
+                (row["symbol"], row["session_date"], row["open"], row["high"],
+                 row["low"], row["close"], row["volume"], row["source"],
+                 row["source_timeframe"], row["derivation_method"], row["source_run_id"],
+                 row["source_first_ts"], row["source_last_ts"],
+                 row["source_completion_cutoff"], row["source_bar_count"]),
+            )
+        pg.commit()
+        return len(rows)
+    except Exception:
+        pg.rollback()
+        raise
+    finally:
+        cur.close()
+
+
+def write_derived_daily_fallback(pg, *, now=None, universe="marginable_long",
+                                 market_factory=_settrade_market, fetch_limit=8):
+    """Bounded EOD writer for current-session Daily rows only.
+
+    It reads official coverage, fetches only affected symbols' current Bangkok
+    session from Settrade 60m, and writes only ``derived_daily_price_data``.
+    """
+    now_bkk = _as_bangkok_datetime(now or dt.datetime.now(dt.timezone.utc))
+    session_date = now_bkk.date()
+    result = {"session_date": session_date.isoformat(), "cutoff": now_bkk.isoformat(),
+              "symbols_affected": 0, "rows_written": 0, "source_run_id": None,
+              "status": "SKIPPED_INCOMPLETE_SESSION"}
+    # The 16:00--17:00 candle closes at 17:00 ICT.
+    if now_bkk.time() < dt.time(17, 0):
+        return result
+    symbols = _current_daily_missing_symbols(pg, session_date, universe)
+    result["symbols_affected"] = len(symbols)
+    if not symbols:
+        result["status"] = "NO_AFFECTED_SYMBOLS"
+        return result
+    fetch_limit = min(max(int(fetch_limit), 1), 8)
+    run_id = uuid.uuid4().hex
+    result["source_run_id"] = run_id
+    market = market_factory()
+    derived = []
+    stats = {}
+    start = f"{session_date.isoformat()}T09:00"
+    for symbol in symbols:
+        with settrade_request_timeout():
+            response = market.get_candlestick(symbol=symbol, interval="60m", limit=fetch_limit,
+                                              start=start, normalized=SETTRADE_NORMALIZED)
+        source_rows = _parse_settrade_intraday(symbol, "60m", response, stats)
+        aggregate = aggregate_complete_derived_daily(symbol, source_rows, session_date, now_bkk, run_id)
+        if aggregate is not None:
+            derived.append(aggregate)
+    result["rows_written"] = _upsert_derived_daily_rows(pg, derived)
+    result["status"] = "WRITTEN" if derived else "NO_COMPLETE_SESSIONS"
+    return result
 
 
 def _intraday_universe(pg, universe="marginable_long"):
@@ -1320,9 +1486,23 @@ def run_vcp_after_ingestion(pg, summary):
 SHADOW_TREND_MAP_PUBLISH_FAILURES = 0
 
 
-def _finish_successful_run(args):
+def _finish_successful_run(args, *, run_derived_fallback=False):
     """Publish read models only after a successful bounded update path."""
     if args.scan and not args.dry_run:
+        fallback_pg = None
+        if run_derived_fallback:
+            try:
+                fallback_pg = get_pg()
+                fallback = write_derived_daily_fallback(fallback_pg)
+                print("DERIVED_DAILY_FALLBACK " + json.dumps(fallback, default=str, sort_keys=True))
+            except Exception as exc:
+                # A failed fallback must remain fail-closed; the official update
+                # and publication path still reports its own bounded result.
+                print("DERIVED_DAILY_FALLBACK_FAILURE " + json.dumps({
+                    "error_type": type(exc).__name__, "message": str(exc)[:240]}, sort_keys=True))
+            finally:
+                if fallback_pg is not None:
+                    fallback_pg.close()
         publish_canonical_read_model()
         # The shadow publisher is independent of the canonical setup read
         # model.  It is deliberately EOD-only and fail-closed; intraday-only
@@ -1421,7 +1601,7 @@ def run(args):
         # successful: one bad/empty symbol must not mark the whole timer failed.
         if summary["status"] not in ("full_success", "partial_success"):
             return 1
-        return _finish_successful_run(args)
+        return _finish_successful_run(args, run_derived_fallback=True)
 
     pg = get_pg()
     until = dt.date.fromisoformat(args.until) if args.until else None
@@ -1553,7 +1733,7 @@ def run(args):
         # successful: one bad/empty symbol must not mark the whole timer failed.
         if summary["status"] not in ("full_success", "partial_success"):
             return 1
-    return _finish_successful_run(args)
+    return _finish_successful_run(args, run_derived_fallback=True)
 
 
 def main():

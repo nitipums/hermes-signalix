@@ -38,20 +38,21 @@ RETRIEVAL_CAP = MAX_VALID_BARS + 30
 SUPPORT_LOOKBACK_BARS = 10
 REVIEW_WINDOW = "current_history_bounded"
 SUPPORT_METHOD = "prior_10d_low"
+DERIVED_DAILY_METHOD = "settrade_60m_complete_bangkok_session_ohlcv_v1"
 STATUS_VALUES = ("DATA_BLOCKED", "AVAILABLE")
 DATA_QUALITY_VALUES = ("NO_DATA", "INVALID_DATA", "INSUFFICIENT_HISTORY", "AVAILABLE", "DATA_BLOCKED")
 
 PROVENANCE = {
-    "source": "price_data",
-    "table": "price_data",
+    "source": "price_data+derived_daily_price_data",
+    "tables": ["price_data", "derived_daily_price_data"],
     "timeframe": "1D",
     "query_mode": "SELECT_ONLY",
     "point_in_time_filter": "date <= as_of",
+    "fallback_policy": "official_price_data_first_then_derived_60m",
 }
 
 QUOTE_PROVENANCE = {
-    "source": "price_data",
-    "table": "price_data",
+    "source": "price_data+derived_daily_price_data",
     "timeframe": "1D",
     "latest_completed_daily_close": True,
 }
@@ -128,16 +129,56 @@ class BackendDailyAdapter:
         rows, _ = self._exec_select(
             conn,
             """
-            SELECT date, open, high, low, close, volume
-            FROM price_data
-            WHERE symbol=%s AND market='TH' AND date <= %s
+            WITH official AS (
+                SELECT date, open, high, low, close, volume, 'price_data' AS daily_source,
+                       NULL::text AS source_timeframe, NULL::text AS derivation_method,
+                       NULL::text AS source_run_id, NULL::timestamptz AS source_first_ts,
+                       NULL::timestamptz AS source_last_ts,
+                       NULL::timestamptz AS source_completion_cutoff,
+                       NULL::integer AS source_bar_count
+                FROM price_data
+                WHERE symbol=%s AND market='TH' AND date <= %s
+            ), derived AS (
+                SELECT session_date AS date, open, high, low, close, volume,
+                       'derived_daily_price_data' AS daily_source, source_timeframe,
+                       derivation_method, source_run_id, source_first_ts, source_last_ts,
+                       source_completion_cutoff, source_bar_count
+                FROM derived_daily_price_data
+                WHERE symbol=%s AND session_date <= %s
+                  AND is_official = FALSE AND source = 'settrade'
+                  AND source_timeframe = '60m' AND source_bar_count = 8
+                  AND derivation_method = 'settrade_60m_complete_bangkok_session_ohlcv_v1'
+                  AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::date = session_date
+                  AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::date = session_date
+                  AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::time = TIME '09:00'
+                  AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::time = TIME '16:00'
+                  AND source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                  AND source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                  AND NOT EXISTS (SELECT 1 FROM official o WHERE o.date = session_date)
+            )
+            SELECT date, open, high, low, close, volume, daily_source,
+                   source_timeframe, derivation_method, source_run_id, source_first_ts,
+                   source_last_ts, source_completion_cutoff, source_bar_count
+            FROM official
+            UNION ALL
+            SELECT date, open, high, low, close, volume, daily_source,
+                   source_timeframe, derivation_method, source_run_id, source_first_ts,
+                   source_last_ts, source_completion_cutoff, source_bar_count FROM derived
             ORDER BY date ASC
             """,
-            (symbol, as_of),
+            (symbol, as_of, symbol, as_of, as_of),
         )
         mapped = [
             {"date": row[0], "open": row[1], "high": row[2], "low": row[3],
-             "close": row[4], "volume": row[5]}
+             "close": row[4], "volume": row[5],
+             "source": row[6] if len(row) > 6 else "price_data",
+             "source_timeframe": row[7] if len(row) > 7 else None,
+             "derivation_method": row[8] if len(row) > 8 else None,
+             "source_run_id": row[9] if len(row) > 9 else None,
+             "source_first_ts": row[10] if len(row) > 10 else None,
+             "source_last_ts": row[11] if len(row) > 11 else None,
+             "source_completion_cutoff": row[12] if len(row) > 12 else None,
+             "source_bar_count": row[13] if len(row) > 13 else None}
             for row in rows
         ]
         return mapped, (mapped[-1]["date"] if mapped else None)
@@ -152,8 +193,40 @@ class BackendDailyAdapter:
         rows, _ = self._exec_select(
             conn,
             """
-            WITH filtered AS (
+            WITH official AS (
                 SELECT symbol, date, open, high, low, close, volume,
+                       'price_data' AS daily_source,
+                       NULL::text AS source_timeframe, NULL::text AS derivation_method,
+                       NULL::text AS source_run_id, NULL::timestamptz AS source_first_ts,
+                       NULL::timestamptz AS source_last_ts,
+                       NULL::timestamptz AS source_completion_cutoff,
+                       NULL::integer AS source_bar_count
+                FROM price_data
+                WHERE symbol=ANY(%s) AND market='TH' AND date <= %s
+            ), derived AS (
+                SELECT symbol, session_date AS date, open, high, low, close, volume,
+                       'derived_daily_price_data' AS daily_source, source_timeframe,
+                       derivation_method, source_run_id, source_first_ts, source_last_ts,
+                       source_completion_cutoff, source_bar_count
+                FROM derived_daily_price_data
+                WHERE symbol=ANY(%s) AND session_date <= %s
+                  AND is_official = FALSE AND source = 'settrade'
+                  AND source_timeframe = '60m' AND source_bar_count = 8
+                  AND derivation_method = 'settrade_60m_complete_bangkok_session_ohlcv_v1'
+                  AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::date = session_date
+                  AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::date = session_date
+                  AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::time = TIME '09:00'
+                  AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::time = TIME '16:00'
+                  AND source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                  AND source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                  AND NOT EXISTS (
+                      SELECT 1 FROM official o
+                      WHERE o.symbol=derived_daily_price_data.symbol AND o.date=session_date
+                  )
+            ), filtered AS (
+                SELECT symbol, date, open, high, low, close, volume, daily_source,
+                       source_timeframe, derivation_method, source_run_id, source_first_ts,
+                       source_last_ts, source_completion_cutoff, source_bar_count,
                        CASE WHEN date IS NOT NULL
                                   AND open IS NOT NULL AND high IS NOT NULL
                                   AND low IS NOT NULL AND close IS NOT NULL
@@ -170,8 +243,7 @@ class BackendDailyAdapter:
                                   AND low <= LEAST(open, close)
                                   AND low <= high
                              THEN 0 ELSE 1 END AS invalid_flag
-                FROM price_data
-                WHERE symbol=ANY(%s) AND market='TH' AND date <= %s
+                FROM (SELECT * FROM official UNION ALL SELECT * FROM derived) source_rows
             ), quality AS (
                 SELECT symbol, COALESCE(SUM(invalid_flag), 0) AS invalid_count
                 FROM filtered
@@ -182,20 +254,35 @@ class BackendDailyAdapter:
                 FROM filtered
                 JOIN quality USING (symbol)
             )
-            SELECT symbol, date, open, high, low, close, volume, invalid_count
+            SELECT symbol, date, open, high, low, close, volume, daily_source,
+                   source_timeframe, derivation_method, source_run_id, source_first_ts,
+                   source_last_ts, source_completion_cutoff, source_bar_count, invalid_count
             FROM bounded
             WHERE retrieval_row <= %s
             ORDER BY symbol ASC, date ASC
             """,
-            (list(symbols), as_of, RETRIEVAL_CAP),
+            (list(symbols), as_of, list(symbols), as_of, as_of, RETRIEVAL_CAP),
         )
         grouped = {symbol: [] for symbol in symbols}
         quality = {symbol: None for symbol in symbols}
-        for symbol, date, open_, high, low, close, volume, invalid_count in rows:
+        for row in rows:
+            if len(row) >= 16:
+                (symbol, date, open_, high, low, close, volume, daily_source,
+                 source_timeframe, derivation_method, source_run_id, source_first_ts,
+                 source_last_ts, source_completion_cutoff, source_bar_count, invalid_count) = row
+            else:
+                symbol, date, open_, high, low, close, volume, invalid_count = row
+                daily_source = "price_data"
+                source_timeframe = derivation_method = source_run_id = None
+                source_first_ts = source_last_ts = source_completion_cutoff = source_bar_count = None
             quality[symbol] = int(invalid_count)
             grouped.setdefault(symbol, []).append(
                 {"date": date, "open": open_, "high": high, "low": low,
-                 "close": close, "volume": volume}
+                 "close": close, "volume": volume, "source": daily_source,
+                 "source_timeframe": source_timeframe, "derivation_method": derivation_method,
+                 "source_run_id": source_run_id, "source_first_ts": source_first_ts,
+                 "source_last_ts": source_last_ts, "source_completion_cutoff": source_completion_cutoff,
+                 "source_bar_count": source_bar_count}
             )
         return {
             symbol: (frame, frame[-1]["date"] if frame else None, {
@@ -237,6 +324,26 @@ def _rows(frame: Any) -> list[dict[str, Any]]:
                  "low": row.get("Low"), "close": row.get("Close"), "volume": row.get("Volume")}
                 for _, row in frame.iterrows()]
     raise TypeError("approved Daily adapter returned unsupported rows")
+
+
+def _frame_source(frame: Any) -> str:
+    sources = {str(row.get("source")) for row in _rows(frame) if row.get("source")}
+    return next(iter(sources)) if len(sources) == 1 else ("mixed" if sources else "price_data")
+
+
+def _row_lineage(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    if not row or row.get("source") != "derived_daily_price_data":
+        return None
+    return {key: row.get(key) for key in (
+        "source", "source_timeframe", "source_run_id", "source_first_ts",
+        "source_last_ts", "source_completion_cutoff", "source_bar_count",
+        "derivation_method")}
+
+
+def _selected_lineage(frame: Any) -> list[dict[str, Any]]:
+    """Return ordered lineage for every selected derived row."""
+    return [lineage for row in _rows(frame)
+            if (lineage := _row_lineage(row)) is not None]
 
 
 def _valid(row: Mapping[str, Any]) -> bool:
@@ -282,18 +389,21 @@ def _quote(clean: list[Mapping[str, Any]] | None) -> dict[str, Any]:
     available = price is not None
     change_available = percent is not None
     latest_date = latest.get("date") if latest else None
+    source = (latest.get("source") or "price_data") if latest else "price_data"
     return {
         "price": price,
         "change_amount": amount if change_available else None,
         "change_pct": percent if change_available else None,
         "change_basis": "previous_daily_close" if change_available else "NOT_VERIFIED",
         "change_amount_basis": "previous_daily_close" if change_available else "NOT_VERIFIED",
-        "source": "price_data",
+        "source": source,
         "as_of": str(latest_date) if latest_date is not None else None,
         "provisional": False,
         "availability": "AVAILABLE" if available else "NOT_VERIFIED",
         "change_availability": "AVAILABLE" if change_available else "NOT_VERIFIED",
-        "provenance": {**QUOTE_PROVENANCE, "as_of": str(latest_date) if latest_date is not None else None},
+        "provenance": {**QUOTE_PROVENANCE, "source": source, "table": source,
+                        "as_of": str(latest_date) if latest_date is not None else None,
+                        "lineage": _row_lineage(latest)},
     }
 
 
@@ -463,7 +573,9 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                     frame, latest = loaded_value[:2]
                     quality = loaded_value[2] if len(loaded_value) > 2 else None
                     row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP, quality)
-                    row["provenance"] = {**PROVENANCE, "adapter": type(adapter).__name__,
+                    row["provenance"] = {**PROVENANCE, "source": _frame_source(frame),
+                                         "selected_daily_lineage": _selected_lineage(frame),
+                                         "adapter": type(adapter).__name__,
                                          "latest_returned_date": str(latest) if latest else None}
                 except Exception as error:
                     retrieval_error = True
@@ -481,7 +593,9 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                 classify_started = time.perf_counter()
                 row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP)
                 classify_ms += (time.perf_counter() - classify_started) * 1000
-                row["provenance"] = {**PROVENANCE, "adapter": type(adapter).__name__,
+                row["provenance"] = {**PROVENANCE, "source": _frame_source(frame),
+                                     "selected_daily_lineage": _selected_lineage(frame),
+                                     "adapter": type(adapter).__name__,
                                      "latest_returned_date": str(latest) if latest else None}
             except Exception as error:
                 retrieval_error = True
@@ -531,7 +645,23 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
     try:
         symbols, manifest = adapter.resolve_universe(conn, UNIVERSE)
         if as_of is None:
-            rows, _ = adapter._exec_select(conn, "SELECT MAX(date) AS max_date FROM price_data WHERE market='TH'")
+            rows, _ = adapter._exec_select(
+                conn,
+                """SELECT MAX(day) AS max_date FROM (
+                    SELECT MAX(date) AS day FROM price_data WHERE market='TH'
+                    UNION ALL
+                    SELECT MAX(session_date) AS day FROM derived_daily_price_data
+                    WHERE is_official=FALSE AND source='settrade'
+                      AND source_timeframe='60m' AND source_bar_count=8
+                      AND derivation_method='settrade_60m_complete_bangkok_session_ohlcv_v1'
+                      AND source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                      AND source_completion_cutoff <= NOW()
+                      AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::date=session_date
+                      AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::date=session_date
+                      AND (source_first_ts AT TIME ZONE 'Asia/Bangkok')::time=TIME '09:00'
+                      AND (source_last_ts AT TIME ZONE 'Asia/Bangkok')::time=TIME '16:00'
+                ) dates""",
+            )
             as_of = rows[0][0] if rows and rows[0][0] else None
         if as_of is None:
             raise RuntimeError("cannot resolve current Daily as-of")

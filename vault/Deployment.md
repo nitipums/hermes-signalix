@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 · current production is `release/signalix-mvp-stable`; Trend Map production-served read-only closeout is complete; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-13 · current production remains `release/signalix-mvp-stable`; existing Trend Map production-served read-only evidence is retained, while the current Issue #22 remediation is dirty with commit/push pending. Evaluator auto-caller remains separate.
 
 ## Stable release
 
@@ -18,7 +18,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Fresh promotion read-back — 2026-09-13
 
-- Source: implementation commit `db481af` and artifact commit `159655d` are included in the release branch; local/remote branch equality was verified at final closeout and the working tree was clean.
+- Source/runtime baseline: current source, documentation, migration, tests, and generated files are dirty; local/remote equality and a clean working tree are not claimed. Commit/push is pending.
 - Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
 - Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
 - Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
@@ -37,6 +37,15 @@ and is non-actionable. `/mvp` and
 `/api/setup-candidates` remain retained trial/future-integration surfaces;
 Elliott Wave work is deferred. Any future Trend Mapping to `BUY_NOW` path must
 be separately approved and gated.
+
+### Derived Daily fallback runtime read-back — 2026-09-13
+
+- Issue [#22 — bounded derived-Daily fallback and lineage](https://github.com/nitipums/hermes-signalix/issues/22) is present in the current EOD scan source, but this final remediation is uncommitted/unpushed.
+- The writer calls Settrade 60m only for symbols missing the current official Daily session, requests a bounded 8-bar current-session window, requires complete 09:00–16:00 ICT coverage, and upserts only `derived_daily_price_data` with `is_official=false`.
+- Live run at cutoff `2026-09-11T17:00:00+07:00`: `3/3` affected symbols, `3` rows written, source run `ef90959e53d24e638fbd67d08d5ab256`; no official `price_data` rows were mutated.
+- Publisher/API after backend/dashboard recreate: `237/237`, `232 AVAILABLE`, `5 INVALID_DATA`, `0 NO_DATA`; 3 derived rows expose source run, source timestamps, 60m timeframe, bar count 8, and derivation method.
+- Migration smoke: `docker exec -i signalix_postgres psql -U signalix -d signalix < backend/migrations/008_derived_daily_from_intraday.sql` applied twice successfully; read-back confirmed `186/186` derived rows have `source_completion_cutoff`, canonical derivation method, and `is_official=false`, while official `price_data` remains empty for the three fallback symbols.
+- Final source/runtime reload: `docker compose up -d --force-recreate backend dashboard`; readiness and public API read-back after the completion-cutoff remediation are recorded in the current acceptance evidence.
 
 ## Historical runtime scope — 2026-09-02
 

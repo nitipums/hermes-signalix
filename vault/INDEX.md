@@ -1,7 +1,7 @@
 # INDEX — Signalix Project Vault
 
 > **STATUS: CURRENT** · Catalog and routing map for the Level-4 vault.
-> **Last reconciled:** 2026-09-12 ICT
+> **Last reconciled:** 2026-09-13 ICT
 > **Authority:** the linked concern-specific documents, not this catalog.
 
 ## How to use
@@ -29,6 +29,7 @@
 ## Focused current specifications and evidence
 
 - `../docs/superpowers/specs/` — current executable product/API/UI contracts.
+- `../docs/current/2026-09-13-daily-trend-derived-fallback-spec.md` — current bounded Derived Daily fallback contract and Issue #22 implementation authority.
 - `../docs/current/` — dated decision records and bounded evidence handoffs.
 - `Browser-and-Freshness-Verification.md` — browser/freshness procedure.
 - `Memory-Cleanup-Candidates.md` — memory/fact cleanup record.
