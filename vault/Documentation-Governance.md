@@ -1,8 +1,8 @@
 # Signalix Documentation Governance
 
 > **STATUS: CURRENT** · governance layer
-> **Last reviewed:** 2026-09-01
-> **Current reconciliation:** T1–T9 source is promoted to `release/signalix-mvp-stable`; public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
+> **Last reviewed:** 2026-09-13
+> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus; `/mvp` and `/api/setup-candidates` remain retained trial/future-integration surfaces. The current production baseline remains `release/signalix-mvp-stable`; the approved Trend-Mapping-only `main` is planning-only until promotion gates pass. Public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 
@@ -80,22 +80,19 @@ Arm chose Markdown `Execution-Pipeline.md` and linked focused plans/specs as the
 6. Treat generated HTML, JSON snapshots, logs, and worktree files as artifacts—not documentation authorities.
 7. Use `Documentation-Cleanup-Review.html` as the visual inventory report; regenerate after each cleanup batch.
 
-## Skill overlap matrix (2026-08-23)
+## Skill overlap matrix — current consolidated set
 
-| Domain | Primary skill | Complementary | Superseded |
-|---|---|---|---|
-| Dashboard verification | `signalix-dashboard-verification` | `signalix-dashboard-contracts` (defines contracts) | `signalix-dashboard-review`, `signalix-served-artifact-verification` |
-| Pipeline reliability | `signalix-pipeline-reliability` | `signalix-data-feed-reliability` (feed-specific) | `signalix-pipeline-stability-review` |
-| Fetch monitoring | `signalix-fetch-monitor` | — | — |
-| Canonical run remediation | `signalix-history-lineage` | — | — |
-| Backfill & parity | `signalix-backfill-and-parity` | — | — |
-| Acceptance / QA | `signalix-read-only-acceptance` | `signalix-state-contracts` | `signalix-canonical-acceptance-review`, `signalix-evidence-reconciliation` |
-| Product strategy | `signalix-product-strategy` | — | `signalix-product-strategy-review`, `signalix-product-roadmap` |
-| UI changes | `signalix-dashboard-ui` | `signalix-dashboard-interaction-contracts` | — |
-| Screening | `signalix-screening-layering` | `signalix-screen-vs-db` | — |
-| Ops / delivery | `signalix-ops` | `signalix-delivery-ops` | — |
-| UI recovery | `signalix-ui-implementation-recovery` | — | — |
-| Documentation governance | `signalix-documentation-governance` | — | — |
-| Kanban | — | — | `signalix-kanban-worker-common`, `signalix-kanban-execution-loop`, `signalix-team-operating-playbook` |
+| Domain | Primary skill | Notes |
+|---|---|---|
+| Routing | `signalix-skill-router` | Start here when unsure |
+| Product strategy | `signalix-product-strategy` | Contract remains in canonical vault/specs |
+| Daily Trend Mapping | `signalix-trend-map` | Current public read-only non-actionable focus |
+| Data/lineage/replay | `signalix-data-lineage` | EOD, intraday, freshness, coverage, backfill, replay |
+| Screening/research | `signalix-screening-research` | Deterministic screening plus explicitly scoped research/compatibility |
+| Dashboard/UI/acceptance | `signalix-dashboard-acceptance` | UI, served artifact, API parity, browser acceptance |
+| Runtime/delivery | `signalix-production-ops` | Docker, systemd, delivery, release, recovery |
+| Codex tooling | `signalix-lite-codex-owner-loop` | Lite-owned Codex invocation and final review |
+| Local development | `signalix-local-development-environment` | Safe laptop/runtime separation |
+| Documentation/governance | `signalix-documentation-governance` | Authority and cleanup procedure |
 
-**Total superseded skills: 12**
+Legacy Signalix procedures remain in the profile archive and are not active routing targets.

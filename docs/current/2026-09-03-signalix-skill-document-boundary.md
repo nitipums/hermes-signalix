@@ -22,16 +22,16 @@ Signalix skills are procedures and routers. Durable product, data, UI, acceptanc
 
 ## Active procedural skill set
 
+- Single Signalix skill router: `signalix-skill-router`
 - Product routing: `signalix-product-strategy`
-- State verification: `signalix-state-contracts`
-- Screening/replay procedure: `signalix-screening-layering`, `signalix-screening-replay`
-- Wave verification: `signalix-wave-verification-loop`
-- Dashboard implementation: `signalix-dashboard-ui`
-- Dashboard runtime verification: `signalix-dashboard-verification`
-- UI/data acceptance: `signalix-ui-data-acceptance`
-- MVP end-to-end verification: `signalix-mvp-verification`
-- Production acceptance: `signalix-acceptance-gates`
-- Production delivery/operations: `signalix-production-delivery`, `signalix-production-operations`
+- Current delivery: `signalix-trend-map`
+- Data/lineage/replay: `signalix-data-lineage`
+- Screening/research: `signalix-screening-research`
+- Dashboard/UI/acceptance: `signalix-dashboard-acceptance`
+- Runtime/delivery: `signalix-production-ops`
+- Codex tooling: `signalix-lite-codex-owner-loop`
+- Local development support: `signalix-local-development-environment`
+- Documentation/governance support: `signalix-documentation-governance`
 
 ## Consolidation rules
 
@@ -53,7 +53,11 @@ These are not automatically deleted. They need a separate bounded review after t
 - `signalix-worktree-maintenance`
 - `equity-wave3-dashboard`
 - `dr-cross-market-vcp-screening`
-- `signalix-data-lineage-gates`
+
+Archived in the profile (reversible; not an active skill):
+
+- `signalix-data-lineage-gates` → `/root/.hermes/profiles/lite/skills/_archived/finance/signalix-data-lineage-gates`
+- `signalix-remediation-gate` → `/root/.hermes/profiles/lite/skills/_archived/finance/signalix-remediation-gate`
 
 ## Scope and verification boundary
 

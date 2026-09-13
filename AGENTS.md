@@ -1,7 +1,7 @@
 # AGENTS.md — Signalix collaboration contract
 
 > **STATUS: CURRENT** · Owner-aligned working instructions for Lite and Codex.
-> **Last reconciled:** 2026-08-31
+> **Last reconciled:** 2026-09-13
 > **Authority:** owner-approved direction in `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`, with current acceptance/evidence rules in `vault/Execution-Pipeline.md`.
 
 ## Product identity
@@ -35,6 +35,11 @@ The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This 
 - R:R is deterministic evidence, not a standalone reason to accept a setup. Trigger, technically meaningful invalidation, explicit target method, and sufficient/fresh data are also required.
 - Setup-layer `REVIEW_NOW` still means worth chart review only. Only the separate private signal policy may emit market-only shadow `BUY_NOW`; it is not an executable broker order. Portfolio data and an owner token must not block the local shadow UI.
 
+## Current delivery focus and branch architecture — 2026-09-13
+
+Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and remains public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` remain retained trial/future-integration surfaces; Elliott/Wave research is deferred.
+
+Wayfinder decision: “clean main” means a physically Trend-Mapping-only source/product line. The approved topology is a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD. The existing remote `main` is stale and is not the migration base. Keep the release branch intact for `/mvp`, compatibility, research, and rollback until the strict promotion gates pass. This is architecture planning only; it does not change current production checkout, default branch, runtime, or deployment.
 ### Decision and state boundaries
 
 Structural `wave.state` uses only:

@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-12 19:53 ICT · release `73bf3ed` is aligned local/remote; shadow hardening and named browser scopes reconciled; evaluator auto-caller separate.
+> **Reconciled:** 2026-09-13 · current production remains on `release/signalix-mvp-stable`; Wayfinder-approved Trend-Mapping-only `main` is a planning candidate, not yet promoted. Shadow route/artifact/browser evidence remains governed separately; evaluator auto-caller separate.
 
 ## Stable release
 

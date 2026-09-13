@@ -2,7 +2,19 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation:** T1–T9 is promoted; `/api/setup-candidates` is primary; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for the three unavailable Daily baselines; evaluator auto-caller remains separate. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus and permanently public read-only research evidence. `/api/setup-candidates` and `/mvp` remain retained trial/future-integration surfaces; all named browser scopes are PASS; setup data freshness remains explicitly partial/stale for unavailable Daily baselines. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+
+## 2026-09-13 — Trend Mapping mainline architecture
+
+Owner decision from Wayfinder map #10:
+
+- “Clean main” means a physically Trend-Mapping-only source/product line.
+- Use a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD; do not use the stale remote `main` as the migration base.
+- Keep `release/signalix-mvp-stable` intact for retained `/mvp`, `/api/setup-candidates`, compatibility, research, and rollback evidence.
+- Do not change GitHub default branch, production checkout, systemd paths, or deployment until the strict six-gate acceptance/rollback decision is independently evidenced.
+- Shared deterministic modules may remain on the Trend Mapping line only when the dependency map proves that the current Trend Mapping path needs them. A separate repository/package remains a future evaluation, not the current decision.
+
+The six promotion gates are: dependency isolation; focused/relevant full tests; artifact/pointer/hash/freshness/universe evidence; public API contract; desktop/mobile browser including drawer/chart and error→Retry→recovery; and tested source-plus-artifact rollback. Missing evidence is `NOT VERIFIED` and blocks promotion. This decision changes branch architecture planning, not current production/runtime behavior.
 
 ## 2026-09-12 — Trend Mapping becomes the primary delivery focus
 
