@@ -12,6 +12,14 @@
 
 The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup candidate and `/mvp` contracts remain retained trial/future-integration evidence, not this delivery target.
 
+### Fresh promotion evidence — 2026-09-13
+
+- Source/release: local `release/signalix-mvp-stable` at `db481af`; working tree clean; remote publication pending at this evidence point.
+- Focused source gate: `57 passed`; Python compile, JavaScript syntax, and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
+- Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map-shadow` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
+- Browser: desktop 237 rows plus drawer/chart; 390px mobile no overflow (`scrollWidth=390`); failure → Retry showed zero rows and recovery returned 237 rows.
+- Rollback: `NOT VERIFIED`; source-plus-artifact rollback remains the final promotion gate.
+
 ## Current acceptance reconciliation — 2026-09-13
 
 - **Current focus gate:** Complete the bounded Daily Trend Mapping closeout in GitHub Issue #17 before resuming broader setup or Elliott work.

@@ -16,6 +16,16 @@ legacy routes: quarantined/404
 
 The primary workstream is the production-served, public, read-only Daily Trend Mapping surface. Its active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
 
+### Fresh promotion read-back — 2026-09-13
+
+- Source: local `release/signalix-mvp-stable` at `db481af`; working tree clean; not yet pushed at this evidence point.
+- Reload: `docker compose up -d --force-recreate backend dashboard`; PostgreSQL and Redis were left running, with no migration or schema change.
+- Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
+- Publication: bounded publisher created a new immutable artifact with `as_of=2026-09-11`, `237/237` declared/evaluated/returned, and publication time `2026-09-13T03:57:47.890717+00:00`.
+- Local/public API: `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `verification_status=VERIFIED`, freshness `FRESH`; quality `229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`; public ingress HTTP 200.
+- Browser: desktop 237 rows and drawer/chart passed; 390px mobile `scrollWidth=390`, failure showed Retry/zero rows, recovery returned 237 rows.
+- Rollback: `NOT VERIFIED`; no production rollback was executed in this promotion slice. The prior immutable shadow artifact remains preserved for a separately bounded rollback drill.
+
 ```text
 /trend-map-shadow
 /api/trend-map-shadow
