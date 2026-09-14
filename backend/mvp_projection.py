@@ -1,9 +1,8 @@
-"""Canonical MVP projection boundary.
+"""Compatibility projection boundary.
 
-The current builder still emits the legacy dashboard snapshot. This module is
-the only compatibility seam that translates that payload into the stable MVP
-contract. Later, the builder can emit this contract directly without changing
-mvp_api or the served routes.
+The legacy dashboard snapshot is retained for audit/replay only. The
+canonical setup-candidates route does not call this module or use its output
+as a fallback.
 """
 from __future__ import annotations
 
@@ -11,6 +10,12 @@ import json
 from pathlib import Path
 
 CONTRACT_VERSION = "signalix.mvp.v1"
+
+COMPATIBILITY_DEPRECATION = {
+    "status": "audit_only",
+    "boundary": "one_day",
+    "message": "Legacy snapshot projection is retained for audit/replay only; use /api/setup-candidates.",
+}
 
 
 def project_legacy_snapshot(payload: dict) -> dict:
@@ -27,6 +32,8 @@ def project_legacy_snapshot(payload: dict) -> dict:
     }
     return {
         "contract_version": CONTRACT_VERSION,
+        "audit_only": True,
+        "deprecation": dict(COMPATIBILITY_DEPRECATION),
         "scan_time": payload.get("scan_time"),
         "scan_run_id": payload.get("scan_run_id"),
         "decision_state": payload.get("decision_state"),

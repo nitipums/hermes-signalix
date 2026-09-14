@@ -1,0 +1,692 @@
+import json
+from decimal import Decimal
+
+import numpy as np
+import pandas as pd
+import pytest
+
+from setup_candidate_contract import (
+    CandidateEvaluation,
+    _setup_evidence_markers,
+    build_peer_context,
+    build_setup_candidate,
+    finalize_candidate_evaluation,
+    project_setup_candidate_list,
+)
+from canonical_setup_projection import _validate_canonical_setup_candidate
+from trade_setup_engine import build_trade_setup
+
+
+def sample_inputs():
+    return {
+        "symbol": "ABC",
+        "as_of": "2026-08-30",
+        "data_status": {"sufficient": True, "freshness": "fresh", "source": "daily_eod+60m"},
+        "trend": {"state": "uptrend", "rise_20d_pct": 18.4, "relative_strength": 91},
+        "wave": {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "PARTIAL", "evidence": {}},
+        "setup": {"state": "EARLY_WAVE_3", "status": "PRE_TRIGGER", "trigger": 12.5},
+        "context": build_peer_context("ABC", {"sector": "Tech", "industry": "Components"}),
+        "bonus_evidence": {"vcp": {"present": False}},
+        "provenance": {"policy_version": "setup-candidates-v1", "daily_source": "eod"},
+    }
+
+
+def test_candidate_contract_keeps_layers_separate():
+    item = build_setup_candidate(**sample_inputs())
+    assert set(("symbol", "as_of", "data_status", "trend", "wave", "setup",
+                "context", "bonus_evidence", "decision_lane", "provenance")) == set(item)
+    assert item["wave"]["timeframe"] == "daily"
+    assert item["setup"]["timeframe"] == "60m"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
+    assert "decision" not in item
+    json.dumps(item)
+
+
+@pytest.mark.parametrize("freshness, expected_lane", [
+    ("fresh", "DAILY_CANDIDATE"),
+    ("stale", "DATA_BLOCKED"),
+    ("unknown", "DATA_BLOCKED"),
+])
+def test_candidate_evaluation_finalizer_matches_compatibility_builder(
+    freshness, expected_lane,
+):
+    inputs = sample_inputs()
+    inputs["data_status"] = {
+        "sufficient": freshness == "fresh", "freshness": freshness,
+        "intraday_60m_freshness": freshness,
+    }
+    old_row = build_setup_candidate(**inputs)
+    new_row = finalize_candidate_evaluation(CandidateEvaluation(**inputs))
+
+    assert new_row == old_row
+    assert new_row["decision_lane"] == expected_lane
+    assert new_row["data_status"] == old_row["data_status"]
+    assert new_row["provenance"] == old_row["provenance"]
+    assert new_row["setup"] == old_row["setup"]
+
+
+def test_stale_intraday_finalization_has_one_precedence_and_does_not_mutate_input():
+    inputs = sample_inputs()
+    original_setup = dict(inputs["setup"])
+    inputs["data_status"] = {
+        "sufficient": False, "freshness": "stale",
+        "intraday_60m_freshness": "stale", "reason_code": "STALE_60M_DATA",
+    }
+    inputs["setup"] = {**inputs["setup"], "data_reason_code": "ENGINE_REASON"}
+
+    row = finalize_candidate_evaluation(CandidateEvaluation(**inputs))
+
+    assert row["decision_lane"] == "DATA_BLOCKED"
+    assert row["setup"]["status"] == "PRE_TRIGGER"
+    assert row["data_status"]["reason_code"] == "STALE_60M_DATA"
+    assert row["data_status"]["reason_codes"] == ["STALE_60M_DATA", "ENGINE_REASON"]
+    assert inputs["setup"] == {**original_setup, "data_reason_code": "ENGINE_REASON"}
+
+
+def test_daily_structure_is_non_actionable_and_cannot_change_lane():
+    base = build_setup_candidate(**sample_inputs())
+    with_context = dict(sample_inputs())
+    with_context["wave"] = {
+        **with_context["wave"],
+        "primary_state": "WAVE_2_NEAR_COMPLETION",
+        "daily_structure": {
+            "phase": "WAVE_4_CORRECTION", "confidence": "HIGH", "actionability": "REVIEW",
+            "source_timeframe": "60m", "policy_version": "wrong", "as_of": "x",
+            "snapshot_id": "x", "anchors": {}, "retracement": None,
+            "supporting_evidence": [], "contradicting_evidence": [], "missing_evidence": [],
+            "alternative_phases": [],
+        },
+    }
+    context = build_setup_candidate(**with_context)
+    assert context["decision_lane"] == base["decision_lane"]
+    assert context["wave"]["daily_structure"]["actionability"] == "NONE"
+    assert context["wave"]["daily_structure"]["source_timeframe"] == "daily"
+    assert context["setup"]["timeframe"] == "60m"
+
+
+def test_deep_pullback_evidence_is_non_actionable_and_cannot_change_lane():
+    inputs = sample_inputs()
+    base = build_setup_candidate(**inputs)
+    inputs["wave"] = {
+        **inputs["wave"],
+        "deep_pullback_evidence": {
+            "status": "DEEP_PULLBACK_W3_EVIDENCE", "actionability": "REVIEW",
+            "source_timeframe": "60m", "policy_version": "wrong",
+            "retracement": 0.753846, "lower_bound": 0, "upper_bound": 1,
+            "reason": "retracement_gate_exceeded",
+            "anchors": {"w1_low": {"price": 2.02}, "w1_high": {"price": 3.32}, "w2_low": {"price": 2.34}},
+        },
+    }
+    row = build_setup_candidate(**inputs)
+    evidence = row["wave"]["deep_pullback_evidence"]
+    assert row["decision_lane"] == base["decision_lane"]
+    assert row["setup"] == base["setup"]
+    assert evidence["status"] == "DEEP_PULLBACK_W3_EVIDENCE"
+    assert evidence["actionability"] == "NONE"
+    assert evidence["source_timeframe"] == "daily"
+
+
+def test_quote_is_optional_and_has_explicit_source_boundary():
+    inputs = sample_inputs()
+    inputs["provenance"] = {
+        "policy_version": "setup-candidates-v1", "source": "price_data+intraday_price_data",
+        "as_of": inputs["as_of"], "freshness": "fresh",
+    }
+    inputs["quote"] = {
+        "price": 13.0, "change_pct": 4.0,
+        "change_basis": "previous_completed_60m_close",
+        "change_amount": 0.5,
+        "change_amount_basis": "previous_completed_60m_close",
+        "source": "intraday_price_data", "as_of": "2026-08-30T10:00:00+07:00",
+        "provisional": True,
+    }
+    item = build_setup_candidate(**inputs)
+    assert item["quote"]["source"] == "intraday_price_data"
+    assert item["quote"]["provisional"] is True
+    assert _validate_canonical_setup_candidate(item) is item
+    assert "quote" not in build_setup_candidate(**sample_inputs())
+
+
+def test_builder_selects_current_intraday_price_with_primary_daily_change():
+    import mvp_api
+
+    daily = pd.DataFrame(
+        {"Open": [10, 11, 12], "High": [11, 12, 13], "Low": [9, 10, 11],
+         "Close": [10, 11, 12], "Volume": [100, 100, 100]},
+        index=pd.date_range("2026-08-28", periods=3, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Open": [12, 12.2, 12.4], "High": [12.3, 12.5, 12.7],
+         "Low": [11.9, 12.1, 12.3], "Close": [12, 12.2, 12.5],
+         "Volume": [10, 10, 10]},
+        index=pd.date_range("2026-09-03 10:00", periods=3, freq="h", tz="Asia/Bangkok"),
+    )
+    intraday.attrs["timeframe"] = "60m"
+    result = mvp_api._build_candidate_row(context=mvp_api._CandidateRowContext(
+        symbol="QUOTE", daily_df=daily, intraday_df=intraday,
+        daily_evidence_valid=True, daily_evidence_usable=True, daily_current=True,
+        daily_freshness="fresh", daily_final_status="fresh",
+        intraday_available=True, intraday_current=True, intraday_freshness="fresh",
+        intraday_as_of=intraday.index[-1].isoformat(), rs_rank=None, profile={},
+        universe_manifest={"universe_filter": "marginable_long"}, wave={"state": "EARLY_WAVE_3"},
+        setup={"status": "FORMING"}, canonical_metadata=None,
+    ))
+    assert result.row["quote"]["price"] == 12.5
+    assert result.row["quote"]["source"] == "intraday_price_data"
+    assert result.row["quote"]["provisional"] is True
+    assert result.row["quote"]["change_amount"] == 0.5
+    assert result.row["quote"]["change_basis"] == "previous_daily_close"
+    assert result.row["as_of"] == daily.index[-1].isoformat()
+    assert result.row["setup"]["status"] == "FORMING"
+
+
+def test_current_quote_builder_has_intraday_daily_and_missing_frame_contracts():
+    from candidate_row_evidence import build_current_quote
+
+    daily = pd.DataFrame(
+        {"Close": [100.0, 102.0]},
+        index=pd.date_range("2026-09-01", periods=2, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Close": [103.0, 104.5]},
+        index=pd.date_range("2026-09-03 10:00", periods=2, freq="h", tz="Asia/Bangkok"),
+    )
+    quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=True,
+    )
+    assert quote == {
+        "price": 104.5, "source": "intraday_price_data",
+        "as_of": intraday.index[-1].isoformat(), "provisional": True,
+        "change_amount": 2.5, "change_amount_basis": "previous_daily_close",
+        "change_pct": (104.5 / 102.0 - 1.0) * 100.0,
+        "change_basis": "previous_daily_close",
+    }
+
+    daily_quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=False,
+    )
+    assert daily_quote["price"] == 102.0
+    assert daily_quote["source"] == "price_data"
+    assert daily_quote["provisional"] is False
+    assert daily_quote["change_basis"] == "previous_daily_close"
+    assert build_current_quote(daily_df=daily, intraday_df=None, intraday_current=True) is None
+
+
+def test_current_quote_irpc_like_daily_change_and_60m_only_is_explicitly_unavailable():
+    from candidate_row_evidence import build_current_quote
+
+    daily = pd.DataFrame(
+        {"Close": [3.10, 3.20]},
+        index=pd.date_range("2026-09-08", periods=2, freq="D"),
+    )
+    intraday = pd.DataFrame(
+        {"Close": [3.04, 3.04]},
+        index=pd.date_range("2026-09-10 10:00", periods=2, freq="h", tz="Asia/Bangkok"),
+    )
+
+    quote = build_current_quote(
+        daily_df=daily, intraday_df=intraday, intraday_current=True,
+    )
+    assert quote["price"] == 3.04
+    assert quote["change_pct"] == pytest.approx(-5.0)
+    assert quote["change_basis"] == "previous_daily_close"
+
+    intraday_only = build_current_quote(
+        daily_df=None, intraday_df=intraday, intraday_current=True,
+    )
+    assert intraday_only == {
+        "price": 3.04, "source": "intraday_price_data",
+        "as_of": intraday.index[-1].isoformat(), "provisional": True,
+    }
+
+
+def test_compact_projection_omits_absent_quote_but_preserves_real_quote():
+    from setup_candidate_contract import compact_setup_candidate_for_list
+
+    absent = compact_setup_candidate_for_list(sample_inputs())
+    assert "quote" not in absent
+    quote = dict(price=104.5, source="intraday_price_data",
+                 as_of="2026-09-03T11:00:00+07:00", provisional=True)
+    present = compact_setup_candidate_for_list(dict(sample_inputs(), quote=quote))
+    assert present["quote"] == quote
+    assert "quote" not in compact_setup_candidate_for_list(dict(sample_inputs(), quote={}))
+
+
+def test_full_candidate_builder_carries_current_intraday_frame_to_quote_row(monkeypatch):
+    """Exercise build_setup_candidates_from_data, not only its quote helper."""
+    import mvp_api
+    import screening
+
+    daily_index = pd.date_range("2026-09-01", periods=25, freq="D")
+    daily = pd.DataFrame({
+        "Open": np.arange(100.0, 125.0), "High": np.arange(101.0, 126.0),
+        "Low": np.arange(99.0, 124.0), "Close": np.arange(100.5, 125.5),
+        "Volume": np.full(25, 1000.0),
+    }, index=daily_index)
+    intraday_index = pd.date_range(
+        "2026-09-03 10:00", periods=3, freq="h", tz="Asia/Bangkok"
+    )
+    intraday = pd.DataFrame({
+        "open": [125.0, 125.5, 126.0], "high": [125.5, 126.0, 126.5],
+        "low": [124.5, 125.0, 125.5], "close": [125.25, 125.75, 126.25],
+        "volume": [100.0, 110.0, 120.0],
+    }, index=intraday_index)
+    intraday.attrs["timeframe"] = "60m"
+
+    monkeypatch.setattr(mvp_api.instruments, "active_ord_symbols", lambda pg: ["AAA"])
+    monkeypatch.setattr(mvp_api.instruments, "profile_taxonomy", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "eligible_symbols", lambda active: (["AAA"], {
+        "universe_filter": "marginable_long", "base_active_ord_count": 1,
+        "eligible_count": 1, "excluded_count": 0,
+    }))
+    monkeypatch.setattr(screening, "load_market", lambda *a, **k: None)
+    monkeypatch.setattr(screening, "_universe_rs_ranks", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "_bulk_candidate_frames",
+                        lambda *a, **k: ({"AAA": daily}, {"AAA": intraday}, 2))
+    monkeypatch.setattr(mvp_api, "expected_market_date", lambda: daily_index[-1].date())
+    monkeypatch.setattr(mvp_api, "_expected_intraday_interval_start",
+                        lambda: intraday_index[-1].to_pydatetime())
+    monkeypatch.setattr(mvp_api, "_load_daily_canonical_metadata", lambda *a, **k: {})
+    monkeypatch.setattr(mvp_api, "_evaluate_candidate_engines",
+                        lambda *a, **k: ({"state": "EARLY_WAVE_3"}, {"status": "FORMING"}))
+
+    rows, _ = mvp_api.build_setup_candidates_from_data(object())
+
+    assert rows[0]["quote"]["price"] == 126.25
+    assert rows[0]["quote"]["source"] == "intraday_price_data"
+    assert rows[0]["quote"]["provisional"] is True
+    assert rows[0]["quote"]["change_basis"] == "previous_daily_close"
+    assert rows[0]["quote"]["change_pct"] == pytest.approx(
+        (126.25 / 124.5 - 1.0) * 100.0
+    )
+
+
+def test_builder_emits_bounded_canonical_daily_metadata():
+    inputs = sample_inputs()
+    inputs["canonical_metadata"] = {
+        "high52": 72, "low52": 41, "ath_high": 89, "ath_low": 12,
+        "index_membership": ["SET50"],
+        "index_membership_evidence": {"source": "set-index"},
+        "daily_metrics": {"avg_trade_value_20": 12345678, "unbounded": "drop"},
+        "unexpected": "must not be copied",
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["high52"] == 72
+    assert item["low52"] == 41
+    assert item["ath_high"] == 89
+    assert item["ath_low"] == 12
+    assert item["index_membership"] == ["SET50"]
+    assert item["index_membership_evidence"] == {"source": "set-index"}
+    assert item["daily_metrics"] == {"avg_trade_value_20": 12345678}
+    assert "unexpected" not in item
+
+
+def test_60m_marker_timestamp_uses_chart_datetime_form():
+    markers = _setup_evidence_markers(
+        {"trigger": 12.5, "trigger_timestamp": "2026-01-02 11:00:00"},
+        {}, {},
+    )
+    assert markers[0]["timestamp"] == "2026-01-02T11:00:00"
+
+
+def test_chart_evidence_stays_inside_setup_canonical_namespace():
+    inputs = sample_inputs()
+    inputs["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 12.5,
+        "trigger_timestamp": "2026-01-02 11:00:00",
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert "chart_evidence" not in item
+    assert item["setup"]["chart_evidence"]["60m"]["timeframe"] == "60m"
+    assert item["setup"]["chart_evidence"]["daily"]["timeframe"] == "daily"
+    assert item["setup"]["chart_evidence"]["60m"]["markers"][0]["timestamp"] == (
+        "2026-01-02T11:00:00"
+    )
+
+
+def test_candidate_preserves_timeframe_mismatches_and_blocks_them():
+    inputs = sample_inputs()
+    inputs["wave"] = {"timeframe": "60m", "state": "WAVE_2_NEAR_COMPLETION"}
+    inputs["setup"] = {"timeframe": "15m", "status": "PRE_TRIGGER"}
+    item = build_setup_candidate(**inputs)
+    assert item["wave"]["timeframe"] == "60m"
+    assert item["setup"]["timeframe"] == "15m"
+    assert item["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_missing_timeframes_are_defaulted_by_contract_construction():
+    inputs = sample_inputs()
+    inputs["wave"].pop("timeframe", None)
+    inputs["setup"].pop("timeframe", None)
+    item = build_setup_candidate(**inputs)
+    assert item["wave"]["timeframe"] == "daily"
+    assert item["setup"]["timeframe"] == "60m"
+
+
+def test_non_unknown_wave_always_has_three_evidence_arrays():
+    inputs = sample_inputs()
+    inputs["wave"] = {"state": "WAVE_1_ADVANCE", "confidence": "MEDIUM"}
+
+    wave = build_setup_candidate(**inputs)["wave"]
+
+    assert wave["primary_state"] == "WAVE_1_ADVANCE"
+    assert wave["supporting_evidence"] == []
+    assert wave["contradicting_evidence"] == []
+    assert wave["missing_evidence"] == []
+
+
+def test_wave_context_normalization_preserves_valid_nested_evidence():
+    inputs = sample_inputs()
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_5_ADVANCE", "secondary_markers": [],
+        "confidence": "HIGH", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": ["ordered_prior_structure"],
+        "contradicting_evidence": [], "missing_evidence": ["owner_chart_review"],
+        "rationale": "Ordered prior structure supports late-cycle context.",
+    }
+
+    context = build_setup_candidate(**inputs)["wave"]["context"]
+
+    assert context["mapped_state"] == "WAVE_5_ADVANCE"
+    assert context["supporting_evidence"] == ["ordered_prior_structure"]
+
+
+def test_invalid_or_ambiguous_wave_context_fails_closed_without_relabelling_primary():
+    inputs = sample_inputs()
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_3_EXTENDED", "secondary_markers": ["WAVE_5_ADVANCE", "NOPE"],
+        "confidence": "CERTAIN", "source_timeframe": "60m",
+        "supporting_evidence": "ambiguous", "missing_evidence": None,
+    }
+
+    wave = build_setup_candidate(**inputs)["wave"]
+
+    assert wave["primary_state"] == "WAVE_2_NEAR_COMPLETION"
+    assert wave["context"]["mapped_state"] == "UNKNOWN"
+    assert wave["context"]["secondary_markers"] == []
+    assert wave["context"]["confidence"] == "LOW"
+    assert wave["context"]["source_timeframe"] == "daily"
+    assert "invalid_structural_context_state" in wave["context"]["contradicting_evidence"]
+
+
+def test_invalid_context_timeframe_cannot_reach_review_now_after_normalization():
+    inputs = sample_inputs()
+    inputs["wave"] = {
+        "state": "EARLY_WAVE_3", "confidence": "HIGH", "evidence": {},
+        "context": {
+            "mapped_state": "EARLY_WAVE_3", "confidence": "HIGH",
+            "source_timeframe": "60m", "secondary_markers": [],
+        },
+    }
+    inputs["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 100,
+        "invalidation": 90, "targets": [120], "rr": {"to_target_1": 2.0},
+    }
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["wave"]["context"]["mapped_state"] == "UNKNOWN"
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_compact_projection_preserves_nested_wave_context():
+    item = build_setup_candidate(**sample_inputs())
+    item["wave"]["context"] = {
+        "mapped_state": "WAVE_1_ADVANCE", "secondary_markers": [],
+        "confidence": "MEDIUM", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": [],
+        "contradicting_evidence": [], "missing_evidence": [], "rationale": "context",
+    }
+
+    from setup_candidate_contract import compact_setup_candidate_for_list
+    compact = compact_setup_candidate_for_list(item)
+
+    assert compact["wave"]["context"] == item["wave"]["context"]
+
+
+def test_canonical_validator_accepts_exact_context_and_rejects_competing_context_label():
+    from canonical_setup_projection import _validate_canonical_setup_candidate
+
+    inputs = sample_inputs()
+    inputs["provenance"] = {
+        "policy_version": "setup-candidates-v1", "source": "test",
+        "as_of": inputs["as_of"], "freshness": "fresh",
+    }
+    inputs["wave"]["context"] = {
+        "mapped_state": "WAVE_4_CORRECTION", "secondary_markers": [],
+        "confidence": "MEDIUM", "rule_version": "elliott-full-wave-context-v1",
+        "source_timeframe": "daily", "supporting_evidence": ["ordered_structure"],
+        "contradicting_evidence": [], "missing_evidence": [], "rationale": "context",
+    }
+    item = build_setup_candidate(**inputs)
+    assert _validate_canonical_setup_candidate(item) is item
+
+    invalid = dict(item)
+    invalid["wave"] = dict(item["wave"])
+    invalid["wave"]["context"] = dict(item["wave"]["context"], primary_state="WAVE_4_CORRECTION")
+    import pytest
+    with pytest.raises(ValueError, match="exact envelope"):
+        _validate_canonical_setup_candidate(invalid)
+
+
+def test_peer_context_derives_breadth_breakouts_and_leadership():
+    context = build_peer_context("ABC", {
+        "sector": "Technology", "industry": "Components",
+        "peers": [
+            {"symbol": "AAA", "state": "uptrend", "is_52w_high_breakout": True},
+            {"symbol": "BBB", "state": "uptrend", "is_52w_high_breakout": False},
+            {"symbol": "CCC", "state": "downtrend", "is_52w_high_breakout": True},
+        ],
+        "sector_leadership": "LEADER",
+        "relative_strength_vs_sector": 7.2,
+    })
+    assert context["sector"] == "Technology"
+    assert context["industry"] == "Components"
+    assert context["peer_trend_breadth"] == "2/3"
+    assert context["peer_breakout_count"] == 2
+    assert context["sector_leader_or_laggard"] == "LEADER"
+
+
+def test_missing_peer_context_is_explicit_and_non_gating():
+    inputs = sample_inputs()
+    inputs["context"] = build_peer_context("ABC")
+    item = build_setup_candidate(**inputs)
+    assert item["context"]["peer_data_status"] == "UNKNOWN"
+    assert item["context"]["peer_trend_breadth"] is None
+    assert item["context"]["peer_symbols"] == []
+    assert item["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_decision_mapping_fails_closed_and_keeps_vcp_as_bonus():
+    blocked = sample_inputs()
+    blocked["data_status"] = {"sufficient": False, "freshness": "unknown"}
+    assert build_setup_candidate(**blocked)["decision_lane"] == "DATA_BLOCKED"
+
+    waiting = sample_inputs()
+    waiting["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "FORMING"}
+    assert build_setup_candidate(**waiting)["decision_lane"] == "DAILY_CANDIDATE"
+
+    avoided = sample_inputs()
+    avoided["setup"] = {"timeframe": "60m", "state": "EARLY_WAVE_3", "status": "INVALIDATED"}
+    assert build_setup_candidate(**avoided)["decision_lane"] == "AVOID"
+
+    non_vcp = sample_inputs()
+    non_vcp["bonus_evidence"] = {"vcp": {"present": False}}
+    assert build_setup_candidate(**non_vcp)["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_lane_plan_requires_ordered_target_1_and_never_uses_target_2_only():
+    base = sample_inputs()
+    base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    base["wave"]["context"] = {
+        "mapped_state": "EARLY_WAVE_3", "confidence": "HIGH",
+        "source_timeframe": "daily", "secondary_markers": [],
+    }
+    base["setup"] = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 12.5,
+        "invalidation": 10.0, "rr": {"to_target_1": 3.0},
+        "targets": [{"name": "target_1", "price": 20.0},
+                    {"name": "target_2", "price": 25.0}],
+        "target_1": 20.0,
+    }
+    assert build_setup_candidate(**base)["decision_lane"] == "REVIEW_NOW"
+
+    for targets, target_1 in (
+        ([{"name": "target_2", "price": 25.0}], None),
+        ([{"name": "target_2", "price": 25.0}], 20.0),
+        ([{"name": "target_1", "price": "not-a-price"}], "not-a-price"),
+        ([{"name": "target_2", "price": 25.0}, {"name": "target_1", "price": 20.0}], 20.0),
+    ):
+        blocked_plan = dict(base["setup"], targets=targets, target_1=target_1)
+        result = build_setup_candidate(**dict(base, setup=blocked_plan))
+        assert result["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_legacy_scalar_targets_remain_compatible_without_downgrading_mixed_targets():
+    base = sample_inputs()
+    base["wave"] = {"state": "WAVE_2_NEAR_COMPLETION", "confidence": "HIGH", "evidence": {}}
+    base["wave"]["context"] = {
+        "mapped_state": "WAVE_3_CONTINUATION", "confidence": "HIGH",
+        "source_timeframe": "daily", "secondary_markers": [],
+    }
+    legacy_setup = {
+        "timeframe": "60m", "status": "PRE_TRIGGER", "trigger": 100,
+        "invalidation": 90, "targets": [120], "rr": {"to_target_1": 2.0},
+    }
+    assert build_setup_candidate(**dict(base, setup=legacy_setup))["decision_lane"] == "REVIEW_NOW"
+
+    mixed_setup = dict(legacy_setup, targets=[120, {"name": "target_2", "price": 130}])
+    assert build_setup_candidate(**dict(base, setup=mixed_setup))["decision_lane"] == "DAILY_CANDIDATE"
+
+
+def test_explicit_failed_structure_and_risk_statuses_avoid():
+    for status in ("FAILED", "BROKEN", "DO_NOT_CHASE", "FAILED_STRUCTURE"):
+        inputs = sample_inputs()
+        inputs["setup"] = {"status": status}
+        assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
+    inputs = sample_inputs()
+    inputs["setup"] = {"status": "FORMING", "risk_status": "RISK_FAILED"}
+    assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
+
+
+def test_failed_setup_status_token_variants_avoid():
+    for status in ("DO-NOT-CHASE", "FAILED STRUCTURE"):
+        inputs = sample_inputs()
+        inputs["setup"] = {"status": status}
+        assert build_setup_candidate(**inputs)["decision_lane"] == "AVOID"
+
+
+def test_blocked_data_precedes_failed_statuses():
+    inputs = sample_inputs()
+    inputs["data_status"] = {"sufficient": False, "freshness": "stale"}
+    inputs["setup"] = {"status": "DO_NOT_CHASE"}
+    assert build_setup_candidate(**inputs)["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_reason_codes_project_no_setup_and_invalid_risk_without_text_matching():
+    no_setup = sample_inputs()
+    no_setup["setup"] = {"status": "FORMING", "reason_code": "NO_SETUP_DETECTED",
+                         "reason": "localized display text"}
+    assert build_setup_candidate(**no_setup)["decision_lane"] == "DAILY_CANDIDATE"
+
+    invalid_risk = sample_inputs()
+    invalid_risk["setup"] = {"status": "INVALIDATED", "risk_status": "INVALID",
+                              "reason_code": "RISK_INVALID", "reason": "display only"}
+    assert build_setup_candidate(**invalid_risk)["decision_lane"] == "AVOID"
+
+    blocked = sample_inputs()
+    blocked["data_status"] = {"sufficient": False, "freshness": "unknown",
+                              "reason_code": "NO_60M_DATA"}
+    blocked["setup"] = {"status": "FORMING", "reason_code": "NO_SETUP_DETECTED"}
+    assert build_setup_candidate(**blocked)["decision_lane"] == "DATA_BLOCKED"
+
+
+def test_direct_engine_data_reason_is_serialized_under_data_status_only():
+    inputs = sample_inputs()
+    inputs["data_status"] = {"sufficient": False, "freshness": "unknown"}
+    inputs["setup"] = build_trade_setup(
+        {"timeframe": "daily", "state": "UNKNOWN"}, None
+    )
+
+    item = build_setup_candidate(**inputs)
+
+    assert item["data_status"]["reason_code"] == "NO_60M_DATA"
+    assert item["data_status"]["reason_codes"] == ["NO_60M_DATA"]
+    assert "data_reason_code" not in item["setup"]
+
+
+def test_recursive_json_conversion_returns_plain_primitives_or_null():
+    inputs = sample_inputs()
+    inputs["trend"] = {
+        "nested": [np.int64(4), np.float32(2.5), Decimal("3.25"), np.nan],
+    }
+    item = build_setup_candidate(**inputs)
+    nested = item["trend"]["nested"]
+    assert nested == [4, 2.5, 3.25, None]
+    assert [type(value) for value in nested] == [int, float, float, type(None)]
+    json.dumps(item)
+
+
+def test_list_projection_preserves_unknown_and_non_vcp_rows():
+    first = build_setup_candidate(**sample_inputs())
+    second = dict(first, symbol="XYZ", decision_lane="DATA_BLOCKED")
+    projected = project_setup_candidate_list([first, second])
+    assert projected["count"] == 2
+    assert [row["symbol"] for row in projected["items"]] == ["ABC", "XYZ"]
+    json.dumps(projected)
+
+
+def test_screening_adapter_does_not_apply_vcp_filter(monkeypatch):
+    import screening
+
+    captured = {}
+
+    def fake_scan_universe(**kwargs):
+        captured.update(kwargs)
+        return ([{"symbol": "AAA", "vcp": {"is_vcp": False}},
+                 {"symbol": "BBB", "analysis_status": "INSUFFICIENT_HISTORY",
+                  "trend_template": {"conditions_met": 0}},
+                 {"symbol": "CCC", "vcp": {"is_vcp": True}}], [])
+
+    monkeypatch.setattr(screening, "scan_universe", fake_scan_universe)
+    rows = screening.load_evaluated_ord_rows(object(), market="TH")
+    assert [row["symbol"] for row in rows] == ["AAA", "BBB", "CCC"]
+    assert captured["min_conditions"] == -1
+    assert captured["market"] == "TH"
+    assert captured["annotate_ath"] is False
+
+
+def test_universe_manifest_uses_authoritative_active_ord_and_explicit_audit_mode():
+    import mvp_api
+    from marginable import load_marginable_data
+
+    eligible = sorted(
+        symbol for symbol, record in load_marginable_data()["by_symbol"].items()
+        if record.get("instrument_type") == "ORD" and record.get("can_buy") is True
+    )
+    assert len(eligible) == 237
+    excluded = [f"NOT_MARGINABLE_{i:03d}" for i in range(694)]
+    active = eligible + excluded
+
+    symbols, manifest = mvp_api.resolve_universe(
+        object(), "marginable_long", active_symbols=active
+    )
+    assert symbols == eligible
+    assert manifest["base_active_ord_count"] == 931
+    assert manifest["eligible_count"] == 237
+    assert manifest["excluded_count"] == 694
+    assert not set(excluded).intersection(symbols)
+
+    audit_symbols, audit_manifest = mvp_api.resolve_universe(
+        object(), "active_ord", active_symbols=active
+    )
+    assert audit_symbols == sorted(active)
+    assert audit_manifest["audit_only"] is True
+    assert audit_manifest["eligible_count"] == 931
+    import pytest
+    with pytest.raises(ValueError, match="unknown universe"):
+        mvp_api.resolve_universe(object(), "all", active_symbols=active)

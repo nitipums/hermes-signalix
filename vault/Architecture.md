@@ -1,8 +1,57 @@
 # Architecture
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`. Verify implementation/runtime when dates conflict.
+> **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
+> **Reconciled:** 2026-09-13 · Daily Trend Mapping is production-served read-only; setup/Elliott paths are retained trial or deferred research; canonical publisher/read-model/API route is deployed and browser/rollback gates are verified.
 
-## Data flow
+## Production-served Daily Trend Mapping
+
+The current architecture is:
+
+```text
+Daily price_data
+→ bounded EOD publisher
+→ immutable shadow read-model artifact + current pointer
+→ GET /api/trend-map-shadow
+→ GET /trend-map-shadow
+→ shared /mvp drawer/chart for evidence review
+```
+
+Trend Mapping is production-served read-only Daily evidence. It does not create
+setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
+publisher and API preserve Daily as-of, provenance, quote basis, data-quality
+states, and fail-closed behavior.
+
+## Retained setup/shadow trial flow — 2026-09-01
+
+The 2026-09-11 private signal transition adds a read-only local shadow consumer
+after the canonical setup read model:
+
+```text
+trailing 7 calendar days of Daily + completed 60m market data
+→ point-in-time canonical setup rebuild (no lookahead)
+→ actionable_signal_policy.py market-buy projection
+→ /api/shadow-buy-signals?days=7
+→ /mvp Shadow Buy Signals · 7D tab
+→ Arm review and manual execution decision
+```
+
+This additive path does not require portfolio data, publish to Redis, send
+alerts, write signal state, or submit broker orders. The canonical
+`/api/setup-candidates` contract remains unchanged during shadow validation.
+
+```text
+marginable_long (237)
+→ Daily EOD trend/strength + Elliott evidence
+→ verified 60m minor structure / trade setup
+→ deterministic trigger + stop + targets + R:R
+→ VCP/sector/peer bonus evidence
+→ /api/setup-candidates
+→ /mvp → Arm chart review
+```
+
+The older flow below is retained as compatibility/history; it must not be read as the current decision authority.
+
+## Historical / compatibility data flow
 ```
             ┌─────────────────── EOD INGESTION ───────────────────┐
    Thai EOD │  update_data.py  (local zip → drive → Settrade → yf) │
@@ -55,34 +104,109 @@ logs in the non-TTY container).
 - `backend/screening.py` — DB-backed Minervini engine
 - `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion; `intraday_feed_status` tracks per-symbol Settrade 60m availability without changing Daily eligibility
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence
-- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → `build_dashboard.build()` from existing Daily scan → `dashboard_snapshot.json`/`dashboard.html` → served `:3001`
+- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
-- `backend/build_dashboard.py` — legacy dashboard artifact builder; not the MVP entrypoint
-- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher
-- `backend/mvp_snapshot.py` — canonical `signalix.mvp.v1` artifact loader/sanitizer
-- `backend/mvp_api.py` — Daily Shortlist, watch-only mover/caution lanes, Explorer projection
-- `backend/mvp_chart_db.py` — SELECT-only `1D`/`1W`/`60M`/`1M` OHLCV + indicators
-- `backend/app.py` — FastAPI routes, chart aggregation (`60m`, `1D`, `1W`, `1M`)
-- `docker-compose.yml` — 4 services
+- `backend/build_dashboard.py` — compatibility snapshot builder; it no longer writes a public dashboard artifact and is not the MVP entrypoint
+- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher; canonical and legacy/audit route handlers are explicit; `/api/setup-candidates` is primary and VCP routes are audit-only
+- `backend/canonical_setup_projection.py` — deep read-only interface for canonical setup-candidate validation, ordering, filters, pagination, lane counts, freshness, and provenance
+- `backend/mvp_api.py` — candidate builders plus compatibility projections; re-exports the canonical projection interface for existing callers
+- `backend/canonical_freshness_lineage.py` — deep read-only sidecar lineage adapter; compares published intraday fetch time with embedded lineage and preserves Daily/read-model identity
+- `backend/mvp_routes.py` — canonical/legacy dispatcher plus compatibility wrapper for freshness overlay
+- `backend/read_model_publisher.py` — validates/publishes canonical read-model and intraday sidecar
+- `backend/canonical_chart_read.py` — deep read-only chart row retrieval/aggregation seam for SQL shape, provisional current-session data, chronological conversion inputs, labels, and timestamp metadata
+- `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
+- `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
-## Current MVP surface contract — 2026-08-25
+## Retained trial MVP surface contract — 2026-09-01
 
-The served owner-only MVP is intentionally separate from the legacy dashboard:
+The retained owner-only trial surface is the Elliott/Trend/Trade-Setup
+decision spine:
 
 ```text
 /mvp
-  ├─ Daily Shortlist       READY / PRE_READY only
-  ├─ Rising Movers         WATCH ONLY; never actionable
-  ├─ Caution               DO NOT CHASE; never actionable
-  └─ All Stocks Explorer   full-ORD research, immediate Stage/Search filters
+  └─ Trend + Daily Elliott candidate + 60m Trade Setup
+      ├─ REVIEW_NOW
+      ├─ SETUP_FORMING
+      ├─ DAILY_CANDIDATE
+      ├─ WAIT
+      ├─ AVOID
+      └─ DATA_BLOCKED
 ```
 
-Daily Shortlist hard gates are unchanged. `Rising Movers` uses explicit Daily
-price/volume evidence for S1/S2 context; `Caution` exposes strong moves in
-S3/S4/topping/extended structures. Neither lane receives shortlist rank,
-trigger permission, or READY styling.
+`/api/setup-candidates` remains the setup-trial API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted but is not the current delivery focus. Browser scopes are owner-confirmed PASS; complete fresh setup coverage remains separate/not verified. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
 
-Chart contract is `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M`:
+### Deterministic chart and OHLCV window summary — 2026-09-10
+
+`GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` is a read-only chart adapter over `price_data`/`intraday_price_data`. It returns source OHLCV candles plus canonical `indicators` under policy `technical-indicators-v2`: MA5/10/20/50/100/200, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and aligned rolling/window data.
+
+`indicators.latest.window_summary` contains rows for 5/10/20/50/100/200/260 candles with Open, High, Low, Close, total/average volume, Change %, Range %, MA when applicable, availability, and provenance. The 260-candle Daily window is the 52-week trading range, not an MA; other timeframes label it `260 candles`. The adapter fetches at least 260 candles so the 52-week value can be verified when source history exists. The UI consumes this payload without recalculating financial values in JavaScript. Missing/invalid/insufficient input is `NOT_VERIFIED`.
+
+### Team Facts Read API v1 (2026-09-03)
+
+`GET /api/team/setup-candidates` is a public, unauthenticated, read-only
+market-data feed over the published canonical `marginable_long` universe. It
+contains no secrets or private fields. The feed is facts-only and has no buy,
+order, or other trading-action semantics.
+
+Team item identity derives `can_buy=true` from membership in that validated
+canonical universe; this is universe membership, not an inferred stock signal.
+An explicit per-item `can_buy` value must agree, and non-canonical or unknown
+universes fail closed.
+
+The `team-facts-v1` response contains top-level deterministic `momentum`,
+`near_high`, and `pullback` views. Items contain only identity, current facts
+from the actual latest price timeframe, neutral indicators, the latest
+completed 60m bar when available, and provenance; historical arrays are not
+included.
+`GET /api/team/setup-candidates/{symbol}/history?timeframe=1D|60m&limit=...`
+returns one canonical symbol's bounded candles for only the requested
+timeframe. Root freshness metadata is preserved,
+but freshness and completeness are evaluated per symbol; a partial root status
+does not globally exclude valid symbols. It does not expose setup, wave, lane,
+trigger, risk, target, mapped labels, or buy
+instructions. Daily and 60m sources/timeframes are explicit. Each view is
+bounded to 400 Daily and 200 60m rows per symbol; exclusion counts and reasons
+are returned for missing, stale, or incomplete data; every applicable view
+requires a completed 60m row. `volume_ratio_20` is explicitly
+`current_daily_volume / mean(previous_20_daily_volumes)` and is null when 20
+prior Daily volume observations are unavailable. Freshness is classified once per symbol from these same rows and response
+`now`: item provenance, facts, the 60m detail Daily baseline, and aggregate
+envelopes all reuse that result. `overall_status` is authoritative; producer
+values are retained only under the explicitly non-authoritative
+`source_metadata` shape `{scope: "published_read_model_report", authoritative:
+false, reported: {...}}`. Raw producer freshness keys therefore remain
+available for audit under `source_metadata.reported` and are never status
+aliases at the `source_metadata` top level.
+Fresh Daily is required for every view. A Daily date remains a date, while
+60m `as_of` is an actual completed candle timestamp; list and detail responses
+use the latest timestamp appropriate to their requested source. The handler loads and
+validates only the current published read model and performs bounded read-only
+OHLCV queries; it does not rebuild/scan, load legacy snapshots, write
+PostgreSQL, send alerts, or execute broker/auto-trading actions. Unavailable
+data/model is 503. The response states
+that values are facts and deterministic indicators for independent review, not
+trading truth or orders. Alerts, auto-trading, and broker execution remain
+`PENDING / FUTURE FEATURE` and OFF.
+
+### Implementation spine history — 2026-08-31 (T1–T9 promoted; current acceptance split above)
+
+- **T1 universe + contract scaffolding: DONE** — commit `8573b9d` (`resolve_universe` 931/237/694, canonical 11-group envelope, session-aware freshness, fail-closed `DATA_BLOCKED`).
+- **T2 Elliott engine production boundary: DONE** — commit `d31a2d2`; Daily close-gate + `build_wave_contract` + frozen CRC/BGRIM/AWC evidence fixtures.
+- **T3 60m trade-setup production boundary: DONE** — commit `347aed5`; explicit `PRE_TRIGGER`/`TESTED_TRIGGER`/`TRIGGERED` distinction, risk-bounded entry zone, target-1 R:R ≥2 gate, expiry and separate Daily thesis invalidation.
+- **T4 canonical decision lanes: DONE** — commit `57cd291`; six fail-closed lanes (`REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`) and deterministic ordering helper.
+- **T5 MVP decision-first rendering: DONE at source** — commit `0787fca`; `/mvp` consumes canonical `/api/setup-candidates`, renders lane groups and honest fallback states. Served browser/public-route evidence is held for T8.
+- **T6 context + bonus enrichment: DONE** — commit `de65be3`; sector/peer context is non-gating and VCP is optional bonus evidence.
+- **T7 lifecycle contract: DONE** — commit `c61cf7b`; pure JSON-safe append-only candidate/setup IDs, snapshots, owner reviews, and revalidation/expiry. T9 now supplies the separate persistence/API integration at source and test-database level.
+- **T8 full-universe ranking source: DONE** — Codex + Lite verified; `project_setup_candidates_response` sorts the complete canonical set before filters/pagination using the T4 lexicographic helper; all six lane counts and evaluated coverage are preserved. Full source suite: 622 passed / 2 skipped.
+- **T8 contract remediation: DONE** — commit `2f6e790`; production builder now uses canonical `build_wave_contract`, preserves explicit intraday timeframe metadata, recognizes `decision_lane` in reconciled projection, and completes ranking tie-break dimensions.
+- **T8 served acceptance: NARROW PASS / BROADER NOT VERIFIED** — release spine promoted; backend + dashboard reloaded; served `/api/setup-candidates` via `:3001` returns the full 237 universe from the live DB builder with honest lanes. The public 390px failure→Retry→recovery journey passed; broader desktop/drawer/chart semantic acceptance remains a separate gate. This line is retained as implementation history.
+- **60m anchor policy: relaxed-1bar-scaled-20260831** — 1-bar legs with scaled 1% significance (3% for 2+ bars); funnel verified: anchors pass 15/237 (was 1/237). Remaining DATA_BLOCKED are honest fail-closed (no qualifying 60m structure in the prior 30 bars).
+- **T9 lifecycle persistence/API: SOURCE+DB DONE** — commits `fd22674`..`7b49de3`; PostgreSQL 3-table append-only persistence, canonical 2-decimal plan comparison, owner-token/server-bound identity enforcement, read-only lifecycle projections, owner review events, and completed-60m opt-in persistence adapter. Lite verified `backend/test_lifecycle_postgres.py` against ephemeral PostgreSQL 16: 9 passed.
+- **LIFECYCLE-T9 runtime boundary: PARTIAL / OWNER DECISION OPEN** — lifecycle routes have source/test and owner-token-protected route evidence; the evaluator caller does not yet invoke the opt-in persistence hook automatically. This is separate from the completed narrow 390px UI failure/recovery gate.
+- **Next:** manual Arm Wave-identification review and any new bounded product feedback; evaluator caller wiring remains a separate owner decision.
+
+VCP runs after committed full/partial 60m ingestion, with ingestion lineage and overlap lock. Failed/skipped ingestion does not create a new VCP run. Missing optional index/margin metadata is omitted from tags; it is never displayed as `NOT_VERIFIED`.
+
 `1D` reads Daily bars, `1W`/`1M` aggregate Daily bars, and `60M` reads stored
 intraday 60m bars. Chart controls and indicator legends are below the plot so
 they cannot obscure candles, volume, MA, or RSI panes.

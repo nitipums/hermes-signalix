@@ -1,8 +1,40 @@
 # Components
 
-> **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`. Legacy modules are labeled in-place.
+> **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
+> **Reconciled:** 2026-09-12 · Daily Trend Mapping is the primary delivery focus; publisher/read-model/shadow API are current; `/mvp` and setup components are retained trial/future integration; Elliott research is deferred.
 
 Every backend module, what it does, and its hard rules.
+
+## Daily Trend Mapping — current delivery surface
+
+The Trend Mapping surface is the current delivery target. Its publisher builds
+an immutable, versioned Daily read model; the shadow API reads and validates
+only the current pointer/artifact; the dashboard renders the public read-only
+research table and reuses the shared `/mvp` drawer/chart. It preserves Daily
+as-of, Daily-first quote provenance, data-quality states, and fail-closed
+behavior. It has no setup, BUY, alert, order, broker, or auto-trading meaning.
+
+Current route pair:
+
+```text
+GET /api/trend-map-shadow
+GET /trend-map-shadow
+```
+
+## `actionable_signal_policy.py` — private paper/shadow signals
+
+Pure deterministic projection over canonical setup-candidate evidence. Its
+Phase 1 market-only seam emits `BUY_NOW`, `BUY_ON_TRIGGER`, `WAIT`, `AVOID`, or
+`DATA_BLOCKED` without portfolio input. Evidence score is explicitly not a
+calibrated probability. The module never writes, publishes, sizes, alerts, or
+submits an order. Position-aware states remain isolated for later work.
+
+`shadow_signal_replay.py` rebuilds canonical candidates at each completed
+session boundary in the trailing seven calendar days, projects `BUY_NOW`, and
+deduplicates repeated observations of the same unchanged setup plan while
+preserving first/latest timestamps. `mvp_routes.py` exposes it through the
+token-free `GET /api/shadow-buy-signals?days=7`; `/mvp` renders the
+shadow result without changing the canonical setup API.
 
 ## `update_data.py` — EOD ingestion
 Incremental, idempotent SET EOD updater. Fetches only trade days **strictly
@@ -12,7 +44,7 @@ after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run
 1. `local` — CSV drop dirs (`/root/signalix/uploads`, seed dir). Owner pushes via `upload_server.py`. Most reliable.
 2. `drive` — re-list Google Drive archive folder via `gdown`, pull newer files.
 3. `settrade` — Settrade Open API v2 (`settrade-v2`), preferred automated source.
-4. `yfinance` — fallback; unreliable for Thai stocks (>15% gaps, zero-vol bars dropped).
+4. `yfinance` — fallback only; no 15% price-gap skip is applied, per owner directive.
 
 > Per Nitipum.s rule: native Thai EOD zip is AUTHORITATIVE; Settrade preferred
 > automated; Drive = owner backup; yfinance = last resort only.
@@ -44,12 +76,12 @@ weekday cycle; the scraper is not a signal/price source.
 Original pandas scanner (pre-DB rewrite). Kept for reference; `screening.py` is
 the live engine. Imports `scan_universe` must stay at module top in `app.py`.
 
-## `build_dashboard.py` — dashboard HTML
-Professional, **English-only**, dark-theme screening workspace. Reads
-`scan_results.json`, emits `dashboard.html` with per-stock cards + clickable
-chart lightbox (canvas, no chart images). Charts fetched from `/chart/{sym}`.
+## `build_dashboard.py` — compatibility snapshot builder
+Builds compatibility snapshots/manifest data for the pipeline. The former
+public `dashboard.html` artifact and route are retired; the owner-facing UI is
+served from `/mvp` and charts are fetched through the MVP API.
 
-Intraday-only runs rebuild this artifact from the existing Daily scan after 60m
+Intraday-only runs refresh the MVP snapshot from the existing Daily scan after 60m
 upsert/evaluation; they do not rerun Daily classification. The active feed is
 filtered by `intraday_feed_status`: after three consecutive Settrade empty/fail
 responses a symbol is `unavailable` for a 24-hour cooldown. This filter is
@@ -57,22 +89,51 @@ intraday-only; Daily/EOD membership and historical data remain intact. Cards
 Cards show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD`
 rather than relabelling an old Daily value as 60m.
 
-## MVP owner-only surface — current
-`mvp_server.py` serves `/mvp` from the bind-mounted release tree. `mvp_routes.py`
+## Retained MVP owner-only trial surface
+`mvp_server.py` serves the retained trial `/mvp` from the bind-mounted release tree. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
-`mvp_api.py` keeps Daily `READY`/`PRE_READY` publication separate from
-`RISING MOVERS` (`WATCH ONLY`) and `CAUTION` (`DO NOT CHASE`) context lanes.
+`mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
 
-`mvp_chart_db.py` is SELECT-only and serves real timeframe contracts:
-`1D` Daily, `1W`/`1M` aggregate Daily, and `60M` stored intraday bars. The
-frontend renders candlestick OHLC, volume, MA, and RSI; timeframe/layer controls
-and indicator values sit below the chart plot.
+`canonical_freshness_lineage.py` owns the read-only intraday sidecar merge and timestamp comparison. The route retains a thin compatibility wrapper so existing tests/callers remain stable; it does not acquire/query PostgreSQL. Daily/read-model identity remains unchanged while intraday run metadata is overlaid only when the sidecar is valid and newer.
+`canonical_chart_read.py` owns the shared SELECT-only chart row retrieval and
+aggregation rules. `chart_rows.py` is a compatibility adapter for that seam;
+`mvp_chart_db.py` and `app.py` retain their existing public imports. The chart
+layer serves real timeframe contracts: `1D` Daily with a current-session
+provisional 60m replacement when available, `1W`/`1M` aggregate those Day bars,
+and `60M` stored intraday bars. The frontend renders candlestick OHLC, volume,
+MA, and RSI; timeframe/layer controls and indicator values sit below the chart
+plot. `as_of` is the chart period key; `latest_time` identifies the actual
+latest stored candle. Runtime promotion and public Day/Week verification
+completed 2026-09-02; request-time metadata caching and explicit audit-run
+universe identity remain bounded follow-up work.
 
-## `dashboard_server.py` — static server (separate dashboard service)
-Serves `/dashboard.html` on :3001 from the bind-mounted `/root/signalix/backend`
-directory. Runtime container is `signalix_dashboard`; it is separate from the
-FastAPI `signalix_backend` service. Verify served artifact freshness against the
+The `/mvp` drawer plots deterministic, source-linked Daily Wave markers only
+on `1D`, using the API's exact timestamp and price. It never derives missing
+positions, never projects Daily Wave markers onto `60m`, and keeps 60m setup
+levels separate. These non-LLM evidence annotations support chart review; they
+are not trade instructions.
+
+The same canonical Wave producer exposes `wave.deep_pullback_evidence` as a
+source-generated, non-actionable Daily shadow envelope for rejected raw W3
+candidates in the `0.60 < retracement <= 0.786` band. Cards and the drawer may
+display its exact API ratio and anchors separately from Primary Daily Wave;
+the frontend does not derive them. It cannot change publication, decision
+lanes, setup/risk math, or chart markers.
+
+### `/mvp` visible diagnostics — current UI decision, 2026-09-12
+
+Owner feedback intentionally removes chart status/timeframe/source diagnostic
+prose and the drawer's Wave Evidence/Evidence Details sections from the visible
+review surface. Deterministic API fields, source-linked chart markers, and
+provenance remain available for audit; this does not remove the underlying
+contract or data.
+
+## `mvp_server.py` — MVP static server (separate dashboard service)
+Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
+directory. The former `/dashboard.html` route returns 404. Runtime container is
+`signalix_dashboard`; it is separate from the FastAPI `signalix_backend` service.
+Verify served source and API freshness against the
 latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 
 ## `app.py` — FastAPI backend

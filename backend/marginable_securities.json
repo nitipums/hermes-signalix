@@ -1,0 +1,3187 @@
+{
+  "schema_version": "signalix.marginable.v1",
+  "source": "Krungsri Securities Credit Balance Marginable Securities List",
+  "source_document": "Marginable_Securities_List_25082026_1787658633_copy.pdf",
+  "effective_date": "2026-08-25",
+  "issuer_review_note": "Issuer PDF says the permitted buy/short list is reviewed quarterly; owner workflow expects a monthly refresh check.",
+  "rates_unit": "percent",
+  "securities": [
+    {
+      "symbol": "3BBIF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ADVANC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AEONTS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AIMIRT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AMATA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AOT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AWC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BAM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BANPU",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BBL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BCH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BCP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BCPG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BDMS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BEM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BGRIM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BJC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BLA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BTG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BTS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CBG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CCET",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CENTEL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CHG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "COM7",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CPALL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CPF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CPN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CRC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "DELTA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "DIF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "DMT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "DOHOME",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "EGCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "ERW",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "FTREIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GFPT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "GLOBAL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "GPSC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "GULF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "GUNKUL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "HANA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "HMPRO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "ICHI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "INET",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "INETREIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ITC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "IVL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KBANK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KCE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KKP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KTB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KTC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "LH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "LHSC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MBK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MEGA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MINT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MOSHI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MTC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "NER",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "NSL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NYT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "OR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "OSP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PLANB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PR9",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PRM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PTG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PTT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PTTEP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PTTGC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "RATCH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SAT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SAWAD",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SCB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SCC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SCGP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SIRI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SJWD",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SPALI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SPRC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "STANLY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "STPI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TASCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TCAP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TFFIF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TFG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "THAI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "THANI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TIDLOR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TISCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TLI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TOA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TOP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TRUE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TTB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TU",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TVO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "UVAN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "WHA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "WHAIR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "WHART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "WHAUP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 50,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AAI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AAV",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "ADVICE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ASIAN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AUCT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AURA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "AXTRART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BAREIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BAY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "BBGI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BKIH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CKP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "CPAXT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CPNREIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CREDIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "EPG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "FM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "FSMART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "HUMAN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ILM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "IMPACT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "JMT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KAMART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "KCG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "KGI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "KLINIQ",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "LHFG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "LHHOTEL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "M",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MAJOR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MRDIYT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "NEO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PSL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "QH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "RBF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "RCL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "RJH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ROJNA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SABINA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SAK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SAPPE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SCCC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SIS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SISB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SKY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SPCG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SSP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "STA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "STECON",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TACC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TEAM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "THCOM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "THG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TIPH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TKN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TQM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TRT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TTA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TTW",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TURBO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "VGI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "WPH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "XO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 60,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AAPL80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AMZN80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ASML01",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AVGO80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BABA80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BIDU80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BYDCOM80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CATL01",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CATL23",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CNTECH01",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "E1VFVN3001",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "FPTVN19",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "FUEVFVND01",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GOLD19",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GOLDUS19",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GOOG80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "LLY80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MEITUAN80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "META80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MSFT80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MWG19",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NFLX80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NVDA01",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NVDA80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PINGAN80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "STAR5001",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TENCENT80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TRIPCOM80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "XIAOMI80",
+      "instrument_type": "DR",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ACE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AMA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AMARC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ASK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ASP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AYUD",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BBIK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BOL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BTSGIF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "COCOCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "DCC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "DITTO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "FORTH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GVREIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "HTC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "INSET",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "IRPC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "ITEL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "KISS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "LPN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "MAGURO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MALEE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MASTER",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MCS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NCAP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "NETBAY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ORI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "PLAT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PSH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PSP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PTL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "S",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SCAP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SFLEX",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SNC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SPA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SPREME",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "STGT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SUC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SYNEX",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TEAMG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TFM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TPIPP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "VIBHA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "WASH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 70,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "QQQM19",
+      "instrument_type": "DR",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AIT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AKR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ALLY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "APO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "AS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "BAFS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BWG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "CPI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "DRT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "EGATIF",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "EKH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "FUTURERT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "GABLE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "HENG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "III",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "IP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "JAS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "JMART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "KSL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "LANNA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "LEE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "MEDEZE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "MFEC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "ONEE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PRI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PROUD",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "PYLON",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SAMART",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SAV",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SCGD",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SEAFCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SENA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SGC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "SINGER",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SMPC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "SUSCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SVOA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TEGH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TKS",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TMAN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TPIPL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "**",
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": true
+    },
+    {
+      "symbol": "TRP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "TSTH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "UTP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "VIH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": null,
+      "can_buy": true,
+      "can_add_collateral": true,
+      "can_short": false
+    },
+    {
+      "symbol": "WICE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 80,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AIE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AMANAH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ANAN",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ANI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "APURE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ASW",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "AU",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BE8",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BEC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BGC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BLAND",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BLC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BRR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "BTC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "CHAO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "CHAYO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "CIVIL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "DEMCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "EAST",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "EASTW",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "GENCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "GFC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "HFT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "HL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ILINK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "JUBILE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "LOXLEY",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "NKT",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "NOBLE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "OKJ",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PREB",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PRINC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "PRTR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "RAM",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "ROCTEC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SAFE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SAMTEL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SGP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SHR",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SITHAI",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SNNP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SONIC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SPC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SRICHA",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "SUPER",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TGE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "THRE",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "THREL",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TIPCO",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TNP",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TVH",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "TWPC",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "UNIQ",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "UV",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "WORK",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    },
+    {
+      "symbol": "XPG",
+      "instrument_type": "ORD",
+      "margin_rate_pct": 100,
+      "marker": "*",
+      "can_buy": false,
+      "can_add_collateral": false,
+      "can_short": false
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "task_id": "t_9fcfe398",
+  "validation_type": "owner_wave_identification",
+  "status": "PASS",
+  "snapshot_as_of": "2026-08-28",
+  "source_record": "docs/current/2026-08-31-elliott-grill-decision-record.md",
+  "review_date": "2026-08-31",
+  "confirmed": [
+    {"symbol": "CRC", "primary_state": "WAVE_1_ADVANCE", "confidence": null, "evidence": "retracement 85.71%; corrected January-low anchor"},
+    {"symbol": "AWC", "primary_state": "WAVE_1_ADVANCE", "confidence": null, "evidence": "retracement 91.18%; fail-closed against Wave 3 promotion"},
+    {"symbol": "BGRIM", "primary_state": "WAVE_3_CONTINUATION", "confidence": "HIGH", "evidence": "retracement 29.17%; Daily close-above-Wave-1-high gate"}
+  ],
+  "disputed": [],
+  "unconfirmed_feedback_examples": ["KCE", "IRPC", "BCP", "RCL", "BBGI"],
+  "auto_tuning": false,
+  "follow_up_ids": ["T05-F1", "T05-F2", "T05-F3"],
+  "runtime_verdict": "NOT VERIFIED"
+}

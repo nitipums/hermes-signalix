@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Variant C — Enhanced Swing 5%/5bars Volume-Weighted + Hysteresis 5d (Prototype)</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial}
+body{max-width:960px;margin:32px auto;padding:0 20px;color:#1a1a1a;background:#fafaf9}
+h1{font-size:22px;margin:0}
+.sub{color:#57534e;font-size:13px;margin:6px 0 18px}
+.card{border:1px solid #e7e5e4;background:#fff;border-radius:12px;padding:16px;margin:12px 0}
+.label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#78716c}
+.state{font-size:18px;font-weight:700}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600}
+.badge-HIGH{background:#dcfce7;color:#166534}.badge-MEDIUM{background:#fef9c3;color:#854d0e}.badge-LOW{background:#fee2e2;color:#991b1b}.badge-UNKNOWN{background:#e7e5e4;color:#44403c}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kv{font-size:13px;line-height:1.5}
+.kv b{color:#44403c}
+button{border:1px solid #d6d3d1;background:#fff;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer}
+button:active{transform:translateY(1px)}
+button.primary{background:#1c1917;color:#fff;border-color:#1c1917}
+.tabs{display:flex;gap:8px;margin:12px 0}
+.tab{padding:8px 12px;border-radius:8px;border:1px solid #d6d3d1;background:#fff;cursor:pointer;font-size:13px}
+.tab.active{background:#1c1917;color:#fff;border-color:#1c1917}
+pre{font-size:12px;background:#f5f5f4;padding:10px;border-radius:8px;overflow:auto}
+.small{font-size:12px;color:#78716c}
+</style>
+</head>
+<body>
+<h1>Variant C — Enhanced Swing 5% / 5 bars · Volume-Weighted + 5-day Hysteresis</h1>
+<div class="sub">Question: Does requiring <b>advance volume &gt; 20d avg</b> + strict <b>High ≥0.98·WH &amp; (Close within 2% ∨ Volume)</b> improve Early-Wave-3 discrimination vs price-only 5%/5bar swings? — Throwaway logic prototype · No DB · Pure reducer in &lt;script&gt;</div>
+
+<div class="card">
+  <div class="label">Current State</div>
+  <div id="statePanel"></div>
+</div>
+
+<div class="card">
+  <div class="label">Free Play — drive the reducer</div>
+  <div id="freePlay" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+  <p class="small">Each button dispatches one action to the pure reducer below. State re-renders instantly. Volume toggle switches the vol regime for the synthetic daily series (no persistence).</p>
+</div>
+
+<div class="card">
+  <div class="label">Guided Walkthroughs</div>
+  <div class="tabs" id="tabs"></div>
+  <div id="walkDesc" class="small" style="margin:8px 0"></div>
+  <div id="walkSteps" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+</div>
+
+<div class="card">
+  <div class="label">Evidence (full)</div>
+  <pre id="evidence"></pre>
+</div>
+
+<script>
+// ---------- Pure module (liftable) ----------
+const VARIANT = { name:"C_enhanced_swing_volume_hysteresis", swing_pct:0.05, swing_bars:5, hysteresis:5, near_high:0.98, close_thr:0.98 };
+const STATES = ["WAVE_1_ADVANCE","WAVE_2_FORMING","WAVE_2_NEAR_COMPLETION","EARLY_WAVE_3","WAVE_3_CONTINUATION","WAVE_4_CORRECTION","WAVE_5_ADVANCE","UNKNOWN"];
+
+function pct(arr, look){ if(arr.length<=look) return null; const s=arr[arr.length-look-1], e=arr[arr.length-1]; if(!s) return null; return (e/s-1)*100; }
+function swingLegs(close){
+  const v=close.filter(x=>isFinite(x)); if(v.length<2) return [];
+  let legs=[], start=0, cur=0;
+  for(let i=1;i<v.length;i++){
+    const sign = v[i]>v[i-1]?1:v[i]<v[i-1]?-1:0; if(!sign) continue;
+    if(!cur){cur=sign; continue;}
+    if(sign!==cur){ legs.push({direction:cur,start,end:i-1,start_price:v[start],end_price:v[i-1]}); start=i-1; cur=sign; }
+  }
+  legs.push({direction:cur,start,end:v.length-1,start_price:v[start],end_price:v[v.length-1]});
+  return legs;
+}
+function avgVol(vol, s,e){ const w=vol.slice(s,e+1).filter(isFinite); return w.length?w.reduce((a,b)=>a+b,0)/w.length:null; }
+function avg20(vol){ if(vol.length<2) return null; const w=vol.length>21?vol.slice(-21,-1):vol.slice(0,-1); const f=w.filter(isFinite); return f.length?f.reduce((a,b)=>a+b,0)/f.length:null; }
+
+function classify(daily){
+  const close=daily.map(d=>d.close), high=daily.map(d=>d.high), vol=daily.map(d=>d.volume);
+  const recent10=pct(close,10), recent20=pct(close,20), recent5=pct(close,5);
+  const prior20=close.length>30?pct(close.slice(0,-20),10):null;
+  const recent_high=Math.max(...close.slice(-20,-5));
+  const drawdown=(close[close.length-1]/recent_high-1)*100;
+  const advance = recent10!==null && recent10>0 && (prior20===null||prior20>0);
+  const rebound = drawdown<=-3 && recent5!==null && recent5>0 && (recent10||0)<0;
+  const pullback = drawdown<=-3 && (recent10||0)<0 && (prior20||0)>0;
+  const legs=swingLegs(close);
+  const baseSig=legs.filter(l=> Math.abs(l.end_price-l.start_price)/Math.max(l.start_price,1e-9)>=0.05 && (l.end-l.start)>=5);
+  const a20=avg20(vol);
+  let sig=[], flags=[];
+  for(const leg of baseSig){
+    const legAvg=avgVol(vol,leg.start,leg.end);
+    const enriched={...leg, avg_volume:legAvg?Math.round(legAvg):null, volume_above_avg20: legAvg!==null&&a20!==null?legAvg>a20:null};
+    if(leg.direction===1 && a20!==null && legAvg!==null){
+      const isSingle=baseSig.length===1;
+      const keepThr=0.95*a20;
+      if(legAvg>=keepThr || isSingle){ enriched.volume_weighted_keep=legAvg>a20; enriched.volume_strength=legAvg>a20?"strong":isSingle?"soft_weak_exempt":"soft"; sig.push(enriched); }
+      else{ enriched.volume_weighted_keep=false; enriched.volume_strength="weak_filtered"; }
+      flags.push(enriched);
+    } else { sig.push({...enriched, volume_weighted_keep:true}); if(leg.direction===1) flags.push(enriched); }
+  }
+  if(a20===null) sig=baseSig.map(l=>({...l, volume_weighted_keep:null}));
+  const effSig=sig.length?sig:baseSig, effDirs=effSig.map(l=>l.direction);
+  const lastClose=close[close.length-1], lastHigh=high[high.length-1];
+  // wave1 high
+  let w1High=null,w1Low=null, pullLow=null, retrace=null, duration=null, holds=null;
+  if(effSig.length){
+    const dirs=effSig.map(l=>l.direction);
+    let w1Idx=null, pbIdx=null;
+    if(effSig.length>=2 && dirs[dirs.length-1]===-1 && dirs[dirs.length-2]===1){w1Idx=effSig.length-2; pbIdx=effSig.length-1;}
+    else if(dirs[dirs.length-1]===1){ if(effSig.length>=3 && dirs.slice(-3).join(",")==="1,-1,1"){w1Idx=effSig.length-3; pbIdx=effSig.length-2;} else w1Idx=effSig.length-1; }
+    else if(dirs[dirs.length-1]===-1){ for(let i=effSig.length-2;i>=0;i--) if(effSig[i].direction===1){w1Idx=i; pbIdx=effSig.length-1; break;}}
+    if(w1Idx!==null){ w1High=effSig[w1Idx].end_price; w1Low=effSig[w1Idx].start_price; if(pbIdx!==null && effSig[pbIdx].direction===-1){ pullLow=effSig[pbIdx].end_price; duration=effSig[pbIdx].end-effSig[pbIdx].start; const rng=w1High-w1Low; if(rng>0) retrace=Math.round((w1High-pullLow)/rng*100*100)/100; holds=pullLow>w1Low; } }
+  }
+  const closeAbove=w1High!==null?lastClose>w1High:null;
+  const isNearHigh=w1High!==null?lastHigh>=0.98*w1High:null;
+  const closeWithin=w1High!==null?(lastClose>=0.98*w1High || lastClose>=0.98*lastHigh):null;
+  const volAbove=a20!==null?vol[vol.length-1]>a20:null;
+  const nearHighBreakout=!!(isNearHigh && (volAbove || closeWithin));
+
+  let state=null;
+  const check=effDirs.length>=4?effDirs:legs.map(l=>l.direction);
+  if(check.slice(-5).join(",")==="1,-1,1,-1,1") state="WAVE_5_ADVANCE";
+  else if(check.slice(-4).join(",")==="1,-1,1,-1") state="WAVE_4_CORRECTION";
+  else if(effDirs.slice(-3).join(",")==="1,-1,1" && effSig.length>=3) state="WAVE_3_CONTINUATION";
+  else if(rebound && (closeAbove || nearHighBreakout)) state="EARLY_WAVE_3";
+  else if((closeAbove || nearHighBreakout) && !pullback && retrace!==null) state="EARLY_WAVE_3";
+  else if(pullback){
+    if(retrace!==null){
+      if(retrace>60 || holds===false) state=null;
+      else if(30<=retrace && retrace<=60 && duration!==null && 5<=duration && duration<=25 && holds) state="WAVE_2_NEAR_COMPLETION";
+      else if(retrace<30) state="WAVE_2_FORMING";
+      else state="WAVE_2_FORMING";
+    } else state="WAVE_2_FORMING";
+  } else if(advance) state="WAVE_1_ADVANCE";
+
+  // hysteresis: if UNKNOWN but advance + holds, keep WAVE_1 if history had it (simulated: if we have >=2 pivots allow)
+  if(!state && advance && (holds!==false)){
+    const pivots=effSig.length||legs.length;
+    if(pivots>=2) { state="WAVE_1_ADVANCE"; }
+  }
+  if(!state) state="UNKNOWN";
+  const confidence = state==="UNKNOWN"?"LOW": (state==="EARLY_WAVE_3" && nearHighBreakout?"MEDIUM": state==="EARLY_WAVE_3" && closeAbove?"HIGH":"MEDIUM");
+  return {state, confidence, evidence:{advance,pullback,rebound,retrace,duration,holds,closeAbove,isNearHigh,closeWithin,volAbove,nearHighBreakout,w1High,w1Low,baseSigLen:baseSig.length,sigLen:sig.length,a20:Math.round(a20||0),flags,recent10:recent10?recent10.toFixed(1):null,recent20:recent20?recent20.toFixed(1):null,drawdown:drawdown.toFixed(1)}, daily};
+}
+
+// ---------- Demo state ----------
+function synth(closes, volRegime="normal"){
+  // volRegime: strongAdvance, weakAdvance, normal
+  let vols;
+  if(volRegime==="strongAdvance") vols=closes.map((_,i)=> i<closes.length-10?1_000_000:3_000_000);
+  else if(volRegime==="weakAdvance") vols=closes.map((_,i)=> i<closes.length-10?3_000_000:600_000);
+  else vols=closes.map(()=>1_200_000);
+  return closes.map((c,i)=>({close:c, high:c*1.015, low:c*0.985, volume:vols[i]}));
+}
+let volRegime="normal";
+let scenarios={
+  wave1:{label:"Wave 1 Advance — steady up", closes:[10,10.6,11.2,11.9,12.6,13.4,14.1,14.9,15.6,16.3,17.0,17.8,18.5,19.2,20.0,20.8,21.5,22.1,22.9,23.6,24.2,25.0]},
+  pullback:{label:"Wave 2 Forming — weak pullback", closes:[10,11,12,13,14,15,16,17,18,19,20,19.2,18.5,17.8,17.2,16.8,17.0,17.4]},
+  nearComplete:{label:"Wave 2 Near Completion — 30-60% retrace", closes:[10,11,12,13,14,15,16,17,18,19,20,19,18,17,16,15,14.5,14.8,15.2]},
+  earlyClose:{label:"Early W3 — close above WH", closes:[10,11,12,13,14,15,16,17,18,19,20,19,18,17,16,14,15,16,17,18,19,20.5]},
+  earlyNearHigh:{label:"Early W3 — High ≥0.98WH + close within 2% (no close above)", closes:[10,11,12,13,14,15,16,17,18,19,20,19,18,17,16,14,15,16,17,18,19,19.7]},
+  weakVolume:{label:"Weak-volume advance (should de-weight)", closes:[10,10.7,11.4,12.1,12.9,13.6,14.3,15.0,15.8,16.5,17.2,17.9,18.6,19.3,20.0,20.6,21.1,21.6]},
+  continuation:{label:"W3 Continuation 1,-1,1", closes:[10,11,12,13,14,15,14,13,12.5,13,14,15,16,17,17.8]},
+};
+let currentKey="wave1";
+function currentDaily(){ return synth(scenarios[currentKey].closes, volRegime); }
+
+function render(){
+  const daily=currentDaily();
+  const res=classify(daily);
+  document.getElementById("statePanel").innerHTML=`
+    <div class="grid">
+      <div>
+        <div class="state">${res.state} <span class="badge badge-${res.confidence}">${res.confidence}</span></div>
+        <div class="small">Variant ${VARIANT.name} · 5%/${VARIANT.swing_bars} bars · hysteresis ${VARIANT.hysteresis}d · Early: High≥${VARIANT.near_high}·WH ∧ (Close≥${VARIANT.close_thr}·WH ∨ Vol&gt;avg20)</div>
+        <div class="small" style="margin-top:6px">Scenario: <b>${scenarios[currentKey].label}</b> · Vol: <b>${volRegime}</b></div>
+      </div>
+      <div class="kv">
+        <div><b>W1 High/Low:</b> ${res.evidence.w1High ?? "—"} / ${res.evidence.w1Low ?? "—"}</div>
+        <div><b>Retrace:</b> ${res.evidence.retrace ?? "—"}% · <b>Duration:</b> ${res.evidence.duration ?? "—"}d · <b>Holds&gt;low:</b> ${res.evidence.holds ?? "—"}</div>
+        <div><b>Close&gt;WH:</b> ${res.evidence.closeAbove} · <b>NearHigh:</b> ${res.evidence.isNearHigh} · <b>CloseWithin2%:</b> ${res.evidence.closeWithin} · <b>Vol&gt;avg:</b> ${res.evidence.volAbove}</div>
+        <div><b>nearHighBreakout:</b> ${res.evidence.nearHighBreakout} · <b>10d/20d:</b> ${res.evidence.recent10}% / ${res.evidence.recent20}% · <b>DD:</b> ${res.evidence.drawdown}%</div>
+        <div><b>Sig legs:</b> ${res.evidence.sigLen} (base ${res.evidence.baseSigLen}) · <b>avg20:</b> ${res.evidence.a20}</div>
+      </div>
+    </div>`;
+  document.getElementById("evidence").textContent=JSON.stringify(res,null,2);
+}
+const freeActions=[
+  {label:"Wave 1", key:"wave1"}, {label:"W2 Forming", key:"pullback"}, {label:"W2 Near Complete", key:"nearComplete"},
+  {label:"Early (close>WH)", key:"earlyClose"}, {label:"Early (0.98WH + 2%)", key:"earlyNearHigh"}, {label:"Continuation", key:"continuation"},
+  {label:"Vol: Normal", fn:()=>{volRegime="normal"; render();}}, {label:"Vol: Strong Advance", fn:()=>{volRegime="strongAdvance"; render();}}, {label:"Vol: Weak Advance", fn:()=>{volRegime="weakAdvance"; render();}},
+];
+const fp=document.getElementById("freePlay");
+freeActions.forEach(a=>{
+  const b=document.createElement("button");
+  b.textContent=a.label;
+  b.onclick=()=>{ if(a.key){currentKey=a.key; } if(a.fn) a.fn(); else render(); highlightWalk(); };
+  fp.appendChild(b);
+});
+const walks=[
+  {id:"happy", label:"Happy: W1 → W2 near-complete → Early", desc:"Watch hysteresis keep W1 and volume gate decide Early. Press in order.", steps:["Wave 1","Vol: Strong Advance","W2 Near Complete","Vol: Normal","Early (0.98WH + 2%)","Vol: Strong Advance"]},
+  {id:"weak", label:"Edge: weak-volume advance gets de-weighted", desc:"Same price, weak volume on the advance leg — sig legs drop vs price-only.", steps:["Wave 1","Vol: Weak Advance","Early (0.98WH + 2%)","Vol: Weak Advance"]},
+  {id:"strict", label:"Edge: strict 0.98/2% without volume fails", desc:"High 0.97×WH or close 3% away should NOT count as Early without volume.", steps:["Early (0.98WH + 2%)","Vol: Normal"]},
+];
+const tabsEl=document.getElementById("tabs"), descEl=document.getElementById("walkDesc"), stepsEl=document.getElementById("walkSteps");
+let activeWalk=walks[0].id;
+function renderTabs(){
+  tabsEl.innerHTML="";
+  walks.forEach(w=>{
+    const t=document.createElement("div"); t.className="tab"+(w.id===activeWalk?" active":""); t.textContent=w.label; t.onclick=()=>{activeWalk=w.id; renderWalk(); highlightWalk();}; tabsEl.appendChild(t);
+  });
+}
+function renderWalk(){
+  const w=walks.find(x=>x.id===activeWalk);
+  descEl.textContent=w.desc;
+  stepsEl.innerHTML="";
+  w.steps.forEach((s,i)=>{
+    const b=document.createElement("button"); b.textContent=(i+1)+". "+s;
+    if(s.startsWith("Vol:")) b.onclick=()=>{ volRegime=s.includes("Strong")?"strongAdvance":s.includes("Weak")?"weakAdvance":"normal"; render(); };
+    else { const k=freeActions.find(x=>x.label===s)?.key; b.onclick=()=>{ if(k) currentKey=k; render(); }; }
+    stepsEl.appendChild(b);
+  });
+}
+function highlightWalk(){ renderTabs(); renderWalk(); }
+renderTabs(); renderWalk(); render();
+</script>
+</body>
+</html>

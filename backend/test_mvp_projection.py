@@ -14,6 +14,16 @@ def test_projection_exposes_mvp_contract_without_legacy_root_shape():
     assert "dashboard_meta" not in result
 
 
+def test_legacy_projection_is_explicitly_audit_only_for_one_day():
+    import mvp_projection
+
+    result = mvp_projection.project_legacy_snapshot({"items": []})
+
+    assert result["audit_only"] is True
+    assert result["deprecation"] == mvp_projection.COMPATIBILITY_DEPRECATION
+    assert result["deprecation"]["boundary"] == "one_day"
+
+
 def test_mvp_uses_canonical_provenance_resolver():
     import mvp_api
     import provenance_contract

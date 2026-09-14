@@ -65,6 +65,33 @@ def apply_projection(items: list[dict], path: str = ARTIFACT_PATH) -> list[dict]
         symbol = item.get("symbol")
         a = by_symbol.get(symbol)
         x = copy.deepcopy(item)
+        # The setup-candidate contract is the sole primary decision surface.
+        # Reconciled taxonomy data remains available to audit consumers but
+        # must not add a competing group/status/action to canonical items.
+        canonical = {"symbol", "as_of", "data_status", "trend", "wave", "setup",
+                     "context", "bonus_evidence", "decision_lane", "provenance"} <= set(x)
+        if canonical:
+            from mvp_snapshot import LEGACY_PRIMARY_FIELDS
+            audit = dict(x.get("audit") or {})
+            legacy = dict(audit.get("legacy_projection") or {})
+            for key in LEGACY_PRIMARY_FIELDS:
+                if key in x:
+                    legacy[key] = x.pop(key)
+            if legacy:
+                audit["legacy_projection"] = legacy
+            if "vcp" in x:
+                vcp = x.pop("vcp")
+                x.setdefault("bonus_evidence", {}).setdefault("vcp", vcp)
+            if audit:
+                audit["raw_item"] = copy.deepcopy(item)
+                x["audit"] = audit
+            if a:
+                audit = dict(x.get("audit") or {})
+                audit["reconciled_row"] = copy.deepcopy(a)
+                x["audit"] = audit
+            x.setdefault("projection_version", PROJECTION_VERSION)
+            out.append(x)
+            continue
         if a:
             group = a["primary_group"]
             x.update({

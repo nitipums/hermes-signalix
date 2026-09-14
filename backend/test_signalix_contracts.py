@@ -7,8 +7,38 @@ import json
 import urllib.error
 import urllib.request
 
+
+def test_canonical_items_do_not_expose_legacy_primary_labels():
+    from mvp_snapshot import sanitize_mvp_item
+
+    item = {
+        "symbol": "AAA", "as_of": "2026-08-30", "data_status": {}, "trend": {},
+        "wave": {}, "setup": {}, "context": {}, "bonus_evidence": {},
+        "decision": "WAIT", "provenance": {}, "primary_group": "fresh",
+        "action": "BUY", "vcp": {"is_vcp": True},
+    }
+    result = sanitize_mvp_item(item)
+    assert result["decision"] == "WAIT"
+    assert "primary_group" not in result and "action" not in result
+    assert result["bonus_evidence"]["vcp"]["is_vcp"] is True
+
+
+def test_reconciled_projection_keeps_canonical_item_primary(monkeypatch):
+    import reconciled_projection
+
+    monkeypatch.setattr(reconciled_projection, "artifact_map", lambda path: {})
+    item = {
+        "symbol": "AAA", "as_of": "2026-08-30", "data_status": {}, "trend": {},
+        "wave": {}, "setup": {}, "context": {}, "bonus_evidence": {},
+        "decision_lane": "WAIT", "provenance": {}, "group": "fresh", "action": "BUY",
+    }
+    result = reconciled_projection.apply_projection([item])[0]
+    assert result["decision_lane"] == "WAIT"
+    assert "group" not in result and "action" not in result
+    assert result["audit"]["legacy_projection"]["action"] == "BUY"
+
 BASE = "http://127.0.0.1:8000"
-DASH = "http://127.0.0.1:3001/dashboard.html?contract-test=1"
+MVP = "http://127.0.0.1:3001/mvp?contract-test=1"
 
 
 def get(url):
@@ -21,20 +51,12 @@ def main():
     health = json.loads(body)
     assert status == 200 and health.get("status") == "ok", health
 
-    status, body = get(BASE + "/dashboard/snapshot")
-    snap = json.loads(body)
-    assert status == 200 and isinstance(snap.get("items"), list) and snap["items"], "snapshot empty"
-    for key in ("data_fetched_at", "data_freshness_source", "data_freshness_status", "market_session", "last_valid_session"):
-        assert key in snap, key
-    session = snap["market_session"]
-    for key in ("status", "is_open", "last_valid_session", "timezone", "source"):
-        assert key in session, key
-    assert snap["last_valid_session"] == session["last_valid_session"]
-    assert session["timezone"] == "Asia/Bangkok"
-    assert snap["data_fetched_at"] is None or "T" in snap["data_fetched_at"], snap["data_fetched_at"]
-    item = snap["items"][0]
-    for key in ("symbol", "close", "athHigh", "athLow", "high52", "low52", "ma10Value", "ma20Value", "ma50Value", "ma200Value"):
-        assert key in item, key
+    try:
+        get(BASE + "/dashboard/snapshot")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 410, exc.code
+    else:
+        raise AssertionError("legacy dashboard snapshot unexpectedly served")
 
     for tf in ("60m", "1D", "1W", "1M"):
         status, body = get(BASE + f"/chart/SIS?timeframe={tf}&limit=30")
@@ -50,14 +72,19 @@ def main():
     else:
         raise AssertionError("15m chart unexpectedly accepted")
 
-    status, body = get(DASH)
+    try:
+        get("http://127.0.0.1:3001/dashboard.html?contract-test=retired")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404, exc.code
+    else:
+        raise AssertionError("retired dashboard.html unexpectedly served")
+
+    status, body = get(MVP)
     html = body.decode("utf-8")
     assert status == 200
-    for marker in ("company-name", "decision-banner", "modal-subtitle", "title-link", "Last Scanned:", "lastFetched:", "Setup quality", "Risk", "Trigger", "VOL", "data-timeframe=\"1D\"", "loadChart:\"Loading chart", "Try again"):
+    for marker in ("Daily VCP Watchlist", "All VCP · 60m", "id=\"daily-vcp-cards\"", "app.js"):
         assert marker in html, marker
-    for removed in ("Market session:", "last valid:", "Evidence provenance", "Canonical event"):
-        assert removed not in html, removed
-    print({"health": health, "items": len(snap["items"]), "dashboard_bytes": len(body), "contracts": "ok"})
+    print({"health": health, "contracts": "ok"})
 
 
 if __name__ == "__main__":

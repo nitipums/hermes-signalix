@@ -67,6 +67,90 @@ class DailyScanHistoryTests(unittest.TestCase):
         self.assertEqual(second_avoid_payload["close"], 999.0)
         self.assertEqual(second["retry_of_run_id"], first["run_id"])
 
+    def test_snapshot_mapping_uses_scan_date_for_no_data_and_error_rows(self):
+        from scan_history import persist_daily_scan_snapshot
+
+        scan_date = dt.date(2026, 8, 13)
+        results = [
+            {
+                "symbol": "MISSING",
+                "analysis_status": "INSUFFICIENT_HISTORY",
+                "reason_codes": ["missing_price_data"],
+                "scan_group": "insufficient_history",
+                "group_reason": "no daily price data",
+                "trend_template": {"conditions_met": 0, "pass": False},
+                "trade_readiness": {"status": "INSUFFICIENT_HISTORY"},
+                "close": None,
+                "last_date": None,
+            },
+            {
+                "symbol": "ERROR",
+                "analysis_status": "NOT_VERIFIED",
+                "reason_codes": ["analysis_exception"],
+                "scan_group": "not_verified",
+                "group_reason": "analysis failed",
+                "trend_template": {"conditions_met": 0, "pass": False},
+                "trade_readiness": {"status": "NOT_VERIFIED"},
+                "close": None,
+                "last_date": None,
+            },
+        ]
+
+        pg = MagicMock()
+        result = persist_daily_scan_snapshot(pg, results, scan_date=scan_date)
+
+        snapshot_calls = [
+            call for call in pg.cursor.return_value.execute.call_args_list
+            if "INSERT INTO daily_analysis_snapshots" in call.args[0]
+        ]
+        assert result["observation_count"] == 2
+        assert [call.args[1][4] for call in snapshot_calls] == [scan_date, scan_date]
+        for call in snapshot_calls:
+            params = call.args[1]
+            assert params[5] is None  # close
+            assert params[6] is None  # volume
+            assert params[7] is None  # ma20
+            assert json.loads(params[-1]) == {}
+
+        observation_calls = [
+            call for call in pg.cursor.return_value.execute.call_args_list
+            if "INSERT INTO daily_scan_observations" in call.args[0]
+        ]
+        missing_payload = json.loads(observation_calls[0].args[1][-1])
+        error_payload = json.loads(observation_calls[1].args[1][-1])
+        assert missing_payload["analysis_status"] == "INSUFFICIENT_HISTORY"
+        assert missing_payload["reason_codes"] == ["missing_price_data"]
+        assert error_payload["analysis_status"] == "NOT_VERIFIED"
+        assert error_payload["reason_codes"] == ["analysis_exception"]
+
+    def test_snapshot_mapping_keeps_normal_analysis_date_and_values(self):
+        from scan_history import persist_daily_scan_snapshot
+
+        pg = MagicMock()
+        persist_daily_scan_snapshot(
+            pg,
+            [{
+                "symbol": "NORMAL",
+                "last_date": "2026-08-12",
+                "close": 12.5,
+                "scan_group": "breakout_new",
+                "trend_template": {"conditions_met": 8, "pass": True, "rs_rating": 95.0},
+                "analysis_metrics": {"volume": 1000.0, "ma20": 12.0},
+                "trade_readiness": {"status": "BUY"},
+            }],
+            scan_date=dt.date(2026, 8, 13),
+        )
+
+        snapshot_call = next(
+            call for call in pg.cursor.return_value.execute.call_args_list
+            if "INSERT INTO daily_analysis_snapshots" in call.args[0]
+        )
+        params = snapshot_call.args[1]
+        assert params[4] == dt.date(2026, 8, 12)
+        assert params[5] == 12.5
+        assert params[6] == 1000.0
+        assert params[7] == 12.0
+
     def test_retry_persists_explicit_parent_and_deterministic_original_root(self):
         from scan_history import persist_daily_scan_snapshot
 
