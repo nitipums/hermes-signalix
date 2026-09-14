@@ -1,7 +1,7 @@
 """Deterministic, no-lookahead technical indicators for aligned OHLCV candles.
 
-Policy ``technical-indicators-v1`` uses SMA over 5/10/20/60/120/240 candles
-and deterministic OHLCV windows over 5/10/20/60/120/240/260 candles,
+Policy ``technical-indicators-v2`` uses SMA over 5/10/20/50/100/200 candles
+and deterministic OHLCV windows over 5/10/20/50/100/200/260 candles,
 MACD(12,26,9) with each EMA seeded by the first period's SMA, Wilder RSI(14),
 and Wilder ATR(14).  True range is ``max(high-low, abs(high-prev_close),
 abs(low-prev_close))`` (the first candle uses ``high-low``).  Wilder RSI and
@@ -16,9 +16,11 @@ import math
 from typing import Any
 
 
-POLICY_VERSION = "technical-indicators-v1"
-MA_PERIODS = (5, 10, 20, 60, 120, 240)
-WINDOW_PERIODS = (5, 10, 20, 60, 120, 240, 260)
+POLICY_VERSION = "technical-indicators-v2"
+# Canonical MA periods. The separate 260-candle Daily window is 52-week
+# coverage, not an MA.
+MA_PERIODS = (5, 10, 20, 50, 100, 200)
+WINDOW_PERIODS = (5, 10, 20, 50, 100, 200, 260)
 # Compatibility name for callers that imported the former rolling-only set.
 HIGH_LOW_PERIODS = WINDOW_PERIODS
 ROUND_DECIMALS = 4
@@ -301,8 +303,8 @@ def build_technical_indicators(candles: list[dict[str, Any]], timeframe: str) ->
             },
             "rounding_decimal_places": ROUND_DECIMALS,
             "formulas": {
-                "ma": "SMA(5,10,20,60,120,240)",
-                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,60,120,240,260 candles",
+                "ma": "SMA(5,10,20,50,100,200)",
+                "rolling_high_low": "trailing max(High)/min(Low) over 5,10,20,50,100,200,260 candles",
                 "window_summary": "Open=first Open; High=max High; Low=min Low; Close=latest Close; volume_total=sum Volume; volume_average=volume_total/N; change_pct=(Close-Open)/Open*100; range_pct=(High-Low)/Low*100",
                 "macd": "EMA(12)-EMA(26), signal EMA(9), SMA-seeded",
                 "rsi": "Wilder RSI(14), first value after 14 close changes",

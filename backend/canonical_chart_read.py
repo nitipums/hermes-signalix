@@ -152,7 +152,8 @@ def fetch_chart_rows_with_metadata(cur, symbol, timeframe, limit, market="TH", r
         return rows, "60-minute (latest candle may be in progress)", {}
 
     # A 260-candle monthly response needs roughly 6,500 trading-day rows.
-    # Keep enough read-only source history for MA240 to become verifiable.
+    # Keep enough read-only source history for canonical MA200 and the
+    # separate 260-candle Daily 52-week coverage window to be verifiable.
     daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 7500)
     cur.execute("""WITH official AS (
                        SELECT date::timestamp, open, high, low, close, volume,

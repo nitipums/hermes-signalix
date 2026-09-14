@@ -120,7 +120,7 @@ def test_shared_drawer_normalizes_object_trend_for_readable_display():
     actual = [run([normalize], "normalizeDrawerTrendDisplay(" + json.dumps(item) + ", " + json.dumps(envelope) + ")")
               for _, item, envelope in cases]
     assert actual == expected
-    assert "dom.drawerTrend.textContent = normalizeDrawerTrendDisplay(item, envelope.trend);" in shared
+    assert "dom.drawerTrend.textContent = shadow ? shadowMainTrend.replace" in shared or "shadowMainTrendDisplay" in shared
 
 
 def test_chart_markers_remain_source_linked_and_are_not_derived_in_browser():

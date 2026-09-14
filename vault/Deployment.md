@@ -16,6 +16,15 @@ legacy routes: quarantined/404
 
 The primary workstream is the production-served, public, read-only Daily Trend Mapping surface. Its active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
 
+### Main Trend 1–4 UI promotion — 2026-09-13
+
+- Owner-authorized bounded promotion for Issue #32: deterministic `main_trend` evidence was published into the immutable Trend Map artifact. The public table and Trend Map drawer now use Main Trend 1–4 as the only visible primary taxonomy; legacy machine-lane/sub-trend presentation is not shown on the public surface. No setup/action/order semantics changed.
+- Artifact: `shadow-trend-map-quote-envelope-v2-2026-09-11-87dce5718dd0784a-e76ebcbf1637fac9-22539233599029de-29081b4b1ba2f3bb`; `237/237` declared/evaluated/returned; `45 Main 1 / 19 Main 2 / 58 Main 3 / 110 Main 4 / 5 blocked`; `226 FULL / 6 PARTIAL` among classified rows. Main Trend policy is `main-trend-ma-calibration-v6`; chart policy is `technical-indicators-v2` with MA5/10/20/50/100/200 and separate 260-candle coverage.
+- Runtime: backend recreated, dashboard started/recreated; readiness returned `status=ok`, `db=up`, `redis=up`. No migration or database write was performed.
+- Public API: HTTP 200, `PRODUCTION_READ_ONLY`, `verification_status=VERIFIED`, freshness `FRESH`, `actionability=NONE`; local/public artifact identity matched.
+- Public browser at 390px: `237` rendered rows; visible Main Trend-only grouping/filter/table; sample values `1 · FULL` / `3 · FULL` / `4 · FULL`; legacy machine-lane labels are absent; `scrollWidth=390`, `bodyScrollWidth=390`.
+- Status: source/tests/runtime/API/browser `PASS`; commit/push not performed; working-tree artifact/source changes remain uncommitted.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.

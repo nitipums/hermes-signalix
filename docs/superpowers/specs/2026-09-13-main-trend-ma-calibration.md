@@ -3,6 +3,7 @@
 > **STATUS: OWNER-APPROVED SPEC** · 2026-09-13 ICT
 > **Owner:** Arm · **Final gate:** Lite
 > **Scope:** deterministic Daily Main Trend 1–4 classification from multiple moving averages.
+> **Calculation authority:** `../current/2026-09-13-main-trend-calculation-contract.md` owns exact formulas, predicates, precedence, and verification semantics.
 > **Product boundary:** current Trend Map remains public, read-only, and non-actionable.
 
 ## Problem Statement
@@ -32,10 +33,15 @@ Interpretation for overlapping cases:
 ## Inputs and Determinism
 
 - Input timeframe: completed Daily candles only.
-- Primary input values: Daily Close and deterministic SMA5, SMA10, SMA20, SMA60, SMA120, and SMA240.
+- Primary input values: Daily Close and deterministic SMA5, SMA10, SMA20, SMA50, SMA100, and SMA200.
 - MA values are produced by the existing deterministic technical-indicator source/code. The browser and LLM do not calculate or infer financial values.
 - MA relationship uses both relative ordering and slope.
 - Slope measurement uses the change over 20 completed Daily bars.
+- SMA50 is the medium structure; SMA100 and SMA200 are the long regime. A
+  separate 260-candle Daily OHLCV window may provide 52-week coverage, but is
+  never an MA and is not mixed into Main Trend.
+- Pullback, extension, break, entry, target, and exit price-action semantics
+  remain separate evidence and are outside this MA-only trend explanation.
 - If one or more MA values are unavailable, classification may use the available values but must expose `evidence_quality=PARTIAL`; it must not claim full MA alignment.
 - Numeric boundaries for ordering tolerance, slope tolerance, distance, and continuity remain calibration-open and must be established from the owner-labelled diagnostic matrix. No arbitrary threshold is promoted by this spec.
 
@@ -103,6 +109,10 @@ Diagnostic evidence must compare the legacy served lane, owner Main Trend label,
 - RSI, MACD, volume, support, fundamentals, and automatic parameter search in the first MA-only calibration slice.
 - PR9/3BBIF chart fallback and mobile RSI rendering; those are separate bounded chart issues already parked in the worktree.
 - Deployment, restart, migration, database writes, commit, push, alerts, broker execution, and auto-trading.
+
+## Current implemented calibration — v6 · 2026-09-13
+
+Exact formulas, predicates, precedence, and verification semantics are owned by `../current/2026-09-13-main-trend-calculation-contract.md`. The current implementation uses the canonical MA5/10/20/50/100/200 set, 20 completed Daily bars for slope, MA50 as medium structure, and MA100/MA200 as long regime. It preserves `FULL/PARTIAL` evidence and the public read-only/non-actionable boundary. Historical v2 calibration notes below are retained as implementation history only.
 
 ## Acceptance Boundary
 

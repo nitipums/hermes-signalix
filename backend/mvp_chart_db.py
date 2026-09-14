@@ -1,7 +1,7 @@
 """MVP Chart DB Adapter — read-only PostgreSQL price_data query layer.
 
 Fills the chart overlay contract with real DB candles and computed
-indicators (MA20/50/200, MACD, RSI) when the database is available.
+indicators (MA5/10/20/50/100/200, MACD, RSI) when the database is available.
 Never writes, never mutates.
 
   GET /api/chart-db/{symbol} → {symbol, candles, ma20, ma50, ma200,
@@ -29,7 +29,7 @@ from canonical_chart_read import (DEFAULT_CHART_CANDLE_LIMIT, ChartReadResult,
 from chart_wave_evidence import (build_legacy_chart_wave_evidence,
                                  canonical_chart_wave_evidence,
                                  neutral_chart_wave_evidence)
-from technical_indicators import build_technical_indicators
+from technical_indicators import MA_PERIODS, build_technical_indicators
 
 
 _POOL = None
@@ -389,7 +389,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
     notes: list[str] = []
     if not input_available:
         notes.append("Indicators NOT_VERIFIED: missing or non-finite High/Low/Close input")
-    for period in (5, 10, 20, 60, 120, 240):
+    for period in MA_PERIODS:
         if len(closes) < period:
             notes.append(f"MA{period} NOT_VERIFIED: insufficient data (< {period} candles)")
     unavailable_windows = [

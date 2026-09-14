@@ -496,8 +496,10 @@ def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
     html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
-    for period in (5, 10, 20, 60, 120, 240):
+    for period in (5, 10, 20, 50, 100, 200):
         assert f'data-ma-period="{period}"' in html
+    for period in (60, 120, 240, 260):
+        assert f'data-ma-period="{period}"' not in html
     for marker in ('id="technical-latest"', 'id="technical-macd"',
                    'id="technical-rsi"', 'id="technical-atr"',
                    'id="rolling-high-low"'):
@@ -870,6 +872,7 @@ def test_daily_marker_legend_and_60m_setup_levels_are_timeframe_separated():
     assert 'dailyWaveMarkersForChart(chart).length' in legend
     assert "escapeHTML(markerState)" in legend
     assert "OHLC" in legend and "MA20" in legend and "MA50" in legend
+    assert all(label not in legend for label in ("MA60", "MA120", "MA240", "MA260"))
     assert ".wave-chart-legend" in css and "flex-wrap:wrap" in css
     merge = _extract_function(js, "mergeChartDecisionOverlay")
     assert 'projectedEvidence = waveEvidenceForItem(item)' in merge

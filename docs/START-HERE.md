@@ -39,6 +39,7 @@ Canonical surfaces:
 | Acceptance / evidence gate | `../vault/Execution-Pipeline.md` | focused acceptance evidence |
 | Runtime / timers / deployment | `../vault/Deployment.md` | live probes and installed units |
 | Manual scanner tuning / threshold change | `scanner-policy-evaluation` + `superpowers/specs/2026-09-13-main-trend-ma-calibration.md` | relevant source + tests + bounded baseline/tuned evidence |
+| Main Trend calculation semantics | `current/2026-09-13-main-trend-calculation-contract.md` | `superpowers/specs/2026-09-13-main-trend-ma-calibration.md`, source/tests |
 | Explicit AutoResearch / deep playbook research | `../vault/Research-Index.md` | `../vault/Research-Playbook-Bible.md`, named project |
 | Current Trend Mapping focus | `../vault/Deployment.md` | `../vault/Execution-Pipeline.md`, shadow API/browser evidence |
 | Vocabulary | `../GLOSSARY.md` | focused contract, if semantics matter |

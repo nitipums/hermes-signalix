@@ -23,6 +23,9 @@ def test_policy_window_and_prior_support_excludes_current():
     assert result["bars_used"] == 400
     assert result["support"]["excluded_current_bar"] is True
     assert result["support"]["prior_bars"] == 10
+    assert result["main_trend"]["main_trend"] in (1, 2, 3, 4)
+    assert result["main_trend"]["source_timeframe"] == "1D"
+    assert result["main_trend"]["actionability"] == "NONE"
 
 
 def test_retrieval_cap_fails_closed_when_it_cannot_establish_full_valid_window():
@@ -236,12 +239,17 @@ def test_report_keeps_every_declared_symbol_and_all_data_quality_reasons():
     assert report["data_quality_summary"]["INSUFFICIENT_HISTORY"] == 1
 
 
-def test_template_has_lane_grouped_table_filters_drawer_chart_and_shadow_markers():
+def test_template_has_main_trend_grouped_table_filter_drawer_chart_and_shadow_markers():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
-    html += shared.read_text()
-    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Daily lane</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states", "setOptions", "laneGroups", "class=\"lane-heading\"", "Machine lane", "row.machine_lane===lane", "!lane||row.machine_lane===lane", "!broad||row.broad_state===broad", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:item.machine_lane", "trend:item.classifier_status", "broad_state:item.broad_state", "source:\"trend-map-shadow\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map-shadow", "/api/chart-db/", 'data-timeframe="1D"', "chartUrl:null", "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "machine_lane", "broad_state", "drawChart", "chartRequestSeq"):
-        assert marker in html
+    combined = html + shared.read_text()
+    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"main-trend-heading\"", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map-shadow\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map-shadow", "/api/chart-db/", 'data-timeframe="1D"', "chartUrl:null", "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'colspan="5"'):
+        assert marker in combined
+    for removed in ("Daily lane", "machine_lane", "Machine lane", "broad_state", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states"):
+        assert removed not in html
+    main_trend_renderer = html.split("function mainTrendValue", 1)[1].split("function render", 1)[0]
+    assert "machine_lane" not in main_trend_renderer
+    assert "broad_state" not in main_trend_renderer
     assert 'id="status"' not in html
     assert '<th>Status</th>' not in html
     assert '<th>Data quality</th>' not in html
@@ -261,7 +269,7 @@ function Element(id) {
   this.classList = {contains: function () { return true; }};
 }
 const elements = {};
-["search", "lane", "broad-state", "summary", "error", "retry", "reload", "rows"].forEach(function (id) {
+["search", "main-trend", "summary", "error", "retry", "reload", "rows"].forEach(function (id) {
   elements[id] = new Element(id);
 });
 Object.defineProperty(elements.rows, "innerHTML", {
@@ -285,7 +293,11 @@ const responseData = {
   status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
   verification_status: "VERIFIED", freshness: {status: "FRESH"}, as_of: "2026-09-11",
   universe: {declared_count: 1}, policy: {classifier: "trend-map-v1"},
-  rows: [{symbol: "AAA", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", classifier_status: "UPTREND", quote: {price: 10, change_amount: 1, change_pct: 10}}]
+  rows: [
+    {symbol: "AAA", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", classifier_status: "UPTREND", main_trend: {main_trend: 2, evidence_quality: "FULL"}, quote: {price: 10, change_amount: 1, change_pct: 10}},
+    {symbol: "BBB", machine_lane: "AVOID", broad_state: "DOWNTREND", main_trend: {main_trend: 9, evidence_quality: "FULL"}, quote: {price: 11, change_amount: -1, change_pct: -9}},
+    {symbol: "CCC", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", quote: {price: 12, change_amount: 0, change_pct: 0}}
+  ]
 };
 const context = {
   window: {}, document: document,
@@ -294,6 +306,7 @@ const context = {
 };
 vm.runInNewContext(%s, context);
 setImmediate(function () {
+  if (elements.rows._html.indexOf("BBB") < 0 || elements.rows._html.indexOf("CCC") < 0 || elements.rows._html.indexOf("Not verified") < 0 || elements.rows._html.indexOf("AVOID") >= 0) process.exit(3);
   const row = elements.rows.rendered[0];
   row.onclick(); row.onclick();
   if (scripts.length !== 1 || opens.length !== 0) process.exit(1);
@@ -324,12 +337,15 @@ def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_con
 
 def test_shadow_table_contract_sorts_quotes_and_navigates_filtered_rendered_rows():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
-    assert "groups[lane].sort" in html
+    assert "group[1].sort" in html
     assert "return bv-av||String(a.symbol).localeCompare(String(b.symbol))" in html
     assert 'typeof value==="number"&&Number.isFinite(value)' in html
     assert 'var change=quoteChangePct(row),changeClass=change===null?"neutral":change>0?"positive":change<0?"negative":"neutral"' in html
     assert 'navigation:{symbols:renderedRows.map(function(candidate){return candidate.symbol;}),items:renderedRows,index:renderedRows.indexOf(item)}' in html
     assert 'window.SignalixSharedDrawer.updateNavigation(renderedRows.map(function(candidate){return candidate.symbol;}),renderedRows)' in html
+    assert 'String(value)===mainTrend' in html
+    assert 'groups.verified' in html
+    assert 'return [1,2,3,4]' in html
     assert '<th>Broad state</th>' not in html
     assert '<th>Bars used</th>' not in html
     assert '<th>As-of</th>' not in html
@@ -384,7 +400,7 @@ def test_template_has_mobile_safe_table_overflow_strategy():
     assert ".table-wrap" in html
     assert "overflow-x:auto" in html
     assert "max-width:100%" in html
-    assert "min-width:720px" in html
+    assert "min-width:780px" in html
     assert "overflow-x:hidden" in html
 
 

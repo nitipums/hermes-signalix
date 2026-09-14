@@ -32,6 +32,7 @@
 - `../docs/current/2026-09-13-daily-trend-derived-fallback-spec.md` — current bounded Derived Daily fallback contract and Issue #22 implementation authority.
 - `../docs/current/2026-09-13-1634-trend-map-drawer-navigation-handoff.md` — current bounded drawer navigation verification and release boundary.
 - `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` — owner-approved spec for Daily Main Trend 1–4 multiple-MA calibration.
+- `../docs/current/2026-09-13-main-trend-calculation-contract.md` — exact current Main Trend v6 formulas, predicates, precedence, and verification contract.
 - `../docs/current/` — dated decision records and bounded evidence handoffs.
 - `Browser-and-Freshness-Verification.md` — browser/freshness procedure.
 - `Memory-Cleanup-Candidates.md` — memory/fact cleanup record.

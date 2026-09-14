@@ -137,9 +137,9 @@ decision spine:
 
 ### Deterministic chart and OHLCV window summary — 2026-09-10
 
-`GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` is a read-only chart adapter over `price_data`/`intraday_price_data`. It returns source OHLCV candles plus canonical `indicators` under policy `technical-indicators-v1`: MA5/10/20/60/120/240, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and aligned rolling/window data.
+`GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` is a read-only chart adapter over `price_data`/`intraday_price_data`. It returns source OHLCV candles plus canonical `indicators` under policy `technical-indicators-v2`: MA5/10/20/50/100/200, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and aligned rolling/window data.
 
-`indicators.latest.window_summary` contains rows for 5/10/20/60/120/240/260 candles with Open, High, Low, Close, total/average volume, Change %, Range %, MA when applicable, availability, and provenance. The 260-candle Daily window is the 52-week trading range; other timeframes label it `260 candles`. The adapter fetches at least 260 candles so the 52-week value can be verified when source history exists. The UI consumes this payload without recalculating financial values in JavaScript. Missing/invalid/insufficient input is `NOT_VERIFIED`.
+`indicators.latest.window_summary` contains rows for 5/10/20/50/100/200/260 candles with Open, High, Low, Close, total/average volume, Change %, Range %, MA when applicable, availability, and provenance. The 260-candle Daily window is the 52-week trading range, not an MA; other timeframes label it `260 candles`. The adapter fetches at least 260 candles so the 52-week value can be verified when source history exists. The UI consumes this payload without recalculating financial values in JavaScript. Missing/invalid/insufficient input is `NOT_VERIFIED`.
 
 ### Team Facts Read API v1 (2026-09-03)
 

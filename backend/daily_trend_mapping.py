@@ -141,9 +141,9 @@ def _evidence(snapshot: Mapping[str, Any], latest: Mapping[str, Any], thresholds
                          else _series_last(snapshot, "open"))
     ma = _value(latest, ("ma",), ("moving_averages",))
     if ma is None:
-        ma = {period: _series_last(snapshot, "ma", period) for period in ("5", "10", "20", "60", "120", "240")}
+        ma = {period: _series_last(snapshot, "ma", period) for period in ("5", "10", "20", "50", "100", "200")}
     ma = ma if isinstance(ma, Mapping) else {}
-    values = {period: _finite(ma.get(period)) for period in ("5", "10", "20", "60", "120", "240")}
+    values = {period: _finite(ma.get(period)) for period in ("5", "10", "20", "50", "100", "200")}
     rsi_value = _value(latest, ("rsi",), ("rsi14",))
     rsi = _finite(rsi_value if rsi_value is not None else _series_last(snapshot, "rsi"))
     macd_value = _value(latest, ("macd", "histogram"), ("macd_histogram",))
@@ -154,7 +154,7 @@ def _evidence(snapshot: Mapping[str, Any], latest: Mapping[str, Any], thresholds
     volume_ratio = current_volume / average_volume if current_volume is not None and average_volume not in (None, 0) else None
     slope_values = {}
     series = snapshot.get("series") if isinstance(snapshot.get("series"), Mapping) else {}
-    for period in ("20", "60", "120", "240"):
+    for period in ("20", "50", "100", "200"):
         slope_values[period] = _slope((series.get("ma") or {}).get(period) if isinstance(series.get("ma"), Mapping) else None)
     support = _finite(_value(latest, ("explicit_support",), ("support_reference",)))
     previous_close = _finite(_series_previous(snapshot, "close"))
@@ -169,7 +169,7 @@ def _evidence(snapshot: Mapping[str, Any], latest: Mapping[str, Any], thresholds
     previous_close_below_support = bool(previous_close is not None and support is not None and previous_close < support)
     available = _series_count(snapshot)
     missing = []
-    for name, value in (("close", close), ("low", low), ("ma_20", values["20"]), ("ma_60", values["60"]), ("rsi", rsi)):
+    for name, value in (("close", close), ("low", low), ("ma_20", values["20"]), ("ma_50", values["50"]), ("rsi", rsi)):
         if value is None:
             missing.append(name)
     return {
@@ -185,11 +185,11 @@ def _evidence(snapshot: Mapping[str, Any], latest: Mapping[str, Any], thresholds
 
 def _base_lane(e: Mapping[str, Any]) -> str:
     close, ma = e["close"], e["ma"]
-    if close is None or ma["20"] is None or ma["60"] is None:
+    if close is None or ma["20"] is None or ma["50"] is None:
         return "S1_1"
     slope = e["slopes"]["20"]
-    bullish = close > ma["20"] > ma["60"] and (slope is None or slope >= e["thresholds"]["ma_slope_pct"])
-    bearish = close < ma["20"] < ma["60"] and (slope is None or slope <= e["thresholds"]["ma_slope_pct"])
+    bullish = close > ma["20"] > ma["50"] and (slope is None or slope >= e["thresholds"]["ma_slope_pct"])
+    bearish = close < ma["20"] < ma["50"] and (slope is None or slope <= e["thresholds"]["ma_slope_pct"])
     rsi = e["rsi"]
     momentum_up = (rsi is not None and rsi >= e["thresholds"]["bullish_rsi"])
     momentum_down = (rsi is not None and rsi < e["thresholds"]["bearish_rsi"])

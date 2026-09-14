@@ -23,11 +23,11 @@ Main 3 = pullback / weakening / distribution while long-term structure is intact
 Main 4 = sustained bearish deterioration / breakdown
 ```
 
-Inputs are Daily Close, SMA5/10/20/60/120/240, and slope over 20 completed Daily bars. Partial MA inputs may classify only with explicit `PARTIAL` evidence quality. Subtypes and action lanes are deferred. Current Trend Map remains public read-only and non-actionable until separate gates pass.
+Inputs are Daily Close, SMA5/10/20/50/100/200, and slope over 20 completed Daily bars. Partial MA inputs may classify only with explicit `PARTIAL` evidence quality. Exact formula/predicate/precedence semantics live in `docs/current/2026-09-13-main-trend-calculation-contract.md`. Subtypes and action lanes are deferred. Current Trend Map remains public read-only and non-actionable until separate gates pass.
 
-## Next bounded task
+## Implementation result
 
-Build the deterministic MA diagnostic matrix/classifier test-first at the approved classifier/builder seam. Compare owner-labelled examples against legacy machine lanes, MA ordering, Close-vs-MA position, 20-bar slopes, missing periods, and ambiguity reasons. Do not tune subtypes or add action semantics in the first slice.
+Implemented the deterministic MA diagnostic matrix/classifier at the approved classifier/builder seam in `backend/main_trend_mapping.py`, with literal owner-labelled diagnostic fixtures in `backend/test_main_trend_mapping.py`. The read-only Trend Map builder carries the result as non-actionable `main_trend` evidence and preserves the legacy `machine_lane` compatibility field. No subtypes or action semantics were added.
 
 ## Parked worktree changes
 
@@ -45,6 +45,7 @@ Do not reset, stash, clean, overwrite, or mix those chart changes into Issue #32
 
 - GitHub issue publication and approval comment read-back: PASS.
 - Documentation edits and `git diff --check`: PASS at session close.
-- Main Trend implementation: NOT STARTED.
-- Runtime/API/browser promotion: NOT PERFORMED.
-- No commit, push, restart, deploy, migration, database write, alert, broker, or auto-trading action performed for this taxonomy.
+- Main Trend implementation: CODE + FOCUSED TESTS COMPLETE; owner/Lite acceptance remains pending.
+- UI/runtime promotion: owner-authorized promotion completed on 2026-09-13. Immutable artifact now carries `main_trend` policy `main-trend-ma-calibration-v6`; public 390px UI uses Main Trend 1–4 as the only visible taxonomy and no longer renders legacy `Machine lane`; the Trend Map drawer shows `Main Trend N · FULL/PARTIAL` as primary label. The canonical chart uses MA5/10/20/50/100/200 under `technical-indicators-v2`; 260 candles remains separate 52-week coverage, not an MA. v6 adds the MA100/MA200 long-slope gate: Main3 candidates with confirmed non-bullish long slopes demote to Main1; missing long slopes remain PARTIAL/reviewable. API/browser read-back passed. See `vault/Deployment.md` for artifact identity and counts.
+- Runtime/API/browser promotion: PASS for the bounded Main Trend evidence/UI slice; no action semantics were added.
+- No commit, push, migration, database write, alert, broker, or auto-trading action performed for this taxonomy. Backend/dashboard recreate and artifact publication were explicitly authorized runtime actions.

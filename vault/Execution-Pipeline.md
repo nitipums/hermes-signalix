@@ -12,7 +12,7 @@
 
 The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup-candidate and `/mvp` contracts are **DROPPED / PAUSED** by owner decision, not this delivery target. Preserve their source/history as retained audit/future-integration evidence, but do not spend work or route tasks there until Arm explicitly resumes them.
 
-The owner-approved Main Trend calibration is a separate bounded diagnostic/classifier specification in `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` (Issue #32). Its first slice uses Daily Close plus SMA5/10/20/60/120/240 and 20 completed Daily bars for slope, defines Main Trend 1–4 only, and does not add action lanes or change the current read-only/non-actionable boundary until implementation and acceptance gates pass.
+The owner-approved Main Trend calibration is a separate bounded diagnostic/classifier specification in `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` (Issue #32). Its current slice uses Daily Close plus SMA5/10/20/50/100/200 and 20 completed Daily bars for slope, defines Main Trend 1–4 only, and does not add action lanes or change the current read-only/non-actionable boundary until implementation and acceptance gates pass.
 
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
@@ -107,7 +107,7 @@ The product must let a user answer, quickly and honestly:
 
 ## Current OHLCV window and Team Facts acceptance — 2026-09-10
 
-The deterministic chart contract is served by `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` under policy `technical-indicators-v1`. It exposes OHLCV candles, MA5/10/20/60/120/240, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and `indicators.latest.window_summary` for 5/10/20/60/120/240/260 candles. Each window contains Open, High, Low, Close, total/average volume, Change %, Range %, MA where applicable, availability, and provenance. Daily 260 candles is the 52-week trading range; other timeframes label it `260 candles`. Missing or insufficient history is `NOT_VERIFIED`, never inferred.
+The deterministic chart contract is served by `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` under policy `technical-indicators-v2`. It exposes OHLCV candles, MA5/10/20/50/100/200, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and `indicators.latest.window_summary` for 5/10/20/50/100/200/260 candles. Each window contains Open, High, Low, Close, total/average volume, Change %, Range %, MA where applicable, availability, and provenance. Daily 260 candles is a separate 52-week trading range, not an MA. Missing or insufficient history is `NOT_VERIFIED`, never inferred.
 
 The Team Facts surface is public unauthenticated read-only by owner decision. It must remain facts-only and separate from `/api/setup-candidates`; no setup, Wave, lane, trigger, risk, target, alert, order, or broker semantics may be exposed. Runtime evidence after release `28f7947`: Team Facts HTTP 200, `marginable_long`, 237 eligible / 695 excluded from 932 active ORD, views momentum 16 / near_high 13 / pullback 58, Daily freshness partial with explicit `3BBIF`, `COM7`, `PR9` missing and intraday fresh. Readiness was `status=ok`, `db=up`, `redis=up`.
 

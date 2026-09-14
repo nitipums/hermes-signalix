@@ -4,7 +4,7 @@
   var $ = function (selector) { return document.querySelector(selector); };
   var $$ = function (selector) { return document.querySelectorAll(selector); };
   var chartLayers = {candles:true, volume:true, ma:true, rsi:true, macd:true,
-    maPeriods: {"5":true,"10":true,"20":true,"60":true,"120":false,"240":false}, waveEvidence:true};
+    maPeriods: {"5":true,"10":true,"20":true,"50":true,"100":false,"200":false}, waveEvidence:true};
   var chartTimeframe = "1D", chartSymbol = null, drawerItem = null, drawerItems = [], drawerSymbols = [], drawerIndex = -1;
   var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null;
   var dom = {};
@@ -23,10 +23,10 @@
       '<div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div><div id="drawer-chart" class="drawer-chart"><canvas id="drawer-canvas" width="720" height="440"></canvas><p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p></div>' +
       '<div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>' +
       '<div class="chart-timeframe-controls" aria-label="Chart timeframe"><span class="chart-control-label">Timeframe</span><button type="button" class="chart-timeframe" data-timeframe="60M">60m</button><button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button><button type="button" class="chart-timeframe" data-timeframe="1W">1W</button><button type="button" class="chart-timeframe" data-timeframe="1M">1M</button></div>' +
-      '<div class="ma-controls" aria-label="Moving average overlays"><span class="chart-control-label">Moving averages</span><label><input type="checkbox" data-ma-period="5" checked> MA5</label><label><input type="checkbox" data-ma-period="10" checked> MA10</label><label><input type="checkbox" data-ma-period="20" checked> MA20</label><label><input type="checkbox" data-ma-period="60" checked> MA60</label><label><input type="checkbox" data-ma-period="120"> MA120</label><label><input type="checkbox" data-ma-period="240"> MA240</label></div>' +
+      '<div class="ma-controls" aria-label="Moving average overlays"><span class="chart-control-label">Moving averages</span><label><input type="checkbox" data-ma-period="5" checked> MA5</label><label><input type="checkbox" data-ma-period="10" checked> MA10</label><label><input type="checkbox" data-ma-period="20" checked> MA20</label><label><input type="checkbox" data-ma-period="50" checked> MA50</label><label><input type="checkbox" data-ma-period="100"> MA100</label><label><input type="checkbox" data-ma-period="200"> MA200</label></div>' +
       '<section id="technical-latest" class="technical-summary" aria-label="Latest deterministic technical values" aria-live="polite"><div><span>High / Low</span><strong id="technical-high-low">Not verified</strong></div><div><span>MACD / Signal / Hist</span><strong id="technical-macd">Not verified</strong></div><div><span>RSI 14</span><strong id="technical-rsi">Not verified</strong></div><div><span>ATR 14</span><strong id="technical-atr">Not verified</strong></div></section>' +
       '<section id="rolling-high-low" class="rolling-high-low" aria-labelledby="rolling-high-low-title" aria-live="polite"><h2 id="rolling-high-low-title">OHLCV Window Summary (candles)</h2><div class="rolling-high-low__table-wrap"><table><thead><tr><th>Candles</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Avg Vol</th><th>MA</th></tr></thead><tbody>' +
-      ["5","10","20","60","120","240","260"].map(function (p) { return '<tr data-rolling-period="' + p + '"><th>' + p + '<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>'; }).join("") +
+      ["5","10","20","50","100","200","260"].map(function (p) { return '<tr data-rolling-period="' + p + '"><th>' + p + '<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>'; }).join("") +
       '</tbody></table></div></section>' +
       '<section class="drawer-section drawer-section--setup" aria-labelledby="drawer-setup-title"><h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2><dl class="drawer-setup-grid"><div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div><div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div><div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div><div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div><div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div></dl></section>' +
       '<section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title"><h2 id="drawer-company-title" class="drawer-section-title">Company context</h2><div class="drawer-company-context"><span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span></div></section></div></div></aside>';
@@ -122,6 +122,15 @@
         nonActionable ? "Non-actionable context · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED") :
         "Not review eligible · backend lane " + ((item && item.decision_lane) || "DATA_BLOCKED")
     };
+  }
+
+  function shadowMainTrendDisplay(item) {
+    var evidence = item && item.main_trend;
+    var value = evidence && evidence.main_trend;
+    if ([1, 2, 3, 4].indexOf(value) < 0) return "Main Trend · Not verified";
+    var quality = evidence && String(evidence.evidence_quality || "").toUpperCase();
+    if (["FULL", "PARTIAL"].indexOf(quality) < 0) quality = "NOT_VERIFIED";
+    return "Main Trend " + value + " · " + quality;
   }
 
   function normalizeDrawerTrendDisplay(item, trend) {
@@ -226,8 +235,9 @@
     dom.drawerSymbol.href = "https://www.tradingview.com/symbols/" + encodeURIComponent(item.symbol || "") + "/?exchange=SET";
     dom.drawerName.textContent = item.name && String(item.name).toUpperCase() !== String(item.symbol || "").toUpperCase() ? item.name : "";
     dom.drawerName.hidden = !dom.drawerName.textContent;
-    dom.drawerLane.textContent = envelope.lane || "Not verified";
-    dom.drawerTrend.textContent = normalizeDrawerTrendDisplay(item, envelope.trend);
+    var shadowMainTrend = shadow ? shadowMainTrendDisplay(item) : null;
+    dom.drawerLane.textContent = shadow ? shadowMainTrend : (envelope.lane || "Not verified");
+    dom.drawerTrend.textContent = shadow ? shadowMainTrend.replace(/ · (FULL|PARTIAL|NOT_VERIFIED)$/, "") : normalizeDrawerTrendDisplay(item, envelope.trend);
     dom.drawerAction.textContent = shadow ? "" : (item.action || item.decision || "Not verified");
     dom.drawerAction.hidden = shadow;
     if (dom.drawerAction.parentElement) dom.drawerAction.parentElement.hidden = shadow;
@@ -497,7 +507,7 @@
     var dailyMarkerCount = isDaily ? dailyWaveMarkersForChart(chart).length : 0;
     var markerState = isDaily ? (dailyMarkerCount ? String(dailyMarkerCount) : "none") : "Day only";
     var timeframe = chart && chart.timeframe || chartTimeframe;
-    dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA20 and MA50 plus selected moving averages use distinct neutral colors; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
+    dom.drawerChartLegend.setAttribute("aria-label", "Chart evidence legend: OHLC candles use green/red direction colors; MA5, MA10, MA20, MA50, MA100, and MA200 use distinct neutral colors; wave markers are source-linked by shape and label; 60m trigger, stop, and target use labelled line styles.");
     var selectedMa = Object.keys(chartLayers.maPeriods).filter(function(period){ return chartLayers.maPeriods[period]; }).map(function(period){ return "MA" + period; }).join(" · ");
     dom.drawerChartLegend.innerHTML = '<span><i class="legend-line legend-line--price"></i>OHLC High/Low</span><span><i class="legend-line legend-line--ma20"></i>' + escapeHTML(selectedMa || "MA hidden") + '</span><span><i class="legend-dot legend-dot--wave"></i>markers (' + escapeHTML(markerState) + ') <button type="button" class="legend-info" aria-label="Show full chart legend">(i)</button></span>';
   }
@@ -616,7 +626,7 @@
     // Green/red communicate candle and volume direction only. All other
     // chart evidence uses neutral/blue annotation colors.
     var colors = { grid: "#2a3345", text: "#8896a6", up: "#26a69a", down: "#ef5350", ma20: "#93c5fd", ma50: "#60a5fa", ma200: "#a78bfa", rsi: "#93c5fd",
-      ma: {"5":"#d8bc65","10":"#7dd3fc","20":"#93c5fd","60":"#60a5fa","120":"#a78bfa","240":"#c4b5fd"}, macd:"#93c5fd", signal:"#a78bfa" };
+      ma: {"5":"#d8bc65","10":"#7dd3fc","20":"#93c5fd","50":"#60a5fa","100":"#a78bfa","200":"#c4b5fd"}, macd:"#93c5fd", signal:"#a78bfa" };
     ctx.font = "11px sans-serif";
     ctx.strokeStyle = colors.grid; ctx.lineWidth = 1;
     [top, top + priceH, top + priceH + volH, top + priceH + volH + macdH, top + priceH + volH + macdH + rsiH].forEach(function(y){ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(w-right,y);ctx.stroke();});

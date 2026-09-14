@@ -1,6 +1,6 @@
 # Signalix OHLCV Window Summary — Current Handoff
 
-> **STATUS: CURRENT** · Evidence handoff for the deterministic chart/screening payload.
+> **STATUS: SUPERSEDED** · Historical evidence handoff; current exact chart semantics are in `../../docs/current/2026-09-13-main-trend-calculation-contract.md` and `../../vault/Architecture.md`.
 > **As of:** 2026-09-10 13:32 ICT (`Asia/Bangkok`)
 > **Authority:** `../superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
 > **Product boundary:** machine-generated candidate/evidence for Arm review; not truth, automatic BUY, or order execution.

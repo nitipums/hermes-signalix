@@ -221,7 +221,7 @@ def test_chart_view_is_trimmed_but_default_chart_remains_full(monkeypatch):
     compact = mvp_chart_db.compact_chart_db_response(full)
 
     assert len(full["candles"]) == 260
-    assert len(full["indicators"]["series"]["ma"]["240"]) == 260
+    assert len(full["indicators"]["series"]["ma"]["200"]) == 260
     assert len(compact["candles"]) == 120
     assert compact["candles"] == full["candles"][-120:]
     for values in compact["indicators"]["series"]["ma"].values():
@@ -231,8 +231,8 @@ def test_chart_view_is_trimmed_but_default_chart_remains_full(monkeypatch):
     assert len(compact["indicators"]["series"]["rsi"]) == 120
     assert len(compact["indicators"]["series"]["atr"]) == 120
     assert compact["indicators"]["latest"] == full["indicators"]["latest"]
-    assert compact["indicators"]["latest"]["ma"]["120"] == full["indicators"]["latest"]["ma"]["120"]
-    assert compact["indicators"]["latest"]["ma"]["240"] == full["indicators"]["latest"]["ma"]["240"]
+    assert compact["indicators"]["latest"]["ma"]["100"] == full["indicators"]["latest"]["ma"]["100"]
+    assert compact["indicators"]["latest"]["ma"]["200"] == full["indicators"]["latest"]["ma"]["200"]
     assert compact["source"] == full["source"]
     assert compact["as_of"] == full["as_of"]
     assert compact["candles"][-1]["provenance"] == full["candles"][-1]["provenance"]

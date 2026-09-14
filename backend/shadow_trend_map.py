@@ -21,6 +21,8 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
+from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
+from main_trend_mapping import classify_main_trend
 from mvp_api import resolve_universe
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
@@ -362,6 +364,7 @@ def _blocked(symbol: str, as_of: Any, status: str, note: str, retrieved: int, in
             "quote": _quote(None),
             "status": "DATA_BLOCKED", "data_quality_status": status,
             "classifier_status": None, "machine_lane": None, "broad_state": None,
+            "main_trend": None,
             "confidence": None,
             "bars_retrieved": retrieved, "bars_used": 0, "invalid_row_count": invalid,
             "retrieval_cap": retrieval_cap, "cap": retrieval_cap,
@@ -486,6 +489,7 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
     indicators["as_of"] = str(as_of) if as_of is not None else None
     indicators["latest"]["explicit_support"] = support
     classified = classify_daily_trend(indicators)
+    main_trend = classify_main_trend(indicators)
     classifier_status = classified["data_status"]
     data_quality_status = "INVALID_DATA" if invalid else classifier_status
     return {"symbol": symbol, "as_of": str(as_of) if as_of is not None else None,
@@ -494,6 +498,7 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
             "data_quality_status": data_quality_status,
             "classifier_status": classifier_status,
             "machine_lane": classified["machine_lane"], "broad_state": classified["broad_state"],
+            "main_trend": main_trend,
             "confidence": classified["confidence"], "bars_retrieved": len(retrieved),
             "bars_used": len(bars), "invalid_row_count": invalid_count,
             "retrieval_cap": effective_cap, "cap": effective_cap,
@@ -515,7 +520,8 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
 
 
 def _policy() -> dict[str, Any]:
-    policy = {"classifier": POLICY_VERSION, "indicators": INDICATOR_POLICY_VERSION,
+    policy = {"classifier": POLICY_VERSION, "main_trend_classifier": MAIN_TREND_POLICY_VERSION,
+              "indicators": INDICATOR_POLICY_VERSION,
               "report": REPORT_VERSION, "representation_revision": REPRESENTATION_REVISION,
               "review_window": REVIEW_WINDOW,
               "min_valid_bars": MIN_VALID_BARS, "max_valid_bars": MAX_VALID_BARS,
@@ -687,7 +693,9 @@ def unavailable_report(error: Exception) -> dict[str, Any]:
     return {"report": REPORT_VERSION, "research_only": False, "status": "DATA_BLOCKED",
             "actionability": ACTIONABILITY, "as_of": None,
             "universe": {"scope": UNIVERSE, "declared_symbols": [], "declared_count": 0},
-            "policy": {"classifier": POLICY_VERSION, "report": REPORT_VERSION,
+            "policy": {"classifier": POLICY_VERSION,
+                       "main_trend_classifier": MAIN_TREND_POLICY_VERSION,
+                       "report": REPORT_VERSION,
                        "representation_revision": REPRESENTATION_REVISION,
                        "review_window": REVIEW_WINDOW,
                        "min_valid_bars": MIN_VALID_BARS, "max_valid_bars": MAX_VALID_BARS,
