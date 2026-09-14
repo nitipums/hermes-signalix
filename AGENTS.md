@@ -1,7 +1,7 @@
 # AGENTS.md — Signalix collaboration contract
 
 > **STATUS: CURRENT** · Owner-aligned working instructions for Lite and Codex.
-> **Last reconciled:** 2026-09-13
+> **Last reconciled:** 2026-09-14
 > **Authority:** owner-approved direction in `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`, with current acceptance/evidence rules in `vault/Execution-Pipeline.md`.
 
 ## Product identity
@@ -55,7 +55,7 @@ User-facing decision lanes are:
 REVIEW_NOW | SETUP_FORMING | DAILY_CANDIDATE | WAIT | AVOID | DATA_BLOCKED
 ```
 
-- **T1–T9 source and release promotion: DONE** — promoted to `release/signalix-mvp-stable`; `/api/setup-candidates` is served from the live DB builder with honest lanes. Public 390px failure→Retry→recovery browser acceptance is `PASS` (2026-09-01); evaluator auto-caller wiring remains a separate owner decision.
+- Historical setup/API spine is retained for audit only; current product delivery and acceptance are the canonical Trend Mapping routes `/trend-map` and `/api/trend-map`.
 
 ## How to use this file
 
@@ -75,7 +75,8 @@ Before any task, Codex must:
 |---|---|---|
 | Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
 | Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + `docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
-| Current setup-candidate direction and API contract (only if explicitly resumed) | `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | Focused design/spec + `AGENTS.md` routing/guardrail only if Arm resumes the paused path |
+| Current Trend Mapping API and UI | `/trend-map`, `/api/trend-map` | source + focused tests |
+| Retained setup/API contract (historical only) | `/mvp`, `/api/setup-candidates` | inspect only for audit/future reactivation |
 | Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
 | Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |
@@ -92,11 +93,11 @@ Before any task, Codex must:
 - **Legacy migration:** preserve historical/audit evidence and mark old routes/notes as compatibility, superseded, or historical. Never make two documents appear equally authoritative.
 - **Before handoff:** run a reference scan for the old contract/labels, inspect the complete diff, and list any intentionally untouched documents plus unresolved conflicts.
 
-## Serving and migration boundary
+## Serving boundary
 
-- The target canonical API is `/api/setup-candidates`; `/mvp` should consume one setup-candidate contract.
-- During migration, `/api/vcp-finder` and VCP artifacts may remain for compatibility, audit, replay, or rollback, but they are not the new primary decision authority.
-- Do not create a second competing visible decision label by mixing legacy Stage/Phase/Daily/VCP labels into the new primary contract. Keep compatibility fields in an explicit audit/legacy namespace.
+The canonical served product is `/trend-map` with `/api/trend-map`. The setup/MVP
+routes are retained historical/audit material and are not active product routes.
+Do not route work there without a new owner-approved product decision.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **931 active ORD**, **237 eligible**, **694 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
 - `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.

@@ -7,7 +7,10 @@
 
 ## Problem
 
-The current canonical `/mvp` surface publishes only `EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, and `NOT_VERIFIABLE`. The prior full-wave engine still computes broader structural evidence, but it is retained under compatibility/context fields and is not exposed as a clean, useful Daily structural view. Wave 1/2/4/5 evidence therefore appears to have disappeared even though the underlying data and legacy observations remain.
+The setup/MVP contract is retained historical evidence only. It previously published
+`EARLY_WAVE_3`, `WAVE_3_CONTINUATION`, and `NOT_VERIFIABLE`; that behavior is not
+part of the current canonical Trend Mapping line. The prior full-wave engine and
+its observations remain preserved for audit/future reference.
 
 ## Owner-approved solution
 
