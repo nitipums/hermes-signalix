@@ -1,22 +1,25 @@
 # Signalix Product Strategy — Market View to Action
 
 > **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
-> **Current stock-setup surface (2026-09-13):** Trend + Daily Elliott candidate + 60m Trade Setup remains a retained audit/future-integration evidence spine, but `/mvp` and `/api/setup-candidates` are DROPPED / PAUSED by owner decision. Do not route work there until Arm explicitly resumes it. A separate market-only policy may project private paper/shadow `BUY_NOW` signals over the trailing seven calendar days without portfolio data or an owner token. Position-aware sells, alerts, and broker execution remain later work. VCP is bonus/compatibility evidence only.
-_Last updated: 2026-09-13; the owner-approved Daily Trend Map promotion is production-served read-only evidence, while private BUY and execution remain separately gated._
+> **Current product line (2026-09-14):** Daily Trend Mapping is the canonical Signalix product surface. The old `/mvp` setup path and `/api/setup-candidates` are retired from active product scope and retained only as historical/audit source. The former shadow naming is retired; the canonical public routes are `/trend-map` and `/api/trend-map`.
+_Last updated: 2026-09-14; Trend Mapping is the primary production-served read-only evidence surface. No setup, signal, alert, broker, or auto-trading semantics are active._
 
-## Current delivery focus — 2026-09-13
+## Current product focus — 2026-09-14
 
-The **Daily Trend Mapping** surface is now an owner-approved production-served,
-public, read-only human-review evidence surface:
-`/trend-map-shadow` and `/api/trend-map-shadow`. It exposes deterministic Daily
-trend classifications, quotes, freshness, provenance, and data-quality states.
+**Daily Trend Mapping is the primary Signalix product line.** It is public,
+read-only, deterministic, and intended for human chart/evidence review. It
+exposes Daily trend classifications, quotes, freshness, provenance, and
+data-quality states through `/trend-map` and `/api/trend-map`.
 
-The `/mvp` and `/api/setup-candidates` setup flow is **DROPPED / PAUSED** by owner decision. Preserve its source/history as retained audit/future-integration material; do not route work there until Arm explicitly resumes it. Trend Mapping does not create setup decisions or action semantics. The Elliott Wave line remains deferred and must not block Trend Mapping promotion.
+`/mvp`, `/api/setup-candidates`, Elliott/Wave setup research, private BUY/SELL
+projections, alerts, broker actions, and auto-trading are retired from active
+scope. Their source and evidence remain preserved as historical/audit material;
+none may be reactivated without a new owner-approved product decision and
+acceptance gate.
 
-The Trend Map is production-served read-only, non-actionable evidence. It must
-not create `BUY_NOW`/`SELL_NOW`, `REVIEW_NOW`, alerts, orders, broker actions,
-portfolio actions, or auto-trading. Any decision, alert, or execution integration
-requires a separate owner-approved contract and acceptance gate.
+The Trend Map is non-actionable evidence. It must not create setup decisions,
+`BUY_NOW`/`SELL_NOW`, `REVIEW_NOW`, alerts, orders, broker actions, portfolio
+actions, or auto-trading.
 
 ## Product thesis
 

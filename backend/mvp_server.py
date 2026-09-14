@@ -1,9 +1,8 @@
-"""MVP dashboard server.
+"""Signalix Daily Trend Map server.
 
-Serves the owner-only Classic Review app at /mvp and the presentation-only
-Wave Context app at /wave-context. The former dashboard.html surface is
-retired and deliberately returns 404. This entrypoint has no dependency on
-legacy_routes, legacy_server, portal.html, portfolio.html, or legacy snapshots.
+Serves the canonical public read-only Trend Map at /trend-map and the
+presentation-only Wave Context app at /wave-context. Retired setup/MVP routes
+remain compatibility history and are not the active product surface.
 """
 from __future__ import annotations
 
@@ -82,7 +81,7 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlsplit(self.path)
         path = parsed.path
         suffix = ("?" + parsed.query) if parsed.query else ""
-        if path == "/trend-map-shadow":
+        if path == "/trend-map":
             template_path = os.path.join(_BACKEND_DIR, "shadow_trend_map_template.html")
             try:
                 with open(template_path, "rb") as template:
@@ -93,7 +92,7 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
         if path.startswith("/api/"):
-            if path == "/api/trend-map-shadow" and handle_shadow_trend_map_api(self.path, self):
+            if path == "/api/trend-map" and handle_shadow_trend_map_api(self.path, self):
                 return
             if handle_mvp_api(self.path, self):
                 return

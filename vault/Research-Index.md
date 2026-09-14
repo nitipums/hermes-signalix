@@ -8,7 +8,7 @@
 
 ## Current delivery focus — 2026-09-12
 
-Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the
+Daily Trend Mapping via `/trend-map` and `/api/trend-map` is the
 current Signalix delivery focus. It is public read-only, non-actionable
 research evidence. The `/mvp` and `/api/setup-candidates` path is **DROPPED /
 PAUSED** by owner decision; preserve source/history for retained audit/future

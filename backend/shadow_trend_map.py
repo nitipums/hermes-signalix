@@ -708,7 +708,7 @@ def unavailable_report(error: Exception) -> dict[str, Any]:
 
 
 def handle_shadow_trend_map_api(path: str, handler) -> bool:
-    if urlsplit(path).path != "/api/trend-map-shadow":
+    if urlsplit(path).path != "/api/trend-map":
         return False
     try:
         payload = build_shadow_report()

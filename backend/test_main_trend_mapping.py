@@ -153,3 +153,48 @@ def test_main_three_is_demoted_when_ma100_or_ma200_slope_is_not_bullish():
         {5: -2.0, 10: -1.5, 20: -1.0, 50: -0.5, 100: -0.2, 200: -0.1}))
     assert result["main_trend"] == 1
     assert result["reason"] == "main3_rejected_long_ma100_ma200_slope_not_bullish"
+
+
+def test_main_trend_display_strict_bullish_precedes_broad_bullish():
+    result = classify_main_trend(feedback_fixture(
+        90.0, {5: 89.0, 10: 88.0, 20: 87.0, 50: 100.0, 100: 95.0, 200: 90.0},
+        {5: 2.0, 10: 2.0, 20: 2.0, 50: 1.0, 100: 1.0, 200: 1.0}))
+    assert result["main_trend"] == 1
+    assert result["main_trend_display"] == "1++"
+
+
+def test_main_trend_display_broad_bullish_and_neutral_main_one():
+    broad = classify_main_trend(feedback_fixture(
+        87.5, {5: 88.0, 10: 88.0, 20: 87.0, 50: 100.0, 100: 95.0, 200: 90.0},
+        {5: 2.0, 10: 2.0, 20: 2.0, 50: 1.0, 100: 1.0, 200: 1.0}))
+    neutral = classify_main_trend(feedback_fixture(
+        80.0, {5: 81.0, 10: 82.0, 20: 83.0, 50: 84.0, 100: 85.0, 200: 86.0},
+        {5: -1.0, 10: 1.0, 20: 1.0, 50: 1.0, 100: 1.0, 200: 1.0}))
+    assert broad["main_trend"] == 1
+    assert broad["main_trend_display"] == "1+"
+    assert neutral["main_trend"] == 1
+    assert neutral["main_trend_display"] == "1"
+
+
+def test_main_trend_display_strict_and_broad_bearish():
+    strict = classify_main_trend(feedback_fixture(
+        99.0, {5: 98.0, 10: 100.0, 20: 102.0, 50: 99.5, 100: 100.0, 200: 95.0},
+        {5: -1.0, 10: -1.0, 20: -1.0, 50: 1.0, 100: 1.0, 200: 1.0}))
+    broad = classify_main_trend(feedback_fixture(
+        99.0, {5: 98.0, 10: 100.0, 20: 102.0, 50: 99.5, 100: 100.0, 200: 95.0},
+        {5: -1.0, 10: -1.0, 20: 1.0, 50: 1.0, 100: 1.0, 200: 1.0}))
+    assert strict["main_trend"] == 3
+    assert strict["main_trend_display"] == "3--"
+    assert broad["main_trend"] == 3
+    assert broad["main_trend_display"] == "3-"
+
+
+def test_partial_main_trend_never_receives_a_suffix():
+    item = feedback_fixture(
+        90.0, {5: 89.0, 10: 88.0, 20: 87.0, 50: 100.0, 100: 95.0, 200: 90.0},
+        {5: 2.0, 10: 2.0, 20: 2.0, 50: 1.0, 100: 1.0, 200: 1.0})
+    del item["latest"]["ma"]["200"]
+    del item["series"]["ma"]["200"]
+    result = classify_main_trend(item)
+    assert result["evidence_quality"] == "PARTIAL"
+    assert result["main_trend_display"] == "1"

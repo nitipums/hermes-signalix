@@ -21,25 +21,22 @@ Verified Market View
 → Arm review and execution decision
 ```
 
-## Current product direction — clean replacement
+## Current product direction — canonical Trend Mapping line — 2026-09-14
 
-The primary decision spine is **Trend + Elliott candidate + Trade Setup**. This replaces VCP-first serving as the product authority; it does not delete valid historical VCP data or old observations.
+Daily Trend Mapping via `/trend-map` and `/api/trend-map` is the canonical
+Signalix product line. It is public, read-only, deterministic Daily evidence
+with `status=PRODUCTION_READ_ONLY`, `research_only=false`, and
+`actionability=NONE`. The former `shadow` route naming is retired.
 
-- **Daily** is authoritative for big-picture trend, strength, 52W/ATH, and Elliott structural candidates. If official Daily is missing for a symbol/date, the read-only Trend Map may use a separately stored, explicitly non-official `derived_daily_price_data` row built from a complete Settrade 60m session; it must preserve source lineage and never be presented as official Daily.
-- **60m** is for early Wave 3 confirmation, lower-timeframe structure, trigger, and entry timing.
-- Daily and 60m evidence must stay explicitly separated. Never label 60m-derived values as Daily evidence.
-- Primary candidates cover the observable progression around **Wave 1 advance → Wave 2 pullback/near completion → early Wave 3 / continuation**. Elliott output is a conservative machine-generated evidence interpretation, not an objectively confirmed count.
-- Trend/strength is first-class evidence: uptrend/emerging uptrend, 20d/60d advance, relative strength, distance to 52W High, 52W breakout, ATH breakout, and distance from the reference.
-- Sector/industry and peer breadth/leadership are context and ranking evidence, not silent hard exclusions.
-- VCP, contraction, and breakout-volume evidence remain optional `bonus_evidence`; VCP must not remove a valid non-VCP candidate.
-- R:R is deterministic evidence, not a standalone reason to accept a setup. Trigger, technically meaningful invalidation, explicit target method, and sufficient/fresh data are also required.
-- Setup-layer `REVIEW_NOW` still means worth chart review only. Only the separate private signal policy may emit market-only shadow `BUY_NOW`; it is not an executable broker order. Portfolio data and an owner token must not block the local shadow UI.
+`/mvp` and `/api/setup-candidates` are retired from active scope. Preserve their
+source/history as historical/audit material only; do not route current work
+there. Elliott/Wave setup research, private signals, alerts, broker execution,
+and auto-trading are outside the active line.
 
-## Current delivery focus and branch architecture — 2026-09-13
+## Current product direction — clean replacement history
 
-Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current production-served focus. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it is public, read-only, and non-actionable. `/mvp` and `/api/setup-candidates` are **DROPPED / PAUSED** by owner decision; preserve their source/history as retained audit/future-integration material, but do not route work there until Arm explicitly resumes them. Elliott/Wave research is deferred.
-
-Wayfinder decision: “clean main” means a physically Trend-Mapping-only source/product line. The approved topology is a same-repository divergent candidate branch from the current `release/signalix-mvp-stable` HEAD. The existing remote `main` is stale and is not the migration base. Keep the release branch intact for compatibility, audit, research, and rollback evidence; do not perform active `/mvp` or setup-candidate work until Arm explicitly resumes it. This is architecture planning only; it does not change current production checkout, default branch, runtime, or deployment.
+The historical setup-to-decision spine remains preserved for audit and future
+reference. It is not the current delivery or product authority.
 ### Decision and state boundaries
 
 Structural `wave.state` uses only:
@@ -108,9 +105,7 @@ Before any task, Codex must:
 ## Agent roles
 
 - **Arm** — owner and decision maker; approves product scope and production-impacting side effects.
-- **Lite** — sole orchestrator and final quality gate. Lite defines the brief, controls scope, independently checks source → tests → runtime → browser, and owns `PASS` / `FAIL` / `REVISE` / `NOT VERIFIED`.
-- **Codex CLI** — bounded coding/review/implementation worker using `gpt-5.6-luna`. Codex supplies evidence and changes; it never self-approves production readiness.
-- **Ploy** — on-demand trader/product/risk challenger. Feedback is input, not acceptance authority.
+- **Lite** — orchestrator and final quality gate. Lite selects direct implementation, Codex, Ploy, or another worker based on task risk and bounded scope; worker output never replaces Lite's independent acceptance decision.
 
 Khim and Nida are historical references, not default active Signalix team members.
 

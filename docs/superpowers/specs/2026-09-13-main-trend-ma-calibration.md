@@ -10,7 +10,7 @@
 
 The current Trend Map machine lanes (`S1_1`, `S1_2`, `S2_2`, `S3_3`, `S4_1`) do not match Arm's visual reading of the Daily chart. The current classifier relies too heavily on MA20/MA60, RSI, support, and a legacy lane graph, so visually different structures are assigned to the same lane. Examples include symbols Arm identifies as Main Trend 1, 3, or 4 while the served artifact assigns `S4_1` or `S2_2`.
 
-The first correction is to establish four broad visual Main Trends from deterministic multiple-MA evidence before introducing any subtype such as `1.1`, `1.2`, `2.1`, `2.2`, `4.1`, or `4.2`.
+The first correction establishes four broad visual Main Trends from deterministic multiple-MA evidence. A bounded owner-approved display suffix taxonomy is now permitted as visual evidence: `1++`, `1+`, `1`, `2`, `3`, `3-`, `3--`, and `4`. It does not change the canonical numeric Main Trend or create an action lane.
 
 ## Owner-Confirmed Main Trend Model
 
@@ -28,7 +28,7 @@ Interpretation for overlapping cases:
 - Recovery or starting to move upward belongs to Main 2.
 - Pullback or distribution inside an intact long-term structure belongs to Main 3.
 - Main 4 is reserved for sustained structural deterioration, not a single close below MA20.
-- Main 1 has no `1.2` subtype in this phase.
+- Main 1 has no legacy `1.2` subtype; the bounded `1++`/`1+` display evidence uses only the exact predicates in the current calculation contract.
 
 ## Inputs and Determinism
 
@@ -103,7 +103,7 @@ Diagnostic evidence must compare the legacy served lane, owner Main Trend label,
 
 ## Out of Scope
 
-- Main Trend subtypes (`1.1`, `2.1`, `2.2`, `4.1`, `4.2`).
+- Legacy Main Trend subtypes (`1.1`, `1.2`, `2.1`, `2.2`, `4.1`, `4.2`); the bounded owner-approved display suffixes are covered above and by the current calculation contract.
 - Action lanes, `BUY_NOW`, `SELL_NOW`, `WATCH`, `HOLD`, or `REVIEW_NOW`.
 - Elliott/Wave truth, setup candidates, `/mvp`, or `/api/setup-candidates`.
 - RSI, MACD, volume, support, fundamentals, and automatic parameter search in the first MA-only calibration slice.

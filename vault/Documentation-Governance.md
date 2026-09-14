@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT** · governance layer
 > **Last reviewed:** 2026-09-13
-> **Current reconciliation:** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the current delivery focus; `/mvp` and `/api/setup-candidates` are **DROPPED / PAUSED** by owner decision and remain retained audit/future-integration material only. Do not route work there until Arm explicitly resumes it. The current production baseline remains `release/signalix-mvp-stable`; the approved Trend-Mapping-only `main` is planning-only until promotion gates pass. Public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
+> **Current reconciliation:** Daily Trend Mapping via `/trend-map` and `/api/trend-map` is the canonical product line; `/mvp` and `/api/setup-candidates` are historical/audit only. Lite selects direct implementation or workers as appropriate and remains the final gate. Public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 

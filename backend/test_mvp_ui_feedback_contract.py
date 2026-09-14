@@ -141,7 +141,7 @@ def test_shared_drawer_supports_horizontal_swipe_navigation_without_breaking_scr
     assert "navigateSharedDrawer(-1)" in shared
     assert "Math.abs(deltaX)" in shared
     assert "Math.abs(deltaY)" in shared
-    assert 'envelope.source === "trend-map-shadow" ? null' in shared
+    assert 'envelope.source === "trend-map" ? null' in shared
 
 
 def test_chart_layout_keeps_all_mobile_panels_inside_canvas():

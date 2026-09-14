@@ -243,6 +243,17 @@ Every result contains one value:
 main_trend: 1 | 2 | 3 | 4
 ```
 
+Every result also contains deterministic display-only evidence:
+`main_trend_display: 1++ | 1+ | 1 | 2 | 3 | 3- | 3-- | 4`. It is derived
+after numeric classification and is never an action lane. `PARTIAL` evidence
+always receives the unsuffixed numeric display value. For Main 1, strict
+bullish evidence (`FULL`, Close above MA10 and MA20, and all short slopes
+positive) takes precedence over broad bullish evidence (Close above MA20 and
+all short slopes positive). For Main 3, strict bearish evidence (`FULL`, all
+short slopes negative, and Close below MA10 or MA20) takes precedence over
+broad bearish evidence (`short_negative_count >= 2` with the same Close
+condition).
+
 Supporting deterministic evidence includes:
 
 ```text

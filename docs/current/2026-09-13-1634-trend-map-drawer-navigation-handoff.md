@@ -53,7 +53,7 @@ PASS
 Public route:
 
 ```text
-http://91.98.72.120:3001/trend-map-shadow
+http://91.98.72.120:3001/trend-map
 ```
 
 At 390px:

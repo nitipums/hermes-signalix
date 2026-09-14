@@ -266,6 +266,32 @@ def classify_main_trend(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         main_trend = 1
         reason = "main3_rejected_long_ma100_ma200_slope_not_bullish"
 
+    # Suffixes are display-only evidence layered on top of the canonical
+    # numeric Main Trend. They run after classification and never use quote,
+    # momentum, volume, broad-state, legacy-lane, or chart output.
+    main_trend_display = str(main_trend)
+    if quality == "FULL":
+        short_close_below = (close_position["10"] == "BELOW" or close_position["20"] == "BELOW")
+        short_slopes_positive = _direction(slopes, SHORT_PERIODS, True)
+        short_slopes_negative = _direction(slopes, SHORT_PERIODS, False)
+        if main_trend == 1:
+            strict_bullish = (
+                close_position["10"] == "ABOVE" and close_position["20"] == "ABOVE"
+                and short_slopes_positive
+            )
+            broad_bullish = close_position["20"] == "ABOVE" and short_slopes_positive
+            if strict_bullish:
+                main_trend_display = "1++"
+            elif broad_bullish:
+                main_trend_display = "1+"
+        elif main_trend == 3:
+            strict_bearish = short_slopes_negative and short_close_below
+            broad_bearish = short_negative_count >= 2 and short_close_below
+            if strict_bearish:
+                main_trend_display = "3--"
+            elif broad_bearish:
+                main_trend_display = "3-"
+
     as_of = latest.get("as_of", source.get("as_of"))
     if as_of is None:
         provenance = source.get("provenance")
@@ -281,6 +307,7 @@ def classify_main_trend(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         ambiguity.append("mixed_long_term_and_short_term_evidence_requires_review")
     return {
         "main_trend": main_trend,
+        "main_trend_display": main_trend_display,
         "evidence_quality": quality,
         "used_periods": [period for period in MA_PERIODS if ma[str(period)] is not None],
         "slope_window": SLOPE_WINDOW,

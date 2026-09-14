@@ -1,31 +1,32 @@
 # Signalix — Start Here
 
 > **STATUS: CURRENT** · Single entrypoint and routing map only.
-> **Last reconciled:** 2026-09-13 ICT
+> **Last reconciled:** 2026-09-14 ICT
 > Product, contract, runtime, and research truth live in the linked authorities below.
 
 ## Signalix in one minute
 
-Signalix prepares deterministic market evidence and private paper/shadow signals for Arm's review. Arm reviews the chart and makes the final decision. Wave output is machine-generated candidate/evidence, not truth, an order, or automatic trading.
+Signalix is Daily Trend Mapping: deterministic, public, read-only evidence for
+Arm's chart review. It is not a setup engine, signal generator, order system,
+or automatic trading system.
 
 ```text
 Daily market data
-→ Trend Mapping
+→ Daily Trend Mapping
 → data quality / freshness review
-→ Arm review
-
-Setup integration is explicitly paused and is not part of the current delivery sequence.
+→ Arm chart review
 ```
 
-Canonical surfaces:
+The former `shadow` naming is retired. The canonical surfaces are:
 
-- **Current production-served focus:** `/trend-map-shadow`, `/api/trend-map-shadow` with canonical envelope `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`
-- **Active promotion/closeout:** GitHub [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17)
-- `/api/setup-candidates`, `/mvp`: **DROPPED / PAUSED** by owner decision; do not route work there until explicitly resumed
-- Operational scope for the current Trend Map: `marginable_long` (runtime counts are not permanent constants)
-- Setup decision lanes and Wave contract are preserved as retained audit/future-integration history only
-- Elliott Wave: deferred research; not the current delivery gate
-- Alerts, broker execution, and auto-trading: `OFF / PENDING`
+- `/trend-map`
+- `/api/trend-map`
+
+The former `/mvp` and `/api/setup-candidates` setup surfaces are retired from
+active scope. Their source/history is retained for audit and future reference,
+but current work must not route there.
+
+Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 
 ## Read the smallest authority set
 

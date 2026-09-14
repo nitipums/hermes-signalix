@@ -10,10 +10,10 @@ The current architecture is:
 ```text
 Daily price_data
 → bounded EOD publisher
-→ immutable shadow read-model artifact + current pointer
-→ GET /api/trend-map-shadow
-→ GET /trend-map-shadow
-→ shared /mvp drawer/chart for evidence review
+→ immutable Trend Map read-model artifact + current pointer
+→ GET /api/trend-map
+→ GET /trend-map
+→ shared chart drawer for evidence review
 ```
 
 Trend Mapping is production-served read-only Daily evidence. It does not create

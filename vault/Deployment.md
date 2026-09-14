@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-13 16:34 ICT · current release HEAD is `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004`; the checkout also carries uncommitted owner/working-tree changes, including the bounded Trend Map drawer navigation fix recorded below. The served Trend Map artifact and runtime evidence below remain the current read-model evidence; Issue #22 implementation is at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; the former shadow naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. Runtime claims below require fresh probes; commit/push state is read from the checkout, not this banner.
 
 ## Stable release
 
@@ -25,13 +25,24 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Public browser at 390px: `237` rendered rows; visible Main Trend-only grouping/filter/table; sample values `1 · FULL` / `3 · FULL` / `4 · FULL`; legacy machine-lane labels are absent; `scrollWidth=390`, `bodyScrollWidth=390`.
 - Status: source/tests/runtime/API/browser `PASS`; commit/push not performed; working-tree artifact/source changes remain uncommitted.
 
+### Main Trend display suffix promotion — 2026-09-14 08:23 ICT
+
+- Owner-authorized bounded promotion adds deterministic display-only suffixes over the canonical numeric Main Trend: `1++`, `1+`, `1`, `2`, `3`, `3-`, `3--`, `4`. `1++`/`3--` are strict; `1+`/`3-` are broad-only; ordinary values remain unsuffixed. This is visual evidence only; `actionability=NONE` and the numeric `main_trend` remain unchanged.
+- Source/tests: focused Main Trend, Trend Map, and shared-drawer suites passed (`65 passed`); Python compile, JavaScript syntax, and `git diff --check` passed.
+- Immutable artifact: `shadow-trend-map-quote-envelope-v2-2026-09-11-87dce5718dd0784a-e76ebcbf1637fac9-1a9d7d18a342e6bd-b049c7d5dd8f590b`; `237/237` declared/evaluated/returned; display distribution `33 Main 1 / 4 1+ / 8 1++ / 19 Main 2 / 39 Main 3 / 10 3- / 9 3-- / 110 Main 4 / 5 blocked`.
+- Runtime/API: backend and dashboard recreated; readiness returned `status=ok`, `db=up`, `redis=up`; local and public API returned HTTP 200, `PRODUCTION_READ_ONLY`, `verification_status=VERIFIED`, freshness `FRESH`, and the new display field.
+- Public browser: `http://91.98.72.120:3001/trend-map` verified at desktop `1280px` and mobile `390px`; representative rows showed `AKR 1++`, `AAI 1+`, `LHFG 3--`, `AOT 3-`; AKR drawer showed `Main Trend 1++ · FULL`; mobile `scrollWidth=390` and `bodyScrollWidth=390`.
+- Follow-up presentation ordering: within Main Trend 1, rows render `1++ → 1+ → 1`; within Main Trend 3, rows render `3-- → 3- → 3`. Quote change descending and symbol ascending remain secondary tie-breaks. Public mobile and desktop read-back passed; opening AKR then Next moved to GFPT (`1++`) in the rendered order.
+- Mobile table containment: at `390px`, the five-column table rendered at `366px` with `document.scrollWidth=390`, `body.scrollWidth=390`, all primary columns visible, and `1++ · FULL` intact; desktop table rendered at `924px` inside a `960px` main container.
+- Boundary: no database migration/write, alert, broker, order, or auto-trading action. Commit and push were not performed; pre-existing untracked version artifacts remain preserved.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.
 - Root cause: drawer navigation retained the first symbol's `chartUrl`, so the header/position advanced while the chart fetched the old symbol; the shared drawer also had no touch gesture handlers.
 - Fix: Trend Map navigation now derives the chart request from the current symbol; the drawer body supports horizontal touch swipe (50px threshold), rejects predominantly vertical movement, and ignores controls/links.
 - Source/tests: the regression test was RED before the fix and GREEN after it. `pytest -q backend/test_mvp_ui_feedback_contract.py backend/test_shadow_trend_map.py -rA` returned `51 passed`; `node --check backend/frontend/shared-drawer.js` and `git diff --check` passed.
-- Served browser read-back through `http://91.98.72.120:3001/trend-map-shadow` at 390px: `TEAM` → `RJH` (`2 of 237`) → `KCG` (`3 of 237`); observed chart requests changed respectively to `/api/chart-db/TEAM?timeframe=1D`, `/api/chart-db/RJH?timeframe=1D`, and `/api/chart-db/KCG?timeframe=1D`. Synthetic touch swipe was also verified.
+- Served browser read-back through `http://91.98.72.120:3001/trend-map` at 390px: `TEAM` → `RJH` (`2 of 237`) → `KCG` (`3 of 237`); observed chart requests changed respectively to `/api/chart-db/TEAM?timeframe=1D`, `/api/chart-db/RJH?timeframe=1D`, and `/api/chart-db/KCG?timeframe=1D`. Synthetic touch swipe was also verified.
 - Runtime boundary: no restart, migration, database write, commit, or push was performed. The served JS matched the current dirty worktree; release promotion remains pending scoped closeout.
 
 ### Fresh promotion read-back — 2026-09-13
@@ -45,8 +56,8 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Rollback: `PASS`; isolated source-plus-artifact pairing read back both the pre-promotion `6095346` + legacy artifact (`READ_ONLY_SHADOW`, `VERIFIED`, 237 rows) and the promoted source + artifact (`PRODUCTION_READ_ONLY`, `VERIFIED`, 237 rows). No production traffic was switched during the drill.
 
 ```text
-/trend-map-shadow
-/api/trend-map-shadow
+/trend-map
+/api/trend-map
 ```
 
 This surface is production-served public read-only Daily evidence
@@ -152,7 +163,7 @@ policy. No credential or secret is recorded here.
 
 The bounded publisher, artifact/failure-sidecar validation, EOD hook, and
 fail-closed SQL guard were deployed and publicly read back. The public
-`GET /api/trend-map-shadow` returned HTTP 200 with 237 rows: `229 AVAILABLE`,
+`GET /api/trend-map` returned HTTP 200 with 237 rows: `229 AVAILABLE`,
 `5 INVALID_DATA`, and `3 NO_DATA`; freshness was `FRESH`. Public `/mvp` also
 returned HTTP 200. The verified pointer targeted artifact
 - **Historical artifact identity (superseded; not current pointer):** `shadow-trend-map-quote-envelope-v2-2026-09-11-2851c3f13cbd8e39-e76ebcbf1637fac9-02bd1d0dee037566-0988111049785ae5` with content hash `02bd1d0dee037566` and measurement hash `0988111049785ae5`.
@@ -406,9 +417,9 @@ after the restart; a successful restart alone is not acceptance evidence.
 - Shadow hardening source contract: publisher retrieval is capped at 430 rows/symbol with explicit `cap_reached`/`cap` provenance. The single read-only batch query returns newest capped rows plus per-symbol `quality_scan`, `quality_established`, and exact `_valid`-equivalent `invalid_count` metadata over filtered Daily source rows; no unbounded history is transferred or claimed. A cap-hit `AVAILABLE` row is valid only with established quality and zero invalid rows; invalid rows remain `INVALID_DATA`, and unestablished quality is `DATA_BLOCKED`. Non-cap-hit rows retain max400/min30/prior10 behavior. Immutable artifacts persist numeric DB-read, classification, serialization/write-preparation, and total publisher timings with `measurement_scope=pre_immutable_write`; HTTP exposes separate read-path latency and validates the pointer/artifact on every request. Version identity includes content and measurement fingerprints, so changed measurement metadata cannot overwrite or falsely collide with an immutable artifact. HTTP returns read-path latency plus `published_at`, `age_seconds`, and configurable stale status; stale/corrupt/missing artifacts are visible `DATA_BLOCKED`/`NOT_VERIFIED` with zero rows. EOD publish exceptions emit structured failure events and preserve the prior pointer. The production Trend Map route is permanently public read-only with no authentication; it is non-actionable Daily evidence and separate from `/mvp`'s owner-only/private signal policy.
 - The current SQL guard is source-only and fail-closed: only one `SELECT`/read-only `WITH` is admitted; mutating verbs (`INSERT`, `UPDATE`, `DELETE`, `MERGE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE`, `GRANT`, `REVOKE`) anywhere in the statement, including data-modifying CTEs, are rejected. The database read-only transaction remains defense-in-depth. The public shadow route requires no credential or secret and has no action/order semantics.
 - Shadow quote-column source change (2026-09-12): the isolated table reads persisted `quote.price`, `quote.change_amount`, and `quote.change_pct` from the immutable Daily artifact, with `previous_daily_close` basis and explicit quote provenance. The quote representation revision is part of artifact and pointer identity, so an older same-as-of/policy/universe artifact without quote fields remains untouched and cannot be overwritten. Deployed/public read-back: HTTP 200, artifact `quote-envelope-v2`, 237 rows, sample quote `4.08`, `-0.04`, `-0.97%`, basis `previous_daily_close`; no `/mvp` frontend behavior or canonical read model changed.
-- Shared drawer DOM mapping regression (2026-09-12): explicit mappings align `renderSharedDetail` with shared markup IDs (`drawer-provenance`, `drawer-52w`, `drawer-ath`). After dashboard recreate, public `/trend-map-shadow` and `/mvp` returned HTTP 200; served `shared-drawer.js` contains one `openSharedDrawer` and one `drawChart`; real headless click test opened shadow drawer for `ADVICE` and reached `Chart status: Confirmed candle · 2026-09-11`. No API, database, ingestion, publisher, `/mvp` semantics, alerts, or broker behavior changed.
+- Shared drawer DOM mapping regression (2026-09-12): explicit mappings align `renderSharedDetail` with shared markup IDs (`drawer-provenance`, `drawer-52w`, `drawer-ath`). After dashboard recreate, public `/trend-map` and `/mvp` returned HTTP 200; served `shared-drawer.js` contains one `openSharedDrawer` and one `drawChart`; real headless click test opened shadow drawer for `ADVICE` and reached `Chart status: Confirmed candle · 2026-09-11`. No API, database, ingestion, publisher, `/mvp` semantics, alerts, or broker behavior changed.
 - Shared drawer OHLCV table overflow fix (2026-09-12): the seven-column `OHLCV Window Summary` is now inside `.rolling-high-low__table-wrap`, which owns horizontal scrolling while the inner table keeps a readable minimum width; page-level horizontal overflow remains hidden. `/mvp` and shadow usage and product semantics are unchanged. Deployed and browser-verified at 390px: `innerWidth=390`, `bodyScrollWidth=390`, drawer visible, wrapper `clientWidth=348`, `scrollWidth=980`, `overflow-x=auto`.
-- Closeout release (2026-09-12): commits `f18e48f` and `15701ef` are pushed to `release/signalix-mvp-stable`; remote SHA is `15701effad9d6549687740bf65af422a909d38af`. Dashboard was recreated from the release source and is healthy; public `/trend-map-shadow`, `/api/trend-map-shadow`, and `/mvp` read-back passed. Browser verification at 390px confirmed drawer/chart, bounded OHLCV scrolling, and MA control computed height `44px`; error→Retry→recovery returned 237 rows. The next scheduled EOD freshness/read-back after this release remains `NOT VERIFIED` and is not claimed here.
+- Closeout release (2026-09-12): commits `f18e48f` and `15701ef` are pushed to `release/signalix-mvp-stable`; remote SHA is `15701effad9d6549687740bf65af422a909d38af`. Dashboard was recreated from the release source and is healthy; public `/trend-map`, `/api/trend-map`, and `/mvp` read-back passed. Browser verification at 390px confirmed drawer/chart, bounded OHLCV scrolling, and MA control computed height `44px`; error→Retry→recovery returned 237 rows. The next scheduled EOD freshness/read-back after this release remains `NOT VERIFIED` and is not claimed here.
 - Worktree note: generated `backend/shadow-read-model/` artifacts are intentionally tracked runtime inputs in commit `f18e48f`, not untracked research artifacts. Untracked `research/`, `docs/current/`, and `docs/agents/` QA/session notes remain preserved owner/research artifacts outside that commit and must not be cleaned or treated as deployment evidence.
 - `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
 

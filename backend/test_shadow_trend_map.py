@@ -243,7 +243,7 @@ def test_template_has_main_trend_grouped_table_filter_drawer_chart_and_shadow_ma
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     combined = html + shared.read_text()
-    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"main-trend-heading\"", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map-shadow\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map-shadow", "/api/chart-db/", 'data-timeframe="1D"', "chartUrl:null", "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'colspan="5"'):
+    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"main-trend-heading\"", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map", "/api/chart-db/", 'data-timeframe="1D"', "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "main_trend_display", "1++", "1+", "1", "2", "3", "3-", "3--", "4", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'colspan="5"'):
         assert marker in combined
     for removed in ("Daily lane", "machine_lane", "Machine lane", "broad_state", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states"):
         assert removed not in html
@@ -313,7 +313,7 @@ setImmediate(function () {
   context.window.SignalixSharedDrawer = {openSharedDrawer: function (payload) { opens.push(payload); }};
   scripts[0].onload();
   setImmediate(function () {
-    if (opens.length !== 2 || opens[0].item.symbol !== "AAA" || opens[0].source !== "trend-map-shadow") process.exit(2);
+    if (opens.length !== 2 || opens[0].item.symbol !== "AAA" || opens[0].source !== "trend-map") process.exit(2);
     process.stdout.write("ok");
   });
 });
@@ -329,7 +329,7 @@ def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_con
     normalized = html.lower()
     for removed in ("permanent public read-only research surface", "no authentication required", "research only", "no financial calculations"):
         assert removed not in normalized
-    assert 'source:"trend-map-shadow"' in html
+    assert 'source:"trend-map"' in html
     assert 'actionability:"NONE"' in html
     for forbidden in ("owner-only", "owner decision", "access control", "auth pending", "authentication pending"):
         assert forbidden not in normalized
@@ -352,6 +352,49 @@ def test_shadow_table_contract_sorts_quotes_and_navigates_filtered_rendered_rows
     assert 'colspan="8"' not in html
 
 
+def test_shadow_table_orders_display_suffixes_before_quote_and_symbol_ties():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    inline = html.split("<script>", 1)[1].split("</script>", 1)[0]
+    harness = r'''
+const elements = {};
+function Element(id) { this.id = id; this.value = ""; this.hidden = false; this.textContent = ""; }
+["search", "main-trend", "summary", "error", "retry", "reload", "rows"].forEach(function (id) { elements[id] = new Element(id); });
+Object.defineProperty(elements.rows, "innerHTML", { set: function (value) {
+  this.renderedSymbols = Array.from(value.matchAll(/data-symbol="([^"]+)"/g), function (match) { return match[1]; });
+} });
+const document = {
+  querySelector: function (selector) { return elements[selector.slice(1)] || null; },
+  querySelectorAll: function () { return []; }
+};
+const rows = [
+  {symbol: "Z1PP", main_trend: {main_trend: 1, main_trend_display: "1++", evidence_quality: "FULL"}, quote: {change_pct: 5}},
+  {symbol: "A1PP", main_trend: {main_trend: 1, main_trend_display: "1++", evidence_quality: "FULL"}, quote: {change_pct: 5}},
+  {symbol: "B1P", main_trend: {main_trend: 1, main_trend_display: "1+", evidence_quality: "FULL"}, quote: {change_pct: 10}},
+  {symbol: "C1", main_trend: {main_trend: 1, main_trend_display: "1", evidence_quality: "FULL"}, quote: {change_pct: 20}},
+  {symbol: "Z3DD", main_trend: {main_trend: 3, main_trend_display: "3--", evidence_quality: "FULL"}, quote: {change_pct: 2}},
+  {symbol: "A3DD", main_trend: {main_trend: 3, main_trend_display: "3--", evidence_quality: "FULL"}, quote: {change_pct: 2}},
+  {symbol: "B3D", main_trend: {main_trend: 3, main_trend_display: "3-", evidence_quality: "FULL"}, quote: {change_pct: 10}},
+  {symbol: "C3", main_trend: {main_trend: 3, main_trend_display: "3", evidence_quality: "FULL"}, quote: {change_pct: 20}}
+];
+const context = {
+  window: {}, document: document, Promise: Promise,
+  fetch: function () { return Promise.resolve({ok: true, json: function () { return Promise.resolve({
+    status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
+    verification_status: "VERIFIED", freshness: {status: "FRESH"}, rows: rows
+  }); }}); }
+};
+vm.runInNewContext(%s, context);
+setImmediate(function () {
+  const expected = ["A1PP", "Z1PP", "B1P", "C1", "A3DD", "Z3DD", "B3D", "C3"];
+  if (JSON.stringify(elements.rows.renderedSymbols) !== JSON.stringify(expected)) process.exit(1);
+  process.stdout.write("ok");
+});
+''' % json.dumps(inline)
+    result = subprocess.run(["node", "-e", "const vm = require('vm');\n" + harness], check=False, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "ok"
+
+
 def test_shadow_drawer_removes_wave_evidence_and_chart_prose_but_preserves_markers_and_identity():
     template = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
@@ -369,7 +412,7 @@ def test_shadow_adapter_uses_shared_drawer_and_suppresses_action_setup_semantics
     template = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     combined = template + shared.read_text()
-    assert 'source:"trend-map-shadow"' in combined
+    assert 'source:"trend-map"' in combined
     assert 'actionability:"NONE"' in combined
     assert 'dom.drawerAction.hidden = shadow' in combined
     assert 'if (setupSection) setupSection.hidden = shadow' in combined
@@ -395,13 +438,59 @@ def test_shadow_shared_drawer_owns_ohlcv_table_overflow_without_page_overflow():
     assert "body {" in css and "overflow-x: hidden;" in css
 
 
-def test_template_has_mobile_safe_table_overflow_strategy():
+def test_template_has_mobile_safe_fixed_five_column_table_strategy():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     assert ".table-wrap" in html
     assert "overflow-x:auto" in html
     assert "max-width:100%" in html
     assert "min-width:780px" in html
+    assert "table-layout:fixed" in html
     assert "overflow-x:hidden" in html
+    mobile = html.split("@media (max-width:720px)", 1)[1]
+    assert ".trend-page .table-wrap{overflow:hidden}" in mobile
+    assert ".trend-page table{min-width:0}" in mobile
+    assert ".trend-page th,.trend-page td{padding:7px 4px;font-size:12px}" in mobile
+    for column, width in ((1, "20%"), (2, "16%"), (3, "18%"), (4, "19%"), (5, "27%")):
+        assert f"nth-child({column})" in mobile
+        assert f"width:{width}" in mobile
+    assert "white-space:nowrap" in html
+    assert "text-overflow:ellipsis" in html
+
+
+def test_shadow_table_renders_inside_390px_viewport_without_hiding_primary_columns():
+    playwright = pytest.importorskip("playwright.sync_api")
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    css = html.split("<style>", 1)[1].split("</style>", 1)[0]
+    with playwright.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=True)
+        except Exception as error:
+            pytest.skip("Chromium cannot start in this sandbox: " + str(error).splitlines()[0])
+        page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+        page.set_content(f'''<style>{css}</style>
+          <body class="shadow-page"><main><div class="table-wrap"><table>
+            <thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>% Change</th><th>Main Trend</th></tr></thead>
+            <tbody><tr><td>AAA</td><td>100.00</td><td>1.00</td><td>1.00%</td><td>1++ · FULL</td></tr></tbody>
+          </table></div></main></body>''')
+        result = page.evaluate("""() => {
+          const table = document.querySelector('table');
+          const cells = [...document.querySelectorAll('tbody td')];
+          return {
+            viewport: document.documentElement.clientWidth,
+            documentScroll: document.documentElement.scrollWidth,
+            bodyScroll: document.body.scrollWidth,
+            table: table.getBoundingClientRect().width,
+            main: document.querySelector('main').getBoundingClientRect().width,
+            cells: cells.map(cell => ({width: cell.getBoundingClientRect().width, text: cell.textContent}))
+          };
+        }""")
+        browser.close()
+    assert result["documentScroll"] <= result["viewport"]
+    assert result["bodyScroll"] <= result["viewport"]
+    assert result["table"] <= result["main"]
+    assert len(result["cells"]) == 5
+    assert all(cell["width"] > 0 for cell in result["cells"])
+    assert result["cells"][-1]["text"] == "1++ · FULL"
 
 
 def test_shadow_module_has_no_database_write_operations():
@@ -714,7 +803,7 @@ def test_api_route_is_same_origin_read_only_envelope(monkeypatch):
             self.body.extend(body)
     handler = Handler()
     monkeypatch.setattr(subject, "build_shadow_report", lambda: {"status": subject.PRODUCTION_READ_ONLY, "research_only": False, "actionability": "NONE", "rows": []})
-    assert subject.handle_shadow_trend_map_api("/api/trend-map-shadow", handler)
+    assert subject.handle_shadow_trend_map_api("/api/trend-map", handler)
     assert handler.status == 200
     payload = json.loads(bytes(handler.body))
     assert payload["status"] == subject.PRODUCTION_READ_ONLY

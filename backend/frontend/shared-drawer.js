@@ -130,7 +130,10 @@
     if ([1, 2, 3, 4].indexOf(value) < 0) return "Main Trend · Not verified";
     var quality = evidence && String(evidence.evidence_quality || "").toUpperCase();
     if (["FULL", "PARTIAL"].indexOf(quality) < 0) quality = "NOT_VERIFIED";
-    return "Main Trend " + value + " · " + quality;
+    var display = evidence && evidence.main_trend_display;
+    var validDisplays = ["1++", "1+", "1", "2", "3", "3-", "3--", "4"];
+    display = quality === "FULL" && validDisplays.indexOf(String(display)) >= 0 ? String(display) : String(value);
+    return "Main Trend " + display + " · " + quality;
   }
 
   function normalizeDrawerTrendDisplay(item, trend) {
@@ -226,7 +229,7 @@
   }
 
   function renderSharedDetail(envelope) {
-    var item = envelope.item || {}, shadow = envelope.source === "trend-map-shadow";
+    var item = envelope.item || {}, shadow = envelope.source === "trend-map";
     dom.drawer.classList.toggle("drawer--shadow", shadow);
     var waveSummary = dom.drawer.querySelector(".drawer-wave-summary");
     if (waveSummary) waveSummary.hidden = shadow;
@@ -360,7 +363,7 @@
     var next = drawerIndex + delta; if (next < 0 || next >= drawerSymbols.length) return;
     var item = drawerItems[next] || {symbol: drawerSymbols[next]};
     var envelope = drawerItem && drawerItem.__sharedEnvelope || {};
-    openSharedDrawer({item:item, lane:item.decision_lane || item.machine_lane, trend:item.trend || item.classifier_status || item.stage, broad_state:item.broad_state, source:envelope.source || "canonical-mvp", actionability:item.actionability, detailUrl:envelope.detailUrl || null, chartUrl:envelope.source === "trend-map-shadow" ? null : (envelope.chartUrl || null), navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
+    openSharedDrawer({item:item, lane:item.decision_lane || item.machine_lane, trend:item.trend || item.classifier_status || item.stage, broad_state:item.broad_state, source:envelope.source || "canonical-mvp", actionability:item.actionability, detailUrl:envelope.detailUrl || null, chartUrl:envelope.source === "trend-map" ? null : (envelope.chartUrl || null), navigation:{symbols:drawerSymbols,items:drawerItems,index:next}});
   }
 
     function escapeHTML(str) {

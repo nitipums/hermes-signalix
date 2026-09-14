@@ -1,18 +1,21 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-13 16:34 ICT · current release HEAD is `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004`; the checkout carries uncommitted owner/working-tree changes, including the bounded Trend Map drawer navigation fix recorded below. Issue #22 implementation remains committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; production-served Trend Map remains read-only; setup freshness remains partial/stale for unavailable Daily baselines; evaluator auto-caller remains separate.
+> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; the former shadow naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
 > Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused current specs under `../docs/superpowers/specs/` for contracts, and the Kanban board only for active named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
 
-## Current delivery focus
+## Current acceptance focus — canonical Trend Mapping
 
-The canonical working focus is the production-served Daily Trend Mapping surface via `/trend-map-shadow` and `/api/trend-map-shadow`; the active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17). See `Deployment.md` for the current delivery boundary. The setup-candidate and `/mvp` contracts are **DROPPED / PAUSED** by owner decision, not this delivery target. Preserve their source/history as retained audit/future-integration evidence, but do not spend work or route tasks there until Arm explicitly resumes them.
-
-The owner-approved Main Trend calibration is a separate bounded diagnostic/classifier specification in `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` (Issue #32). Its current slice uses Daily Close plus SMA5/10/20/50/100/200 and 20 completed Daily bars for slope, defines Main Trend 1–4 only, and does not add action lanes or change the current read-only/non-actionable boundary until implementation and acceptance gates pass.
+The acceptance target is the public Daily Trend Mapping surface at `/trend-map`
+and `/api/trend-map`. Verify deterministic source, immutable artifact/pointer,
+API schema, freshness/quality distribution, non-actionable boundary, and the
+real desktop/mobile chart journey. The retired `/mvp` and
+`/api/setup-candidates` surfaces are historical/audit only and are not current
+acceptance targets.
 
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
@@ -25,7 +28,7 @@ The owner-approved Main Trend calibration is a separate bounded diagnostic/class
 
 - Prior source/runtime baseline for the promotion evidence below was `45095b320fba6bde72ff3af553ffdaa366426bac`; Issue #22 implementation baseline is `f99becb5d5d50a49331419bb8d878ae6b9f6d979`; the bounded drawer working-tree verification is recorded above and no new release promotion is claimed here.
 - Focused source gate: fallback/Trend Map command `pytest -q backend/test_derived_daily_fallback.py backend/test_shadow_trend_map.py` returned `52 passed`; publisher/intraday/artifact regressions also passed; Python compile and `git diff --check` passed. The broader `/mvp` frontend contract has 20 pre-existing failures on the base commit and is not attributed to this Trend Map slice.
-- Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map-shadow` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
+- Runtime/API: backend/dashboard recreated; readiness `ok`; local and public `/api/trend-map` returned HTTP 200 with `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `VERIFIED`, `FRESH`, and `237/237` rows.
 - Browser: desktop 237 rows plus drawer/chart; 390px mobile no overflow (`scrollWidth=390`); failure → Retry showed zero rows and recovery returned 237 rows. Hermes `browser_exec` helper syntax was separately verified after restoring the managed Browser Use CLI path.
 - Rollback: `PASS`; isolated source-plus-artifact pairing read back the pre-promotion `6095346` + legacy artifact and the promoted source + artifact, each with 237 verified rows and matching status semantics. No production traffic was switched during the drill.
 
@@ -40,7 +43,7 @@ The owner-approved Main Trend calibration is a separate bounded diagnostic/class
 
 - **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
 - **Source/release:** `NOT VERIFIED` for this drawer slice's release promotion — local/remote release HEAD is `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004`, while the drawer fix and related evidence remain uncommitted in the working tree; Issue #22 implementation remains committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`.
-- **Runtime/API:** `PASS` for the served `/api/trend-map-shadow` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` are dropped/paused and are not current acceptance targets.
+- **Runtime/API:** `PASS` for the served `/api/trend-map` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` are dropped/paused and are not current acceptance targets.
 - **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Official Daily remains unavailable for `3BBIF`, `COM7`, and `PR9`; their Trend Map rows use explicitly non-official derived Daily evidence from complete Settrade 60m sessions.
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
 - **Safety:** Wave remains machine-generated evidence for Arm review; the Trend Map is production-served public read-only Daily evidence (`status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`); alerts, broker execution, and auto-trading remain `OFF/PENDING`.
@@ -213,8 +216,8 @@ Derived from **260 cards / 355 runs / 154 logs** (`vault/Lesson-Learned-2026-08-
 4. **Browser locality:** QA primary evidence is `curl :3001/mvp + curl :3001/api/vcp-finder?...daily_watchlist=true + curl :8000/health/readiness + read_file /worktree/*.json`. `browser_open localhost` is screenshot-only; 119× blocked prepares on `t_cbd7e900` is forbidden.
 5. **Completion schema:** `kanban_complete` requires non-empty `artifacts` — at minimum one probe JSON (`sl8000_after.json`). Pure-logic fix without file must still emit a probe. Mirror `artifacts` inside metadata.
 6. **Heartbeat checkpoint:** Orchestrator watches `last_heartbeat_at` with empty artifacts. >15 min → bounded checkpoint: complete with artifacts or block with root cause in 10 min. Heartbeat-only (`t_3755a74f` 17 heartbeats, `t_7e1964f8` 59) not acceptable.
-7. **No parallel workers** for full-universe or docker rebuild cards (owner directive 2026-08-19).
-8. **Stagger + crash-cluster pause:** Do not open >2 large P0/UI cards concurrently (08-22/23 had 29–33 waste runs/day). If `crashed` >3 in 1 min, pause dispatch 10 min (08-19/21 clusters). Lite sole orchestrator enforces.
+7. **Bounded concurrency:** Parallel work is allowed when scopes/worktrees do not overlap; serialize overlapping writers and shared runtime side effects.
+8. **Stagger + crash-cluster pause:** Keep dispatch bounded and pause on crash clusters. Lite chooses whether workers are appropriate for the task.
 
 ## Evidence standard for every pull
 
@@ -231,7 +234,7 @@ Before a row above can be marked complete in this document, record:
 ## Historical deployment evidence — 2026-09-12 (superseded by 2026-09-13 closeout)
 
 - Previously deployed shadow/UI slices remain historical evidence only: the shared-drawer OHLCV containment and DOM-mapping changes were deployed and browser-verified on 2026-09-12, with no `/mvp` semantic, API, database, ingestion, alert, or broker change. They do not prove the current backend hardening source is served.
-- Owner decision (2026-09-12): the Daily Trend Map is permanently production-served public read-only. `GET /trend-map-shadow` and same-origin `GET /api/trend-map-shadow` require no authentication. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it has no setup, recommendation, alert, order, broker, BUY, or other action semantics, and this decision does not change `/mvp`'s separate owner-only/private signal policy.
+- Owner decision (2026-09-12): the Daily Trend Map is permanently production-served public read-only. `GET /trend-map` and same-origin `GET /api/trend-map` require no authentication. Its canonical envelope is `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; it has no setup, recommendation, alert, order, broker, BUY, or other action semantics, and this decision does not change `/mvp`'s separate owner-only/private signal policy.
 - Historical hardening source and deployment read-back (2026-09-12; superseded by the production closeout above): bounded publisher, artifact/failure-sidecar validation, EOD hook, and fail-closed SQL guard were deployed. Public shadow API returned HTTP 200 with 237 rows, `229 AVAILABLE / 5 INVALID_DATA / 3 NO_DATA`, `FRESH`, and the historical artifact identity is preserved below for audit only. It is not the current pointer.
 - Read-only shadow review surface: the route does not change `/mvp`, setup candidates, classifier semantics, schema, alerts, broker paths, or BUY/action paths.
 - The surface uses a backend-local SELECT-only adapter (with the research replay adapter retained for host compatibility), current `price_data` Daily as-of, and the canonical `marginable_long` universe. Every declared symbol remains visible; row `status` is `AVAILABLE` only for valid classifier output and `DATA_BLOCKED` otherwise, while `data_quality_status` preserves `NO_DATA`, `INVALID_DATA`, `INSUFFICIENT_HISTORY`, `AVAILABLE`, or `DATA_BLOCKED` reason visibility.

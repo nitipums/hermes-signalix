@@ -88,7 +88,7 @@ def test_shadow_trend_map_route_uses_send_bytes_seam(monkeypatch):
     monkeypatch.setattr(shadow_trend_map, "build_shadow_report", lambda: payload)
     handler = RouteHandler()
 
-    assert shadow_trend_map.handle_shadow_trend_map_api("/api/trend-map-shadow", handler)
+    assert shadow_trend_map.handle_shadow_trend_map_api("/api/trend-map", handler)
     assert handler.status == 200
     assert handler.content_type == "application/json; charset=utf-8"
     assert handler.cache_control == "no-store"

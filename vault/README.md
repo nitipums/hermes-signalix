@@ -1,7 +1,7 @@
 # Signalix — Project Vault
 
-> **STATUS: CURRENT** · Reconciled 2026-09-13.
-> Current production-served focus: public read-only Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow`. `/mvp` and `/api/setup-candidates` are **DROPPED / PAUSED** by owner decision; preserve source/history as retained audit/future-integration material and do not route work there until Arm explicitly resumes it. Elliott research is deferred.
+> **STATUS: CURRENT** · Reconciled 2026-09-14.
+> Current canonical product line: public read-only Daily Trend Mapping at `/trend-map` and `/api/trend-map`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are retained historical/audit source only; Elliott setup research is deferred.
 
 Signalix is Arm's deterministic Thai-market evidence system. The current
 production-served focus is Daily Trend Mapping: public read-only Daily evidence
@@ -17,8 +17,8 @@ an order or auto-trading system.
 |-------|-------|-------|
 | Data ingestion (EOD) | ✅ Done | local/drive/settrade/yfinance, idempotent, FULL ORD |
 | Scanner (TT/VCP/RS/Position sizing) | ✅ Done | deterministic, pandas + Postgres |
-| Trend Mapping surface | ✅ Production-served | public read-only `/trend-map-shadow` and `/api/trend-map-shadow`; `PRODUCTION_READ_ONLY`, non-actionable |
-| Setup/MVP trial | 🟡 Retained trial | `/mvp` + `/api/setup-candidates`; possible future Trend Mapping → deterministic `BUY_NOW` integration |
+| Trend Mapping surface | ✅ Production-served | public read-only `/trend-map` and `/api/trend-map`; `PRODUCTION_READ_ONLY`, non-actionable |
+| Setup/MVP line | Historical/audit only | `/mvp` + `/api/setup-candidates`; not active and requires a new owner decision to reactivate |
 | Backend API | ✅ Done | FastAPI, ports 8000/3001 |
 | Realtime delivery | ⏸ Paused | Docker `delivery` is gated under Compose profile `alerts`; source/routing retained |
 | Webhook auth | ✅ Done | `WEBHOOK_SECRET` + hmac |

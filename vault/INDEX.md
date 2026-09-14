@@ -1,7 +1,7 @@
 # INDEX — Signalix Project Vault
 
 > **STATUS: CURRENT** · Catalog and routing map for the Level-4 vault.
-> **Last reconciled:** 2026-09-13 ICT
+> **Last reconciled:** 2026-09-14 ICT
 > **Authority:** the linked concern-specific documents, not this catalog.
 
 ## How to use
@@ -30,10 +30,10 @@
 
 - `../docs/superpowers/specs/` — current executable product/API/UI contracts.
 - `../docs/current/2026-09-13-daily-trend-derived-fallback-spec.md` — current bounded Derived Daily fallback contract and Issue #22 implementation authority.
-- `../docs/current/2026-09-13-1634-trend-map-drawer-navigation-handoff.md` — current bounded drawer navigation verification and release boundary.
+- Current production-served focus: `/trend-map`, `/api/trend-map` — public read-only Daily Trend Mapping; former shadow naming is retired
 - `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` — owner-approved spec for Daily Main Trend 1–4 multiple-MA calibration.
 - `../docs/current/2026-09-13-main-trend-calculation-contract.md` — exact current Main Trend v6 formulas, predicates, precedence, and verification contract.
-- `../docs/current/` — dated decision records and bounded evidence handoffs.
+- `../docs/current/2026-09-14-1112-main-trend-display-ui-closeout.md` — superseded historical evidence for the former shadow-named display slice; current route authority is this index plus `Deployment.md`.
 - `Browser-and-Freshness-Verification.md` — browser/freshness procedure.
 - `Memory-Cleanup-Candidates.md` — memory/fact cleanup record.
 - `Team-Operating-Model.md` and `Codex-Standard-Workflow-2026-08-29.md` — roles and worker procedure.

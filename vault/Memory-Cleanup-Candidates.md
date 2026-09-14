@@ -33,7 +33,7 @@ Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as th
 
 ## Profile cleanup — 2026-09-13
 
-Signalix currently uses Lite as sole orchestrator/final gate. Ploy is available alone only when Arm explicitly requests a trader/product challenge. Other Signalix sub-agents are not dispatched unless Arm changes this rule. Wallie remains outside Signalix.
+Signalix uses Lite as orchestrator/final gate. Worker selection is task-dependent; no project-wide sub-agent prohibition applies. Ploy remains optional advisory input. Wallie remains outside Signalix.
 
 ## Safety
 

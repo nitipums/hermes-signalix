@@ -1,7 +1,7 @@
 # Components
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
-> **Reconciled:** 2026-09-12 · Daily Trend Mapping is the primary delivery focus; publisher/read-model/shadow API are current; `/mvp` and setup components are retained trial/future integration; Elliott research is deferred.
+> **Reconciled:** 2026-09-14 · Daily Trend Mapping is the canonical product line; its public routes are `/trend-map` and `/api/trend-map`. The former shadow naming is retired. `/mvp` and setup components are retained historical/audit only; Elliott research is deferred.
 
 Every backend module, what it does, and its hard rules.
 
@@ -17,8 +17,8 @@ behavior. It has no setup, BUY, alert, order, broker, or auto-trading meaning.
 Current route pair:
 
 ```text
-GET /api/trend-map-shadow
-GET /trend-map-shadow
+GET /api/trend-map
+GET /trend-map
 ```
 
 ## `actionable_signal_policy.py` — private paper/shadow signals

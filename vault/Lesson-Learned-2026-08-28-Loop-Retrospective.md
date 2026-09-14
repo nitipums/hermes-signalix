@@ -58,8 +58,8 @@ If mismatch with source, verdict = REVISE stale_runtime, not PASS. Deploy step i
 ### F. Heartbeat checkpoint
 - Orchestrator (Lite) watches `last_heartbeat_at` + `artifacts empty`. If heartbeat continues >15 min with no artifact, issue bounded checkpoint: complete with artifacts or block with root cause in next 10 min. Heartbeat-only continuation not acceptable (patched in `hermes-kanban-ops`).
 
-### G. No parallel workers for full-universe or docker cards
-Arm decision 2026-08-19: parallel workers not production-approved. One worker at a time for docker/rebuild cards.
+### G. Bounded concurrency for full-universe or docker cards
+Historical note: the one-worker-at-a-time rule was an owner constraint at that time. Current policy is bounded concurrency with non-overlapping scopes/worktrees and serialized shared side effects.
 
 ## 4. Detection queries
 

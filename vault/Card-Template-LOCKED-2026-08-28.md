@@ -35,7 +35,7 @@ Body:
 ## Constraints
 - Work only in $HERMES_KANBAN_WORKSPACE
 - max_retries=1 if docker/restart
-- No parallel workers for docker/full-universe
+- bounded concurrency: parallel workers are allowed only with non-overlapping scopes/worktrees
 - Primary QA evidence = curl + read_file, browser = screenshot only
 ```
 
@@ -45,7 +45,7 @@ Body:
 - [ ] `max_retries=1` for docker/restart/full-universe
 - [ ] QA includes `:8000` live probe vs source diff
 - [ ] `artifacts` will be non-empty (probe JSON at minimum)
-- [ ] No >2 large P0/UI cards concurrently
+- [ ] concurrency is bounded and overlapping writers are serialized
 - [ ] Heartbeat >15m with empty artifacts → checkpoint in 10m
 
 Refs: `vault/Execution-Pipeline.md` Loop prevention (LOCKED), `vault/Lesson-Learned-Full-Board-260-Cards-2026-08-28.md`

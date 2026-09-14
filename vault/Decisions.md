@@ -2,7 +2,17 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation (2026-09-13):** Daily Trend Mapping via `/trend-map-shadow` and `/api/trend-map-shadow` is the owner-approved production-served, public, read-only human-review evidence surface. It exposes deterministic Daily trend classifications, quotes, freshness, provenance, and data-quality states; it remains non-actionable and must not create setup decisions, BUY/SELL, alerts, orders, broker actions, portfolio actions, or auto-trading. `/api/setup-candidates` and `/mvp` are **DROPPED / PAUSED** by owner decision; preserve their source/history as retained audit/future-integration material and do not route work there until Arm explicitly resumes them. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation (2026-09-14):** Daily Trend Mapping is the canonical Signalix product line and public read-only evidence surface at `/trend-map` and `/api/trend-map`. The former shadow route naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. No setup, BUY/SELL, alert, order, broker, portfolio, or auto-trading semantics are active. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+
+## 2026-09-14 — Trend Mapping becomes the canonical product line
+
+Arm approved a clean product-line boundary: Signalix now focuses on Daily Trend Mapping as the primary and canonical surface. The public route names are `/trend-map` and `/api/trend-map`; `shadow` is no longer a product qualifier.
+
+- Trend Mapping is deterministic, public, read-only, and non-actionable evidence for Arm's chart review.
+- `/mvp` and `/api/setup-candidates` are retired from active scope. Preserve source, tests, artifacts, and historical decisions for audit/future reference, but do not route current work there.
+- Elliott/Wave setup research, private signal projections, alerts, broker actions, and auto-trading are outside the active line.
+- A future reactivation requires a new owner-approved decision, contract, implementation slice, and acceptance gate.
+- Lite owns orchestration and may choose whether a worker or direct implementation is appropriate per task; no project-wide prohibition on sub-agents applies.
 
 ## 2026-09-13 — Main Trend 1–4 multiple-MA taxonomy
 

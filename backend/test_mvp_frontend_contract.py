@@ -142,7 +142,7 @@ window.addEventListener = function() {};
 window.fetch = function() { return Promise.resolve({ok: true, json: () => Promise.resolve({candles: []})}); };
 vm.runInThisContext(fs.readFileSync("backend/frontend/shared-drawer.js", "utf8"));
 window.SignalixSharedDrawer.openSharedDrawer({
-  source: "trend-map-shadow", lane: "DATA_BLOCKED", trend: "DATA_BLOCKED",
+  source: "trend-map", lane: "DATA_BLOCKED", trend: "DATA_BLOCKED",
   item: {symbol: "AAA", as_of: "2026-09-11", quote: {source: "price_data"}}
 });
 if (elements["drawer-provenance"].textContent !== "11 Sept 2026 time unavailable (Bangkok)") process.exit(1);
