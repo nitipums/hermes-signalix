@@ -15,7 +15,7 @@ and `/api/trend-map`. Verify deterministic source, immutable artifact/pointer,
 API schema, freshness/quality distribution, non-actionable boundary, and the
 real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
-acceptance targets.
+acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 

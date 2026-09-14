@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; the former shadow naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. Runtime claims below require fresh probes; commit/push state is read from the checkout, not this banner.
+> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; source/release commit is `d4cffeaf5e1cec1cb2d1bf25b7645d972f54d7cd`; dashboard was recreated and public route read back successfully. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
 
 ## Stable release
 
@@ -11,6 +11,16 @@ source: /root/signalix
 MVP server: mvp_server.py
 legacy routes: quarantined/404
 ```
+
+## Runtime reload read-back — 2026-09-14 11:35 ICT
+
+- Authorized action: `docker compose up -d --force-recreate dashboard`; PostgreSQL and Redis were not restarted, migrated, or written.
+- Container: `signalix_dashboard` running and healthy after recreate.
+- Readiness: `GET http://127.0.0.1:8000/health/readiness` returned `{"status":"ok","db":"up","redis":"up"}`.
+- Public HTML: `/trend-map` returned HTTP 200; browser rendered 237 rows at desktop and mobile 390px.
+- Public API: `/api/trend-map` returned HTTP 200 with `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `verification_status=VERIFIED`, and 237 rows.
+- Retired route read-back: `/trend-map-shadow` and `/api/trend-map-shadow` returned HTTP 404.
+- Browser metrics: desktop `scrollWidth=485`/`clientWidth=485`; mobile `scrollWidth=390`/`clientWidth=390`; `shadow` was absent from visible DOM copy.
 
 ## Current delivery focus — 2026-09-12
 
