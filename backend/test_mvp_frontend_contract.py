@@ -1021,6 +1021,23 @@ def test_chart_contract_has_real_layers_and_fail_closed_runtime():
     assert "tryFixtureExplorer" not in js
 
 
+def test_shared_drawer_chart_requires_two_usable_candles():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    usable = _extract_function(shared, "usableChartCandles")
+    render = _extract_function(shared, "renderDrawerChart")
+    assert "usableChartCandles(chart).length >= 2" in render
+    assert 'Chart unavailable: insufficient candle history' in render
+    assert _run_node(
+        [usable],
+        "[usableChartCandles({candles: []}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: 1.5}]}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: 1.5}, "
+        "{open: 2, high: 3, low: 1, close: 2.5}]}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: null}, "
+        "{open: 2, high: 3, low: 1, close: 2.5}]}).length]",
+    ) == [0, 1, 2, 1]
+
+
 def test_mobile_interactive_targets_are_touch_safe():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css

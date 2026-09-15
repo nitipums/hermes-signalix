@@ -745,12 +745,20 @@
     }
   }
 
+  function usableChartCandles(chart) {
+    return chart && Array.isArray(chart.candles) ? chart.candles.filter(function (candle) {
+      return candle && ["open", "high", "low", "close"].every(function (field) {
+        return candle[field] != null && Number.isFinite(Number(candle[field]));
+      });
+    }) : [];
+  }
+
   function renderDrawerChart(chart) {
     window.__signalixLastChart = chart; renderChartLegend(chart); renderTechnicalSummary(chart);
-    if (chart && Array.isArray(chart.candles) && chart.candles.length) {
+    if (usableChartCandles(chart).length >= 2) {
       dom.drawerChartPH.style.display = "none"; dom.drawerCanvas.style.display = "block"; if (dom.drawerChartRetry) dom.drawerChartRetry.hidden = true; drawChart(chart);
     } else {
-      dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = (chart && chart.provenance && chart.provenance.note) || "No chart data available (candles NOT_VERIFIED)";
+      dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = "Chart unavailable: insufficient candle history";
       dom.drawerCanvas.style.display = "none"; if (dom.drawerChartRetry) dom.drawerChartRetry.hidden = true;
     }
   }
