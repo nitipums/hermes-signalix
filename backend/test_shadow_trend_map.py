@@ -279,6 +279,95 @@ def test_valid_classifier_row_is_available_and_has_diagnostic_trace():
     assert result["diagnostic_trace"]["classification"]["machine_lane"] == result["machine_lane"]
 
 
+def test_compact_public_projection_preserves_envelope_rows_and_display_evidence():
+    row = subject.evaluate_symbol("AAA", bars(75), "2026-09-11")
+    row["provenance"] = {
+        "source": "price_data+derived_daily_price_data", "timeframe": "1D",
+        "latest_returned_date": "2026-09-11", "selected_daily_lineage": [
+            {"source": "derived_daily_price_data", "source_timeframe": "60m",
+             "source_run_id": "run-1", "source_bar_count": 8,
+             "derivation_method": subject.DERIVED_DAILY_METHOD},
+            {"source": "derived_daily_price_data", "source_timeframe": "60m",
+             "source_run_id": "run-1", "source_bar_count": 8,
+             "derivation_method": subject.DERIVED_DAILY_METHOD},
+        ],
+    }
+    report = {"status": subject.PRODUCTION_READ_ONLY, "as_of": "2026-09-11",
+              "freshness": {"status": "FRESH"}, "counts": {"declared": 1},
+              "quality": {"verified": True}, "universe": {"declared_count": 1},
+              "policy": {"hash": "policy"}, "provenance": {"source": "artifact"},
+              "read_path": {"validated_every_request": True},
+              "rows": [row]}
+
+    compact = subject.compact_public_trend_map_report(report)
+
+    assert compact is not report
+    assert compact["rows"] is not report["rows"]
+    assert compact["rows"][0]["symbol"] == "AAA"
+    assert compact["rows"][0]["main_trend"] == {
+        key: row["main_trend"][key]
+        for key in ("main_trend", "evidence_quality", "main_trend_display",
+                    "source_timeframe", "as_of", "policy_version")}
+    assert compact["rows"][0]["quote"] == row["quote"]
+    assert compact["rows"][0]["provenance"] == {
+        "source": "price_data+derived_daily_price_data", "timeframe": "1D",
+        "latest_returned_date": "2026-09-11", "no_lookahead": True,
+        "lineage_summary": {
+            "source": "price_data+derived_daily_price_data", "derived_row_count": 2,
+            "source_timeframe": "60m", "source_bar_count": 8,
+            "derivation_method": subject.DERIVED_DAILY_METHOD, "source_run_id": "run-1",
+        },
+    }
+    assert set(compact["rows"][0]) == {
+        "symbol", "as_of", "status", "data_quality_status", "classifier_status",
+        "confidence", "machine_lane", "broad_state", "main_trend", "quote",
+        "provenance", "note",
+    }
+    assert "diagnostic_trace" not in compact["rows"][0]
+    assert "evidence" not in compact["rows"][0]
+    assert "retrieval_selection" not in compact["rows"][0]
+    assert "selected_daily_lineage" not in json.dumps(compact["rows"][0])
+    assert len(json.dumps(compact["rows"][0], separators=(",", ":"))) < 5000
+    assert compact["universe"] == report["universe"]
+    assert compact["counts"] == report["counts"]
+    assert compact["read_path"] == report["read_path"]
+    assert "diagnostic_trace" in row
+
+
+def test_api_route_serializes_compact_public_projection(monkeypatch):
+    class Handler:
+        def __init__(self):
+            self.body = bytearray()
+            self.wfile = self
+        def send_response(self, status):
+            self.status = status
+        def send_header(self, key, value):
+            pass
+        def end_headers(self):
+            pass
+        def write(self, body):
+            self.body.extend(body)
+
+    row = subject.evaluate_symbol("AAA", bars(75), "2026-09-11")
+    row["provenance"] = {"source": "price_data", "timeframe": "1D",
+                         "latest_returned_date": "2026-09-11",
+                         "selected_daily_lineage": []}
+    monkeypatch.setattr(subject, "build_shadow_report", lambda: {
+        "status": subject.PRODUCTION_READ_ONLY, "research_only": False,
+        "actionability": "NONE", "rows": [row],
+    })
+
+    handler = Handler()
+    assert subject.handle_shadow_trend_map_api("/api/trend-map", handler)
+    payload = json.loads(bytes(handler.body))
+    public_row = payload["rows"][0]
+    assert public_row["main_trend"]["main_trend_display"] == row["main_trend"]["main_trend_display"]
+    assert public_row["provenance"]["no_lookahead"] is True
+    assert "diagnostic_trace" not in public_row
+    assert "evidence" not in public_row
+    assert "retrieval_selection" not in public_row
+
+
 def test_report_preserves_canonical_universe_and_as_of():
     class Adapter:
         def resolve_universe(self, conn, value):

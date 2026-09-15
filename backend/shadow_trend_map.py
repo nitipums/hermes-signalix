@@ -733,9 +733,11 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
         source = "database" if adapter is not None or conn is not None else "published"
     if source in {"published", "read_model", "current"}:
         from shadow_read_model_publisher import read_current_shadow_report
-        report = read_current_shadow_report()
+        # Keep the validated immutable artifact separate from display-only
+        # overlay/projection work performed for this request.
+        report = deepcopy(read_current_shadow_report())
         overlay_intraday_quotes(report)
-        return report
+        return compact_public_trend_map_report(report)
     if source not in {"database", "builder", "publisher"}:
         raise ValueError(f"unsupported shadow report source: {source}")
     adapter = adapter or _adapter()
@@ -905,6 +907,55 @@ def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, 
     return report
 
 
+def _compact_provenance(provenance: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Keep public row provenance useful without exposing selected history."""
+    source = dict(provenance or {})
+    lineage = source.get("selected_daily_lineage")
+    lineages = lineage if isinstance(lineage, list) else []
+    summary: dict[str, Any] = {
+        "source": source.get("source"),
+        "derived_row_count": len(lineages),
+    }
+    if lineages:
+        first = lineages[0] if isinstance(lineages[0], Mapping) else {}
+        summary = {**summary, **{key: first.get(key) for key in (
+            "source_timeframe", "source_bar_count", "derivation_method")}}
+        run_ids = {str(item.get("source_run_id")) for item in lineages
+                   if isinstance(item, Mapping) and item.get("source_run_id")}
+        summary["source_run_id"] = next(iter(run_ids)) if len(run_ids) == 1 else (
+            "multiple" if run_ids else None)
+    return {
+        "source": source.get("source"),
+        "timeframe": source.get("timeframe"),
+        "latest_returned_date": source.get("latest_returned_date"),
+        "no_lookahead": True,
+        "lineage_summary": summary,
+    }
+
+
+def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a compact public copy while preserving the report envelope."""
+    projected = deepcopy(dict(report))
+    compact_rows = []
+    for original in report.get("rows", []) if isinstance(report.get("rows"), list) else []:
+        if not isinstance(original, Mapping):
+            continue
+        row = {key: deepcopy(original.get(key)) for key in (
+            "symbol", "as_of", "status", "data_quality_status", "classifier_status",
+            "confidence", "machine_lane", "broad_state", "quote", "note")}
+        main_trend = original.get("main_trend")
+        if isinstance(main_trend, Mapping):
+            row["main_trend"] = {key: deepcopy(main_trend.get(key)) for key in (
+                "main_trend", "evidence_quality", "main_trend_display",
+                "source_timeframe", "as_of", "policy_version")}
+        else:
+            row["main_trend"] = None
+        row["provenance"] = _compact_provenance(original.get("provenance"))
+        compact_rows.append(row)
+    projected["rows"] = compact_rows
+    return projected
+
+
 def unavailable_report(error: Exception) -> dict[str, Any]:
     return {"report": REPORT_VERSION, "research_only": False, "status": "DATA_BLOCKED",
             "actionability": ACTIONABILITY, "as_of": None,
@@ -928,6 +979,7 @@ def handle_shadow_trend_map_api(path: str, handler) -> bool:
         return False
     try:
         payload = build_shadow_report()
+        payload = compact_public_trend_map_report(payload)
         status = 200
     except Exception as error:  # fail closed with a visible envelope
         payload, status = unavailable_report(error), 200

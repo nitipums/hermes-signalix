@@ -114,6 +114,20 @@ The primary workstream is the production-served, public, read-only Daily Trend M
   passed. No database write or migration was performed; chart artifacts and
   dashboard restart were explicitly authorized runtime actions.
 
+### Compact public Trend Map projection — runtime performance PASS
+
+- The public `/api/trend-map` now projects a compact copy of each validated row:
+  it preserves quote, Main Trend display fields, status/quality, concise
+  provenance, no-lookahead, and fallback evidence while removing raw selected
+  lineage arrays, diagnostic traces, retrieval selection, and audit-only evidence
+  from the first-screen payload. The immutable artifact remains unchanged.
+- Public body size in the measured route fell from approximately `1.34MB` to
+  `410KB` uncompressed (`237` rows preserved); compressed transfer remained
+  small. The public browser still rendered `237` rows and opened the drawer/chart.
+- Source/tests: compact projection and API contract tests passed; runtime API and
+  browser read-back passed. No actionability, scan, or classifier semantics
+  changed.
+
 ### Main Trend 1–4 UI promotion — 2026-09-13
 
 - Owner-authorized bounded promotion for Issue #32: deterministic `main_trend` evidence was published into the immutable Trend Map artifact. The public table and Trend Map drawer now use Main Trend 1–4 as the only visible primary taxonomy; legacy machine-lane/sub-trend presentation is not shown on the public surface. No setup/action/order semantics changed.
