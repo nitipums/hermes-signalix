@@ -109,6 +109,11 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Public browser drawer: 1W and 1M controls requested their exact timeframe
   routes and rendered the canvas; quote remained `60m provisional`, `237` rows
   remained visible, and page overflow stayed contained.
+- Drawer chart projection now serializes only renderer-required aligned series
+  (`ma`, `macd.line/signal/histogram`, `rsi`) while preserving candles,
+  indicators.latest/window summaries, provenance, and default full-chart
+  contract. The measured 1D chart body fell from approximately `274KB` to
+  `44KB`; browser chart request remained approximately `18ms` and rendered.
 - Source/tests: all-timeframe chart read-model, Trend Map, and technical-indicator
   focused tests passed; Python compile, JavaScript syntax, and `git diff --check`
   passed. No database write or migration was performed; chart artifacts and

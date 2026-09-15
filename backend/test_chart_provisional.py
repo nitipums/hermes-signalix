@@ -229,7 +229,8 @@ def test_chart_view_is_trimmed_but_default_chart_remains_full(monkeypatch):
     for values in compact["indicators"]["series"]["macd"].values():
         assert len(values) == 120
     assert len(compact["indicators"]["series"]["rsi"]) == 120
-    assert len(compact["indicators"]["series"]["atr"]) == 120
+    assert "atr" not in compact["indicators"]["series"]
+    assert "atr" in full["indicators"]["series"]
     assert compact["indicators"]["latest"] == full["indicators"]["latest"]
     assert compact["indicators"]["latest"]["ma"]["100"] == full["indicators"]["latest"]["ma"]["100"]
     assert compact["indicators"]["latest"]["ma"]["200"] == full["indicators"]["latest"]["ma"]["200"]

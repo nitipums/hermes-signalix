@@ -31,6 +31,58 @@ def test_publish_and_readback_is_compact_and_content_addressed(tmp_path, monkeyp
     assert "raw_history" not in artifact
 
 
+def test_chart_projection_keeps_renderer_series_and_removes_unused_aligned_series():
+    from mvp_chart_db import compact_chart_db_response
+
+    candles = [{"date": f"2026-09-{index + 1:02d}", "close": index}
+               for index in range(3)]
+    aligned = lambda value: [f"{value}-{index}" for index in range(3)]
+    payload = {
+        "symbol": "AAA",
+        "timeframe": "1D",
+        "candles": candles,
+        "indicators": {
+            "policy_version": "technical-indicators-v2",
+            "timeframe": "1D",
+            "alignment": "candle_index",
+            "availability": {"input": {"status": "AVAILABLE"}},
+            "provenance": {"no_lookahead": True},
+            "series": {
+                "ma": {period: aligned(f"ma-{period}") for period in ("5", "10", "20", "50", "100", "200")},
+                "macd": {name: aligned(f"macd-{name}") for name in ("line", "signal", "histogram")},
+                "rsi": aligned("rsi"),
+                "atr": aligned("atr"),
+                "high": aligned("high"),
+                "low": aligned("low"),
+                "rolling_high": {"20": aligned("rolling-high")},
+                "rolling_low": {"20": aligned("rolling-low")},
+                "window_summary": [{"close": 1}] * 3,
+            },
+            "latest": {"window_summary": {"20": {"close": 2}}, "rsi": 2},
+        },
+        "availability": {"status": "available"},
+        "source": "price_data",
+        "as_of": "2026-09-03",
+        "latest_time": "2026-09-03",
+        "wave_evidence": {"markers": []},
+        "provenance": {"source": "price_data", "as_of": "2026-09-03"},
+    }
+
+    compact = compact_chart_db_response(payload, limit=2)
+    assert compact["candles"] == candles[-2:]
+    assert set(compact["indicators"]["series"]) == {"ma", "macd", "rsi"}
+    assert set(compact["indicators"]["series"]["ma"]) == {"5", "10", "20", "50", "100", "200"}
+    assert set(compact["indicators"]["series"]["macd"]) == {"line", "signal", "histogram"}
+    assert compact["indicators"]["series"]["rsi"] == aligned("rsi")[-2:]
+    assert compact["indicators"]["latest"] == payload["indicators"]["latest"]
+    assert compact["indicators"]["policy_version"] == "technical-indicators-v2"
+    assert compact["availability"] == payload["availability"]
+    assert compact["wave_evidence"] == payload["wave_evidence"]
+    assert compact["source"] == payload["source"]
+    assert compact["as_of"] == payload["as_of"]
+    assert compact["timeframe"] == payload["timeframe"]
+
+
 def test_60m_selection_and_stale_artifact_fail_closed(tmp_path, monkeypatch):
     monkeypatch.setattr("mvp_chart_db.project_chart_db_response", lambda symbol, timeframe, connection, canonical_item: _payload(symbol, timeframe))
     crm.publish(object(), ["AAA"], "60M", root=tmp_path,
@@ -108,6 +160,33 @@ def test_chart_route_reads_valid_artifact_without_database(tmp_path, monkeypatch
     handler = Handler()
     assert mvp_routes.handle_mvp_api(f"/api/chart-db/AAA?timeframe={timeframe}&view=chart", handler)
     assert json.loads(handler.body)["symbol"] == "AAA"
+
+
+def test_chart_route_db_fallback_is_compact_and_explicitly_labelled(monkeypatch):
+    payload = _payload()
+    payload["indicators"]["series"] = {
+        "ma": {"5": [1, 2]},
+        "macd": {"line": [1, 2], "signal": [1, 2], "histogram": [1, 2]},
+        "rsi": [1, 2], "atr": [1, 2], "high": [1, 2],
+    }
+    monkeypatch.setattr("chart_read_model.read_current", lambda *args, **kwargs: None)
+    monkeypatch.setattr("mvp_chart_db.project_chart_db_response",
+                        lambda *args, **kwargs: payload)
+    monkeypatch.setattr(mvp_routes, "load_payload", lambda: {"items": []})
+
+    class Handler:
+        def __init__(self):
+            self.wfile = self
+        def send_response(self, status): self.status = status
+        def send_header(self, key, value): pass
+        def end_headers(self): pass
+        def write(self, body): self.body = body
+
+    handler = Handler()
+    assert mvp_routes.handle_mvp_api("/api/chart-db/AAA?timeframe=1D&view=chart", handler)
+    response = json.loads(handler.body)
+    assert response["provenance"]["chart_read_model"] == "DB_FALLBACK"
+    assert set(response["indicators"]["series"]) == {"ma", "macd", "rsi"}
 
 
 def test_eod_publication_calls_all_aggregates_and_is_nonfatal(monkeypatch):

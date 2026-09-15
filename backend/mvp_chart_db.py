@@ -230,9 +230,11 @@ _CHART_VIEW_CANDLE_LIMIT = 120
 def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VIEW_CANDLE_LIMIT) -> Optional[dict]:
     """Project the full chart contract into the drawer's bounded chart view.
 
-    Indicators are still calculated from the full source window. Only aligned
-    display series are trimmed, while ``indicators.latest`` and its window
-    summaries remain the full-window values required by the drawer.
+    Indicators are still calculated from the full source window. The drawer
+    receives only the aligned series used by its renderer, while
+    ``indicators.latest`` and its window summaries remain the full-window
+    values required by the drawer. The default (non-``view=chart``) response
+    does not pass through this projection.
     """
     if payload is None:
         return None
@@ -253,17 +255,29 @@ def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VI
         compact["indicators"] = indicators
     series = indicators.get("series") if isinstance(indicators, dict) else None
     if isinstance(series, dict):
-        series = dict(series)
-        indicators["series"] = series
-        for name, values in list(series.items()):
-            if isinstance(values, list):
-                series[name] = values[start:]
-            elif isinstance(values, dict):
-                values = dict(values)
-                series[name] = values
-                for key, aligned in values.items():
-                    if isinstance(aligned, list):
-                        values[key] = aligned[start:]
+        # Keep this allow-list in sync with the shared drawer renderer. In
+        # particular, do not serialize the source OHLC-derived aligned series
+        # (ATR, rolling highs/lows, and raw high/low/window-summary series).
+        # ``latest`` below remains authoritative for summary/window details.
+        compact_series = {}
+        ma = series.get("ma")
+        if isinstance(ma, dict):
+            compact_series["ma"] = {
+                period: values[start:]
+                for period, values in ma.items()
+                if isinstance(values, list)
+            }
+        macd = series.get("macd")
+        if isinstance(macd, dict):
+            compact_series["macd"] = {
+                name: values[start:]
+                for name in ("line", "signal", "histogram")
+                if isinstance(values := macd.get(name), list)
+            }
+        rsi = series.get("rsi")
+        if isinstance(rsi, list):
+            compact_series["rsi"] = rsi[start:]
+        indicators["series"] = compact_series
 
     for key in ("ma20", "ma50", "ma200", "macd", "rsi"):
         compact.pop(key, None)
