@@ -16,6 +16,26 @@ Daily price_data
 → shared chart drawer for evidence review
 ```
 
+### Read-path prebuild invariant
+
+Every reusable market-data payload used by the public Trend Map must be
+prebuilt at the relevant publication boundary as a compact, validated,
+content-addressed read model. The drawer chart contract covers all four
+supported timeframes: `1D`, `60M`, `1W`, and `1M`.
+
+```text
+EOD publication → 1D / 1W / 1M chart artifacts
+Intraday commit → 60M chart artifact
+request path   → pointer validation → symbol/timeframe selection
+              → explicit DB fallback only when artifact is unavailable/stale
+```
+
+The request path must not query PostgreSQL, parse raw history, rescan the
+universe, or recompute indicators for a valid artifact. Artifact freshness,
+source/as-of, pointer identity, and fallback provenance are mandatory. This is
+an architectural invariant for Signalix read-only surfaces, not an optional
+latency optimization.
+
 Trend Mapping is production-served read-only Daily evidence. It does not create
 setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
 publisher and API preserve Daily as-of, provenance, quote basis, data-quality

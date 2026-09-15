@@ -17,6 +17,41 @@ real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
 acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
+### Quote/display versus scan boundary
+
+Trend Map classification and scan evidence remain sourced from the immutable
+completed Daily/EOD artifact. Display-only `price`, `change`, and `%change` may
+be overlaid at the read path from the latest completed 60m intraday bar, using
+the immediately prior Daily close as the deterministic change basis. The API
+must expose the intraday timeframe/provenance and `provisional=true`; missing
+or unusable intraday data must retain the EOD quote and its Daily provenance.
+The overlay must not alter `main_trend`, data-quality/status fields, classifier
+evidence, artifact `as_of`, or the non-actionable boundary.
+
+The intraday display quote should be prebuilt after the committed intraday
+ingestion boundary into a compact validated read model. The public request path
+must read that artifact without PostgreSQL access; stale/missing/invalid
+artifacts fall back to the immutable EOD quote with explicit provenance.
+
+Intraday and EOD publication boundaries must prebuild compact validated chart
+read models for every drawer timeframe: `1D`, `60M`, `1W`, and `1M`. The
+request path reads the selected artifact and uses DB fallback only when that
+artifact is unavailable or stale; chart indicators remain deterministic
+source-code outputs. This is a Signalix design invariant, not an optional
+performance enhancement.
+
+### Full Trend Map UX remediation boundary
+
+The Trend Map first screen must make the EOD classification versus provisional
+completed-60m display quote distinction visible before drawer interaction. The
+drawer must have an explicit recoverable script/chart failure path, distinguish
+official Daily from derived Daily provenance, preserve stale-response guards,
+and support keyboard focus entry, containment, and restoration. Blocked or
+invalid Daily classifications remain visible with an explicit reason/filter;
+quote availability must not imply classifier availability. At 390px the page
+must remain contained while retaining an accessible full-value affordance for
+truncated Main Trend labels.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Acceptance contract: opening a Trend Map row and moving to the next/previous row must refresh the chart for the newly selected symbol; horizontal swipe is supported while vertical drawer scrolling remains available.

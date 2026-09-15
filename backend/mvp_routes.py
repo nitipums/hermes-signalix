@@ -615,6 +615,19 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
         import mvp_chart_db
         timeframe = (qs.get("timeframe", ["1D"])[0] or "1D").upper()
         chart_view = (qs.get("view", [""])[0] or "").lower() == "chart"
+        if chart_view:
+            try:
+                from chart_read_model import read_current
+                prebuilt = read_current(symbol, timeframe=timeframe)
+            except Exception:
+                prebuilt = None
+            if prebuilt is not None:
+                prebuilt = dict(prebuilt)
+                provenance = dict(prebuilt.get("provenance") or {})
+                provenance["chart_read_model"] = "PREBUILT"
+                prebuilt["provenance"] = provenance
+                json_response(handler, _legacy_response(prebuilt))
+                return True
         canonical_item = None
         try:
             from read_model_publisher import load_current_read_model
@@ -638,6 +651,9 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
         else:
             if chart_view:
                 result = mvp_chart_db.compact_chart_db_response(result)
+                provenance = dict(result.get("provenance") or {})
+                provenance["chart_read_model"] = "DB_FALLBACK"
+                result["provenance"] = provenance
             json_response(handler, _legacy_response(result))
         return True
 

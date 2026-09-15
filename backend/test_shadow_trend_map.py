@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 
@@ -177,6 +178,98 @@ def test_quote_preserves_price_when_previous_daily_close_is_unavailable():
     assert result["quote"]["change_pct"] is None
     assert result["quote"]["change_availability"] == "NOT_VERIFIED"
     assert result["quote"]["change_basis"] == "NOT_VERIFIED"
+
+
+def _published_quote_report():
+    return {"rows": [{"symbol": "AAA", "main_trend": {"main_trend": 2},
+                      "quote": {"price": 100, "change_amount": 1,
+                                "change_pct": 1, "source": "price_data",
+                                "provisional": False}}]}
+
+
+def test_intraday_quote_overlay_uses_latest_completed_bar_and_previous_daily_close(monkeypatch):
+    class Adapter:
+        def load_intraday_quotes(self, conn, symbols, now):
+            assert symbols == ["AAA"]
+            return {"AAA": {"ts": "2026-09-11T09:00:00+00:00", "close": 110,
+                            "daily_close": 100, "daily_date": "2026-09-10",
+                            "daily_source": "price_data"}}
+
+    report = _published_quote_report()
+    subject.overlay_intraday_quotes(
+        report, adapter=Adapter(), conn=object(),
+        now=datetime(2026, 9, 11, 9, 30, tzinfo=timezone.utc),
+    )
+    quote = report["rows"][0]["quote"]
+    assert quote["price"] == 110
+    assert quote["change_amount"] == 10
+    assert quote["change_pct"] == 10
+    assert quote["source"] == "intraday_price_data"
+    assert quote["timeframe"] == "60m"
+    assert quote["provisional"] is True
+    assert quote["as_of"] == "2026-09-11T09:00:00+00:00"
+    assert quote["change_basis"] == "previous_daily_close"
+    assert quote["provenance"]["daily_baseline"] == {
+        "source": "price_data", "timeframe": "1D", "date": "2026-09-10"
+    }
+    assert quote["eod_fallback"]["source"] == "price_data"
+
+
+@pytest.mark.parametrize("quote_row", [
+    {"ts": "2026-09-11T10:00:00+00:00", "close": 110, "daily_close": 100,
+     "daily_date": "2026-09-10", "daily_source": "price_data"},
+    {"ts": "2026-09-10T09:00:00+00:00", "close": 110, "daily_close": 100,
+     "daily_date": "2026-09-09", "daily_source": "price_data"},
+    {"ts": "2026-09-11T09:00:00+00:00", "close": "bad", "daily_close": 100,
+     "daily_date": "2026-09-10", "daily_source": "price_data"},
+    {"ts": "2026-09-11T09:00:00+00:00", "close": 110, "daily_close": 0,
+     "daily_date": "2026-09-10", "daily_source": "price_data"},
+])
+def test_intraday_quote_overlay_fails_closed_to_immutable_eod_quote(quote_row):
+    class Adapter:
+        def load_intraday_quotes(self, conn, symbols, now):
+            return {"AAA": quote_row}
+
+    report = _published_quote_report()
+    original = dict(report["rows"][0]["quote"])
+    subject.overlay_intraday_quotes(
+        report, adapter=Adapter(), conn=object(),
+        now=datetime(2026, 9, 11, 9, 30, tzinfo=timezone.utc),
+    )
+    assert report["rows"][0]["quote"] == original
+    assert report["rows"][0]["main_trend"] == {"main_trend": 2}
+
+
+def test_intraday_overlay_does_not_change_scan_or_classifier_fields():
+    class Adapter:
+        def load_intraday_quotes(self, conn, symbols, now):
+            return {"AAA": {"ts": "2026-09-11T09:00:00+00:00", "close": 110,
+                            "daily_close": 100, "daily_date": "2026-09-10",
+                            "daily_source": "derived_daily_price_data"}}
+
+    report = _published_quote_report()
+    report["rows"][0].update({"status": "AVAILABLE", "machine_lane": "REVIEW_NOW",
+                               "classifier_status": "AVAILABLE", "data_quality_status": "AVAILABLE"})
+    invariant = {key: report["rows"][0][key] for key in
+                 ("main_trend", "status", "machine_lane", "classifier_status", "data_quality_status")}
+    subject.overlay_intraday_quotes(
+        report, adapter=Adapter(), conn=object(),
+        now=datetime(2026, 9, 11, 9, 30, tzinfo=timezone.utc),
+    )
+    assert {key: report["rows"][0][key] for key in invariant} == invariant
+    assert report["rows"][0]["quote"]["provenance"]["daily_baseline"]["source"] == "derived_daily_price_data"
+
+
+def test_published_overlay_reads_artifact_without_request_database(monkeypatch):
+    artifact = {"generated_at": "2026-09-15T09:00:00+00:00", "quotes": [{
+        "symbol": "AAA", "status": "UNAVAILABLE"}]}
+    monkeypatch.setattr("intraday_quote_read_model.read_current", lambda **_: artifact)
+    monkeypatch.setattr(subject.BackendDailyAdapter, "_get_conn",
+                        lambda *_: (_ for _ in ()).throw(AssertionError("request DB access")))
+    report = _published_quote_report()
+    subject.overlay_intraday_quotes(report, now=datetime(2026, 9, 15, 9, 30, tzinfo=timezone.utc))
+    assert report["rows"][0]["quote"]["source"] == "price_data"
+    assert report["intraday_quote_overlay"]["query_mode"] == "PREBUILT_READ_MODEL"
 
 
 def test_valid_classifier_row_is_available_and_has_diagnostic_trace():
@@ -632,6 +725,75 @@ def test_backend_adapter_preserves_complete_derived_lineage_from_fake_result_set
         "source_last_ts": "2026-09-11T09:00:00+00:00",
         "source_completion_cutoff": "2026-09-11T10:00:00+00:00", "source_bar_count": 8,
     }
+
+
+def test_backend_adapter_selects_latest_completed_60m_row_and_daily_baseline():
+    class Cursor:
+        description = [(name,) for name in ("symbol", "ts", "close", "date", "daily_close", "daily_source")]
+
+        def execute(self, sql, params):
+            self.sql, self.params = sql, params
+
+        def fetchall(self):
+            return [
+                ("AAA", "2026-09-11T08:00:00+00:00", 109, "2026-09-10", 100, "price_data"),
+                ("AAA", "2026-09-11T09:00:00+00:00", 110, "2026-09-10", 100, "price_data"),
+            ]
+
+        def close(self):
+            pass
+
+    class Connection:
+        def __init__(self):
+            self.cursor_instance = Cursor()
+
+        def cursor(self):
+            return self.cursor_instance
+
+    conn = Connection()
+    result = subject.BackendDailyAdapter().load_intraday_quotes(
+        conn, ["AAA"], now=datetime(2026, 9, 11, 9, 30, tzinfo=timezone.utc),
+    )
+    assert result["AAA"] == {
+        "ts": "2026-09-11T09:00:00+00:00", "close": 110.0,
+        "daily_close": 100.0, "daily_date": "2026-09-10", "daily_source": "price_data",
+    }
+    assert "intraday_price_data" in conn.cursor_instance.sql
+    assert "SELECT DISTINCT ON (symbol)" in conn.cursor_instance.sql
+    assert "LEFT JOIN LATERAL" in conn.cursor_instance.sql
+    assert "daily_candidates" not in conn.cursor_instance.sql
+    assert "p.date < (i.ts AT TIME ZONE 'Asia/Bangkok')::date" in conn.cursor_instance.sql
+    assert "ORDER BY daily.date DESC, daily.source_priority ASC" in conn.cursor_instance.sql
+    assert "NOT EXISTS" in conn.cursor_instance.sql
+    assert conn.cursor_instance.params == (["AAA"],)
+
+
+@pytest.mark.parametrize("daily_source", ["price_data", "derived_daily_price_data"])
+def test_backend_adapter_preserves_official_first_or_derived_daily_baseline(daily_source):
+    class Cursor:
+        description = [(name,) for name in ("symbol", "ts", "close", "date", "daily_close", "daily_source")]
+
+        def execute(self, sql, params):
+            self.sql, self.params = sql, params
+
+        def fetchall(self):
+            return [("AAA", "2026-09-11T09:00:00+00:00", 110, "2026-09-10", 100, daily_source)]
+
+        def close(self):
+            pass
+
+    class Connection:
+        def __init__(self):
+            self.cursor_instance = Cursor()
+
+        def cursor(self):
+            return self.cursor_instance
+
+    result = subject.BackendDailyAdapter().load_intraday_quotes(
+        Connection(), ["AAA"], now=datetime(2026, 9, 11, 9, 30, tzinfo=timezone.utc),
+    )
+    assert result["AAA"]["daily_source"] == daily_source
+    assert result["AAA"]["daily_close"] == 100.0
 
 
 def test_backend_local_adapter_batches_symbols_with_exact_as_of_filter():

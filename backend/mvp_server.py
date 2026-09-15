@@ -123,6 +123,12 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(DIR)
+    try:
+        from chart_read_model import warm_current
+        for timeframe in ("1D", "60M", "1W", "1M"):
+            warm_current(timeframe)
+    except Exception:
+        pass
     with socketserver.ThreadingTCPServer((HOST, PORT), MVPHandler) as httpd:
         httpd.daemon_threads = True
         print(f"Serving MVP dashboard on {HOST}:{PORT}")

@@ -1436,6 +1436,79 @@ def publish_intraday_metadata_after_commit(summary):
         return None
 
 
+def publish_intraday_quote_read_model_after_commit(summary, pg):
+    """Publish compact display quotes after the committed intraday summary.
+
+    This sidecar is never allowed to convert a successful DB ingestion into a
+    failed/destructive run; its prior valid pointer remains authoritative when
+    production or validation fails.
+    """
+    if summary.get("fetch_universe") != "marginable_long":
+        return None
+    try:
+        from intraday_quote_read_model import publish
+        result = publish(pg, summary)
+        print("INTRADAY_QUOTE_READ_MODEL_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except Exception as exc:
+        print("INTRADAY_QUOTE_READ_MODEL_FAILURE " + json.dumps({
+            "event": "intraday_quote_read_model_failure",
+            "error_type": type(exc).__name__, "message": str(exc)[:240],
+            "pointer_preserved": True,
+        }, sort_keys=True))
+        return None
+
+
+def publish_chart_read_model_after_commit(pg, timeframe):
+    """Publish compact chart data after the source publication boundary."""
+    try:
+        from read_model_publisher import load_current_read_model
+        from chart_read_model import publish
+        model = load_current_read_model()
+        items = {str(item["symbol"]).upper(): item for item in model.get("items", [])}
+        symbols = sorted(items)
+        if not symbols:
+            raise RuntimeError("canonical read model has no chart symbols")
+        result = publish(pg, symbols, timeframe=timeframe, canonical_items=items)
+        print("CHART_READ_MODEL_PUBLISHED " + json.dumps(result, sort_keys=True))
+        return result
+    except Exception as exc:
+        print("CHART_READ_MODEL_PUBLISH_FAILURE " + json.dumps({
+            "event": "chart_read_model_publish_failure",
+            "timeframe": timeframe, "reason": repr(exc)[:240],
+            "pointer_preserved": True,
+        }, sort_keys=True))
+        return None
+
+
+def publish_eod_chart_read_models_after_commit():
+    """Publish all EOD chart aggregates without affecting ingestion success."""
+    chart_pg = None
+    try:
+        chart_pg = get_pg()
+        for timeframe in ("1D", "1W", "1M"):
+            publish_chart_read_model_after_commit(chart_pg, timeframe)
+    except Exception as exc:
+        # Connection/setup failures are sidecar failures too: existing chart
+        # pointers remain readable and ingestion remains authoritative.
+        for timeframe in ("1D", "1W", "1M"):
+            print("CHART_READ_MODEL_PUBLISH_FAILURE " + json.dumps({
+                "event": "chart_read_model_publish_failure",
+                "timeframe": timeframe, "reason": repr(exc)[:240],
+                "pointer_preserved": True,
+            }, sort_keys=True), file=sys.stderr)
+    finally:
+        if chart_pg is not None:
+            try:
+                chart_pg.close()
+            except Exception as exc:
+                print("CHART_READ_MODEL_PUBLISH_FAILURE " + json.dumps({
+                    "event": "chart_read_model_publish_failure",
+                    "timeframe": "EOD", "reason": repr(exc)[:240],
+                    "pointer_preserved": True,
+                }, sort_keys=True), file=sys.stderr)
+
+
 def run_vcp_after_ingestion(pg, summary):
     """Evaluate/persist VCP only after a committed successful ingestion."""
     if summary.get("status") not in {"full_success", "partial_success"}:
@@ -1504,6 +1577,7 @@ def _finish_successful_run(args, *, run_derived_fallback=False):
                 if fallback_pg is not None:
                     fallback_pg.close()
         publish_canonical_read_model()
+        publish_eod_chart_read_models_after_commit()
         # The shadow publisher is independent of the canonical setup read
         # model.  It is deliberately EOD-only and fail-closed; intraday-only
         # runs never set args.scan and therefore never publish it.
@@ -1580,6 +1654,8 @@ def run(args):
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
             publish_intraday_metadata_after_commit(summary)
+            publish_intraday_quote_read_model_after_commit(summary, pg)
+            publish_chart_read_model_after_commit(pg, "60M")
             run_vcp_after_ingestion(pg, summary)
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
             print(format_intraday_run_log(
@@ -1726,6 +1802,8 @@ def run(args):
             update_intraday_feed_status(pg, summary)
             record_intraday_run_summary(pg, summary)
             publish_intraday_metadata_after_commit(summary)
+            publish_intraday_quote_read_model_after_commit(summary, pg)
+            publish_chart_read_model_after_commit(pg, "60M")
             print("INTRADAY_RUN_SUMMARY " + json.dumps(summary, sort_keys=True))
         finally:
             pg.close()

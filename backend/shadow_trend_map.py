@@ -16,9 +16,11 @@ import re
 import threading
 import time
 from copy import deepcopy
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
@@ -26,6 +28,7 @@ from main_trend_mapping import classify_main_trend
 from mvp_api import resolve_universe
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
+from team_facts_api import _is_completed
 
 ROOT = Path(__file__).resolve().parents[1]
 ADAPTER_PATH = ROOT / "prototypes" / "elliott-state-replay" / "replay_lab.py"
@@ -184,6 +187,97 @@ class BackendDailyAdapter:
             for row in rows
         ]
         return mapped, (mapped[-1]["date"] if mapped else None)
+
+    def load_intraday_quotes(self, conn, symbols, now=None):
+        """Load one latest 60m observation and its immediately prior Daily close.
+
+        This is a display-only seam.  Completion/session validation remains in
+        Python so a future, stale, malformed, or otherwise unusable latest row
+        cannot fall back to an older observation and masquerade as current.
+        """
+        rows, _ = self._exec_select(
+            conn,
+            """
+            WITH latest_intraday AS (
+                SELECT DISTINCT ON (symbol) symbol, ts, close
+                FROM intraday_price_data
+                WHERE symbol=ANY(%s) AND interval='60m'
+                ORDER BY symbol, ts DESC
+            )
+            SELECT i.symbol, i.ts, i.close, d.date, d.close, d.daily_source
+            FROM latest_intraday i
+            LEFT JOIN LATERAL (
+                SELECT daily.date, daily.close, daily.daily_source
+                FROM (
+                    SELECT p.date, p.close, 'price_data' AS daily_source, 0 AS source_priority
+                    FROM price_data p
+                    WHERE p.symbol=i.symbol AND p.market='TH'
+                      AND p.date < (i.ts AT TIME ZONE 'Asia/Bangkok')::date
+                    UNION ALL
+                    SELECT d.session_date AS date, d.close,
+                           'derived_daily_price_data' AS daily_source, 1 AS source_priority
+                    FROM derived_daily_price_data d
+                    WHERE d.symbol=i.symbol
+                      AND d.session_date < (i.ts AT TIME ZONE 'Asia/Bangkok')::date
+                      AND d.is_official=FALSE AND d.source='settrade'
+                      AND d.source_timeframe='60m' AND d.source_bar_count=8
+                      AND d.derivation_method='settrade_60m_complete_bangkok_session_ohlcv_v1'
+                      AND (d.source_first_ts AT TIME ZONE 'Asia/Bangkok')::date=d.session_date
+                      AND (d.source_last_ts AT TIME ZONE 'Asia/Bangkok')::date=d.session_date
+                      AND (d.source_first_ts AT TIME ZONE 'Asia/Bangkok')::time=TIME '09:00'
+                      AND (d.source_last_ts AT TIME ZONE 'Asia/Bangkok')::time=TIME '16:00'
+                      AND d.source_completion_cutoff >= ((d.session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
+                      AND d.source_completion_cutoff <= NOW()
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM price_data official
+                          WHERE official.symbol=d.symbol AND official.market='TH'
+                            AND official.date=d.session_date
+                      )
+                ) daily
+                ORDER BY daily.date DESC, daily.source_priority ASC
+                LIMIT 1
+            ) d ON TRUE
+            """,
+            (list(symbols),),
+        )
+        observed_now = now or datetime.now(timezone.utc)
+        if observed_now.tzinfo is None:
+            observed_now = observed_now.replace(tzinfo=timezone.utc)
+        boundary = observed_now.replace(minute=0, second=0, microsecond=0)
+        session_date = observed_now.astimezone(ZoneInfo("Asia/Bangkok")).date()
+        output = {}
+        latest_rows = {}
+        for row in rows:
+            try:
+                parsed = row[1] if isinstance(row[1], datetime) else datetime.fromisoformat(str(row[1]).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                current = latest_rows.get(str(row[0]))
+                if current is None or parsed > current[0]:
+                    latest_rows[str(row[0])] = (parsed, row)
+            except (IndexError, TypeError, ValueError, OverflowError):
+                continue
+        for _, (latest_stamp, row) in latest_rows.items():
+            symbol, stamp, close, daily_date, daily_close, daily_source = row
+            try:
+                parsed = latest_stamp
+                local_date = parsed.astimezone(ZoneInfo("Asia/Bangkok")).date()
+                if local_date != session_date or not _is_completed(parsed.isoformat(), boundary):
+                    continue
+                if (not _finite(close) or not _finite(daily_close) or float(daily_close) == 0
+                        or daily_date is None or daily_source not in {"price_data", "derived_daily_price_data"}):
+                    continue
+                price = float(close)
+                baseline = float(daily_close)
+                output[str(symbol)] = {
+                    "ts": parsed.isoformat(), "close": price,
+                    "daily_close": baseline, "daily_date": str(daily_date),
+                    "daily_source": daily_source,
+                }
+            except (TypeError, ValueError, OverflowError):
+                continue
+        return output
 
     def load_daily_pit_batch(self, conn, symbols, as_of):
         """Load bounded Daily rows plus a bounded quality aggregate.
@@ -639,7 +733,9 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
         source = "database" if adapter is not None or conn is not None else "published"
     if source in {"published", "read_model", "current"}:
         from shadow_read_model_publisher import read_current_shadow_report
-        return read_current_shadow_report()
+        report = read_current_shadow_report()
+        overlay_intraday_quotes(report)
+        return report
     if source not in {"database", "builder", "publisher"}:
         raise ValueError(f"unsupported shadow report source: {source}")
     adapter = adapter or _adapter()
@@ -687,6 +783,126 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
     finally:
         if owns_conn:
             conn.close()
+
+
+def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, now=None) -> dict[str, Any]:
+    """Overlay display quotes from the prebuilt artifact without querying DB.
+
+    ``adapter``/``conn`` remain an explicit producer/test seam only.  The
+    canonical published-report path supplies neither and therefore reads only
+    the validated file artifact.
+    """
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows:
+        report["intraday_quote_overlay"] = {"status": "UNAVAILABLE", "fallback": "eod_quote",
+                                             "source": "intraday_price_data", "timeframe": "60m",
+                                             "query_mode": "PREBUILT_READ_MODEL", "read_only": True}
+        return report
+    if adapter is None and conn is None:
+        try:
+            from intraday_quote_read_model import read_current
+            artifact = read_current(now=now)
+            by_symbol = {item["symbol"]: item for item in artifact["quotes"]}
+            applied = 0
+            for row in rows:
+                item = by_symbol.get(row.get("symbol"))
+                eod_quote = row.get("quote")
+                if item is None or item.get("status") != "AVAILABLE" or not isinstance(eod_quote, Mapping):
+                    continue
+                baseline = item["daily_baseline"]
+                row["quote"] = {
+                    "price": item["price"], "change_amount": item["change_amount"],
+                    "change_pct": item["change_pct"], "availability": "AVAILABLE",
+                    "change_availability": "AVAILABLE", "source": "intraday_price_data",
+                    "table": "intraday_price_data", "timeframe": "60m", "provisional": True,
+                    "as_of": item["latest_completed_60m"], "change_basis": "previous_daily_close",
+                    "change_amount_basis": "previous_daily_close",
+                    "provenance": {"source": "intraday_price_data", "table": "intraday_price_data",
+                                   "timeframe": "60m", "latest_completed_60m": True,
+                                   "change_basis": "previous_daily_close", "daily_baseline": {
+                                       "source": baseline["source"], "timeframe": "1D", "date": baseline["date"]}},
+                    "eod_fallback": deepcopy(dict(eod_quote)),
+                }
+                applied += 1
+            report["intraday_quote_overlay"] = {
+                "status": "AVAILABLE" if applied else "UNAVAILABLE", "applied_count": applied,
+                "fallback": "eod_quote", "source": "intraday_price_data", "timeframe": "60m",
+                "query_mode": "PREBUILT_READ_MODEL", "read_only": True,
+                "artifact_generated_at": artifact["generated_at"], "completed_semantics": "team_facts_api",
+            }
+        except Exception as error:
+            report["intraday_quote_overlay"] = {
+                "status": "UNAVAILABLE", "fallback": "eod_quote", "source": "intraday_price_data",
+                "timeframe": "60m", "query_mode": "PREBUILT_READ_MODEL", "read_only": True,
+                "error_type": type(error).__name__,
+            }
+        return report
+    adapter = adapter or BackendDailyAdapter()
+    owns_conn = conn is None
+    try:
+        conn = conn or adapter._get_conn()
+        observed_now = now or datetime.now(timezone.utc)
+        if observed_now.tzinfo is None:
+            observed_now = observed_now.replace(tzinfo=timezone.utc)
+        boundary = observed_now.replace(minute=0, second=0, microsecond=0)
+        session_date = observed_now.astimezone(ZoneInfo("Asia/Bangkok")).date()
+        symbols = [row.get("symbol") for row in rows if row.get("symbol")]
+        observed = adapter.load_intraday_quotes(conn, symbols, now=observed_now)
+        applied = 0
+        for row in rows:
+            item = observed.get(row.get("symbol"))
+            eod_quote = row.get("quote")
+            if not isinstance(item, Mapping) or not isinstance(eod_quote, Mapping):
+                continue
+            try:
+                parsed = datetime.fromisoformat(str(item.get("ts")).replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                if (parsed.astimezone(ZoneInfo("Asia/Bangkok")).date() != session_date
+                        or not _is_completed(parsed.isoformat(), boundary)):
+                    continue
+            except (TypeError, ValueError, OverflowError):
+                continue
+            baseline = item.get("daily_close")
+            price = item.get("close")
+            if (not _finite(price) or not _finite(baseline) or float(baseline) == 0
+                    or item.get("daily_source") not in {"price_data", "derived_daily_price_data"}):
+                continue
+            amount = float(price) - float(baseline)
+            row["quote"] = {
+                "price": float(price), "change_amount": amount,
+                "change_pct": amount / float(baseline) * 100,
+                "availability": "AVAILABLE", "change_availability": "AVAILABLE",
+                "source": "intraday_price_data", "table": "intraday_price_data",
+                "timeframe": "60m", "provisional": True, "as_of": item["ts"],
+                "change_basis": "previous_daily_close",
+                "change_amount_basis": "previous_daily_close",
+                "provenance": {
+                    "source": "intraday_price_data", "table": "intraday_price_data",
+                    "timeframe": "60m", "latest_completed_60m": True,
+                    "change_basis": "previous_daily_close",
+                    "daily_baseline": {"source": item["daily_source"], "timeframe": "1D",
+                                       "date": item["daily_date"]},
+                },
+                "eod_fallback": deepcopy(dict(eod_quote)),
+            }
+            applied += 1
+        report["intraday_quote_overlay"] = {
+            "status": "AVAILABLE" if applied else "UNAVAILABLE",
+            "applied_count": applied, "fallback": "eod_quote",
+            "source": "intraday_price_data", "timeframe": "60m",
+            "query_mode": "SELECT_ONLY", "completed_semantics": "team_facts_api",
+        }
+    except Exception as error:
+        report["intraday_quote_overlay"] = {
+            "status": "UNAVAILABLE", "fallback": "eod_quote",
+            "source": "intraday_price_data", "timeframe": "60m",
+            "query_mode": "SELECT_ONLY", "error_type": type(error).__name__,
+        }
+    finally:
+        if owns_conn and conn is not None:
+            conn.close()
+    return report
 
 
 def unavailable_report(error: Exception) -> dict[str, Any]:

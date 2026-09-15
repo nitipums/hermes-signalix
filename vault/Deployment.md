@@ -26,6 +26,94 @@ legacy routes: quarantined/404
 
 The primary workstream is the production-served, public, read-only Daily Trend Mapping surface. Its active bounded promotion/closeout contract is GitHub Issue [#17 — Daily Trend Map: public read-only delivery closeout](https://github.com/nitipums/hermes-signalix/issues/17):
 
+### Intraday display quote overlay — runtime read-back PASS
+
+- The Trend Map scan/classification remains EOD-only and immutable. A bounded
+  read-only API overlay now uses the latest completed `intraday_price_data`
+  60m bar for display-only `quote.price`, `quote.change_amount`, and
+  `quote.change_pct`; the change basis is the immediately prior completed Daily
+  close. `main_trend`, scan status, classifier evidence, and EOD `as_of` remain
+  unchanged. Missing, stale, future, malformed, or unusable intraday data falls
+  back to the immutable EOD quote with explicit provenance.
+- Source/tests: `PASS` — `pytest -q backend/test_read_model_publisher.py backend/test_shadow_trend_map.py -rA` returned `73 passed, 1 skipped`; compile and `git diff --check` passed.
+- Authorized runtime action: `docker compose restart dashboard`; PostgreSQL and
+  Redis were not restarted, migrated, or written.
+- Readiness: `{"status":"ok","db":"up","redis":"up"}`; dashboard health
+  `healthy`.
+- Public `/api/trend-map`: HTTP 200, `PRODUCTION_READ_ONLY`, `VERIFIED`,
+  `237` rows; intraday overlay `AVAILABLE`, `236` rows applied, `1` row
+  (`PTL`) explicitly fell back to EOD quote.
+- Public browser: `TEAM` displayed `5.75`, `-0.05`, `-0.86%`, and
+  `Quote · 60m provisional`; drawer chart rendered with a `461x360` canvas,
+  no page overflow (`bodyScrollWidth=500`, `clientWidth=500`).
+- No database write, migration, commit, or push was performed.
+
+### Full Trend Map UX remediation — browser read-back PASS
+
+- Scope: drawer failure recovery, chart retry control, EOD-versus-intraday
+  provenance, official-versus-derived Daily labels, keyboard focus handling,
+  blocked-row filter/reason affordance, stale-drawer invalidation, and mobile
+  full-value affordance. Scan/classifier semantics and the immutable artifact
+  were unchanged.
+- Source/tests: `pytest -q backend/test_shadow_trend_map.py` returned `51
+  passed`; Trend Map UX contract selection
+  `pytest -q backend/test_mvp_frontend_contract.py -k 'trend_map_'` returned
+  `5 passed`; JavaScript syntax, Python compile, and `git diff --check` passed.
+- Public desktop browser: `237` rows; provenance line visible; `Not verified /
+  blocked` filter visible; drawer opened with focus on `drawer-close`; quote
+  label showed `Quote · 60m provisional (intraday_price_data)`; chart canvas
+  rendered `461x360`; page width remained contained.
+- Public 390px browser: `237` rows; drawer opened with chart canvas `366x360`;
+  document/body width remained `390`; closing restored focus to the triggering
+  `AKR` row.
+- The broader retained `/mvp` frontend contract suite still has unrelated
+  historical failures and is not used as Trend Map acceptance evidence.
+- Post-review remediation: hidden controls are excluded from the focus trap and pending drawer opens are cleared on filter/reload invalidation; focused contract selection reran with `6 passed`.
+- No database write, migration, commit, or push was performed.
+
+### Prebuilt intraday quote read model — runtime performance PASS
+
+- Intraday display quotes are now prebuilt after the intraday ingestion commit
+  into a compact validated artifact; `/api/trend-map` reads the artifact and
+  no longer opens PostgreSQL for each page request. EOD scan/classification
+  remains immutable and separate.
+- Artifact read-back: schema `signalix.intraday-quote-read-model.v1`, canonical
+  `marginable_long`, `237` symbols, artifact generated
+  `2026-09-15T07:43:40.964764+00:00`.
+- Public API before optimization: approximately `3.2–3.8s` per request.
+  After reload: local/public API `0.11–0.21s` in bounded repeated probes,
+  HTTP public `TTFB=0.105s`, `total=0.108s`, with `237/237` intraday quotes and
+  `query_mode=PREBUILT_READ_MODEL`.
+- Public browser after reload: `/api/trend-map` resource approximately
+  `217ms`, `237` rows, no page overflow; drawer still renders the provisional
+  intraday quote and chart. Chart request remains a separate optimization
+  target (`~1.37s` in the measured browser run) because it reads historical
+  OHLC/indicator data rather than the compact quote model.
+- Source/tests: `76 passed, 1 skipped` across the prebuilt quote, Trend Map, and
+  intraday resilience focused suites; Python compile and `git diff --check`
+  passed. No database write or migration was performed; the artifact write and
+  dashboard restart were explicitly authorized runtime actions.
+
+### Prebuilt drawer chart read model — runtime performance PASS
+
+- Compact validated chart artifacts are now built for `1D`, `60M`, `1W`, and `1M`
+  after the relevant EOD/intraday publication boundaries. The chart route reads
+  the artifact before DB fallback; fallback is explicit `DB_FALLBACK` only when
+  an artifact is unavailable or stale.
+- Startup prewarming validates all four chart artifact identities into the
+  process cache. A validated pointer change invalidates only the affected
+  timeframe; stale/missing/corrupt artifacts still fall back safely.
+- Public API after reload: first requests for all four timeframes were below
+  `50ms` after startup prewarm; subsequent requests remained below `30ms`,
+  versus the prior `~1.4–2.5s` cold chart path.
+- Public browser drawer: 1W and 1M controls requested their exact timeframe
+  routes and rendered the canvas; quote remained `60m provisional`, `237` rows
+  remained visible, and page overflow stayed contained.
+- Source/tests: all-timeframe chart read-model, Trend Map, and technical-indicator
+  focused tests passed; Python compile, JavaScript syntax, and `git diff --check`
+  passed. No database write or migration was performed; chart artifacts and
+  dashboard restart were explicitly authorized runtime actions.
+
 ### Main Trend 1–4 UI promotion — 2026-09-13
 
 - Owner-authorized bounded promotion for Issue #32: deterministic `main_trend` evidence was published into the immutable Trend Map artifact. The public table and Trend Map drawer now use Main Trend 1–4 as the only visible primary taxonomy; legacy machine-lane/sub-trend presentation is not shown on the public surface. No setup/action/order semantics changed.
@@ -412,7 +500,7 @@ after the restart; a successful restart alone is not acceptance evidence.
 | `SETTRADE_*` | Settrade Open API creds (in `settradeupdated.env`) |
 
 ## systemd timers (host, not docker)
-- `signalix-update.timer` — weekday EOD ingestion + Daily scan at 18:30 Bangkok. Its canonical source is `/root/signalix/backend/update_data.service`; the deployed unit must be byte-identical. Daily path does **not** run full intraday; `signalix-intraday.service` owns 60m fetching. `ExecStartPost` runs `verify_mvp_only.py` against the canonical MVP artifact and latest Daily run.
+- `signalix-update.timer` — weekday EOD ingestion + Daily scan at 17:00 Bangkok. Its canonical source is `/root/signalix/backend/update_data.service`; the deployed unit must be byte-identical. Daily path does **not** run full intraday; `signalix-intraday.service` owns 60m fetching. `ExecStartPost` runs `verify_mvp_only.py` against the canonical MVP artifact and latest Daily run.
 - `signalix-eod-healthcheck.timer` — weekday EOD freshness watchdog at 20:00 Bangkok. It checks the latest `price_data` date, latest Daily scan date, service result, and writes durable JSONL/state evidence to `/root/signalix/eod_healthcheck_log.jsonl` and `/root/signalix/eod_healthcheck_observations.json`.
 - `signalix-intraday.timer` — 13 weekday rounds in Bangkok: `10:00, 10:30, 11:00, 11:30, 12:00, 12:30, 14:00, 14:30, 15:00, 15:30, 16:00, 16:30, 16:45`. The service guard is `10:00–16:45`; the default fetch scope is canonical `marginable_long`, with explicit `active_ord` retained for audit/rollback runs. It runs with `--no-scan`: each round fetches/evaluates stored 60m data and does not invoke the expensive Daily scan, avoiding overlap. Failed/skipped fetches do not advance VCP.
 - `signalix-intraday-watchdog.timer` — independent freshness monitor. It tolerates expected `partial_success`, checks `intraday_price_data` at a cadence-aware 90-minute threshold, checks evaluator state at 30 minutes, and writes structured JSONL evidence.

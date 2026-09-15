@@ -274,7 +274,8 @@ def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VI
     return compact
 
 
-def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None) -> Optional[dict]:
+def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None,
+                              connection: Any | None = None) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
     Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
@@ -283,7 +284,8 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
     if timeframe not in {"1D", "1W", "60M", "1M"}:
         raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
     chart_source = _chart_source(timeframe)
-    pg = _get_db_connection()
+    owns_connection = connection is None
+    pg = connection if connection is not None else _get_db_connection()
     if pg is None:
         return {
             "symbol": symbol.upper(),
@@ -341,10 +343,11 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
             },
         }
     finally:
-        try:
-            _release_db_connection(pg)
-        except Exception:
-            pass
+        if owns_connection:
+            try:
+                _release_db_connection(pg)
+            except Exception:
+                pass
 
     if not candles:
         if timeframe == "60M":

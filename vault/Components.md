@@ -21,6 +21,16 @@ GET /api/trend-map
 GET /trend-map
 ```
 
+### Read-model rule
+
+Public Trend Map request paths consume validated compact artifacts rather than
+querying raw market history. The drawer chart prebuild contract covers `1D`,
+`60M`, `1W`, and `1M`: EOD publication owns `1D/1W/1M`, intraday commit owns
+`60M`, and the request path selects a symbol/timeframe entry. DB fallback is
+explicit and provenance-labelled only when the artifact is unavailable or
+stale. No request-time scan, rescan, indicator rebuild, or PostgreSQL history
+query is permitted for a valid artifact.
+
 ## `actionable_signal_policy.py` — private paper/shadow signals
 
 Pure deterministic projection over canonical setup-candidate evidence. Its

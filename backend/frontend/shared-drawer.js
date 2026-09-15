@@ -6,11 +6,11 @@
   var chartLayers = {candles:true, volume:true, ma:true, rsi:true, macd:true,
     maPeriods: {"5":true,"10":true,"20":true,"50":true,"100":false,"200":false}, waveEvidence:true};
   var chartTimeframe = "1D", chartSymbol = null, drawerItem = null, drawerItems = [], drawerSymbols = [], drawerIndex = -1;
-  var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null;
+  var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null, drawerTriggerElement = null;
   var dom = {};
 
   function drawerMarkup() {
-    return '<aside id="drawer" class="drawer drawer--hidden" role="dialog" aria-modal="true" aria-label="Stock detail">' +
+    return '<aside id="drawer" class="drawer drawer--hidden" role="dialog" aria-modal="true" aria-labelledby="drawer-symbol">' +
       '<div class="drawer-overlay" id="drawer-overlay"></div><div class="drawer-panel"><header class="drawer-header">' +
       '<div class="drawer-identity"><a id="drawer-symbol" class="drawer-title drawer-symbol-link" target="_blank" rel="noopener noreferrer"></a>' +
       '<span id="drawer-name" class="drawer-name"></span><span id="drawer-lane" class="drawer-lane">Not verified</span></div>' +
@@ -20,7 +20,7 @@
       '<div class="drawer-price-row"><strong id="drawer-price">–</strong><span id="drawer-change" class="drawer-change">–</span><span id="drawer-trade-value" class="drawer-trade-value">Trade value –</span></div>' +
       '<div id="drawer-quote-source" class="drawer-quote-source">Quote · Not verified</div><div class="drawer-decision"><span id="drawer-trend" class="drawer-trend">–</span><strong id="drawer-action" class="drawer-action">–</strong></div>' +
       '<div class="drawer-wave-summary" aria-label="Primary Daily Wave"><span>Primary Daily Wave <strong id="drawer-wave">Not verified</strong></span><span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span><span id="drawer-wave-source">Daily structural · source unavailable</span></div>' +
-      '<div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div><div id="drawer-chart" class="drawer-chart"><canvas id="drawer-canvas" width="720" height="440"></canvas><p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p></div>' +
+      '<div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div><div id="drawer-chart" class="drawer-chart"><canvas id="drawer-canvas" width="720" height="440"></canvas><p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p><button id="drawer-chart-retry" class="chart-retry" type="button" hidden>Retry chart</button></div>' +
       '<div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>' +
       '<div class="chart-timeframe-controls" aria-label="Chart timeframe"><span class="chart-control-label">Timeframe</span><button type="button" class="chart-timeframe" data-timeframe="60M">60m</button><button type="button" class="chart-timeframe is-active" data-timeframe="1D">1D</button><button type="button" class="chart-timeframe" data-timeframe="1W">1W</button><button type="button" class="chart-timeframe" data-timeframe="1M">1M</button></div>' +
       '<div class="ma-controls" aria-label="Moving average overlays"><span class="chart-control-label">Moving averages</span><label><input type="checkbox" data-ma-period="5" checked> MA5</label><label><input type="checkbox" data-ma-period="10" checked> MA10</label><label><input type="checkbox" data-ma-period="20" checked> MA20</label><label><input type="checkbox" data-ma-period="50" checked> MA50</label><label><input type="checkbox" data-ma-period="100"> MA100</label><label><input type="checkbox" data-ma-period="200"> MA200</label></div>' +
@@ -35,7 +35,7 @@
   function bindDom() {
     var mount = document.querySelector("#drawer-mount");
     if (mount && !document.querySelector("#drawer")) mount.innerHTML = drawerMarkup();
-    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
+    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartRetry","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
       var ids = {
         drawerChartPH:"drawer-chart-placeholder",
         drawerRR:"drawer-rr"
@@ -256,7 +256,7 @@
     dom.drawerChange.textContent = changeText[0] + " (" + fmtChangeAmount(quote.change_amount != null ? quote.change_amount : item.change_amount) + ")";
     dom.drawerChange.className = "drawer-change drawer-change--" + changeText[1];
     dom.drawerPrice.className = "drawer-price drawer-price--" + changeText[1];
-    dom.drawerQuoteSource.textContent = quote.source === "intraday_price_data" ? "Quote · 60m provisional" : quote.source === "price_data" ? "Quote · Daily close" : "Quote · Not verified";
+    dom.drawerQuoteSource.textContent = quote.source === "intraday_price_data" ? "Quote · 60m provisional (intraday_price_data)" : quote.source === "price_data" ? "Quote · Daily official (price_data) · Daily close" : quote.source === "derived_daily_price_data" ? "Quote · Daily derived (derived_daily_price_data · 60m-derived)" : "Quote · Not verified";
     dom.drawerTradeValue.textContent = shadow ? "Trade value Not applicable" : "Trade value " + fmtNum(item.trade_value);
     dom.drawerChartPH.textContent = "Chart loading…";
     dom.drawerChartPH.style.display = "block"; dom.drawerCanvas.style.display = "none";
@@ -288,6 +288,7 @@
     dom.drawerMarketCap.textContent = shadow ? "Market cap Not applicable" : "Market cap " + fmtNum(item.market_cap);
     dom.drawer.classList.remove("drawer--hidden");
     document.body.style.overflow = "hidden";
+    if (dom.drawerClose && typeof dom.drawerClose.focus === "function") dom.drawerClose.focus();
   }
 
   function setChartTimeframeButtons(value) {
@@ -301,6 +302,8 @@
       drawerIndex = drawerSymbols.indexOf(currentSymbol);
     }
     var hasItems = drawerSymbols.length > 0 && drawerIndex >= 0;
+    var open = dom.drawer && !dom.drawer.classList.contains("drawer--hidden");
+    if (open && !hasItems) { closeSharedDrawer(); return; }
     if (dom.drawerPrev) dom.drawerPrev.disabled = !hasItems || drawerIndex <= 0;
     if (dom.drawerNext) dom.drawerNext.disabled = !hasItems || drawerIndex >= drawerSymbols.length - 1;
     if (dom.drawerPosition) dom.drawerPosition.textContent = hasItems ? (drawerIndex + 1) + " of " + drawerSymbols.length : "– of –";
@@ -309,6 +312,8 @@
     chartRequestSeq += 1; if (chartAbort) chartAbort.abort(); chartAbort = null; drawerItem = null; chartSymbol = null;
     if (dom.drawer) dom.drawer.classList.add("drawer--hidden");
     document.body.style.overflow = "";
+    if (drawerTriggerElement && typeof drawerTriggerElement.focus === "function") drawerTriggerElement.focus();
+    drawerTriggerElement = null;
   }
   function chartRequestUrl(envelope, symbol, timeframe) {
     var base = timeframe === "1D" && envelope && envelope.chartUrl
@@ -320,7 +325,7 @@
     var key = symbol + "|" + timeframe + "|chart";
     var cached = chartCache[key];
     if (cached) { renderDrawerChart(cached); return; }
-    dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = "Chart loading…"; dom.drawerCanvas.style.display = "none";
+    dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = "Chart loading…"; dom.drawerCanvas.style.display = "none"; if (dom.drawerChartRetry) dom.drawerChartRetry.hidden = true;
     fetch(chartRequestUrl(envelope, symbol, timeframe), {signal: chartAbort.signal, cache:"no-store"})
       .then(function (response) { if (!response.ok) throw new Error("Chart HTTP " + response.status); return response.json(); })
       .then(function (chart) {
@@ -335,9 +340,10 @@
       })
       .catch(function (error) {
         if (error && error.name === "AbortError") return;
-        if (seq !== chartRequestSeq || symbol !== chartSymbol) return;
-        dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = timeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "Chart data unavailable · Retry";
+        if (seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe) return;
+        dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = timeframe === "60M" ? "60m unavailable · Daily EOD remains the decision source" : "Chart data unavailable";
         dom.drawerCanvas.style.display = "none";
+        if (dom.drawerChartRetry) { dom.drawerChartRetry.hidden = false; dom.drawerChartRetry.onclick = function () { requestChart(envelope, symbol, timeframe, seq); }; }
       });
   }
   function openSharedDrawer(envelope) {
@@ -345,6 +351,8 @@
     var item = envelope.item || {};
     var symbol = item.symbol;
     if (!symbol) return;
+    if (envelope.triggerElement) drawerTriggerElement = envelope.triggerElement;
+    else if (!drawerTriggerElement && document.activeElement && document.activeElement !== document.body) drawerTriggerElement = document.activeElement;
     chartSymbol = symbol; item.__sharedEnvelope = envelope; drawerItem = item; drawerSymbols = envelope.navigation && Array.isArray(envelope.navigation.symbols) ? envelope.navigation.symbols.slice() : [symbol];
     drawerItems = envelope.navigation && Array.isArray(envelope.navigation.items) ? envelope.navigation.items.slice() : [item];
     drawerIndex = envelope.navigation && Number.isInteger(envelope.navigation.index) ? envelope.navigation.index : drawerSymbols.indexOf(symbol);
@@ -740,10 +748,10 @@
   function renderDrawerChart(chart) {
     window.__signalixLastChart = chart; renderChartLegend(chart); renderTechnicalSummary(chart);
     if (chart && Array.isArray(chart.candles) && chart.candles.length) {
-      dom.drawerChartPH.style.display = "none"; dom.drawerCanvas.style.display = "block"; drawChart(chart);
+      dom.drawerChartPH.style.display = "none"; dom.drawerCanvas.style.display = "block"; if (dom.drawerChartRetry) dom.drawerChartRetry.hidden = true; drawChart(chart);
     } else {
       dom.drawerChartPH.style.display = "block"; dom.drawerChartPH.textContent = (chart && chart.provenance && chart.provenance.note) || "No chart data available (candles NOT_VERIFIED)";
-      dom.drawerCanvas.style.display = "none";
+      dom.drawerCanvas.style.display = "none"; if (dom.drawerChartRetry) dom.drawerChartRetry.hidden = true;
     }
   }
 
@@ -776,7 +784,19 @@
       if (window.__signalixLastChart) drawChart(window.__signalixLastChart);
     }); });
     window.addEventListener("resize", function () { if (dom.drawer && !dom.drawer.classList.contains("drawer--hidden") && window.__signalixLastChart) drawChart(window.__signalixLastChart); });
-    document.addEventListener("keydown", function (event) { if (event.key === "Escape" && dom.drawer && !dom.drawer.classList.contains("drawer--hidden")) closeSharedDrawer(); });
+    document.addEventListener("keydown", function (event) {
+      if (!dom.drawer || dom.drawer.classList.contains("drawer--hidden")) return;
+      if (event.key === "Escape") { closeSharedDrawer(); return; }
+      if (event.key !== "Tab") return;
+      var focusable = Array.prototype.slice.call(dom.drawer.querySelectorAll("a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex=\"-1\"])"));
+      focusable = focusable.filter(function (element) {
+        return !element.hidden && element.getAttribute("aria-hidden") !== "true" && !element.closest("[hidden],[aria-hidden=\"true\"]");
+      });
+      if (!focusable.length) { event.preventDefault(); return; }
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
   }
   bindDom(); bindEvents();
   window.SignalixSharedDrawer = {openSharedDrawer: openSharedDrawer, closeSharedDrawer: closeSharedDrawer, drawChart: drawChart, updateNavigation: updateSharedDrawerNavigation};

@@ -1682,3 +1682,60 @@ def test_shadow_cards_are_mobile_bounded_and_show_decision_levels():
         assert marker in card
     assert ".shadow-signal-card { width:100%; max-width:100%; min-width:0;" in css
     assert ".shadow-signal-card__plan { grid-template-columns:repeat(2,minmax(0,1fr)); }" in css
+
+
+def test_trend_map_drawer_failure_has_separate_retry_and_resets_single_flight():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'id="drawer-retry"' in template
+    assert "sharedDrawerPromise=null" in template
+    assert "pendingDrawerOpen" in template
+    assert "Retry detail drawer" in template
+    assert 'id="retry" hidden>Retry page data' in template
+    assert 'sharedDrawerPromise=null;throw error' in template
+    assert "function clearPendingDrawerOpen()" in template
+
+
+def test_trend_map_invalidates_stale_drawer_and_chart_has_actionable_retry():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function invalidateDrawer(rows)" in template
+    assert "closeSharedDrawer()" in template
+    assert 'id="drawer-chart-retry"' in shared
+    assert "Retry chart" in shared
+    assert "requestChart(envelope, symbol, timeframe, seq)" in shared
+    assert 'seq !== chartRequestSeq || symbol !== chartSymbol' in shared
+    assert "if(pendingDrawerOpen)clearPendingDrawerOpen();" in template
+    assert 'addEventListener("click",clearPendingDrawerOpen,true)' in template
+
+
+def test_trend_map_provenance_and_drawer_source_labels_keep_quote_as_of_separate():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "Classification: Daily EOD" in template
+    assert "latest completed 60m provisional" in template
+    assert "Classification/EOD as-of remains separate from quote as-of" in template
+    for label in ("price_data", "derived_daily_price_data", "intraday_price_data"):
+        assert label in shared
+    assert "Daily official" in shared and "Daily derived" in shared
+
+
+def test_trend_map_drawer_focus_is_labelled_trapped_and_restored():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'aria-labelledby="drawer-symbol"' in shared
+    assert "drawerTriggerElement" in shared
+    assert "drawerClose.focus()" in shared
+    assert "drawerTriggerElement.focus()" in shared
+    assert 'event.key !== "Tab"' in shared
+    assert "event.shiftKey" in shared
+    assert 'return !element.hidden && element.getAttribute("aria-hidden") !== "true"' in shared
+    assert 'element.closest("[hidden],[aria-hidden=\\"true\\"]")' in shared
+
+
+def test_trend_map_blocked_filter_reason_and_mobile_full_value_affordance_are_visible():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'value="BLOCKED">Not verified / blocked' in template
+    assert 'mainTrend==="BLOCKED"?value===null' in template
+    assert 'data_quality_status==="INVALID_DATA"' in template
+    assert 'class="main-trend-value" title="' in template
+    assert 'aria-label="' in template
+    assert ".main-trend-value" in template
