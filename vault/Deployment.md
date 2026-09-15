@@ -132,6 +132,9 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Source/tests: compact projection and API contract tests passed; runtime API and
   browser read-back passed. No actionability, scan, or classifier semantics
   changed.
+- Drawer chart now fails closed when usable OHLC history has fewer than two
+  candles: the canvas is hidden and the user sees `Chart unavailable:
+  insufficient candle history` instead of a blank graph.
 
 ### Main Trend 1–4 UI promotion — 2026-09-13
 

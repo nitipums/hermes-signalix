@@ -35,10 +35,11 @@ artifacts fall back to the immutable EOD quote with explicit provenance.
 
 Intraday and EOD publication boundaries must prebuild compact validated chart
 read models for every drawer timeframe: `1D`, `60M`, `1W`, and `1M`. The
-request path reads the selected artifact and uses DB fallback only when that
+The request path reads the selected artifact and uses DB fallback only when that
 artifact is unavailable or stale; chart indicators remain deterministic
 source-code outputs. This is a Signalix design invariant, not an optional
-performance enhancement.
+performance enhancement. Insufficient usable candles must render an explicit
+`NOT_VERIFIED`/unavailable state, never a blank canvas.
 
 ### Full Trend Map UX remediation boundary
 
