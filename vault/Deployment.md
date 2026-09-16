@@ -186,9 +186,10 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Commit/push closeout — 2026-09-16 07:33 ICT
 
-- Scoped commit: `4eb33a6f80122287cf99593d2ff6ba7c205f83c1` (`feat(trend-map): refine accordion evidence UX`).
-- Published branch: `release/signalix-mvp-stable`; remote `origin/release/signalix-mvp-stable` read back the same SHA.
-- Files in the scoped commit: `backend/shadow_trend_map_template.html`, `backend/test_shadow_trend_map.py`, and `vault/Deployment.md`. No unrelated dirty files remained after the closeout.
+- Scoped implementation commit: `4eb33a6f80122287cf99593d2ff6ba7c205f83c1` (`feat(trend-map): refine accordion evidence UX`).
+- Documentation closeout commit: `396f2f5` (`docs(deployment): record trend-map closeout`).
+- Published branch: `release/signalix-mvp-stable`; final remote `origin/release/signalix-mvp-stable` is verified at the documentation closeout commit above.
+- Implementation scope: `backend/shadow_trend_map_template.html` and `backend/test_shadow_trend_map.py`; the deployment authority was updated in the closeout commits. No unrelated dirty files remained after the closeout.
 
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
