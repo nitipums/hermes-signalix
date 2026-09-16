@@ -156,6 +156,34 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Mobile table containment: at `390px`, the five-column table rendered at `366px` with `document.scrollWidth=390`, `body.scrollWidth=390`, all primary columns visible, and `1++ · FULL` intact; desktop table rendered at `924px` inside a `960px` main container.
 - Boundary: no database migration/write, alert, broker, order, or auto-trading action. Commit and push were not performed; pre-existing untracked version artifacts remain preserved.
 
+### Signal Accordion visual redesign — 2026-09-15 21:22 ICT
+
+- Scope: `backend/shadow_trend_map_template.html` plus focused contract coverage; API, immutable read model, classifier semantics, and shared drawer source were unchanged.
+- UI: production `/trend-map` now groups Main Trend 1–4 and blocked evidence into closed-by-default accordion sections. Per-symbol table rows are created only when a section opens; one section stays open at a time. Search/filter/retry and lazy drawer behavior remain read-only.
+- Branding/theme: Signalix wordmark/mark, editorial hierarchy, semantic trend colors, and persisted dark-default/light theme were added without external assets or additional network requests.
+- Source/test: `pytest -q backend/test_shadow_trend_map.py -rA` returned `58 passed`; Python compile, inline JavaScript syntax, and `git diff --check` passed.
+- Served browser: public `http://91.98.72.120:3001/trend-map` rendered the new accordion/theme markers, 237 rows, and FRESH data. At 390px, opening Main Trend 1 rendered 44 rows, opening BJC opened the real drawer/chart, and `scrollWidth=390` / `bodyScrollWidth=390`. Desktop 500px also remained contained.
+- Performance boundary: only the existing `/api/trend-map` request was observed for the page; accordion expansion performs client-side projection only. No database write, migration, restart, commit, or push was performed.
+
+### Trend Map drawer theme inheritance — 2026-09-15
+
+- Light theme now bridges the Trend Map palette into the shared drawer surface without changing drawer JavaScript, chart requests, or data semantics.
+- Public browser read-back: persisted `theme-light` rendered drawer panel/header `#fffdf8`, chart shell `#f4f1ea`, text `#1d2733`; drawer opened normally and `scrollWidth=500` / `bodyScrollWidth=500`.
+- Source/test/runtime boundary: focused Trend Map tests, compile, inline JS syntax, and `git diff --check` passed; no database write, migration, restart, commit, or push was performed.
+
+### Adversarial UX refinement — 2026-09-15
+
+- Persona feedback added one concise first-screen explanation: `Main Trend shows the Daily direction. Open a group to see its evidence.` Accordion controls now expose visible and accessible `Open evidence` / `Close evidence` states.
+- Adversarial browser regression found and fixed deferred-DOM retention: closing a group now clears its symbol rows from the hidden panel; public 390px read-back showed `44 rows → 0 rows on close → 44 rows on reopen`, with no overflow (`375/375`).
+- Source/test: focused Trend Map tests, Python compile, inline JavaScript syntax, and `git diff --check` passed. No API/data/drawer logic or database behavior changed.
+
+### Plain-language Trend Map refinement — 2026-09-15
+
+- First-screen copy now uses `Data date`, `Status · Current`, `Scope · Thai listed universe`, `Showing`, and `Total`; the raw classifier policy id and technical freshness/status values moved under collapsed `Technical details`.
+- Provenance copy explicitly explains that Daily direction is classified from end-of-day data and the 60-minute price is display-only; this preserves the EOD/intraday boundary without requiring users to know `provisional` or `Thai ORD` terminology.
+- Public 390px browser read-back: helper copy, plain labels, accordion/drawer, light drawer palette, no overflow (`375/375` page and `390/390` drawer), and `DATA_BLOCKED → Retry → Showing 237 of 237 symbols` recovery all passed.
+- Source/test/runtime boundary: no API/data/read-model changes, database write, migration, restart, commit, or push.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.

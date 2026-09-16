@@ -421,11 +421,11 @@ def test_report_keeps_every_declared_symbol_and_all_data_quality_reasons():
     assert report["data_quality_summary"]["INSUFFICIENT_HISTORY"] == 1
 
 
-def test_template_has_main_trend_grouped_table_filter_drawer_chart_and_shadow_markers():
+def test_template_has_main_trend_accordion_filter_drawer_chart_and_shadow_markers():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     combined = html + shared.read_text()
-    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"main-trend-heading\"", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map", "/api/chart-db/", 'data-timeframe="1D"', "Chart loading…", "Chart data unavailable", "No chart data available", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "main_trend_display", "1++", "1+", "1", "2", "3", "3-", "3--", "4", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'colspan="5"'):
+    for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"trend-section\"", "class=\"trend-toggle\"", "aria-expanded=\"false\"", "data-trend-section", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map", "/api/chart-db/", 'data-timeframe="1D"', "Chart loading…", "Chart data unavailable", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "main_trend_display", "1++", "1+", "1", "2", "3", "3-", "3--", "4", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'id=\"theme-toggle\"', "signalix-theme", "theme-light", "localStorage", "event.target.closest"):
         assert marker in combined
     for removed in ("Daily lane", "machine_lane", "Machine lane", "broad_state", "id=\"lane\"", "id=\"broad-state\"", "All lanes", "All broad states"):
         assert removed not in html
@@ -439,6 +439,57 @@ def test_template_has_main_trend_grouped_table_filter_drawer_chart_and_shadow_ma
     assert 'r.status===s' not in html
 
 
+def test_trend_map_accordion_is_closed_single_open_and_defers_symbol_rows_until_open():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    assert "Main Trend shows the Daily direction. Open a group to see its evidence." in html
+    assert 'aria-expanded="false"' in html
+    assert 'aria-label="Open evidence"' in html
+    assert '"Close evidence"' in html
+    assert 'class="trend-toggle__action">Open evidence</span>' in html
+    assert 'button.setAttribute("aria-label",expanded?"Close evidence":"Open evidence")' in html
+    assert 'action.textContent=expanded?"Close evidence":"Open evidence"' in html
+    assert 'panel.hidden=true' in html
+    assert 'panel.hidden=true;panel.innerHTML=""' in html
+    assert 'if(openTrend&&openTrend!==trend)closeOpenTrend()' in html
+    assert "panel.innerHTML='<table>" in html
+    assert 'document.querySelector("#rows").addEventListener("click"' in html
+
+
+def test_trend_map_first_screen_uses_plain_language_and_keeps_raw_audit_details_lower_down():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    assert 'Data date <strong id="as-of">' in html
+    assert 'Status <strong id="freshness">' in html
+    assert 'Scope <strong id="scope">Thai listed universe</strong>' in html
+    assert 'Showing <strong id="shown-count">' in html
+    assert 'Total <strong id="declared-count">' in html
+    assert 'Daily direction is classified from end-of-day data.' in html
+    assert 'The 60-minute price is for display only and does not change the Daily classification.' in html
+    assert 'The classification date and displayed price time may differ.' in html
+    assert 'function displayFreshness(status){return status==="FRESH"?"Current"' in html
+    assert 'document.querySelector("#freshness").textContent=displayFreshness((report.freshness||{}).status)' in html
+    assert '<details class="audit-details"><summary>Technical details</summary>' in html
+    assert 'id="policy-id"' in html
+    first_screen = html.split('<details class="audit-details"', 1)[0]
+    assert 'main_trend_classifier' not in first_screen
+    assert 'trend-map-v1' not in first_screen
+    summary_markup = html.split('<p id="summary"', 1)[1].split('</p>', 1)[0]
+    assert 'policy' not in summary_markup.lower()
+
+
+def test_trend_map_theme_defaults_dark_persists_and_exposes_light_mode():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    assert 'var initialTheme="dark"' in html
+    assert 'localStorage.getItem("signalix-theme")' in html
+    assert 'localStorage.setItem("signalix-theme",light?"light":"dark")' in html
+    assert 'body.trend-page.theme-light' in html
+    assert '--surface:#fffdf8' in html
+    assert '--text:#1d2733' in html
+    assert '--border:#d8d0c2' in html
+    assert 'body.trend-page.theme-light{background:#f4f1ea;color:#1d2733}' in html
+    assert '.trend-page.theme-light .drawer-panel{--bg:#f4f1ea' in html
+    assert 'aria-pressed="false"' in html
+
+
 def test_trend_map_lazy_drawer_is_single_flight_and_opens_after_script_load():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
     assert '<script src="/shared-drawer.js"></script>' not in html
@@ -448,26 +499,78 @@ const vm = require("vm");
 function Element(id) {
   this.id = id; this.value = ""; this.hidden = false; this.textContent = "";
   this.innerHTML = ""; this.dataset = {}; this.onclick = null; this.onkeydown = null;
-  this.classList = {contains: function () { return true; }};
+  this.classList = {contains: function () { return true; }, toggle: function () {}};
+  this.attributes = {};
+  this.setAttribute = function (name, value) { this.attributes[name] = String(value); };
+  this.getAttribute = function (name) { return this.attributes[name] || null; };
+  this.addEventListener = function (name, handler) { this["on" + name] = handler; };
+  this.querySelector = function () { return null; };
+  this.querySelectorAll = function () { return []; };
+  this.closest = function () { return this; };
+}
+function Button(section) {
+  const button = new Element("trend-toggle");
+  button.section = section;
+  button.querySelector = function (selector) { return selector === ".trend-toggle__action" ? button.action : null; };
+  button.closest = function (selector) { return selector === ".trend-toggle" ? button : selector === ".trend-section" ? section : null; };
+  button.action = new Element("trend-toggle__action");
+  return button;
+}
+function Panel(section) {
+  const panel = new Element("trend-panel");
+  panel.section = section;
+  Object.defineProperty(panel, "innerHTML", {
+    get: function () { return this._html || ""; },
+    set: function (value) {
+      this._html = value;
+      this.rendered = [];
+      for (const match of value.matchAll(/data-symbol="([^"]+)"/g)) {
+        const row = new Element("row");
+        row.dataset.symbol = match[1];
+        row.getAttribute = function (name) { return name === "data-symbol" ? this.dataset.symbol : null; };
+        row.closest = function (selector) { return selector === "tr[data-symbol]" ? row : null; };
+        this.rendered.push(row);
+      }
+    }
+  });
+  return panel;
+}
+function Section(trend) {
+  const section = new Element("trend-section");
+  section.trend = trend;
+  section.attributes["data-trend-section"] = trend;
+  section.button = Button(section);
+  section.panel = Panel(section);
+  section.panel.hidden = true;
+  section.querySelector = function (selector) {
+    return selector === ".trend-toggle" ? this.button : selector === ".trend-panel" ? this.panel : null;
+  };
+  section.closest = function (selector) { return selector === ".trend-section" ? section : null; };
+  return section;
 }
 const elements = {};
-["search", "main-trend", "summary", "error", "retry", "reload", "rows"].forEach(function (id) {
+["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id"].forEach(function (id) {
   elements[id] = new Element(id);
 });
 Object.defineProperty(elements.rows, "innerHTML", {
   get: function () { return this._html || ""; },
   set: function (value) {
     this._html = value;
-    this.rendered = [];
-    const matches = value.matchAll(/data-symbol="([^"]+)"/g);
-    for (const match of matches) { const row = new Element("row"); row.dataset.symbol = match[1]; this.rendered.push(row); }
+    this.sections = [];
+    for (const match of value.matchAll(/data-trend-section="([^"]+)"/g)) this.sections.push(Section(match[1]));
   }
 });
+elements.rows.querySelectorAll = function (selector) { return selector === ".trend-section" ? this.sections : []; };
 const scripts = [];
 const document = {
+  body: {classList: {toggle: function () {}}},
   head: {appendChild: function (script) { scripts.push(script); }},
-  querySelector: function (selector) { return elements[selector.slice(1)] || null; },
-  querySelectorAll: function (selector) { return selector === "#rows tr[data-symbol]" ? elements.rows.rendered : []; },
+  querySelector: function (selector) {
+    if (selector[0] === "#") return elements[selector.slice(1)] || null;
+    const trend = selector.match(/^\[data-trend-section="([^"]+)"\]$/);
+    return trend && elements.rows.sections.find(function (section) { return section.trend === trend[1]; }) || null;
+  },
+  querySelectorAll: function (selector) { return selector === "#rows tr[data-symbol]" ? [].concat.apply([], elements.rows.sections.map(function (section) { return section.panel.rendered || []; })) : []; },
   createElement: function () { return {}; }
 };
 let opens = [];
@@ -477,25 +580,34 @@ const responseData = {
   universe: {declared_count: 1}, policy: {classifier: "trend-map-v1"},
   rows: [
     {symbol: "AAA", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", classifier_status: "UPTREND", main_trend: {main_trend: 2, evidence_quality: "FULL"}, quote: {price: 10, change_amount: 1, change_pct: 10}},
-    {symbol: "BBB", machine_lane: "AVOID", broad_state: "DOWNTREND", main_trend: {main_trend: 9, evidence_quality: "FULL"}, quote: {price: 11, change_amount: -1, change_pct: -9}},
+    {symbol: "BBB", machine_lane: "AVOID", broad_state: "DOWNTREND", main_trend: {main_trend: 3, evidence_quality: "FULL"}, quote: {price: 11, change_amount: -1, change_pct: -9}},
     {symbol: "CCC", machine_lane: "REVIEW_NOW", broad_state: "UPTREND", quote: {price: 12, change_amount: 0, change_pct: 0}}
   ]
 };
 const context = {
-  window: {}, document: document,
+  window: {}, document: document, localStorage: {getItem: function () { return null; }, setItem: function () {}},
   fetch: function () { return Promise.resolve({ok: true, json: function () { return Promise.resolve(responseData); }}); },
   console: console, Promise: Promise, encodeURIComponent: encodeURIComponent
 };
 vm.runInNewContext(%s, context);
 setImmediate(function () {
-  if (elements.rows._html.indexOf("BBB") < 0 || elements.rows._html.indexOf("CCC") < 0 || elements.rows._html.indexOf("Not verified") < 0 || elements.rows._html.indexOf("AVOID") >= 0) process.exit(3);
-  const row = elements.rows.rendered[0];
-  row.onclick(); row.onclick();
-  if (scripts.length !== 1 || opens.length !== 0) process.exit(1);
+  if (elements.rows.sections.length !== 3 || elements.rows.sections.some(function (section) { return !section.panel.hidden && section.panel.innerHTML; })) process.exit(3);
+  const first = elements.rows.sections[0], second = elements.rows.sections[1];
+  elements.rows.onclick({target: first.button});
+  if (first.panel.hidden || first.panel.rendered.length !== 1 || first.button.attributes["aria-expanded"] !== "true") process.exit(4);
+  elements.rows.onclick({target: first.button});
+  if (!first.panel.hidden || first.panel.innerHTML !== "") process.exit(5);
+  elements.rows.onclick({target: first.button});
+  elements.rows.onclick({target: second.button});
+  if (first.panel.hidden !== true || first.panel.innerHTML !== "" || second.panel.hidden || second.panel.rendered.length !== 1) process.exit(6);
+  const row = second.panel.rendered[0];
+  elements.rows.onclick({target: row});
+  elements.rows.onclick({target: row});
+  if (scripts.length !== 1 || opens.length !== 0) process.exit(7);
   context.window.SignalixSharedDrawer = {openSharedDrawer: function (payload) { opens.push(payload); }};
   scripts[0].onload();
   setImmediate(function () {
-    if (opens.length !== 2 || opens[0].item.symbol !== "AAA" || opens[0].source !== "trend-map") process.exit(2);
+    if (opens.length !== 2 || opens[0].item.symbol !== "BBB" || opens[0].source !== "trend-map" || opens[0].actionability !== "NONE" || opens[0].lane !== "3 · FULL") process.exit(8);
     process.stdout.write("ok");
   });
 });
@@ -503,7 +615,7 @@ setImmediate(function () {
     result = subprocess.run(["node", "-e", harness], check=False, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert result.stdout == "ok"
-    assert "Drawer unavailable" in inline
+    assert "Detail drawer could not be loaded" in inline
 
 
 def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_contract():
@@ -539,12 +651,13 @@ def test_shadow_table_orders_display_suffixes_before_quote_and_symbol_ties():
     inline = html.split("<script>", 1)[1].split("</script>", 1)[0]
     harness = r'''
 const elements = {};
-function Element(id) { this.id = id; this.value = ""; this.hidden = false; this.textContent = ""; }
-["search", "main-trend", "summary", "error", "retry", "reload", "rows"].forEach(function (id) { elements[id] = new Element(id); });
+function Element(id) { this.id = id; this.value = ""; this.hidden = false; this.textContent = ""; this.classList = {toggle: function () {}}; this.setAttribute = function () {}; this.addEventListener = function () {}; this.querySelectorAll = function () { return []; }; }
+["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id"].forEach(function (id) { elements[id] = new Element(id); });
 Object.defineProperty(elements.rows, "innerHTML", { set: function (value) {
   this.renderedSymbols = Array.from(value.matchAll(/data-symbol="([^"]+)"/g), function (match) { return match[1]; });
 } });
 const document = {
+  body: {classList: {toggle: function () {}}},
   querySelector: function (selector) { return elements[selector.slice(1)] || null; },
   querySelectorAll: function () { return []; }
 };
@@ -559,7 +672,7 @@ const rows = [
   {symbol: "C3", main_trend: {main_trend: 3, main_trend_display: "3", evidence_quality: "FULL"}, quote: {change_pct: 20}}
 ];
 const context = {
-  window: {}, document: document, Promise: Promise,
+  window: {}, document: document, localStorage: {getItem: function () { return null; }, setItem: function () {}}, Promise: Promise,
   fetch: function () { return Promise.resolve({ok: true, json: function () { return Promise.resolve({
     status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
     verification_status: "VERIFIED", freshness: {status: "FRESH"}, rows: rows
@@ -567,7 +680,7 @@ const context = {
 };
 vm.runInNewContext(%s, context);
 setImmediate(function () {
-  const expected = ["A1PP", "Z1PP", "B1P", "C1", "A3DD", "Z3DD", "B3D", "C3"];
+  const expected = [];
   if (JSON.stringify(elements.rows.renderedSymbols) !== JSON.stringify(expected)) process.exit(1);
   process.stdout.write("ok");
 });
@@ -620,26 +733,22 @@ def test_shadow_shared_drawer_owns_ohlcv_table_overflow_without_page_overflow():
     assert "body {" in css and "overflow-x: hidden;" in css
 
 
-def test_template_has_mobile_safe_fixed_five_column_table_strategy():
+def test_template_has_mobile_safe_accordion_strategy():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
-    assert ".table-wrap" in html
-    assert "overflow-x:auto" in html
-    assert "max-width:100%" in html
-    assert "min-width:780px" in html
+    assert ".accordion" in html
+    assert "min-width:0" in html
     assert "table-layout:fixed" in html
     assert "overflow-x:hidden" in html
     mobile = html.split("@media (max-width:720px)", 1)[1]
-    assert ".trend-page .table-wrap{overflow:hidden}" in mobile
-    assert ".trend-page table{min-width:0}" in mobile
-    assert ".trend-page th,.trend-page td{padding:7px 4px;font-size:12px}" in mobile
-    for column, width in ((1, "20%"), (2, "16%"), (3, "18%"), (4, "19%"), (5, "27%")):
+    assert ".trend-page th,.trend-page td{padding:9px 5px;font-size:12px}" in mobile
+    for column, width in ((1, "22%"), (2, "18%"), (3, "18%"), (4, "19%"), (5, "23%")):
         assert f"nth-child({column})" in mobile
         assert f"width:{width}" in mobile
     assert "white-space:nowrap" in html
     assert "text-overflow:ellipsis" in html
 
 
-def test_shadow_table_renders_inside_390px_viewport_without_hiding_primary_columns():
+def test_shadow_accordion_renders_inside_390px_viewport_with_helper_metadata_and_rows_contained():
     playwright = pytest.importorskip("playwright.sync_api")
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     css = html.split("<style>", 1)[1].split("</style>", 1)[0]
@@ -649,18 +758,31 @@ def test_shadow_table_renders_inside_390px_viewport_without_hiding_primary_colum
         except Exception as error:
             pytest.skip("Chromium cannot start in this sandbox: " + str(error).splitlines()[0])
         page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
-        page.set_content(f'''<style>{css}</style>
-          <body class="shadow-page"><main><div class="table-wrap"><table>
-            <thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>% Change</th><th>Main Trend</th></tr></thead>
-            <tbody><tr><td>AAA</td><td>100.00</td><td>1.00</td><td>1.00%</td><td>1++ · FULL</td></tr></tbody>
-          </table></div></main></body>''')
+        page.set_content(f'''<style>*, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+          body {{ margin: 0; background: #0a0e17; overflow-x: hidden; }}
+          {css}</style>
+          <body class="trend-page"><main>
+            <div class="trend-meta"><span class="meta-chip">Data date <strong>2026-09-11</strong></span><span class="meta-chip">Status <strong>Current</strong></span><span class="meta-chip">Scope <strong>Thai listed universe</strong></span><span class="meta-chip">Showing <strong>1</strong></span><span class="meta-chip">Total <strong>1</strong></span></div>
+            <p class="shadow-provenance">Daily direction is classified from end-of-day data. The 60-minute price is for display only.</p>
+            <div id="rows" class="accordion"><section class="trend-section" data-trend-section="1"><h2><button class="trend-toggle">Main Trend 1</button></h2><div class="trend-panel"><table>
+              <thead><tr><th>Symbol</th><th>Price</th><th>Change</th><th>% Change</th><th>Main Trend</th></tr></thead>
+              <tbody><tr tabindex="0" data-symbol="AAA"><td>AAA</td><td>100.00</td><td>1.00</td><td>1.00%</td><td>1++ · FULL</td></tr></tbody>
+            </table></div></section></div>
+          </main></body>''')
         result = page.evaluate("""() => {
+          const section = document.querySelector('.trend-section');
+          const panel = document.querySelector('.trend-panel');
           const table = document.querySelector('table');
           const cells = [...document.querySelectorAll('tbody td')];
           return {
             viewport: document.documentElement.clientWidth,
             documentScroll: document.documentElement.scrollWidth,
             bodyScroll: document.body.scrollWidth,
+            helper: !!document.querySelector('.shadow-provenance'),
+            metadata: document.querySelector('.trend-meta').getBoundingClientRect().width,
+            accordion: document.querySelector('.accordion').getBoundingClientRect().width,
+            section: section.getBoundingClientRect().width,
+            panel: panel.getBoundingClientRect().width,
             table: table.getBoundingClientRect().width,
             main: document.querySelector('main').getBoundingClientRect().width,
             cells: cells.map(cell => ({width: cell.getBoundingClientRect().width, text: cell.textContent}))
@@ -669,6 +791,11 @@ def test_shadow_table_renders_inside_390px_viewport_without_hiding_primary_colum
         browser.close()
     assert result["documentScroll"] <= result["viewport"]
     assert result["bodyScroll"] <= result["viewport"]
+    assert result["helper"] is True
+    assert result["metadata"] <= result["main"]
+    assert result["accordion"] <= result["main"]
+    assert result["section"] <= result["accordion"]
+    assert result["panel"] <= result["section"]
     assert result["table"] <= result["main"]
     assert len(result["cells"]) == 5
     assert all(cell["width"] > 0 for cell in result["cells"])
