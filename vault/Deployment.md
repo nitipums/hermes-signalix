@@ -184,6 +184,12 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Public 390px browser read-back: helper copy, plain labels, accordion/drawer, light drawer palette, no overflow (`375/375` page and `390/390` drawer), and `DATA_BLOCKED → Retry → Showing 237 of 237 symbols` recovery all passed.
 - Source/test/runtime boundary: no API/data/read-model changes, database write, migration, restart, commit, or push.
 
+### Commit/push closeout — 2026-09-16 07:33 ICT
+
+- Scoped commit: `4eb33a6f80122287cf99593d2ff6ba7c205f83c1` (`feat(trend-map): refine accordion evidence UX`).
+- Published branch: `release/signalix-mvp-stable`; remote `origin/release/signalix-mvp-stable` read back the same SHA.
+- Files in the scoped commit: `backend/shadow_trend_map_template.html`, `backend/test_shadow_trend_map.py`, and `vault/Deployment.md`. No unrelated dirty files remained after the closeout.
+
 ### Trend Map drawer navigation remediation — 2026-09-13 16:34 ICT
 
 - Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.
