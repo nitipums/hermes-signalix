@@ -17,6 +17,14 @@ real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
 acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
+### Daily quality-window boundary
+
+Daily quality gating applies to the same newest bounded analytical window used
+for classification (`RETRIEVAL_CAP=430`). Historical invalid OHLCV rows outside
+that selected window remain untouched and may be retained as audit evidence, but
+must not block the current Trend Map classification. Invalid rows inside the
+selected window remain fail-closed as `DATA_BLOCKED` / `INVALID_DATA`.
+
 ### Quote/display versus scan boundary
 
 Trend Map classification and scan evidence remain sourced from the immutable

@@ -280,11 +280,11 @@ class BackendDailyAdapter:
         return output
 
     def load_daily_pit_batch(self, conn, symbols, as_of):
-        """Load bounded Daily rows plus a bounded quality aggregate.
+        """Load bounded Daily rows plus quality for the selected window.
 
-        The aggregate scans only scalar validation metadata from the filtered
-        Daily source; OHLCV history outside the newest ``RETRIEVAL_CAP`` rows
-        is never transferred to the process.
+        Quality gating must describe the same newest ``RETRIEVAL_CAP`` rows
+        that can be classified.  Older filtered-source rows are not part of
+        the classification contract, though they remain untouched in the DB.
         """
         rows, _ = self._exec_select(
             conn,
@@ -340,14 +340,18 @@ class BackendDailyAdapter:
                                   AND low <= high
                              THEN 0 ELSE 1 END AS invalid_flag
                 FROM (SELECT * FROM official UNION ALL SELECT * FROM derived) source_rows
-            ), quality AS (
-                SELECT symbol, COALESCE(SUM(invalid_flag), 0) AS invalid_count
-                FROM filtered
-                GROUP BY symbol
-            ), bounded AS (
-                SELECT filtered.*, quality.invalid_count,
+            ), bounded_rows AS (
+                SELECT filtered.*,
                        row_number() OVER (PARTITION BY filtered.symbol ORDER BY filtered.date DESC) AS retrieval_row
                 FROM filtered
+            ), quality AS (
+                SELECT symbol, COALESCE(SUM(invalid_flag), 0) AS invalid_count
+                FROM bounded_rows
+                WHERE retrieval_row <= %s
+                GROUP BY symbol
+            ), bounded AS (
+                SELECT bounded_rows.*, quality.invalid_count
+                FROM bounded_rows
                 JOIN quality USING (symbol)
             )
             SELECT symbol, date, open, high, low, close, volume, daily_source,
@@ -357,7 +361,7 @@ class BackendDailyAdapter:
             WHERE retrieval_row <= %s
             ORDER BY symbol ASC, date ASC
             """,
-            (list(symbols), as_of, list(symbols), as_of, as_of, RETRIEVAL_CAP),
+            (list(symbols), as_of, list(symbols), as_of, as_of, RETRIEVAL_CAP, RETRIEVAL_CAP),
         )
         grouped = {symbol: [] for symbol in symbols}
         quality = {symbol: None for symbol in symbols}
@@ -385,7 +389,7 @@ class BackendDailyAdapter:
                 "quality_scan": "filtered_daily_source",
                 "invalid_count": quality[symbol] if quality[symbol] is not None else 0,
                 "quality_established": quality[symbol] is not None,
-                "quality_scope": "price_data where symbol=ANY(symbols) and market='TH' and date<=as_of",
+                "quality_scope": "selected newest Daily rows where symbol=ANY(symbols) and date<=as_of",
                 "full_history_claim": False,
             })
             for symbol, frame in grouped.items()

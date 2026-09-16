@@ -75,16 +75,26 @@ def test_cap_hit_with_established_zero_invalid_quality_is_available():
     assert result["full_history_claim"] is False
 
 
-def test_invalid_row_outside_selected_cap_remains_blocked_from_quality_aggregate():
+def test_invalid_row_outside_selected_cap_does_not_block_selected_window():
     frame = bars(subject.RETRIEVAL_CAP + 1)
     for i, row in enumerate(frame):
         row["date"] = f"2025-{i // 28 + 1:02d}-{i % 28 + 1:02d}"
     frame[0]["low"] = "bad"  # older than the selected newest-430 window
     result = subject.evaluate_symbol(
         "BTS", frame, "2026-09-11",
-        quality_metadata={"quality_scan": "filtered_daily_source", "invalid_count": 1,
+        quality_metadata={"quality_scan": "selected_window_only", "invalid_count": 0,
                           "quality_established": True, "full_history_claim": False},
     )
+    assert result["status"] == "AVAILABLE"
+    assert result["data_quality_status"] == "AVAILABLE"
+    assert result["invalid_count"] == 0
+    assert result["invalid_row_count"] == 0
+
+
+def test_invalid_row_inside_selected_cap_still_blocks_classification():
+    frame = bars(subject.RETRIEVAL_CAP)
+    frame[-1]["low"] = "bad"  # within the selected newest-430 window
+    result = subject.evaluate_symbol("CPN", frame, "2026-09-11")
     assert result["status"] == "DATA_BLOCKED"
     assert result["data_quality_status"] == "INVALID_DATA"
     assert result["invalid_count"] == 1
@@ -1048,8 +1058,9 @@ def test_backend_local_adapter_batches_symbols_with_exact_as_of_filter():
     assert "market='TH'" in conn.cursor_instance.sql
     assert "date <= %s" in conn.cursor_instance.sql
     assert "ORDER BY symbol ASC, date ASC" in conn.cursor_instance.sql
-    assert conn.cursor_instance.params == (["AAA", "BBB"], "2026-09-11", ["AAA", "BBB"], "2026-09-11", "2026-09-11", subject.RETRIEVAL_CAP)
+    assert conn.cursor_instance.params == (["AAA", "BBB"], "2026-09-11", ["AAA", "BBB"], "2026-09-11", "2026-09-11", subject.RETRIEVAL_CAP, subject.RETRIEVAL_CAP)
     assert "row_number() OVER (PARTITION BY filtered.symbol ORDER BY filtered.date DESC)" in conn.cursor_instance.sql
+    assert "FROM bounded_rows\n                WHERE retrieval_row <= %s" in conn.cursor_instance.sql
     assert "invalid_count" in conn.cursor_instance.sql
 
 
