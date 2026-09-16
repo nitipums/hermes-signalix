@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; source/release commit is `d4cffeaf5e1cec1cb2d1bf25b7645d972f54d7cd`; dashboard was recreated and public route read back successfully. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
+> **Reconciled:** 2026-09-16 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; source/release commit is `2d83f9f77b72fa4feb32053f1bc2342b08fabece`; dashboard was reloaded and public route read back successfully. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
 
 ## Stable release
 
@@ -21,6 +21,23 @@ legacy routes: quarantined/404
 - Public API: `/api/trend-map` returned HTTP 200 with `status=PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`, `verification_status=VERIFIED`, and 237 rows.
 - Retired route read-back: `/trend-map-shadow` and `/api/trend-map-shadow` returned HTTP 404.
 - Browser metrics: desktop `scrollWidth=485`/`clientWidth=485`; mobile `scrollWidth=390`/`clientWidth=390`; `shadow` was absent from visible DOM copy.
+
+## Historical-invalid quality-window fix — 2026-09-16
+
+- Root cause: six old OHLC-incoherent rows across five symbols (`BTS`, `CPN`,
+  `SABINA`, `SC`, `SIRI`) were outside the newest 430-row analytical window,
+  but the producer's quality aggregate scanned all history and blocked the
+  current classification.
+- Settrade Open API manual read-only check returned 430 clean Daily rows for
+  each affected symbol through `2026-09-15`; the API did not return replacement
+  values for the 2011–2013 source rows, so historical DB rows were not mutated.
+- Fix: quality gating now uses the same newest `RETRIEVAL_CAP=430` rows used for
+  classification. Invalid rows inside that window remain fail-closed; older
+  invalid rows remain untouched/audit evidence and do not block current output.
+- Commit: `2d83f9f77b72fa4feb32053f1bc2342b08fabece`.
+- Runtime/API read-back: `237/237` returned, `AVAILABLE=237`,
+  `INVALID_DATA=0`, `DATA_BLOCKED=0`, `verification_status=VERIFIED`; dashboard
+  and backend healthy. No PostgreSQL write or migration was performed.
 
 ## Current delivery focus — 2026-09-12
 
