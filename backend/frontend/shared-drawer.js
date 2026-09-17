@@ -29,13 +29,14 @@
       ["5","10","20","50","100","200","260"].map(function (p) { return '<tr data-rolling-period="' + p + '"><th>' + p + '<small class="window-detail">Not verified</small></th><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td><td>Not verified</td></tr>'; }).join("") +
       '</tbody></table></div></section>' +
       '<section class="drawer-section drawer-section--setup" aria-labelledby="drawer-setup-title"><h2 id="drawer-setup-title" class="drawer-section-title">Key setup</h2><dl class="drawer-setup-grid"><div class="drawer-setup-field"><dt>Current</dt><dd id="drawer-current">Not verified</dd></div><div class="drawer-setup-field"><dt>Trigger</dt><dd id="drawer-trigger">Not ready</dd></div><div class="drawer-setup-field"><dt>Stop</dt><dd id="drawer-stop">Not ready</dd></div><div class="drawer-setup-field"><dt>Target 1</dt><dd id="drawer-target">Not ready</dd></div><div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div></dl></section>' +
-      '<section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title"><h2 id="drawer-company-title" class="drawer-section-title">Company context</h2><div class="drawer-company-context"><span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span></div></section></div></div></aside>';
+      '<section class="drawer-section drawer-section--company" aria-labelledby="drawer-company-title"><h2 id="drawer-company-title" class="drawer-section-title">Company context</h2><div class="drawer-company-context"><span id="drawer-market-cap">Market cap –</span><span id="drawer-sector">Sector –</span><span id="drawer-industry">Industry –</span></div></section>' +
+      '<section class="drawer-section drawer-section--route" aria-labelledby="drawer-route-title"><h2 id="drawer-route-title" class="drawer-section-title">Trend Route</h2><div id="drawer-route-status" class="trend-route-status" aria-live="polite">Loading…</div><div id="drawer-route-graph" class="trend-route-graph" role="list" aria-label="Trend Route from older to latest"></div><div id="drawer-route-detail" class="trend-route-detail" hidden></div><button id="drawer-route-retry" class="chart-retry" type="button" hidden>Retry Trend Route</button></section></div></div></aside>';
   }
 
   function bindDom() {
     var mount = document.querySelector("#drawer-mount");
     if (mount && !document.querySelector("#drawer")) mount.innerHTML = drawerMarkup();
-    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartRetry","drawerChartLegend","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
+    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartRetry","drawerChartLegend","drawerRouteStatus","drawerRouteGraph","drawerRouteDetail","drawerRouteRetry","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
       var ids = {
         drawerChartPH:"drawer-chart-placeholder",
         drawerRR:"drawer-rr"
@@ -100,6 +101,38 @@
       '<div><dt>W1 low</dt><dd>' + escapeHTML(anchorText(anchors.w1_low)) + '</dd></div>' +
       '<div><dt>W1 high</dt><dd>' + escapeHTML(anchorText(anchors.w1_high)) + '</dd></div>' +
       '<div><dt>W2 low</dt><dd>' + escapeHTML(anchorText(anchors.w2_low)) + '</dd></div></dl>';
+  }
+
+  function renderTrendRoute(route) {
+    if (!dom.drawerRouteStatus || !dom.drawerRouteGraph) return;
+    var payload = route && route.route ? route.route : null;
+    dom.drawerRouteGraph.innerHTML = "";
+    if (!payload || payload.status === "NOT_VERIFIED") {
+      dom.drawerRouteStatus.textContent = "Trend Route unavailable · Not verified";
+      if (dom.drawerRouteRetry) { dom.drawerRouteRetry.hidden = false; dom.drawerRouteRetry.onclick = function () { requestTrendRoute(chartSymbol); }; }
+      return;
+    }
+    dom.drawerRouteStatus.textContent = (payload.status === "FULL" ? "Complete Daily history" : "Partial Daily history") +
+      " · " + ((payload.coverage || {}).sessions || 0) + " sessions";
+    (payload.segments || []).forEach(function (segment) {
+      var button = document.createElement("button");
+      button.type = "button"; button.className = "trend-route-segment"; button.setAttribute("role", "listitem");
+      button.style.flex = "" + Math.max(1, Number(segment.sessions) || 1) + " 1 0%";
+      button.setAttribute("aria-label", segment.label + ", " + segment.sessions + " sessions, " + segment.start + " to " + segment.end);
+      button.textContent = segment.label;
+      button.setAttribute("data-current", segment.current === true ? "true" : "false");
+      button.onclick = function () { if (dom.drawerRouteDetail) { dom.drawerRouteDetail.hidden = false; dom.drawerRouteDetail.textContent = "Main Trend " + (segment.main_trend == null ? "Not verified" : segment.main_trend) + " · " + segment.label + " · " + (segment.quality || "Not verified") + " · " + ((segment.provenance || {}).source || "Provenance unavailable") + " · " + (segment.date || segment.end || "Date unavailable") + " · " + (segment.session_count || segment.sessions || 0) + " sessions"; } };
+      dom.drawerRouteGraph.appendChild(button);
+    });
+    if (dom.drawerRouteRetry) dom.drawerRouteRetry.hidden = true;
+  }
+  function requestTrendRoute(symbol) {
+    if (!symbol || !dom.drawerRouteStatus) return;
+    dom.drawerRouteStatus.textContent = "Loading Trend Route…";
+    fetch("/api/trend-map/" + encodeURIComponent(symbol) + "/route", {cache:"no-store"})
+      .then(function (response) { if (!response.ok) throw new Error("Route HTTP " + response.status); return response.json(); })
+      .then(renderTrendRoute)
+      .catch(function () { renderTrendRoute(null); });
   }
 
   function waveContextPresentation(item) {
@@ -231,6 +264,8 @@
   function renderSharedDetail(envelope) {
     var item = envelope.item || {}, shadow = envelope.source === "trend-map";
     dom.drawer.classList.toggle("drawer--shadow", shadow);
+    var routeSection = dom.drawerRouteStatus && dom.drawerRouteStatus.closest(".drawer-section--route");
+    if (routeSection) routeSection.hidden = !shadow;
     var waveSummary = dom.drawer.querySelector(".drawer-wave-summary");
     if (waveSummary) waveSummary.hidden = shadow;
     if (dom.drawerChartLegend) dom.drawerChartLegend.hidden = shadow;
@@ -360,6 +395,7 @@
     chartRequestSeq += 1; if (chartAbort) chartAbort.abort(); chartAbort = new AbortController();
     var seq = chartRequestSeq; chartTimeframe = "1D"; setChartTimeframeButtons(chartTimeframe);
     renderSharedDetail(envelope);
+    if (envelope.source === "trend-map") requestTrendRoute(symbol);
     requestChart(envelope, symbol, chartTimeframe, seq);
     if (envelope.detailUrl) fetch(envelope.detailUrl, {signal: chartAbort.signal, cache:"no-store"}).then(function (response) { if (!response.ok) throw new Error("Detail HTTP " + response.status); return response.json(); }).then(function (detail) {
       if (seq === chartRequestSeq && symbol === chartSymbol && envelope.source === "canonical-mvp") {

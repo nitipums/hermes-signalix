@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 from mvp_routes import handle_mvp_api
 from shadow_trend_map import handle_shadow_trend_map_api
+from trend_route_api import handle_trend_route_api
 
 PORT = int(os.getenv("DASHBOARD_PORT", "3001"))
 HOST = os.getenv("DASHBOARD_BIND_HOST", "127.0.0.1")
@@ -92,6 +93,8 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
         if path.startswith("/api/"):
+            if handle_trend_route_api(self.path, self):
+                return
             if path == "/api/trend-map" and handle_shadow_trend_map_api(self.path, self):
                 return
             if handle_mvp_api(self.path, self):
