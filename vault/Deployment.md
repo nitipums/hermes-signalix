@@ -3,6 +3,24 @@
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
 > **Reconciled:** 2026-09-16 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; source/release commit is `2d83f9f77b72fa4feb32053f1bc2342b08fabece`; dashboard was reloaded and public route read back successfully. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
 
+## Dashboard canonical-mount repair — 2026-09-16 20:20 ICT
+
+- Root cause: `signalix_dashboard` had been recreated from `/root/signalix/.worktrees/trend-route-task1/backend`, while the EOD updater and backend publisher write to `/root/signalix/backend`; the public pointer therefore remained on the 2026-09-15 artifact despite a successful 2026-09-16 EOD run.
+- Authorized action: from `/root/signalix`, `docker compose up -d --force-recreate dashboard`; PostgreSQL, Redis, and backend were not restarted or written.
+- Read-back: dashboard bind mount is `/root/signalix/backend -> /app`; container pointer and public `/api/trend-map` now report artifact `shadow-trend-map-quote-envelope-v2-2026-09-16-87dce5718dd0784a-e76ebcbf1637fac9-bff84361c2fcd4f4-9b4d0a5b86167135`, `as_of=2026-09-16`, `verification_status=VERIFIED`, and `237` rows.
+- Public browser `/trend-map` read-back shows `Data date 2026-09-16`, `Status Current`, and `Showing 237 of 237` symbols.
+- Prevention boundary: do not recreate the dashboard from a task worktree; production Compose commands must run from `/root/signalix` so EOD-generated artifacts and served read models share one canonical mount.
+
+## Trend Route production read-back — 2026-09-17
+
+- Source: scoped feature commit `3733c4d` on `release/signalix-mvp-stable`; no database migration or PostgreSQL/Redis restart.
+- Publisher: optimized deterministic replay computes aligned Daily indicators once per symbol; benchmark `237 × 260 sessions` completed in `18.718s` on the publication host. Real SELECT-only replay completed with one market-wide cutoff `2026-09-17`.
+- Artifact: `trend-route-cc791d2d85645bce9b5347b8`, pointer `backend/trend-route-read-model/current.json`, `237/237` resolved/published routes, `229 FULL`, `8 PARTIAL`; partial reasons are explicit: limited history for `3BBIF`, `COM7`, `PR9`, `MRDIYT`, `TURBO`, `WASH`, and true missing-session evidence for `BANPU`, `PROUD`.
+- API: local/public `GET /api/trend-map/TEAM/route` returned HTTP 200, `PRODUCTION_READ_ONLY`, `VERIFIED`, `FULL`, `260` sessions; unknown `ZZZ` returned HTTP 404. Public API reads the validated artifact and does not replay/query raw history.
+- Runtime: dashboard recreated from `/root/signalix`; readiness remained healthy; PostgreSQL and Redis were not restarted.
+- Browser: public `/trend-map` drawer rendered the route graph and segment detail at desktop and 390px; mobile `scrollWidth=390`, `bodyScrollWidth=390`, graph width `366px`; no action/order semantics were added.
+- Rollback: prior Trend Route artifact remains immutable in the isolated source history; explicit source-plus-artifact rollback drill is `NOT VERIFIED` for this new feature.
+
 ## Stable release
 
 ```text

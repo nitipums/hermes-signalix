@@ -17,6 +17,18 @@ real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
 acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
+### Trend Route acceptance — 2026-09-17
+
+Trend Route is a symbol-scoped historical evidence extension at
+`/api/trend-map/{symbol}/route` and within the existing Trend Map drawer. It
+replays the unchanged deterministic Main Trend classifier over up to 260
+completed Daily sessions at one market-wide cutoff, from a validated immutable
+read model. Current real artifact read-back: `trend-route-cc791d2d85645bce9b5347b8`,
+237 routes, 229 `FULL`, 8 explicit `PARTIAL`; public TEAM API and desktop/390px
+browser journeys passed. The feature remains `PRODUCTION_READ_ONLY`,
+`research_only=false`, and `actionability=NONE`. Source commit is `3733c4d`;
+rollback drill for the new route artifact remains `NOT VERIFIED`.
+
 ### Daily quality-window boundary
 
 Daily quality gating applies to the same newest bounded analytical window used
