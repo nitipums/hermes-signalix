@@ -269,6 +269,64 @@ def test_api_default_path_never_invokes_classifier_or_history(monkeypatch, tmp_p
     assert result["counts"] == {"declared": 3, "evaluated": 3, "returned": 3, "blocked": 2}
 
 
+def test_api_exposes_only_validated_snapshot_index_sessions_without_history(monkeypatch, tmp_path):
+    monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
+    publish(tmp_path)
+    publisher.publish_shadow_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-10", root=tmp_path,
+                                        published_at="2026-09-12T02:00:00+00:00")
+    monkeypatch.setenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", str(tmp_path))
+    monkeypatch.setattr(trend_map, "classify_daily_trend",
+                        lambda *_: (_ for _ in ()).throw(AssertionError("classifier called")))
+    monkeypatch.setattr(trend_map.BackendDailyAdapter, "load_daily_pit_batch",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("history queried")))
+
+    result = trend_map.build_shadow_report()
+
+    assert [item["as_of"] for item in result["snapshots"]] == ["2026-09-11", "2026-09-10"]
+    assert result["snapshots"] == result["snapshot"]["sessions"]
+    assert result["snapshot"]["sessions_verification"] == {"status": "VERIFIED", "reason": None}
+    assert set(result["snapshots"][0]) >= {"as_of", "row_count", "artifact_id", "is_current"}
+    assert result["snapshots"][0]["is_current"] is True
+    assert result["snapshots"][1]["is_current"] is True
+
+
+def test_corrupt_snapshot_index_keeps_current_report_and_marks_sessions_unverified(tmp_path, monkeypatch):
+    monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
+    publish(tmp_path)
+    (tmp_path / "snapshots.json").write_text("not json")
+
+    result = publisher.read_current_shadow_report(tmp_path)
+
+    assert result["status"] == trend_map.PRODUCTION_READ_ONLY
+    assert result["rows"]
+    assert result["snapshots"] == []
+    assert result["snapshot"]["sessions"] == []
+    assert result["snapshot"]["sessions_verification"] == {
+        "status": "NOT_VERIFIED", "reason": "index_corrupt"}
+
+    missing_root = tmp_path / "missing-index"
+    publish(missing_root)
+    (missing_root / "snapshots.json").unlink()
+    missing = publisher.read_current_shadow_report(missing_root)
+    assert missing["status"] == trend_map.PRODUCTION_READ_ONLY
+    assert missing["snapshots"] == []
+    assert missing["snapshot"]["sessions_verification"] == {
+        "status": "NOT_VERIFIED", "reason": "index_missing"}
+
+
+def test_historical_response_exposes_same_validated_sessions(tmp_path):
+    publish(tmp_path)
+    publisher.publish_shadow_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-10", root=tmp_path,
+                                        published_at="2026-09-12T02:00:00+00:00")
+
+    result = publisher.read_historical_shadow_report("2026-09-10", tmp_path)
+
+    assert result["snapshot"]["kind"] == "historical"
+    assert [item["as_of"] for item in result["snapshots"]] == ["2026-09-11", "2026-09-10"]
+    assert result["snapshots"] == result["snapshot"]["sessions"]
+    assert result["snapshot"]["sessions_verification"]["status"] == "VERIFIED"
+
+
 def test_publisher_rejects_unverified_or_incomplete_build(tmp_path, monkeypatch):
     monkeypatch.setattr(trend_map, "build_shadow_report", lambda **kwargs: {"status": "DATA_BLOCKED", "verification_status": "NOT_VERIFIED"})
     try:

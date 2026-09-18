@@ -1287,3 +1287,27 @@ def test_api_route_is_same_origin_read_only_envelope(monkeypatch):
     assert payload["status"] == subject.PRODUCTION_READ_ONLY
     assert payload["research_only"] is False
     assert payload["actionability"] == "NONE"
+
+
+def test_history_trigger_ui_contract_is_explicit_and_fail_closed():
+    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    drawer = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text(encoding="utf-8")
+    for marker in (
+        'id="snapshot-select"', "Latest EOD", "Historical EOD snapshot", "snapshot=",
+        "HISTORICAL_DATA_BLOCKED", "no current fallback used", "snapshotIsHistorical",
+        "Trend changed", "trend_duration_sessions", "UP TRIGGER REACHED",
+        "DOWN TRIGGER REACHED", "NO MARKER", "confirmation requires a completed EOD close/classification",
+        "NO CURRENT-SESSION MARKER", "Not verified", "actionability===\"NONE\"",
+    ):
+        assert marker in template
+    assert "drawer-trend-evidence" in drawer
+    assert "trend_changed_date" in drawer and "trend_duration_sessions" in drawer
+    assert "completed EOD close/classification" in drawer
+
+
+def test_history_trigger_ui_keeps_current_freshness_gate_separate_from_historical():
+    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'data.freshness.status!=="FRESH"' in template
+    assert 'data.freshness.status==="HISTORICAL"' in template
+    assert 'fetch(path,{cache:"no-store"})' in template
+    assert 'selectedSnapshot?"?snapshot="+encodeURIComponent(selectedSnapshot)' in template

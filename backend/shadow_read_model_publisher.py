@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import shadow_trend_map as trend_map
-from trend_map_history import TrendMapEodSnapshotStore
+from trend_map_history import SnapshotSelectionError, TrendMapEodSnapshotStore
 
 DEFAULT_ROOT = Path(__file__).with_name("shadow-read-model")
 CURRENT_NAME = "current.json"
@@ -262,6 +262,44 @@ def _validate_pointer(root: Path, pointer: Mapping[str, Any]) -> dict[str, Any]:
     return artifact
 
 
+def _read_validated_snapshot_sessions(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Read only sessions whose index entries and immutable artifacts verify."""
+    store = TrendMapEodSnapshotStore(root, validator=_validate_report)
+    if not store.index_path.exists():
+        return [], {"status": "NOT_VERIFIED", "reason": "index_missing"}
+    try:
+        index = store.read_index()
+        sessions = []
+        for entry in index["sessions"]:
+            if (not isinstance(entry, Mapping)
+                    or not isinstance(entry.get("as_of"), str)
+                    or not isinstance(entry.get("artifact_id"), str)
+                    or not isinstance(entry.get("row_count"), int)
+                    or not isinstance(entry.get("is_current"), bool)):
+                raise SnapshotSelectionError("index_invalid")
+            selected = store.select(entry["as_of"])
+            metadata = selected["snapshot"]
+            sessions.append({key: metadata.get(key) for key in (
+                "as_of", "row_count", "artifact_id", "quality", "provenance")}
+                            | {"is_current": entry.get("is_current") is True})
+        return sessions, {"status": "VERIFIED", "reason": None}
+    except Exception as error:
+        return [], {"status": "NOT_VERIFIED",
+                    "reason": getattr(error, "reason", None) or "index_invalid"}
+
+
+def _attach_snapshot_sessions(report: dict[str, Any], root: Path) -> dict[str, Any]:
+    sessions, verification = _read_validated_snapshot_sessions(root)
+    report["snapshots"] = sessions
+    snapshot = report.get("snapshot")
+    if not isinstance(snapshot, dict):
+        snapshot = {}
+        report["snapshot"] = snapshot
+    snapshot["sessions"] = sessions
+    snapshot["sessions_verification"] = verification
+    return report
+
+
 def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]:
     root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
     started = time.perf_counter()
@@ -290,17 +328,21 @@ def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]
                                "quality": artifact.get("quality") or artifact.get("data_quality_summary"),
                                "provenance": artifact.get("provenance"),
                                "artifact_id": artifact.get("artifact_id")}
+        _attach_snapshot_sessions(result, root_path)
         result["last_failure"] = _read_failure_metadata(root_path)
         if freshness_status == "STALE":
             blocked = trend_map.unavailable_report(RuntimeError("shadow artifact is stale"))
             blocked["freshness"] = result["freshness"]
             blocked["read_path"] = result["read_path"]
             blocked["artifact"] = result["artifact"]
+            blocked["snapshots"] = result["snapshots"]
+            blocked["snapshot"] = result["snapshot"]
             blocked["last_failure"] = result["last_failure"]
             return blocked
         return result
     except Exception as error:
         blocked = trend_map.unavailable_report(error)
+        _attach_snapshot_sessions(blocked, root_path)
         blocked["read_path"] = {"latency_ms": round((time.perf_counter() - started) * 1000, 3),
                                  "cache": "pointer_artifact", "validated_every_request": True}
         return blocked | {"artifact": {"id": None, "path": str(root_path / CURRENT_NAME), "published_at": None}, "source": "shadow_read_model_pointer", "last_failure": _read_failure_metadata(root_path), "freshness": {"status": "UNKNOWN", "published_at": None, "age_seconds": None, "stale_after_seconds": DEFAULT_STALE_AFTER_SECONDS}}
@@ -315,6 +357,7 @@ def read_historical_shadow_report(snapshot_date: str, root: str | Path | None = 
                              "path": str((root_path / "versions" / f"{selected['snapshot']['artifact_id']}.json").resolve()),
                              "published_at": artifact.get("published_at")}
     artifact["snapshot"] = selected["snapshot"]
+    _attach_snapshot_sessions(artifact, root_path)
     artifact["freshness"] = {"status": "HISTORICAL", "as_of": artifact.get("as_of")}
     artifact["read_path"] = {"cache": "snapshot_index_artifact", "validated_every_request": True,
                               "artifact_id": artifact["artifact_id"]}
