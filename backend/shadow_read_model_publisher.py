@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import shadow_trend_map as trend_map
+from trend_map_history import TrendMapEodSnapshotStore
 
 DEFAULT_ROOT = Path(__file__).with_name("shadow-read-model")
 CURRENT_NAME = "current.json"
@@ -283,6 +284,12 @@ def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]
                                 "cache": "pointer_artifact", "validated_every_request": True,
                                 "artifact_id": pointer["artifact_id"]}
         result["cache"] = {"status": "pointer_artifact", "ttl_seconds": 0, "as_of": artifact.get("as_of"), "policy_hash": artifact.get("policy", {}).get("hash")}
+        result["snapshot"] = {"as_of": artifact.get("as_of"), "kind": "current",
+                               "row_count": len(artifact.get("rows", [])),
+                               "universe": artifact.get("universe"),
+                               "quality": artifact.get("quality") or artifact.get("data_quality_summary"),
+                               "provenance": artifact.get("provenance"),
+                               "artifact_id": artifact.get("artifact_id")}
         result["last_failure"] = _read_failure_metadata(root_path)
         if freshness_status == "STALE":
             blocked = trend_map.unavailable_report(RuntimeError("shadow artifact is stale"))
@@ -297,6 +304,21 @@ def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]
         blocked["read_path"] = {"latency_ms": round((time.perf_counter() - started) * 1000, 3),
                                  "cache": "pointer_artifact", "validated_every_request": True}
         return blocked | {"artifact": {"id": None, "path": str(root_path / CURRENT_NAME), "published_at": None}, "source": "shadow_read_model_pointer", "last_failure": _read_failure_metadata(root_path), "freshness": {"status": "UNKNOWN", "published_at": None, "age_seconds": None, "stale_after_seconds": DEFAULT_STALE_AFTER_SECONDS}}
+
+
+def read_historical_shadow_report(snapshot_date: str, root: str | Path | None = None) -> dict[str, Any]:
+    """Select one validated EOD artifact without using the current pointer."""
+    root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
+    selected = TrendMapEodSnapshotStore(root_path, validator=_validate_report).select(snapshot_date)
+    artifact = dict(selected["artifact"])
+    artifact["artifact"] = {"id": artifact["artifact_id"],
+                             "path": str((root_path / "versions" / f"{selected['snapshot']['artifact_id']}.json").resolve()),
+                             "published_at": artifact.get("published_at")}
+    artifact["snapshot"] = selected["snapshot"]
+    artifact["freshness"] = {"status": "HISTORICAL", "as_of": artifact.get("as_of")}
+    artifact["read_path"] = {"cache": "snapshot_index_artifact", "validated_every_request": True,
+                              "artifact_id": artifact["artifact_id"]}
+    return artifact
 
 
 def publish_shadow_read_model(*, adapter=None, conn=None, as_of=None, root: str | Path | None = None, published_at=None) -> dict[str, Any]:
@@ -328,6 +350,8 @@ def publish_shadow_read_model(*, adapter=None, conn=None, as_of=None, root: str 
     version_id, artifact = _artifact(report, published_at_value, timing)
     artifact_path = root_path / ARTIFACT_DIR / f"{version_id}.json"
     _write_immutable(artifact_path, artifact)
+    TrendMapEodSnapshotStore(root_path, validator=_validate_report).publish(
+        artifact, artifact_path=str(Path(ARTIFACT_DIR) / artifact_path.name), is_current=True)
     pointer = {"schema_version": SCHEMA_VERSION, "artifact_id": version_id, "artifact_path": str(Path(ARTIFACT_DIR) / artifact_path.name), "published_at": artifact["published_at"], "as_of": artifact["as_of"], "representation_revision": artifact["identity"]["representation_revision"], "policy_hash": artifact["identity"]["policy_hash"], "universe_hash": artifact["identity"]["universe_hash"], "content_hash": artifact["identity"]["content_hash"], "measurement_hash": artifact["identity"]["measurement_hash"]}
     _atomic_write(root_path / CURRENT_NAME, pointer)
     return {"artifact_id": version_id, "artifact_path": str(artifact_path), "pointer_path": str(root_path / CURRENT_NAME), "counts": artifact["counts"], "as_of": artifact["as_of"], "published_at": artifact["published_at"], "timing": timing}

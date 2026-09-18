@@ -19,7 +19,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
@@ -726,7 +726,7 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
             "limitations": ["Production-served read-only Daily evidence; no setup, signal, order, alert, broker, or production mutation."]}
 
 
-def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> dict[str, Any]:
+def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None, snapshot_date=None) -> dict[str, Any]:
     """Return the published report by default; build from DB only explicitly.
 
     The HTTP surface must not classify or query price history.  ``source`` is
@@ -735,6 +735,10 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
     global _report_cache
     if source is None:
         source = "database" if adapter is not None or conn is not None else "published"
+    if snapshot_date is not None and adapter is None and conn is None:
+        from shadow_read_model_publisher import read_historical_shadow_report
+        report = read_historical_shadow_report(snapshot_date)
+        return compact_public_trend_map_report(report)
     if source in {"published", "read_model", "current"}:
         from shadow_read_model_publisher import read_current_shadow_report
         # Keep the validated immutable artifact separate from display-only
@@ -975,14 +979,18 @@ def unavailable_report(error: Exception) -> dict[str, Any]:
             "summary": {status: 0 for status in STATUS_VALUES} | {"DATA_BLOCKED": 1},
             "data_quality_summary": {status: 0 for status in DATA_QUALITY_VALUES} | {"DATA_BLOCKED": 1},
             "status_by_symbol": {}, "verification_status": "NOT_VERIFIED",
-            "provenance": {**PROVENANCE, "adapter": "BackendDailyAdapter", "availability": "NOT_VERIFIED", "error_type": type(error).__name__}}
+            "provenance": {**PROVENANCE, "adapter": "BackendDailyAdapter", "availability": "NOT_VERIFIED", "error_type": type(error).__name__},
+            "verification_reason": getattr(error, "reason", None) or str(error)[:240]}
 
 
 def handle_shadow_trend_map_api(path: str, handler) -> bool:
     if urlsplit(path).path != "/api/trend-map":
         return False
     try:
-        payload = build_shadow_report()
+        requested = parse_qs(urlsplit(path).query)
+        snapshot_date = (requested.get("snapshot", [None])[0]
+                         or requested.get("snapshot_date", [None])[0])
+        payload = build_shadow_report(snapshot_date=snapshot_date) if snapshot_date is not None else build_shadow_report()
         payload = compact_public_trend_map_report(payload)
         status = 200
     except Exception as error:  # fail closed with a visible envelope
