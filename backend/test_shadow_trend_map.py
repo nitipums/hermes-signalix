@@ -710,6 +710,39 @@ def test_template_has_main_trend_accordion_filter_drawer_chart_and_shadow_marker
     assert 'r.status===s' not in html
 
 
+def test_trend_map_renders_finite_trigger_prices_and_fails_closed_with_reason():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
+    combined = html + shared
+    for marker in (
+        'UP trigger ', 'DOWN trigger ', 'Not verified', 'trigger_reason',
+        'Number.isFinite', 'class="trigger-price-evidence"',
+        'id="drawer-trigger-evidence"', 'shadowTriggerPriceEvidence',
+    ):
+        assert marker in combined
+    assert 'trigger_marker' in html and 'Provisional; confirmation requires a completed EOD close/classification' in html
+    assert 'NO CURRENT-SESSION MARKER · Historical EOD snapshot' in html
+    assert 'NO CURRENT-SESSION MARKER · Historical EOD snapshot' in shared
+    assert 'trigger-price-evidence' in html
+    assert 'trigger-price-evidence' not in shared.split('function shadowTriggerPriceEvidence', 1)[0]
+
+
+def test_trigger_price_evidence_is_top_level_and_mobile_contained_for_current_and_historical_rows():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
+    assert 'row[direction+"_trigger"]' in html
+    assert 'item[direction+"_trigger"]' in shared
+    assert 'overflow-wrap:anywhere' in html
+    assert 'overflowWrap = "anywhere"' in shared
+    assert 'value.toFixed(2)' in html and 'value.toFixed(2)' in shared
+    assert 'shadow ? shadowTriggerPriceEvidence(item)' in shared
+    assert 'snapshotIsHistorical()' in html
+    assert 'historical:snapshotIsHistorical()' in html
+    assert 'trigger_price' not in html
+    assert 'trigger_price' not in shared
+    assert 'actionability:"NONE"' in html
+
+
 def test_trend_map_accordion_is_closed_single_open_and_defers_symbol_rows_until_open():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     assert "Main Trend shows the Daily direction. Open a group to see its evidence." in html

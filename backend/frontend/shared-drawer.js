@@ -18,7 +18,7 @@
       '<span id="drawer-position" class="drawer-position" aria-live="polite">– of –</span><button id="drawer-next" class="drawer-nav-button" type="button" aria-label="Next stock">→</button></div>' +
       '<button id="drawer-close" class="drawer-close" type="button" aria-label="Close detail">&times;</button></header><div id="drawer-body" class="drawer-body">' +
       '<div class="drawer-price-row"><strong id="drawer-price">–</strong><span id="drawer-change" class="drawer-change">–</span><span id="drawer-trade-value" class="drawer-trade-value">Trade value –</span></div>' +
-      '<div id="drawer-quote-source" class="drawer-quote-source">Quote · Not verified</div><div id="drawer-trend-evidence" class="drawer-quote-source" aria-live="polite">Trend evidence · Not verified</div><div class="drawer-decision"><span id="drawer-trend" class="drawer-trend">–</span><strong id="drawer-action" class="drawer-action">–</strong></div>' +
+      '<div id="drawer-quote-source" class="drawer-quote-source">Quote · Not verified</div><div id="drawer-trend-evidence" class="drawer-quote-source" aria-live="polite">Trend evidence · Not verified</div><div id="drawer-trigger-evidence" class="drawer-quote-source" aria-live="polite">UP trigger Not verified · DOWN trigger Not verified</div><div class="drawer-decision"><span id="drawer-trend" class="drawer-trend">–</span><strong id="drawer-action" class="drawer-action">–</strong></div>' +
       '<div class="drawer-wave-summary" aria-label="Primary Daily Wave"><span>Primary Daily Wave <strong id="drawer-wave">Not verified</strong></span><span>Confidence <strong id="drawer-wave-confidence">NOT_VERIFIED</strong></span><span id="drawer-wave-source">Daily structural · source unavailable</span></div>' +
       '<div id="drawer-deep-pullback" class="deep-pullback-evidence" hidden></div><div id="drawer-chart" class="drawer-chart"><canvas id="drawer-canvas" width="720" height="440"></canvas><p id="drawer-chart-placeholder" class="chart-placeholder">Chart loading…</p><button id="drawer-chart-retry" class="chart-retry" type="button" hidden>Retry chart</button></div>' +
       '<div id="drawer-chart-legend" class="wave-chart-legend" aria-label="Chart evidence legend"></div>' +
@@ -36,7 +36,7 @@
   function bindDom() {
     var mount = document.querySelector("#drawer-mount");
     if (mount && !document.querySelector("#drawer")) mount.innerHTML = drawerMarkup();
-    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrendEvidence","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartRetry","drawerChartLegend","drawerRouteStatus","drawerRouteGraph","drawerRouteDetail","drawerRouteRetry","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
+    ["drawer","drawerOverlay","drawerClose","drawerPrev","drawerNext","drawerPosition","drawerSymbol","drawerName","drawerLane","drawerPrice","drawerCurrent","drawerChange","drawerQuoteSource","drawerTrendEvidence","drawerTriggerEvidence","drawerTrend","drawerAction","drawerWave","drawerWaveConfidence","drawerWaveSource","drawerDeepPullback","drawerSector","drawerIndustry","drawerMarketCap","drawerTradeValue","drawerCanvas","drawerChartPH","drawerChartRetry","drawerChartLegend","drawerRouteStatus","drawerRouteGraph","drawerRouteDetail","drawerRouteRetry","technicalHighLow","technicalMacd","technicalRsi","technicalAtr","rollingHighLow","drawerTarget","drawerTrigger","drawerStop","drawerRR","drawerBody"].forEach(function (key) {
       var ids = {
         drawerChartPH:"drawer-chart-placeholder",
         drawerRR:"drawer-rr"
@@ -169,6 +169,15 @@
     return "Main Trend " + display + " · " + quality;
   }
 
+  function shadowTriggerPriceEvidence(item) {
+    var reason = item && (item.trigger_reason || item.reason) || "";
+    var labels = ["up", "down"].map(function (direction) {
+      var value = item && item[direction+"_trigger"];
+      return direction.toUpperCase() + " trigger " + (typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "Not verified");
+    });
+    return labels.join(" · ") + (reason ? " · " + reason : "");
+  }
+
   function normalizeDrawerTrendDisplay(item, trend) {
     var itemTrend = item && item.trend;
     var candidate = itemTrend && typeof itemTrend === "object" && !Array.isArray(itemTrend)
@@ -296,6 +305,12 @@
     var changed = trendEvidence.trend_changed_date || item.trend_changed_date;
     var duration = trendEvidence.trend_duration_sessions || item.trend_duration_sessions;
     var evidenceText = changed && duration != null ? "Trend changed " + changed + " · " + duration + " completed sessions" : "Trend duration Not verified" + ((trendEvidence.trigger_reason || item.trigger_reason || item.reason) ? " · " + (trendEvidence.trigger_reason || item.trigger_reason || item.reason) : "");
+    if (dom.drawerTriggerEvidence) {
+      dom.drawerTriggerEvidence.textContent = shadow ? shadowTriggerPriceEvidence(item) : "";
+      dom.drawerTriggerEvidence.hidden = !shadow;
+      dom.drawerTriggerEvidence.style.whiteSpace = "normal";
+      dom.drawerTriggerEvidence.style.overflowWrap = "anywhere";
+    }
     var marker = item.trigger_marker;
     var markerText = shadow && item.__sharedEnvelope && item.__sharedEnvelope.historical ? "NO CURRENT-SESSION MARKER · Historical EOD snapshot" : marker && marker.status !== "NOT_VERIFIED" ? (marker.label || "NO MARKER") + " · Provisional; confirmation requires a completed EOD close/classification" : "TRIGGER MARKER · Not verified" + (marker && marker.reason ? " · " + marker.reason : "");
     if (dom.drawerTrendEvidence) dom.drawerTrendEvidence.textContent = evidenceText + " · " + markerText;
