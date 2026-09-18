@@ -41,6 +41,32 @@ setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
 publisher and API preserve Daily as-of, provenance, quote basis, data-quality
 states, and fail-closed behavior.
 
+### Historical EOD snapshot boundary — Issue #47, source closeout 2026-09-18
+
+The approved history contract extends this same read-only boundary with a
+bounded index of at most 30 completed EOD session artifacts. The selected
+artifact owns its `as_of`, resolved historical universe, row count, quality,
+and provenance. The request path reads the validated index and immutable JSON
+artifact only; it does not query PostgreSQL, raw market history, rescan the
+universe, or rebuild indicators. A missing, stale, corrupt, or mismatched
+index/artifact is `NOT_VERIFIED` and must not fall back to the current session.
+
+The approved row contract also includes deterministic trend change date,
+completed-session duration, up/down trigger levels, comparison operators, and
+trigger basis. Current-session intraday markers are a display-only provisional
+overlay on the current EOD snapshot; historical snapshots never receive
+today's quote or marker. `status=PRODUCTION_READ_ONLY`,
+`research_only=false`, and `actionability=NONE` remain unchanged.
+
+Closeout evidence: the history/classifier, artifact/index seams, and compact
+public projection are present in the source checkout. The current and
+historical projections expose `trend_changed_date`,
+`trend_duration_sessions`, `up_trigger`, `down_trigger`, and `trigger_basis`;
+source/contract and temporary-fixture artifact/index/API projection tests
+pass. Public served runtime, production data freshness, browser,
+deployment/promotion, and rollback acceptance remain `NOT VERIFIED` because
+no deploy, restart, or public-route read-back was exercised.
+
 ## Retained setup/shadow trial flow — 2026-09-01
 
 The 2026-09-11 private signal transition adds a read-only local shadow consumer

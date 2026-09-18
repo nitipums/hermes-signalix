@@ -17,6 +17,29 @@ real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
 acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
+### Historical EOD snapshots and trigger evidence — Issue #47 closeout boundary
+
+The approved extension is limited to the latest 30 completed EOD session
+artifacts. Each selected historical artifact must retain its own `as_of`,
+resolved universe, quality, provenance, duration/change-date evidence, and
+deterministic trigger fields. The current snapshot may receive a provisional,
+display-only intraday trigger marker; historical snapshots must not receive
+today's quote or marker. Missing, stale, corrupt, or mismatched artifacts
+must be visible `NOT_VERIFIED` with no current-snapshot fallback. The route
+remains `PRODUCTION_READ_ONLY`, `research_only=false`, and
+`actionability=NONE`; no alert, order, broker, or auto-trading behavior is in
+scope.
+
+Acceptance evidence as of 2026-09-18: source/contract and temporary-fixture
+artifact/index/API projection tests pass, including bounded retention,
+immutable publication, exact selection, no-fallback failures, historical
+universe identity, provisional marker boundaries, and the no-DB request-path
+guard. The current and historical compact projections expose
+`trend_changed_date`, `trend_duration_sessions`, `up_trigger`, `down_trigger`,
+and `trigger_basis`. Public served runtime, production data freshness,
+browser, deployment/promotion, and rollback acceptance remain `NOT VERIFIED`
+because no deploy, restart, or public-route read-back was exercised.
+
 ### Trend Route acceptance — 2026-09-17
 
 Trend Route is a symbol-scoped historical evidence extension at

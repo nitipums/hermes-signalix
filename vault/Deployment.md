@@ -21,6 +21,32 @@
 - Browser: public `/trend-map` drawer rendered the route graph and segment detail at desktop and 390px; mobile `scrollWidth=390`, `bodyScrollWidth=390`, graph width `366px`; no action/order semantics were added.
 - Rollback: prior Trend Route artifact remains immutable in the isolated source history; explicit source-plus-artifact rollback drill is `NOT VERIFIED` for this new feature.
 
+## Issue #47 Trend Map history closeout — 2026-09-18 source/read-back boundary
+
+- Approved contract: retain up to 30 completed EOD session artifacts under a
+  validated index; the selected artifact owns its historical universe and
+  `as_of`, quality, provenance, trend duration/change date, and deterministic
+  up/down trigger fields. The latest snapshot remains the default.
+- Read-path contract: historical selection reads the bounded index and one
+  immutable artifact without PostgreSQL, raw-history queries, universe rescans,
+  or indicator rebuilds. Missing, stale, corrupt, or mismatched state is
+  explicit `NOT_VERIFIED` and never silently falls back to current.
+- Intraday boundary: only the current EOD snapshot may receive a provisional
+  display-only marker from the validated intraday read model. Historical EOD
+  snapshots do not receive today's quote or marker. The route remains
+  `PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+- Source/contract and temporary-fixture artifact/index/API projection tests
+  pass. Current and historical compact projections expose
+  `trend_changed_date`, `trend_duration_sessions`, `up_trigger`,
+  `down_trigger`, and `trigger_basis`; fixture selection used the expected
+  status/freshness/universe identity without a production database or
+  artifact path.
+- Public served runtime, production data freshness, browser,
+  deployment/promotion, and rollback remain `NOT VERIFIED`: no deploy,
+  restart, or public-route read-back was exercised. No migration, database
+  write, production artifact rewrite, push, or release promotion was
+  performed or claimed.
+
 ## Stable release
 
 ```text
