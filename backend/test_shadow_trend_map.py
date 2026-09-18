@@ -1374,3 +1374,92 @@ def test_history_trigger_ui_keeps_current_freshness_gate_separate_from_historica
     assert 'data.freshness.status==="HISTORICAL"' in template
     assert 'fetch(path,{cache:"no-store"})' in template
     assert 'selectedSnapshot?"?snapshot="+encodeURIComponent(selectedSnapshot)' in template
+
+
+def test_snapshot_selector_populates_from_successful_responses_and_preserves_history_selection():
+    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    inline = template.split("<script>", 1)[1].split("</script>", 1)[0]
+    assert 'function render(){renderSnapshotOptions(report);' in inline
+    assert 'function snapshotSessions(data){var values=data&&data.snapshots;' in inline
+    assert "snapshot.sessions" not in inline
+    harness = r'''
+const vm = require("vm");
+const options = [];
+function Element(id) {
+  this.id = id; this.value = ""; this.hidden = false; this.textContent = "";
+  this.innerHTML = ""; this.onclick = null; this.onchange = null;
+  this.classList = {contains: function () { return false; }, toggle: function () {}};
+  this.setAttribute = function () {};
+  this.addEventListener = function (name, handler) { this["on" + name] = handler; };
+  this.querySelector = function () { return null; };
+  this.querySelectorAll = function () { return []; };
+  this.closest = function () { return this; };
+  Object.defineProperty(this, "innerHTML", {
+    get: function () { return this._innerHTML || ""; },
+    set: function (value) {
+      this._innerHTML = value;
+      if (this.id !== "snapshot-select") return;
+      options.length = 0;
+      String(value).replace(/<option value="([^"]*)">/g, function (_, optionValue) {
+        options.push(optionValue);
+        return _;
+      });
+      if (options.indexOf(this.value) < 0) this.value = "";
+    },
+  });
+}
+const elements = {};
+const ids = ["snapshot-select", "snapshot-banner", "error", "retry", "drawer-retry",
+  "summary", "shown-count", "declared-count", "as-of", "freshness", "report-status",
+  "report-freshness", "policy-id", "search", "main-trend", "rows", "theme-toggle", "reload"];
+ids.forEach(function (id) { elements[id] = new Element(id); });
+elements["error"].hidden = true; elements["retry"].hidden = true;
+const current = {
+  status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
+  verification_status: "VERIFIED", freshness: {status: "FRESH"}, rows: [],
+  snapshots: ["2026-09-15", "2026-09-14", "2026-09-11"],
+  snapshot: {kind: "current", row_count: 0}, universe: {declared_count: 0}, policy: {},
+};
+const historical = Object.assign({}, current, {
+  freshness: {status: "HISTORICAL"},
+  snapshot: {kind: "historical", as_of: "2026-09-14", row_count: 0},
+});
+const corrupt = Object.assign({}, current, {snapshots: null});
+const requests = [];
+const context = {
+  console: console, setTimeout: setTimeout, clearTimeout: clearTimeout,
+  window: {}, document: {
+    body: elements.body || (elements.body = new Element("body")),
+    querySelector: function (selector) {
+      if (selector.charAt(0) === "#") return elements[selector.slice(1)] || null;
+      return null;
+    },
+  },
+  localStorage: {getItem: function () { return null; }, setItem: function () {}},
+  fetch: function (path) {
+    requests.push(path);
+    return Promise.resolve({ok: true, json: function () {
+      return Promise.resolve(requests.length === 1 ? current : requests.length === 2 ? historical : corrupt);
+    }});
+  },
+};
+vm.runInNewContext(INLINE, context);
+setTimeout(function () {
+  if (options.join(",") !== ",2026-09-15,2026-09-14,2026-09-11") process.exit(1);
+  elements["snapshot-select"].value = "2026-09-14";
+  elements["snapshot-select"].onchange();
+  setTimeout(function () {
+    if (requests.join("|") !== "/api/trend-map|/api/trend-map?snapshot=2026-09-14") process.exit(2);
+    if (options.join(",") !== ",2026-09-15,2026-09-14,2026-09-11") process.exit(3);
+    if (elements["snapshot-select"].value !== "2026-09-14") process.exit(4);
+    elements["snapshot-select"].value = "";
+    elements["snapshot-select"].onchange();
+    setTimeout(function () {
+      if (requests.length !== 3 || options.join(",") !== "") process.exit(5);
+      process.exit(0);
+    }, 0);
+  }, 0);
+}, 0);
+'''.replace("INLINE", json.dumps(inline))
+    result = subprocess.run(["node", "-e", harness], check=False, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr or result.stdout
