@@ -9,6 +9,7 @@ the owner-labelled diagnostic matrix remains the authority for future tuning.
 from __future__ import annotations
 
 import math
+from datetime import date, datetime
 from typing import Any, Mapping
 
 
@@ -19,6 +20,7 @@ MA_PERIODS = (5, 10, 20, 50, 100, 200)
 MEDIUM_PERIOD = 50
 LONG_PERIODS = (100, 200)
 SHORT_PERIODS = (5, 10, 20)
+PRODUCTION_READ_ONLY = "PRODUCTION_READ_ONLY"
 
 
 def _number(value: Any) -> float | None:
@@ -335,3 +337,148 @@ def classify_main_trend(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
 
 
 build_main_trend_evidence = classify_main_trend
+
+
+def _history_date(value: Any) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _history_trend(value: Any) -> int | None:
+    if isinstance(value, Mapping):
+        value = value.get("main_trend", value.get("value"))
+    if isinstance(value, bool):
+        return None
+    try:
+        trend = int(value)
+    except (TypeError, ValueError):
+        return None
+    return trend if trend in (1, 2, 3, 4) else None
+
+
+def _history_trigger(observation: Mapping[str, Any], name: str) -> float | None:
+    value = observation.get(name)
+    if value is None:
+        evidence = observation.get("trigger_evidence")
+        value = evidence.get(name) if isinstance(evidence, Mapping) else None
+    return _number(value)
+
+
+def _unverified_history_row(*, reason: str, as_of: Any = None, trend: int | None = None) -> dict[str, Any]:
+    return {
+        "as_of": as_of,
+        "trend_state": trend,
+        "main_trend": trend,
+        "trend_changed_date": None,
+        "trend_duration_sessions": None,
+        "up_trigger": None,
+        "down_trigger": None,
+        "up_trigger_operator": ">=",
+        "down_trigger_operator": "<=",
+        "trigger_basis": "NOT_VERIFIED",
+        "trigger_quality": "NOT_VERIFIED",
+        "trigger_reason": reason,
+        "quality": "NOT_VERIFIED",
+        "reason": reason,
+        "status": PRODUCTION_READ_ONLY,
+        "research_only": False,
+        "actionability": "NONE",
+    }
+
+
+def build_trend_history_evidence(observations: Any, *, symbol: str | None = None) -> list[dict[str, Any]]:
+    """Build deterministic per-completed-EOD trend duration evidence.
+
+    ``observations`` must be ordered completed-EOD classifier output for one
+    symbol.  Trigger levels are deliberately not calculated here: only
+    explicit finite levels supplied by the classifier evidence are accepted.
+    This keeps the history seam from introducing an undocumented threshold.
+    """
+    raw = observations if isinstance(observations, (list, tuple)) else []
+    if not raw:
+        row = _unverified_history_row(reason="no_completed_eod_observations")
+        row["symbol"] = symbol
+        return [row]
+
+    parsed: list[tuple[Mapping[str, Any], date, int]] = []
+    structural_reason = None
+    previous_date = None
+    for observation in raw:
+        if not isinstance(observation, Mapping):
+            structural_reason = "invalid_observation"
+            break
+        observed_date = _history_date(observation.get("as_of", observation.get("date", observation.get("session_date"))))
+        trend = _history_trend(observation.get("main_trend", observation.get("trend_state", observation.get("trend"))))
+        if observed_date is None:
+            structural_reason = "invalid_observation_date"
+            break
+        if trend is None:
+            structural_reason = "invalid_trend_state"
+            break
+        if previous_date is not None and observed_date <= previous_date:
+            structural_reason = "observations_not_strictly_ordered"
+            break
+        parsed.append((observation, observed_date, trend))
+        previous_date = observed_date
+
+    if structural_reason is not None:
+        return [_unverified_history_row(reason=structural_reason,
+                                         as_of=(item.get("as_of", item.get("date"))
+                                                if isinstance(item, Mapping) else None))
+                for item in raw]
+
+    result = []
+    previous_trend = None
+    changed_date = None
+    duration = 0
+    for observation, observed_date, trend in parsed:
+        if trend != previous_trend:
+            changed_date = observed_date.isoformat()
+            duration = 1
+        else:
+            duration += 1
+        up_trigger = _history_trigger(observation, "up_trigger")
+        down_trigger = _history_trigger(observation, "down_trigger")
+        trigger_basis = observation.get("trigger_basis")
+        if up_trigger is None or down_trigger is None:
+            trigger_reason = ("authoritative_trigger_fields_unavailable"
+                              if up_trigger is None and down_trigger is None
+                              else "authoritative_trigger_fields_incomplete")
+            trigger_quality = "NOT_VERIFIED"
+            trigger_basis = "NOT_VERIFIED"
+        else:
+            trigger_reason = None
+            trigger_quality = "VERIFIED"
+            trigger_basis = str(trigger_basis or "supplied_classifier_evidence")
+        item = {
+            "symbol": symbol,
+            "as_of": observed_date.isoformat(),
+            "trend_state": trend,
+            "main_trend": trend,
+            "trend_changed_date": changed_date,
+            "trend_duration_sessions": duration,
+            "up_trigger": up_trigger,
+            "down_trigger": down_trigger,
+            "up_trigger_operator": ">=",
+            "down_trigger_operator": "<=",
+            "trigger_basis": trigger_basis,
+            "trigger_quality": trigger_quality,
+            "trigger_reason": trigger_reason,
+            "quality": "VERIFIED" if trigger_quality == "VERIFIED" else "NOT_VERIFIED",
+            "reason": trigger_reason,
+            "status": PRODUCTION_READ_ONLY,
+            "research_only": False,
+            "actionability": "NONE",
+        }
+        result.append(item)
+        previous_trend = trend
+    return result
+
+
+build_trend_history = build_trend_history_evidence

@@ -2,7 +2,13 @@
 
 import pytest
 
-from main_trend_mapping import MA_PERIODS, POLICY_VERSION, SLOPE_WINDOW, classify_main_trend
+from main_trend_mapping import (
+    MA_PERIODS,
+    POLICY_VERSION,
+    SLOPE_WINDOW,
+    build_trend_history_evidence,
+    classify_main_trend,
+)
 
 
 LABELS = {
@@ -198,3 +204,80 @@ def test_partial_main_trend_never_receives_a_suffix():
     result = classify_main_trend(item)
     assert result["evidence_quality"] == "PARTIAL"
     assert result["main_trend_display"] == "1"
+
+
+def _classified_observations(*values, triggers=False):
+    observations = []
+    for index, trend in enumerate(values, start=1):
+        observation = {"as_of": f"2026-09-{index:02d}", "main_trend": trend}
+        if triggers:
+            observation.update({"up_trigger": 110.0 + index, "down_trigger": 90.0 - index,
+                                "trigger_basis": "supplied_classifier_evidence"})
+        observations.append(observation)
+    return observations
+
+
+def test_trend_history_first_session_starts_duration_and_change_date_at_one():
+    result = build_trend_history_evidence(_classified_observations(2), symbol="AAA")
+
+    assert result[0]["trend_state"] == 2
+    assert result[0]["trend_changed_date"] == "2026-09-01"
+    assert result[0]["trend_duration_sessions"] == 1
+    assert result[0]["actionability"] == "NONE"
+
+
+def test_trend_history_continuation_and_transition_reset_duration():
+    result = build_trend_history_evidence(_classified_observations(2, 2, 3, 3, 2))
+
+    assert [(item["trend_state"], item["trend_duration_sessions"], item["trend_changed_date"])
+            for item in result] == [
+                (2, 1, "2026-09-01"), (2, 2, "2026-09-01"),
+                (3, 1, "2026-09-03"), (3, 2, "2026-09-03"),
+                (2, 1, "2026-09-05"),
+            ]
+
+
+def test_trend_history_uses_only_observations_through_each_eod():
+    result = build_trend_history_evidence(_classified_observations(1, 1, 4))
+
+    assert result[0]["trend_state"] == 1
+    assert result[0]["trend_duration_sessions"] == 1
+    assert result[1]["trend_state"] == 1
+    assert result[1]["trend_duration_sessions"] == 2
+
+
+def test_trend_history_emits_inclusive_trigger_operators_and_basis():
+    result = build_trend_history_evidence(_classified_observations(2, triggers=True))
+
+    assert result[0]["up_trigger"] == 111.0
+    assert result[0]["down_trigger"] == 89.0
+    assert result[0]["up_trigger_operator"] == ">="
+    assert result[0]["down_trigger_operator"] == "<="
+    assert result[0]["trigger_basis"] == "supplied_classifier_evidence"
+    assert result[0]["trigger_quality"] == "VERIFIED"
+
+
+def test_trend_history_missing_triggers_is_explicitly_not_verified_and_non_actionable():
+    result = build_trend_history_evidence(_classified_observations(2))
+
+    assert result[0]["up_trigger"] is None
+    assert result[0]["down_trigger"] is None
+    assert result[0]["trigger_basis"] == "NOT_VERIFIED"
+    assert result[0]["trigger_quality"] == "NOT_VERIFIED"
+    assert result[0]["trigger_reason"] == "authoritative_trigger_fields_unavailable"
+    assert result[0]["actionability"] == "NONE"
+
+
+@pytest.mark.parametrize("observations", [
+    [],
+    [{"as_of": "2026-09-01", "main_trend": 9}],
+    [{"as_of": "2026-09-02", "main_trend": 2}, {"as_of": "2026-09-01", "main_trend": 2}],
+    [{"as_of": "not-a-date", "main_trend": 2}],
+    [{"as_of": "2026-09-01", "main_trend": 2, "up_trigger": "bad"}],
+])
+def test_trend_history_invalid_inputs_fail_closed_with_quality_and_reason(observations):
+    result = build_trend_history_evidence(observations)
+
+    assert result
+    assert all(item["quality"] == "NOT_VERIFIED" for item in result)
+    assert all(item["reason"] for item in result)
