@@ -31,6 +31,7 @@
 - `../docs/superpowers/specs/` — current executable product/API/UI contracts.
 - `../docs/current/2026-09-13-daily-trend-derived-fallback-spec.md` — current bounded Derived Daily fallback contract and Issue #22 implementation authority.
 - Current production-served focus: `/trend-map`, `/api/trend-map` — public read-only Daily Trend Mapping; former shadow naming is retired
+- `../docs/current/2026-09-17-1015-trend-route-closeout.md` — current Trend Route production evidence handoff; automated refresh wiring and rollback remain explicitly `NOT VERIFIED`
 - `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` — owner-approved spec for Daily Main Trend 1–4 multiple-MA calibration.
 - `../docs/current/2026-09-13-main-trend-calculation-contract.md` — exact current Main Trend v6 formulas, predicates, precedence, and verification contract.
 - `../docs/current/2026-09-14-1112-main-trend-display-ui-closeout.md` — superseded historical evidence for the former shadow-named display slice; current route authority is this index plus `Deployment.md`.

@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-14 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; the former shadow naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
+> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; source/release commit is `cf85be67d15f9e189b7d73bce6e29a576244859a`. Automated EOD publication wiring and Trend Route rollback remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only and retained as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.

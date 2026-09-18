@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-16 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; source/release commit is `2d83f9f77b72fa4feb32053f1bc2342b08fabece`; dashboard was reloaded and public route read back successfully. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
+> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; source/release commit is `cf85be67d15f9e189b7d73bce6e29a576244859a`. The automated EOD publication hook and Trend Route rollback drill remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
 
 ## Dashboard canonical-mount repair — 2026-09-16 20:20 ICT
 
