@@ -809,6 +809,7 @@ def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, 
                                              "query_mode": "PREBUILT_READ_MODEL", "read_only": True}
         return report
     if adapter is None and conn is None:
+        artifact = None
         try:
             from intraday_quote_read_model import read_current
             artifact = read_current(now=now)
@@ -840,12 +841,14 @@ def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, 
                 "query_mode": "PREBUILT_READ_MODEL", "read_only": True,
                 "artifact_generated_at": artifact["generated_at"], "completed_semantics": "team_facts_api",
             }
+            project_intraday_trigger_markers(report, artifact=artifact)
         except Exception as error:
             report["intraday_quote_overlay"] = {
                 "status": "UNAVAILABLE", "fallback": "eod_quote", "source": "intraday_price_data",
                 "timeframe": "60m", "query_mode": "PREBUILT_READ_MODEL", "read_only": True,
                 "error_type": type(error).__name__,
             }
+            project_intraday_trigger_markers(report, reason="quote_read_model_unavailable")
         return report
     adapter = adapter or BackendDailyAdapter()
     owns_conn = conn is None
@@ -903,15 +906,109 @@ def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, 
             "source": "intraday_price_data", "timeframe": "60m",
             "query_mode": "SELECT_ONLY", "completed_semantics": "team_facts_api",
         }
+        project_intraday_trigger_markers(report, artifact={"generated_at": observed_now.isoformat(),
+                                                           "quotes": [
+                                                               {"symbol": symbol, "status": "AVAILABLE",
+                                                                "price": item.get("close"),
+                                                                "latest_completed_60m": item.get("ts")}
+                                                               for symbol, item in observed.items()
+                                                               if isinstance(item, Mapping)]})
     except Exception as error:
         report["intraday_quote_overlay"] = {
             "status": "UNAVAILABLE", "fallback": "eod_quote",
             "source": "intraday_price_data", "timeframe": "60m",
             "query_mode": "SELECT_ONLY", "error_type": type(error).__name__,
         }
+        project_intraday_trigger_markers(report, reason="quote_read_model_unavailable")
     finally:
         if owns_conn and conn is not None:
             conn.close()
+    return report
+
+
+def _trigger_marker(*, status: str, label: str | None, reason: str | None,
+                    quote_applied: bool, price: float | None = None,
+                    reached: list[str] | None = None) -> dict[str, Any]:
+    """Build display-only current-session trigger evidence."""
+    return {
+        "status": status,
+        "label": label,
+        "price": price,
+        "reached": list(reached or []),
+        "provisional": True,
+        "eod_close_required": True,
+        "reason": reason,
+        "provenance": {
+            "source": "intraday_quote_read_model",
+            "query_mode": "PREBUILT_READ_MODEL",
+            "read_only": True,
+            "quote_applied": quote_applied,
+            "confirmation": "completed_eod_close_and_classification_required",
+        },
+    }
+
+
+def project_intraday_trigger_markers(report: dict[str, Any], *, artifact: Mapping[str, Any] | None = None,
+                                     reason: str | None = None) -> dict[str, Any]:
+    """Project provisional trigger markers onto the current EOD snapshot.
+
+    This is intentionally a read-path projection.  It accepts only trigger
+    levels already persisted in the EOD row and prices from the validated
+    intraday quote artifact; it never calculates thresholds or changes EOD
+    classification, duration, identity, or actionability.
+    """
+    rows = report.get("rows")
+    snapshot = report.get("snapshot")
+    historical = isinstance(snapshot, Mapping) and snapshot.get("kind") == "historical"
+    quote_by_symbol = {}
+    if isinstance(artifact, Mapping) and isinstance(artifact.get("quotes"), list):
+        quote_by_symbol = {item.get("symbol"): item for item in artifact["quotes"]
+                           if isinstance(item, Mapping) and item.get("symbol")}
+    for row in rows if isinstance(rows, list) else []:
+        if not isinstance(row, dict):
+            continue
+        if historical:
+            row["trigger_marker"] = _trigger_marker(
+                status="NOT_VERIFIED", label=None,
+                reason="historical_snapshot_no_intraday_overlay", quote_applied=False)
+            continue
+        item = quote_by_symbol.get(row.get("symbol"))
+        if reason or not isinstance(item, Mapping) or item.get("status") != "AVAILABLE" or not _finite(item.get("price")):
+            row["trigger_marker"] = _trigger_marker(
+                status="NOT_VERIFIED", label=None,
+                reason=reason or "quote_unavailable", quote_applied=False)
+            continue
+        main_trend = row.get("main_trend")
+        up = main_trend.get("up_trigger") if isinstance(main_trend, Mapping) else row.get("up_trigger")
+        down = main_trend.get("down_trigger") if isinstance(main_trend, Mapping) else row.get("down_trigger")
+        if not _finite(up) or not _finite(down):
+            row["trigger_marker"] = _trigger_marker(
+                status="NOT_VERIFIED", label=None,
+                reason="authoritative_trigger_fields_unavailable", quote_applied=False)
+            continue
+        price = float(item["price"])
+        reached = []
+        if price >= float(up):
+            reached.append("UP TRIGGER REACHED")
+        if price <= float(down):
+            reached.append("DOWN TRIGGER REACHED")
+        label = reached[0] if reached else "NO MARKER"
+        row["trigger_marker"] = _trigger_marker(
+            status=("UP_TRIGGER_REACHED" if reached and reached[0].startswith("UP")
+                    else "DOWN_TRIGGER_REACHED" if reached
+                    else "NO_MARKER"),
+            label=label, reason=None, quote_applied=True, price=price, reached=reached)
+    available_quotes = any(isinstance(item, Mapping) and item.get("status") == "AVAILABLE"
+                           and _finite(item.get("price")) for item in quote_by_symbol.values())
+    report["intraday_trigger_projection"] = {
+        "status": "NOT_VERIFIED" if historical or reason or not available_quotes else "AVAILABLE",
+        "scope": "CURRENT_SNAPSHOT_ONLY",
+        "provisional": True,
+        "eod_close_required": True,
+        "source": "intraday_quote_read_model",
+        "query_mode": "PREBUILT_READ_MODEL",
+        "reason": "historical_snapshot_no_intraday_overlay" if historical else reason,
+    }
     return report
 
 
@@ -951,6 +1048,8 @@ def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]
         row = {key: deepcopy(original.get(key)) for key in (
             "symbol", "as_of", "status", "data_quality_status", "classifier_status",
             "confidence", "machine_lane", "broad_state", "quote", "note")}
+        if "trigger_marker" in original:
+            row["trigger_marker"] = deepcopy(original.get("trigger_marker"))
         main_trend = original.get("main_trend")
         if isinstance(main_trend, Mapping):
             row["main_trend"] = {key: deepcopy(main_trend.get(key)) for key in (

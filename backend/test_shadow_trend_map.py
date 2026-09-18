@@ -282,6 +282,95 @@ def test_published_overlay_reads_artifact_without_request_database(monkeypatch):
     assert report["intraday_quote_overlay"]["query_mode"] == "PREBUILT_READ_MODEL"
 
 
+def _trigger_report(*, up=110, down=90, price=100):
+    return {
+        "status": subject.PRODUCTION_READ_ONLY,
+        "research_only": False,
+        "actionability": "NONE",
+        "snapshot": {"kind": "current", "as_of": "2026-09-17", "artifact_id": "eod-1"},
+        "rows": [{
+            "symbol": "AAA", "as_of": "2026-09-17", "status": "AVAILABLE",
+            "main_trend": {"main_trend": 2, "up_trigger": up, "down_trigger": down,
+                            "up_trigger_operator": ">=", "down_trigger_operator": "<=",
+                            "trigger_basis": "supplied_classifier_evidence"},
+            "quote": {"price": 100, "provisional": False},
+        }],
+    }, {"generated_at": "2026-09-18T03:00:00+00:00", "quotes": [{
+        "symbol": "AAA", "status": "AVAILABLE", "price": price,
+        "latest_completed_60m": "2026-09-18T03:00:00+00:00",
+    }]}
+
+
+@pytest.mark.parametrize("price, expected", [
+    (110, "UP TRIGGER REACHED"), (111, "UP TRIGGER REACHED"),
+    (90, "DOWN TRIGGER REACHED"), (89, "DOWN TRIGGER REACHED"),
+    (100, "NO MARKER"),
+])
+def test_intraday_trigger_marker_boundaries_are_inclusive_and_provisional(price, expected):
+    report, artifact = _trigger_report(price=price)
+    subject.project_intraday_trigger_markers(report, artifact=artifact)
+    marker = report["rows"][0]["trigger_marker"]
+    assert marker["label"] == expected
+    assert marker["provisional"] is True
+    assert marker["eod_close_required"] is True
+    assert report["rows"][0]["main_trend"]["main_trend"] == 2
+
+
+@pytest.mark.parametrize("artifact, reason", [
+    (None, "quote_unavailable"),
+    ({"generated_at": "2026-09-18T03:00:00+00:00", "quotes": [{"symbol": "AAA", "status": "UNAVAILABLE"}]}, "quote_unavailable"),
+])
+def test_intraday_trigger_marker_fails_closed_for_missing_quote(artifact, reason):
+    report, _ = _trigger_report()
+    subject.project_intraday_trigger_markers(report, artifact=artifact)
+    marker = report["rows"][0]["trigger_marker"]
+    assert marker["status"] == "NOT_VERIFIED"
+    assert marker["reason"] == reason
+    assert marker["provenance"]["source"] == "intraday_quote_read_model"
+
+
+def test_intraday_trigger_marker_fails_closed_when_validated_quote_model_is_stale(monkeypatch):
+    report, _ = _trigger_report()
+
+    def stale_read_current(**_):
+        raise ValueError("intraday quote artifact is stale")
+
+    monkeypatch.setattr("intraday_quote_read_model.read_current", stale_read_current)
+    subject.overlay_intraday_quotes(report)
+    assert report["rows"][0]["trigger_marker"]["status"] == "NOT_VERIFIED"
+    assert report["rows"][0]["trigger_marker"]["reason"] == "quote_read_model_unavailable"
+    assert report["intraday_trigger_projection"]["query_mode"] == "PREBUILT_READ_MODEL"
+
+
+@pytest.mark.parametrize("up, down", [(None, 90), (110, None), ("bad", 90), (110, float("nan"))])
+def test_intraday_trigger_marker_fails_closed_for_missing_or_invalid_trigger(up, down):
+    report, artifact = _trigger_report(up=up, down=down, price=100)
+    subject.project_intraday_trigger_markers(report, artifact=artifact)
+    marker = report["rows"][0]["trigger_marker"]
+    assert marker["status"] == "NOT_VERIFIED"
+    assert marker["reason"] == "authoritative_trigger_fields_unavailable"
+    assert report["rows"][0]["main_trend"]["up_trigger"] == up
+
+
+def test_intraday_trigger_marker_never_overlays_historical_snapshot():
+    report, artifact = _trigger_report(price=110)
+    report["snapshot"]["kind"] = "historical"
+    subject.project_intraday_trigger_markers(report, artifact=artifact)
+    marker = report["rows"][0]["trigger_marker"]
+    assert marker["status"] == "NOT_VERIFIED"
+    assert marker["reason"] == "historical_snapshot_no_intraday_overlay"
+    assert marker["provenance"]["quote_applied"] is False
+
+
+def test_intraday_trigger_marker_preserves_non_actionable_contract_and_eod_identity():
+    report, artifact = _trigger_report(price=110)
+    before = {key: report[key] for key in ("status", "research_only", "actionability")}
+    row_before = {key: report["rows"][0][key] for key in ("as_of", "main_trend", "quote")}
+    subject.project_intraday_trigger_markers(report, artifact=artifact)
+    assert {key: report[key] for key in before} == before
+    assert {key: report["rows"][0][key] for key in row_before} == row_before
+
+
 def test_valid_classifier_row_is_available_and_has_diagnostic_trace():
     result = subject.evaluate_symbol("AAA", bars(75), "2026-09-11")
     assert result["status"] == "AVAILABLE"
