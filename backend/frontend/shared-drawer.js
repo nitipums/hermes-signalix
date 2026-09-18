@@ -270,6 +270,31 @@
       previousDisabled: index <= 0 || count === 0, nextDisabled: index < 0 || index >= count - 1 || count === 0};
   }
 
+  function shadowTriggerPriceEvidence(item) {
+    var evidence = item && item.main_trend && typeof item.main_trend === "object" ? item.main_trend : item || {};
+    var reason = evidence.trigger_reason || item.trigger_reason || item.reason || "Not verified";
+    var basis = evidence.trigger_basis || item.trigger_basis || "Not verified";
+    var labels = ["up", "down"].map(function (direction) {
+      var value = item && item[direction+"_trigger"];
+      return direction.toUpperCase() + " trigger " + (typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "Not verified");
+    });
+    return labels.join(" · ") + " · Basis " + basis + " · Reason " + reason;
+  }
+
+  function renderShadowMarkerEvidence(item, historical) {
+    var node = document.getElementById("drawer-marker-evidence");
+    if (!node) {
+      node = document.createElement("div");
+      node.id = "drawer-marker-evidence";
+      node.className = "drawer-quote-source";
+      node.setAttribute("aria-live", "polite");
+      if (dom.drawerTriggerEvidence && dom.drawerTriggerEvidence.parentNode) dom.drawerTriggerEvidence.parentNode.appendChild(node);
+    }
+    var marker = item && item.trigger_marker;
+    node.textContent = historical ? "Intraday marker · Not shown for historical EOD snapshots" : marker && marker.status !== "NOT_VERIFIED" ? "Intraday marker · " + (marker.label || "NO MARKER") + " · Provisional; confirmation requires a completed EOD close/classification" : "Intraday marker · Not verified" + (marker && marker.reason ? " · " + marker.reason : "");
+    node.hidden = false;
+  }
+
   function renderSharedDetail(envelope) {
     var item = envelope.item || {}, shadow = envelope.source === "trend-map";
     dom.drawer.classList.toggle("drawer--shadow", shadow);
@@ -311,9 +336,8 @@
       dom.drawerTriggerEvidence.style.whiteSpace = "normal";
       dom.drawerTriggerEvidence.style.overflowWrap = "anywhere";
     }
-    var marker = item.trigger_marker;
-    var markerText = shadow && item.__sharedEnvelope && item.__sharedEnvelope.historical ? "NO CURRENT-SESSION MARKER · Historical EOD snapshot" : marker && marker.status !== "NOT_VERIFIED" ? (marker.label || "NO MARKER") + " · Provisional; confirmation requires a completed EOD close/classification" : "TRIGGER MARKER · Not verified" + (marker && marker.reason ? " · " + marker.reason : "");
-    if (dom.drawerTrendEvidence) dom.drawerTrendEvidence.textContent = evidenceText + " · " + markerText;
+    if (dom.drawerTrendEvidence) dom.drawerTrendEvidence.textContent = evidenceText;
+    renderShadowMarkerEvidence(item, shadow && envelope.historical);
     dom.drawerTradeValue.textContent = shadow ? "Trade value Not applicable" : "Trade value " + fmtNum(item.trade_value);
     dom.drawerChartPH.textContent = "Chart loading…";
     dom.drawerChartPH.style.display = "block"; dom.drawerCanvas.style.display = "none";

@@ -716,15 +716,15 @@ def test_trend_map_renders_finite_trigger_prices_and_fails_closed_with_reason():
     combined = html + shared
     for marker in (
         'UP trigger ', 'DOWN trigger ', 'Not verified', 'trigger_reason',
-        'Number.isFinite', 'class="trigger-price-evidence"',
+        'Number.isFinite', 'class="trigger-summary"',
         'id="drawer-trigger-evidence"', 'shadowTriggerPriceEvidence',
     ):
         assert marker in combined
     assert 'trigger_marker' in html and 'Provisional; confirmation requires a completed EOD close/classification' in html
     assert 'NO CURRENT-SESSION MARKER · Historical EOD snapshot' in html
-    assert 'NO CURRENT-SESSION MARKER · Historical EOD snapshot' in shared
-    assert 'trigger-price-evidence' in html
-    assert 'trigger-price-evidence' not in shared.split('function shadowTriggerPriceEvidence', 1)[0]
+    assert 'Intraday marker · Not shown for historical EOD snapshots' in shared
+    assert 'trigger-summary' in html
+    assert 'trigger-summary' not in shared
 
 
 def test_trigger_price_evidence_is_top_level_and_mobile_contained_for_current_and_historical_rows():
@@ -1516,6 +1516,24 @@ def test_history_trigger_ui_keeps_current_freshness_gate_separate_from_historica
     assert 'data.freshness.status==="HISTORICAL"' in template
     assert 'fetch(path,{cache:"no-store"})' in template
     assert 'selectedSnapshot?"?snapshot="+encodeURIComponent(selectedSnapshot)' in template
+
+
+def test_lean_rows_keep_compact_triggers_and_move_history_below_table():
+    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    drawer = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text(encoding="utf-8")
+    row_renderer = template.split("function compactTriggerValue", 1)[1].split("function setAccordionState", 1)[0]
+    assert "trigger-summary" in row_renderer
+    assert "↑" in row_renderer and "↓" in row_renderer
+    assert "Trend changed" not in row_renderer
+    assert "completed sessions" not in row_renderer
+    assert "markerEvidence(row)" not in row_renderer
+    assert "trigger_reason" not in row_renderer
+    assert 'aria-label="' in row_renderer
+    assert template.index('id="snapshot-banner"') < template.index('id="rows"') < template.index('id="snapshot-history-title"')
+    assert "drawer-marker-evidence" in drawer
+    assert "Intraday marker ·" in drawer
+    assert "trigger_basis" in drawer and "trigger_reason" in drawer
+    assert "actionability:\"NONE\"" in template
 
 
 def test_snapshot_selector_populates_from_successful_responses_and_preserves_history_selection():
