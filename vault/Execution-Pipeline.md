@@ -40,6 +40,12 @@ and `trigger_basis`. Public served runtime, production data freshness,
 browser, deployment/promotion, and rollback acceptance remain `NOT VERIFIED`
 because no deploy, restart, or public-route read-back was exercised.
 
+The bounded producer computes the current EOD classifier and verified trigger
+once per symbol. Historical duration evidence is accepted only through an
+ordered, bounded caller/read-model/replay history seam; when that evidence is
+unavailable, duration remains explicitly `NOT_VERIFIED`/null and no historical
+indicator reconstruction is performed.
+
 ### Trend Route acceptance — 2026-09-17
 
 Trend Route is a symbol-scoped historical evidence extension at

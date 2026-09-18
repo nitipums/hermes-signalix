@@ -259,6 +259,23 @@ def test_publisher_reports_timing_metrics(tmp_path):
     assert loaded["read_path"]["latency_ms"] >= 0
 
 
+def test_publisher_passes_validated_prior_rows_to_current_builder(monkeypatch, tmp_path):
+    publish(tmp_path)
+    captured = {}
+    original = trend_map.build_shadow_report
+
+    def capture(**kwargs):
+        captured["history"] = kwargs.get("history_observations_by_symbol")
+        return original(**kwargs)
+
+    monkeypatch.setattr(trend_map, "build_shadow_report", capture)
+    publisher.publish_shadow_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-12",
+                                        root=tmp_path, published_at="2026-09-13T01:00:00+00:00")
+
+    assert [row["as_of"] for row in captured["history"]["AAA"]] == ["2026-09-11"]
+    assert "BBB" in captured["history"] and captured["history"]["BBB"][0]["status"] == "DATA_BLOCKED"
+
+
 def test_api_default_path_never_invokes_classifier_or_history(monkeypatch, tmp_path):
     publish(tmp_path)
     monkeypatch.setenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", str(tmp_path))
@@ -320,7 +337,7 @@ def test_current_and_historical_api_compact_history_fields_are_read_model_only(m
     assert {key: historical["rows"][0][key] for key in fields} == {
         "trend_changed_date": "2026-09-09", "trend_duration_sessions": 2,
         "up_trigger": 111.0, "down_trigger": 89.0,
-        "trigger_basis": "historical_classifier_evidence",
+        "trigger_basis": "NOT_VERIFIED",
     }
     assert current["status"] == historical["status"] == trend_map.PRODUCTION_READ_ONLY
     assert current["research_only"] is historical["research_only"] is False

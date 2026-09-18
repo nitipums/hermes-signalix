@@ -288,6 +288,34 @@ def _read_validated_snapshot_sessions(root: Path) -> tuple[list[dict[str, Any]],
                     "reason": getattr(error, "reason", None) or "index_invalid"}
 
 
+def _read_validated_prior_history(root: Path, current_as_of: Any) -> dict[str, list[dict[str, Any]]]:
+    """Load ordered prior row observations from validated immutable artifacts."""
+    store = TrendMapEodSnapshotStore(root, validator=_validate_report)
+    if not store.index_path.exists():
+        return {}
+    cutoff = str(current_as_of)[:10] if current_as_of is not None else None
+    try:
+        index = store.read_index()
+        observations: dict[str, list[dict[str, Any]]] = {}
+        for entry in index["sessions"]:
+            if not isinstance(entry, Mapping) or not isinstance(entry.get("as_of"), str):
+                raise SnapshotSelectionError("index_invalid")
+            if cutoff is not None and entry["as_of"] >= cutoff:
+                continue
+            selected = store.select(entry["as_of"])
+            for row in selected["artifact"].get("rows", []):
+                if not isinstance(row, Mapping) or not row.get("symbol"):
+                    raise SnapshotSelectionError("artifact_rows_invalid")
+                observations.setdefault(str(row["symbol"]), []).append(dict(row))
+        for rows in observations.values():
+            rows.sort(key=lambda row: str(row.get("as_of", "")))
+        return observations
+    except Exception:
+        # Prior history is optional evidence; invalid history must not block
+        # publication of a current EOD row or make it look verified.
+        return {}
+
+
 def _attach_snapshot_sessions(report: dict[str, Any], root: Path) -> dict[str, Any]:
     sessions, verification = _read_validated_snapshot_sessions(root)
     report["snapshots"] = sessions
@@ -368,7 +396,9 @@ def publish_shadow_read_model(*, adapter=None, conn=None, as_of=None, root: str 
     """Build, validate, and atomically publish one bounded shadow artifact."""
     root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
     started = time.perf_counter()
-    report = trend_map.build_shadow_report(adapter=adapter, conn=conn, as_of=as_of, source="publisher")
+    prior_history = _read_validated_prior_history(root_path, as_of)
+    report = trend_map.build_shadow_report(adapter=adapter, conn=conn, as_of=as_of, source="publisher",
+                                           history_observations_by_symbol=prior_history)
     if (report.get("status") != trend_map.PRODUCTION_READ_ONLY
             or report.get("research_only") is not False
             or report.get("actionability") != trend_map.ACTIONABILITY

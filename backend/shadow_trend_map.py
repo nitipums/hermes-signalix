@@ -24,7 +24,9 @@ from zoneinfo import ZoneInfo
 
 from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
-from main_trend_mapping import classify_main_trend
+from main_trend_mapping import (build_main_trend_trigger_evidence,
+                                build_trend_history_evidence,
+                                classify_main_trend)
 from mvp_api import resolve_universe
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
@@ -463,6 +465,11 @@ def _blocked(symbol: str, as_of: Any, status: str, note: str, retrieved: int, in
             "status": "DATA_BLOCKED", "data_quality_status": status,
             "classifier_status": None, "machine_lane": None, "broad_state": None,
             "main_trend": None,
+            "trend_changed_date": None, "trend_duration_sessions": None,
+            "up_trigger": None, "down_trigger": None,
+            "up_trigger_operator": ">=", "down_trigger_operator": "<=",
+            "trigger_basis": "NOT_VERIFIED", "trigger_quality": "NOT_VERIFIED",
+            "trigger_reason": "history_unavailable",
             "confidence": None,
             "bars_retrieved": retrieved, "bars_used": 0, "invalid_row_count": invalid,
             "retrieval_cap": retrieval_cap, "cap": retrieval_cap,
@@ -509,7 +516,8 @@ def _quote(clean: list[Mapping[str, Any]] | None) -> dict[str, Any]:
 
 
 def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RETRIEVAL_CAP,
-                    quality_metadata: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                    quality_metadata: Mapping[str, Any] | None = None,
+                    *, history_observations: Any = None) -> dict[str, Any]:
     requested = _rows(frame)
     # The evaluator is a security/data boundary, not merely a consumer of a
     # well-behaved loader.  Keep the newest rows when a caller supplies more
@@ -588,12 +596,33 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
     indicators["latest"]["explicit_support"] = support
     classified = classify_daily_trend(indicators)
     main_trend = classify_main_trend(indicators)
+    current_trigger = build_main_trend_trigger_evidence(indicators, main_trend)
+    main_trend = {**main_trend, **current_trigger}
+    current_trigger_fields = {key: current_trigger.get(key) for key in (
+        "up_trigger", "down_trigger", "up_trigger_operator", "down_trigger_operator",
+        "trigger_basis", "trigger_quality", "trigger_reason", "quality", "reason", "actionability")}
+    prior_history = (list(history_observations)[-30:]
+                     if isinstance(history_observations, (list, tuple)) else [])
+    current_observation = {"as_of": as_of, "main_trend": main_trend,
+                           **current_trigger_fields}
+    supplied_history = isinstance(history_observations, (list, tuple)) and bool(history_observations)
+    has_current_observation = any(
+        isinstance(item, Mapping) and str(item.get("as_of", item.get("date", "")))[:10] == str(as_of)[:10]
+        for item in prior_history
+    )
+    history_input = (prior_history if has_current_observation else prior_history + [current_observation])
+    history = (build_trend_history_evidence(history_input, symbol=symbol)
+               if supplied_history else [])
+    history_evidence = history[-1] if history else {}
     classifier_status = classified["data_status"]
     data_quality_status = "INVALID_DATA" if invalid else classifier_status
-    return {"symbol": symbol, "as_of": str(as_of) if as_of is not None else None,
+    result = {"symbol": symbol, "as_of": str(as_of) if as_of is not None else None,
             "quote": quote,
             "status": "AVAILABLE" if data_quality_status == "AVAILABLE" else "DATA_BLOCKED",
             "data_quality_status": data_quality_status,
+            "trend_changed_date": None, "trend_duration_sessions": None,
+            "history_quality": "NOT_VERIFIED",
+            "history_reason": "ordered_history_unavailable",
             "classifier_status": classifier_status,
             "machine_lane": classified["machine_lane"], "broad_state": classified["broad_state"],
             "main_trend": main_trend,
@@ -615,6 +644,17 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
                 "selected_window": "most_recent_valid_daily_bars",
                 "max_valid_bars": MAX_VALID_BARS},
                 "classification": classified}}
+    for key, value in current_trigger_fields.items():
+        result[key] = value
+    # History contributes only duration/change-date. Current EOD trigger
+    # evidence was calculated once above and must not be replaced by a prior
+    # snapshot's levels.
+    if history_evidence.get("trend_duration_sessions") is not None:
+        result["trend_changed_date"] = history_evidence.get("trend_changed_date")
+        result["trend_duration_sessions"] = history_evidence.get("trend_duration_sessions")
+        result["history_quality"] = history_evidence.get("quality", "NOT_VERIFIED")
+        result["history_reason"] = history_evidence.get("reason")
+    return result
 
 
 def _policy() -> dict[str, Any]:
@@ -643,7 +683,8 @@ def clear_report_cache() -> None:
         _report_cache = None
 
 
-def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, Any]:
+def _build_shadow_report(adapter, conn, symbols, manifest, as_of,
+                         history_observations_by_symbol=None) -> dict[str, Any]:
     started = time.perf_counter()
     policy = _policy()
     output = []
@@ -676,7 +717,8 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                     loaded_value = loaded.get(symbol, ([], None))
                     frame, latest = loaded_value[:2]
                     quality = loaded_value[2] if len(loaded_value) > 2 else None
-                    row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP, quality)
+                    row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP, quality,
+                                          history_observations=(history_observations_by_symbol or {}).get(symbol, []))
                     row["provenance"] = {**PROVENANCE, "source": _frame_source(frame),
                                          "selected_daily_lineage": _selected_lineage(frame),
                                          "adapter": type(adapter).__name__,
@@ -695,7 +737,8 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
                 frame, latest = adapter.load_daily_pit(conn, symbol, as_of)
                 db_read_ms += (time.perf_counter() - db_read_started) * 1000
                 classify_started = time.perf_counter()
-                row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP)
+                row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP,
+                                      history_observations=(history_observations_by_symbol or {}).get(symbol, []))
                 classify_ms += (time.perf_counter() - classify_started) * 1000
                 row["provenance"] = {**PROVENANCE, "source": _frame_source(frame),
                                      "selected_daily_lineage": _selected_lineage(frame),
@@ -726,7 +769,8 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
             "limitations": ["Production-served read-only Daily evidence; no setup, signal, order, alert, broker, or production mutation."]}
 
 
-def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None, snapshot_date=None) -> dict[str, Any]:
+def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None, snapshot_date=None,
+                        history_observations_by_symbol=None) -> dict[str, Any]:
     """Return the published report by default; build from DB only explicitly.
 
     The HTTP surface must not classify or query price history.  ``source`` is
@@ -785,7 +829,8 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None, sna
                     cached = deepcopy(_report_cache[2])
                     cached["cache"] = _report_cache_metadata("warm", as_of, policy)
                     return cached
-        report = _build_shadow_report(adapter, conn, symbols, manifest, as_of)
+        report = _build_shadow_report(adapter, conn, symbols, manifest, as_of,
+                                      history_observations_by_symbol)
         if use_cache and report["status"] == PRODUCTION_READ_ONLY:
             with _report_cache_lock:
                 _report_cache = (time.monotonic() + REPORT_CACHE_TTL_SECONDS, key, report)
@@ -1043,7 +1088,8 @@ def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]
     projected = deepcopy(dict(report))
     history_trigger_fields = (
         "trend_changed_date", "trend_duration_sessions", "up_trigger",
-        "down_trigger", "trigger_basis",
+        "down_trigger", "up_trigger_operator", "down_trigger_operator",
+        "trigger_basis", "trigger_quality", "trigger_reason",
     )
     compact_rows = []
     for original in report.get("rows", []) if isinstance(report.get("rows"), list) else []:
@@ -1062,7 +1108,7 @@ def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]
         else:
             row["main_trend"] = None
         for key in history_trigger_fields:
-            if key in original:
+            if key in original and original.get(key) is not None:
                 row[key] = deepcopy(original.get(key))
             elif isinstance(main_trend, Mapping) and key in main_trend:
                 row[key] = deepcopy(main_trend.get(key))

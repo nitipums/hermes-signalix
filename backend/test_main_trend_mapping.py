@@ -1,6 +1,7 @@
 """Owner-labelled diagnostic fixtures for Issue #32 Main Trend calibration."""
 
 import pytest
+import main_trend_mapping as subject
 
 from main_trend_mapping import (
     MA_PERIODS,
@@ -86,6 +87,98 @@ def test_canonical_main_trend_evidence_has_no_legacy_ma_periods():
     assert set(result["slopes_20d_pct"]) == {"5", "10", "20", "50", "100", "200"}
     assert "short_stack_vs_ma50_pct" in result
     assert not any(key in result for key in ("ma60", "ma120", "ma240", "ma260"))
+
+
+def transition_snapshot(close=100.0):
+    ma = {str(period): 100.0 for period in MA_PERIODS}
+    return {"latest": {"close": close, "ma": ma},
+            "series": {"close": [close] * 22,
+                        "ma": {period: [100.0] * 22 for period in ma}},
+            "timeframe": "1D"}
+
+
+def test_classifier_transition_triggers_are_nearest_inclusive_and_verified(monkeypatch):
+    def fake_classifier(snapshot):
+        close = float(snapshot["latest"]["close"])
+        return {"main_trend": 1 if close >= 110 else 3 if close <= 90 else 2}
+
+    monkeypatch.setattr(subject, "classify_main_trend", fake_classifier)
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
+               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+    result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
+    assert result["up_trigger"] == pytest.approx(110.0)
+    assert result["down_trigger"] == pytest.approx(90.0)
+    assert result["trigger_quality"] == "VERIFIED"
+    assert result["trigger_basis"].startswith("main-trend-classifier-transition-v1")
+
+
+def test_classifier_transition_triggers_fail_closed_for_no_transition_and_partial_evidence():
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "PARTIAL",
+               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+    partial = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
+    assert partial["trigger_quality"] == "NOT_VERIFIED"
+    assert partial["trigger_reason"] == "partial_or_missing_classifier_evidence"
+
+
+def test_classifier_transition_triggers_fail_closed_when_classifier_never_changes(monkeypatch):
+    monkeypatch.setattr(subject, "classify_main_trend", lambda snapshot: {"main_trend": 2})
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
+               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+    result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
+    assert result["up_trigger"] is None and result["down_trigger"] is None
+    assert result["trigger_reason"] == "no_verified_classifier_transition_in_bounded_domain"
+
+
+@pytest.mark.parametrize(
+    ("direction", "expected", "missing"),
+    [("up", 110.0, "down"), ("down", 90.0, "up")],
+)
+def test_classifier_transition_triggers_are_directionally_independent(monkeypatch, direction, expected, missing):
+    def fake_classifier(snapshot):
+        close = float(snapshot["latest"]["close"])
+        if direction == "up":
+            return {"main_trend": 1 if close >= 110 else 2}
+        return {"main_trend": 3 if close <= 90 else 2}
+
+    monkeypatch.setattr(subject, "classify_main_trend", fake_classifier)
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
+               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+    result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
+
+    assert result[f"{direction}_trigger"] == pytest.approx(expected)
+    assert result[f"{missing}_trigger"] is None
+    assert result["trigger_quality"] == "PARTIAL"
+    assert result["quality"] == "PARTIAL"
+    assert result["trigger_reason"] == f"{missing}_transition_not_verified"
+    assert result["trigger_basis"].startswith("main-trend-classifier-transition-v1")
+
+
+def test_classifier_transition_triggers_never_use_non_finite_search_evidence():
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
+               "moving_averages": {"5": float("nan")}}
+    result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
+    assert result["up_trigger"] is None
+    assert result["down_trigger"] is None
+    assert result["trigger_quality"] == "NOT_VERIFIED"
+
+
+def test_transition_probe_is_shallow_copy_on_write_and_does_not_look_ahead():
+    snapshot = transition_snapshot()
+    snapshot["series"]["ma"]["5"][-1] = 101.0
+    snapshot["latest"]["evidence"] = {"source": "same-object"}
+
+    candidate = subject._trigger_snapshot(snapshot, 123.0)
+
+    assert candidate is not snapshot
+    assert candidate["latest"] is not snapshot["latest"]
+    assert candidate["series"] is not snapshot["series"]
+    assert candidate["series"]["close"] is not snapshot["series"]["close"]
+    assert candidate["series"]["ma"] is snapshot["series"]["ma"]
+    assert candidate["latest"]["evidence"] is snapshot["latest"]["evidence"]
+    assert candidate["latest"]["close"] == 123.0
+    assert candidate["series"]["close"][-1] == 123.0
+    assert snapshot["latest"]["close"] == 100.0
+    assert snapshot["series"]["close"][-1] == 100.0
 
 
 # Literal values copied from /tmp/maintrend_feedback_api.json.  These are

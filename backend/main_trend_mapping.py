@@ -21,6 +21,10 @@ MEDIUM_PERIOD = 50
 LONG_PERIODS = (100, 200)
 SHORT_PERIODS = (5, 10, 20)
 PRODUCTION_READ_ONLY = "PRODUCTION_READ_ONLY"
+TRIGGER_POLICY_VERSION = "main-trend-classifier-transition-v1"
+TRIGGER_SEARCH_STEPS = 128
+TRIGGER_REFINEMENT_STEPS = 45
+TRIGGER_PRECISION = 10
 
 
 def _number(value: Any) -> float | None:
@@ -339,6 +343,140 @@ def classify_main_trend(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
 build_main_trend_evidence = classify_main_trend
 
 
+def _trigger_snapshot(snapshot: Mapping[str, Any], close: float) -> dict[str, Any]:
+    """Build a copy-on-write view for one hypothetical latest close.
+
+    Classifier transition probes must preserve every non-close evidence value,
+    but only the top-level mapping, ``latest`` mapping, ``series`` mapping, and
+    close-series endpoint need to be detached.  In particular, the indicator
+    history and MA series remain shared and are never recursively copied.
+    """
+    candidate = dict(snapshot)
+    latest = candidate.get("latest")
+    if isinstance(latest, Mapping):
+        latest = dict(latest)
+        latest["close"] = close
+        candidate["latest"] = latest
+    else:
+        candidate["close"] = close
+    series = candidate.get("series")
+    if isinstance(series, Mapping):
+        series = dict(series)
+        closes = series.get("close")
+        if isinstance(closes, (list, tuple)) and closes:
+            closes = list(closes)
+            closes[-1] = close
+            series["close"] = closes
+        candidate["series"] = series
+    return candidate
+
+
+def _trigger_unverified(reason: str) -> dict[str, Any]:
+    return {
+        "up_trigger": None,
+        "down_trigger": None,
+        "up_trigger_operator": ">=",
+        "down_trigger_operator": "<=",
+        "trigger_basis": "NOT_VERIFIED",
+        "trigger_quality": "NOT_VERIFIED",
+        "trigger_reason": reason,
+        "quality": "NOT_VERIFIED",
+        "reason": reason,
+        "actionability": "NONE",
+    }
+
+
+def _transition_level(snapshot: Mapping[str, Any], current_close: float, current_trend: int,
+                     *, direction: str, lower: float, upper: float) -> float | None:
+    """Find and verify the nearest classifier transition in one direction."""
+    increasing = direction == "up"
+
+    def changed(level: float) -> bool:
+        result = classify_main_trend(_trigger_snapshot(snapshot, level))
+        trend = _history_trend(result.get("main_trend"))
+        return trend is not None and ((trend < current_trend) if increasing else (trend > current_trend))
+
+    start, end = (current_close, upper) if increasing else (current_close, lower)
+    if (not _number(start) or not _number(end)
+            or (increasing and end <= start) or (not increasing and end >= start)):
+        return None
+    step = (end - start) / TRIGGER_SEARCH_STEPS
+    previous = start
+    for index in range(1, TRIGGER_SEARCH_STEPS + 1):
+        level = start + step * index
+        if changed(level):
+            lo, hi = (previous, level) if increasing else (level, previous)
+            for _ in range(TRIGGER_REFINEMENT_STEPS):
+                middle = (lo + hi) / 2.0
+                if changed(middle):
+                    if increasing:
+                        hi = middle
+                    else:
+                        lo = middle
+                else:
+                    if increasing:
+                        lo = middle
+                    else:
+                        hi = middle
+            candidate = round(hi if increasing else lo, TRIGGER_PRECISION)
+            if not changed(candidate):
+                candidate = hi if increasing else lo
+            verified = changed(candidate)
+            if verified and (candidate >= current_close if increasing else candidate <= current_close):
+                return candidate
+            return None
+        previous = level
+    return None
+
+
+def build_main_trend_trigger_evidence(snapshot: Mapping[str, Any] | None,
+                                      classification: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Calculate verified EOD classifier-transition boundaries.
+
+    Only the hypothetical latest close changes.  The bounded search is
+    deterministic and every returned level is reclassified before publication.
+    """
+    source = snapshot if isinstance(snapshot, Mapping) else {}
+    current = classification if isinstance(classification, Mapping) else classify_main_trend(source)
+    current_close = _number(current.get("close"))
+    current_trend = _history_trend(current.get("main_trend"))
+    values = current.get("moving_averages")
+    ma_values = [_number(value) for value in values.values()] if isinstance(values, Mapping) else []
+    if current.get("evidence_quality") != "FULL":
+        return _trigger_unverified("partial_or_missing_classifier_evidence")
+    if current_close is None or current_trend is None or not ma_values or any(value is None or value <= 0 for value in ma_values):
+        return _trigger_unverified("non_finite_or_insufficient_search_evidence")
+    lower = max(min([current_close, *ma_values]) * 0.5, 10 ** -TRIGGER_PRECISION)
+    upper = max([current_close, *ma_values]) * 1.5
+    if not math.isfinite(lower) or not math.isfinite(upper) or lower >= current_close or upper <= current_close:
+        return _trigger_unverified("insufficient_search_domain")
+    up = _transition_level(source, current_close, current_trend, direction="up", lower=lower, upper=upper)
+    down = _transition_level(source, current_close, current_trend, direction="down", lower=lower, upper=upper)
+    if up is None and down is None:
+        return _trigger_unverified("no_verified_classifier_transition_in_bounded_domain")
+    missing = []
+    if up is None:
+        missing.append("up")
+    if down is None:
+        missing.append("down")
+    reason = f"{missing[0]}_transition_not_verified" if len(missing) == 1 else "incomplete_classifier_transition_evidence"
+    return {
+        "up_trigger": up,
+        "down_trigger": down,
+        "up_trigger_operator": ">=",
+        "down_trigger_operator": "<=",
+        "trigger_basis": f"{TRIGGER_POLICY_VERSION};hold_all_evidence_except_latest_close",
+        "trigger_quality": "VERIFIED" if not missing else "PARTIAL",
+        "trigger_reason": None if not missing else reason,
+        "quality": "VERIFIED" if not missing else "PARTIAL",
+        "reason": None if not missing else reason,
+        "actionability": "NONE",
+    }
+
+
+build_classifier_transition_triggers = build_main_trend_trigger_evidence
+
+
 def _history_date(value: Any) -> date | None:
     if isinstance(value, datetime):
         return value.date()
@@ -446,12 +584,16 @@ def build_trend_history_evidence(observations: Any, *, symbol: str | None = None
         up_trigger = _history_trigger(observation, "up_trigger")
         down_trigger = _history_trigger(observation, "down_trigger")
         trigger_basis = observation.get("trigger_basis")
-        if up_trigger is None or down_trigger is None:
-            trigger_reason = ("authoritative_trigger_fields_unavailable"
-                              if up_trigger is None and down_trigger is None
-                              else "authoritative_trigger_fields_incomplete")
+        missing_directions = [direction for direction, value in (
+            ("up", up_trigger), ("down", down_trigger)) if value is None]
+        if len(missing_directions) == 2:
+            trigger_reason = "authoritative_trigger_fields_unavailable"
             trigger_quality = "NOT_VERIFIED"
             trigger_basis = "NOT_VERIFIED"
+        elif missing_directions:
+            trigger_reason = f"{missing_directions[0]}_trigger_not_verified"
+            trigger_quality = "PARTIAL"
+            trigger_basis = str(trigger_basis or "supplied_classifier_evidence")
         else:
             trigger_reason = None
             trigger_quality = "VERIFIED"

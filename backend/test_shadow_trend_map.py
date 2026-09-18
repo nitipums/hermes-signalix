@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
+import time
 
 import pytest
 
@@ -27,6 +28,113 @@ def test_policy_window_and_prior_support_excludes_current():
     assert result["main_trend"]["main_trend"] in (1, 2, 3, 4)
     assert result["main_trend"]["source_timeframe"] == "1D"
     assert result["main_trend"]["actionability"] == "NONE"
+
+
+def test_current_eod_path_computes_indicators_once_and_marks_missing_history_not_verified(monkeypatch):
+    calls = 0
+    original = subject.build_technical_indicators
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(subject, "build_technical_indicators", counted)
+    result = subject.evaluate_symbol("AAA", bars(75), "2026-09-11")
+
+    assert calls == 1
+    assert result["trend_duration_sessions"] is None
+    assert result["history_quality"] == "NOT_VERIFIED"
+    assert result["history_reason"] == "ordered_history_unavailable"
+    assert result["main_trend"]["trigger_basis"].startswith("main-trend-classifier-transition-v1") or result["main_trend"]["trigger_basis"] == "NOT_VERIFIED"
+
+
+def test_supplied_ordered_history_is_consumed_without_recomputing_indicators():
+    history = [
+        {"as_of": "2026-09-09", "main_trend": 2, "up_trigger": 110, "down_trigger": 90},
+        {"as_of": "2026-09-10", "main_trend": 2, "up_trigger": 111, "down_trigger": 89},
+        {"as_of": "2026-09-11", "main_trend": 3, "up_trigger": 112, "down_trigger": 88},
+    ]
+    result = subject.evaluate_symbol("AAA", bars(75), "2026-09-11", history_observations=history)
+
+    assert result["trend_changed_date"] == "2026-09-11"
+    assert result["trend_duration_sessions"] == 1
+    assert result["history_quality"] == "VERIFIED"
+
+
+def test_prior_history_adds_duration_without_replacing_current_trigger_fields(monkeypatch):
+    monkeypatch.setattr(subject, "build_main_trend_trigger_evidence", lambda *_: {
+        "up_trigger": 150.0, "down_trigger": None,
+        "up_trigger_operator": ">=", "down_trigger_operator": "<=",
+        "trigger_basis": "current-test-basis", "trigger_quality": "PARTIAL",
+        "trigger_reason": "down_transition_not_verified", "quality": "PARTIAL",
+        "reason": "down_transition_not_verified", "actionability": "NONE",
+    })
+    history = [
+        {"as_of": "2026-09-09", "main_trend": 3, "up_trigger": 120.0, "down_trigger": 80.0},
+        {"as_of": "2026-09-10", "main_trend": 3, "up_trigger": 121.0, "down_trigger": 79.0},
+    ]
+    result = subject.evaluate_symbol("AAA", bars(75), "2026-09-11", history_observations=history)
+
+    assert result["trend_duration_sessions"] == 3
+    assert result["trend_changed_date"] == "2026-09-09"
+    assert result["up_trigger"] == 150.0
+    assert result["down_trigger"] is None
+    assert result["trigger_quality"] == "PARTIAL"
+
+
+def test_compact_projection_exposes_direction_quality_and_reason():
+    row = {"symbol": "AAA", "main_trend": {"main_trend": 2},
+           "up_trigger": 150.0, "down_trigger": None,
+           "up_trigger_operator": ">=", "down_trigger_operator": "<=",
+           "trigger_basis": "classifier-transition-v1", "trigger_quality": "PARTIAL",
+           "trigger_reason": "down_transition_not_verified"}
+    compact = subject.compact_public_trend_map_report({"rows": [row]})
+    assert {key: compact["rows"][0][key] for key in (
+        "up_trigger", "down_trigger", "up_trigger_operator", "down_trigger_operator",
+        "trigger_basis", "trigger_quality", "trigger_reason")} == {
+        "up_trigger": 150.0, "down_trigger": None, "up_trigger_operator": ">=",
+        "down_trigger_operator": "<=", "trigger_basis": "classifier-transition-v1",
+        "trigger_quality": "PARTIAL", "trigger_reason": "down_transition_not_verified",
+    }
+
+
+def test_scale_smoke_237_synthetic_rows_is_bounded_and_batch_only(monkeypatch):
+    """SCALE SMOKE ONLY: synthetic 237-row producer path, not market evidence."""
+    symbols = [f"S{i:03d}" for i in range(237)]
+    frames = {symbol: bars(60) for symbol in symbols}
+
+    class ScaleSmokeAdapter:
+        db_reads = 0
+
+        def load_daily_pit_batch(self, conn, requested_symbols, as_of):
+            assert requested_symbols == symbols
+            return {symbol: (frames[symbol], as_of, {
+                "quality_scan": "scale_smoke_synthetic",
+                "invalid_count": 0,
+                "quality_established": True,
+                "full_history_claim": False,
+            }) for symbol in requested_symbols}
+
+    original = subject.build_technical_indicators
+    calls = 0
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(subject, "build_technical_indicators", counted)
+    started = time.perf_counter()
+    report = subject._build_shadow_report(
+        ScaleSmokeAdapter(), object(), symbols, {"universe_filter": subject.UNIVERSE}, "2026-09-11")
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 20.0
+    assert calls == len(symbols)
+    assert report["status"] == subject.PRODUCTION_READ_ONLY
+    assert len(report["rows"]) == len(symbols)
+    assert ScaleSmokeAdapter.db_reads == 0
 
 
 def test_retrieval_cap_fails_closed_when_it_cannot_establish_full_valid_window():
@@ -421,7 +529,8 @@ def test_compact_public_projection_preserves_envelope_rows_and_display_evidence(
         "symbol", "as_of", "status", "data_quality_status", "classifier_status",
         "confidence", "machine_lane", "broad_state", "main_trend", "quote",
         "provenance", "note", "trend_changed_date", "trend_duration_sessions",
-        "up_trigger", "down_trigger", "trigger_basis",
+        "up_trigger", "down_trigger", "up_trigger_operator", "down_trigger_operator",
+        "trigger_basis", "trigger_quality", "trigger_reason",
     }
     assert "diagnostic_trace" not in compact["rows"][0]
     assert "evidence" not in compact["rows"][0]
@@ -487,13 +596,13 @@ def test_compact_public_projection_keeps_missing_and_explicit_not_verified_field
     }
 
 
-def test_compact_public_projection_prefers_explicit_top_level_null_over_nested_value():
+def test_compact_public_projection_uses_nested_legacy_value_when_top_level_is_unset():
     row = {"symbol": "AAA", "trend_duration_sessions": None,
            "main_trend": {"trend_duration_sessions": 9}}
 
     compact = subject.compact_public_trend_map_report({"rows": [row]})
 
-    assert compact["rows"][0]["trend_duration_sessions"] is None
+    assert compact["rows"][0]["trend_duration_sessions"] == 9
 
 
 def test_api_route_serializes_compact_public_projection(monkeypatch):
