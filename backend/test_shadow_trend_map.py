@@ -711,7 +711,7 @@ function Section(trend) {
   return section;
 }
 const elements = {};
-["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id"].forEach(function (id) {
+["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id", "snapshot-banner"].forEach(function (id) {
   elements[id] = new Element(id);
 });
 Object.defineProperty(elements.rows, "innerHTML", {
@@ -814,7 +814,7 @@ def test_shadow_table_orders_display_suffixes_before_quote_and_symbol_ties():
     harness = r'''
 const elements = {};
 function Element(id) { this.id = id; this.value = ""; this.hidden = false; this.textContent = ""; this.classList = {toggle: function () {}}; this.setAttribute = function () {}; this.addEventListener = function () {}; this.querySelectorAll = function () { return []; }; }
-["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id"].forEach(function (id) { elements[id] = new Element(id); });
+["search", "main-trend", "summary", "error", "retry", "reload", "rows", "theme-toggle", "shown-count", "declared-count", "as-of", "freshness", "report-status", "report-freshness", "policy-id", "snapshot-banner"].forEach(function (id) { elements[id] = new Element(id); });
 Object.defineProperty(elements.rows, "innerHTML", { set: function (value) {
   this.renderedSymbols = Array.from(value.matchAll(/data-symbol="([^"]+)"/g), function (match) { return match[1]; });
 } });
@@ -1379,7 +1379,7 @@ def test_history_trigger_ui_keeps_current_freshness_gate_separate_from_historica
 def test_snapshot_selector_populates_from_successful_responses_and_preserves_history_selection():
     template = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
     inline = template.split("<script>", 1)[1].split("</script>", 1)[0]
-    assert 'function render(){renderSnapshotOptions(report);' in inline
+    assert 'function render(){renderSnapshotOptions(report);renderSnapshotBanner();' in inline
     assert 'function snapshotSessions(data){var values=data&&data.snapshots;' in inline
     assert "snapshot.sessions" not in inline
     harness = r'''
@@ -1446,12 +1446,14 @@ const context = {
 vm.runInNewContext(INLINE, context);
 setTimeout(function () {
   if (options.join(",") !== ",2026-09-15,2026-09-14,2026-09-11") process.exit(1);
+  if (elements["snapshot-banner"].innerHTML.indexOf("Latest EOD") < 0 || elements["snapshot-banner"].innerHTML.indexOf("0 rows in this snapshot") < 0 || elements["snapshot-banner"].innerHTML.indexOf("Current session markers are provisional") < 0) process.exit(6);
   elements["snapshot-select"].value = "2026-09-14";
   elements["snapshot-select"].onchange();
   setTimeout(function () {
     if (requests.join("|") !== "/api/trend-map|/api/trend-map?snapshot=2026-09-14") process.exit(2);
     if (options.join(",") !== ",2026-09-15,2026-09-14,2026-09-11") process.exit(3);
     if (elements["snapshot-select"].value !== "2026-09-14") process.exit(4);
+    if (elements["snapshot-banner"].innerHTML.indexOf("Historical EOD snapshot · 2026-09-14") < 0 || elements["snapshot-banner"].innerHTML.indexOf("0 rows in this snapshot") < 0 || elements["snapshot-banner"].innerHTML.indexOf("Historical EOD only; current-session quote and trigger markers are not shown.") < 0) process.exit(7);
     elements["snapshot-select"].value = "";
     elements["snapshot-select"].onchange();
     setTimeout(function () {
