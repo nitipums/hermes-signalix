@@ -269,6 +269,64 @@ def test_api_default_path_never_invokes_classifier_or_history(monkeypatch, tmp_p
     assert result["counts"] == {"declared": 3, "evaluated": 3, "returned": 3, "blocked": 2}
 
 
+def test_current_and_historical_api_compact_history_fields_are_read_model_only(monkeypatch, tmp_path):
+    original = trend_map.build_shadow_report
+
+    def report_with_history_fields(**kwargs):
+        report = original(adapter=Adapter(), conn=object(), as_of=kwargs.get("as_of"),
+                          source="publisher")
+        row = report["rows"][0]
+        if kwargs.get("as_of") == "2026-09-10":
+            row["main_trend"].update({
+                "trend_changed_date": "2026-09-09",
+                "trend_duration_sessions": 2,
+                "up_trigger": 111.0,
+                "down_trigger": 89.0,
+                "trigger_basis": "historical_classifier_evidence",
+            })
+        else:
+            row.update({
+                "trend_changed_date": "2026-09-08",
+                "trend_duration_sessions": 3,
+                "up_trigger": 112.0,
+                "down_trigger": 88.0,
+                "trigger_basis": "current_classifier_evidence",
+            })
+        return report
+
+    monkeypatch.setattr(trend_map, "build_shadow_report", report_with_history_fields)
+    publisher.publish_shadow_read_model(root=tmp_path, as_of="2026-09-10",
+                                        published_at="2026-09-12T01:00:00+00:00")
+    publisher.publish_shadow_read_model(root=tmp_path, as_of="2026-09-11",
+                                        published_at="2026-09-12T02:00:00+00:00")
+    monkeypatch.setenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", str(tmp_path))
+    monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
+    monkeypatch.setattr(trend_map, "classify_daily_trend",
+                        lambda *_: (_ for _ in ()).throw(AssertionError("classifier called")))
+    monkeypatch.setattr(trend_map.BackendDailyAdapter, "load_daily_pit_batch",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("history queried")))
+    monkeypatch.setattr(trend_map, "build_shadow_report", original)
+
+    current = trend_map.build_shadow_report()
+    historical = trend_map.build_shadow_report(snapshot_date="2026-09-10")
+
+    fields = ("trend_changed_date", "trend_duration_sessions", "up_trigger",
+              "down_trigger", "trigger_basis")
+    assert {key: current["rows"][0][key] for key in fields} == {
+        "trend_changed_date": "2026-09-08", "trend_duration_sessions": 3,
+        "up_trigger": 112.0, "down_trigger": 88.0,
+        "trigger_basis": "current_classifier_evidence",
+    }
+    assert {key: historical["rows"][0][key] for key in fields} == {
+        "trend_changed_date": "2026-09-09", "trend_duration_sessions": 2,
+        "up_trigger": 111.0, "down_trigger": 89.0,
+        "trigger_basis": "historical_classifier_evidence",
+    }
+    assert current["status"] == historical["status"] == trend_map.PRODUCTION_READ_ONLY
+    assert current["research_only"] is historical["research_only"] is False
+    assert current["actionability"] == historical["actionability"] == "NONE"
+
+
 def test_api_exposes_only_validated_snapshot_index_sessions_without_history(monkeypatch, tmp_path):
     monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
     publish(tmp_path)

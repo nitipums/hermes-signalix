@@ -420,7 +420,8 @@ def test_compact_public_projection_preserves_envelope_rows_and_display_evidence(
     assert set(compact["rows"][0]) == {
         "symbol", "as_of", "status", "data_quality_status", "classifier_status",
         "confidence", "machine_lane", "broad_state", "main_trend", "quote",
-        "provenance", "note",
+        "provenance", "note", "trend_changed_date", "trend_duration_sessions",
+        "up_trigger", "down_trigger", "trigger_basis",
     }
     assert "diagnostic_trace" not in compact["rows"][0]
     assert "evidence" not in compact["rows"][0]
@@ -431,6 +432,68 @@ def test_compact_public_projection_preserves_envelope_rows_and_display_evidence(
     assert compact["counts"] == report["counts"]
     assert compact["read_path"] == report["read_path"]
     assert "diagnostic_trace" in row
+
+
+def test_compact_public_projection_preserves_history_and_trigger_fields_from_row():
+    row = {"symbol": "AAA", "main_trend": {"main_trend": 2},
+           "trend_changed_date": "2026-09-01", "trend_duration_sessions": 4,
+           "up_trigger": 110.5, "down_trigger": 90.25,
+           "trigger_basis": "supplied_classifier_evidence"}
+
+    compact = subject.compact_public_trend_map_report({"rows": [row]})
+
+    assert {key: compact["rows"][0][key] for key in (
+        "trend_changed_date", "trend_duration_sessions", "up_trigger",
+        "down_trigger", "trigger_basis")} == {
+        "trend_changed_date": "2026-09-01", "trend_duration_sessions": 4,
+        "up_trigger": 110.5, "down_trigger": 90.25,
+        "trigger_basis": "supplied_classifier_evidence",
+    }
+
+
+def test_compact_public_projection_promotes_nested_main_trend_history_and_triggers():
+    row = {"symbol": "AAA", "main_trend": {
+        "main_trend": 2, "trend_changed_date": "2026-09-02",
+        "trend_duration_sessions": 2, "up_trigger": 111.0,
+        "down_trigger": 89.0, "trigger_basis": "classifier_evidence",
+    }}
+
+    compact = subject.compact_public_trend_map_report({"rows": [row]})
+
+    assert {key: compact["rows"][0][key] for key in (
+        "trend_changed_date", "trend_duration_sessions", "up_trigger",
+        "down_trigger", "trigger_basis")} == {
+        "trend_changed_date": "2026-09-02", "trend_duration_sessions": 2,
+        "up_trigger": 111.0, "down_trigger": 89.0,
+        "trigger_basis": "classifier_evidence",
+    }
+
+
+def test_compact_public_projection_keeps_missing_and_explicit_not_verified_fields():
+    row = {"symbol": "AAA", "main_trend": {
+        "trend_changed_date": None, "trend_duration_sessions": None,
+        "up_trigger": None, "down_trigger": None,
+        "trigger_basis": "NOT_VERIFIED", "trigger_reason": "missing_evidence",
+    }}
+
+    compact = subject.compact_public_trend_map_report({"rows": [row]})
+
+    assert {key: compact["rows"][0][key] for key in (
+        "trend_changed_date", "trend_duration_sessions", "up_trigger",
+        "down_trigger", "trigger_basis")} == {
+        "trend_changed_date": None, "trend_duration_sessions": None,
+        "up_trigger": None, "down_trigger": None,
+        "trigger_basis": "NOT_VERIFIED",
+    }
+
+
+def test_compact_public_projection_prefers_explicit_top_level_null_over_nested_value():
+    row = {"symbol": "AAA", "trend_duration_sessions": None,
+           "main_trend": {"trend_duration_sessions": 9}}
+
+    compact = subject.compact_public_trend_map_report({"rows": [row]})
+
+    assert compact["rows"][0]["trend_duration_sessions"] is None
 
 
 def test_api_route_serializes_compact_public_projection(monkeypatch):

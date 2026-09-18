@@ -1041,6 +1041,10 @@ def _compact_provenance(provenance: Mapping[str, Any] | None) -> dict[str, Any]:
 def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]:
     """Return a compact public copy while preserving the report envelope."""
     projected = deepcopy(dict(report))
+    history_trigger_fields = (
+        "trend_changed_date", "trend_duration_sessions", "up_trigger",
+        "down_trigger", "trigger_basis",
+    )
     compact_rows = []
     for original in report.get("rows", []) if isinstance(report.get("rows"), list) else []:
         if not isinstance(original, Mapping):
@@ -1057,6 +1061,15 @@ def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]
                 "source_timeframe", "as_of", "policy_version")}
         else:
             row["main_trend"] = None
+        for key in history_trigger_fields:
+            if key in original:
+                row[key] = deepcopy(original.get(key))
+            elif isinstance(main_trend, Mapping) and key in main_trend:
+                row[key] = deepcopy(main_trend.get(key))
+            else:
+                # Keep unavailable source evidence explicit in the public
+                # contract; this projection never calculates or infers it.
+                row[key] = None
         row["provenance"] = _compact_provenance(original.get("provenance"))
         compact_rows.append(row)
     projected["rows"] = compact_rows
