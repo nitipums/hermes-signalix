@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from mvp_chart_db import _fetch_candles
+from mvp_chart_db import _chart_source, _fetch_candles
 
 
 class _Cursor:
@@ -15,6 +15,12 @@ class _Cursor:
 
     def fetchall(self):
         return list(self.rows)
+
+
+def test_chart_source_matches_timeframe_storage_boundary():
+    assert _chart_source("60M") == "intraday_price_data"
+    for timeframe in ("1D", "1W", "1M"):
+        assert _chart_source(timeframe) == "price_data"
 
 
 def test_week_and_month_candles_are_ascending():

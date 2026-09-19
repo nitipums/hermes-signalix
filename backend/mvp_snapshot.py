@@ -1,23 +1,88 @@
 """Canonical MVP snapshot built from one deterministic scan projection."""
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 CONTRACT_VERSION = "signalix.mvp.v1"
 
-# Legacy projection fields are not canonical MVP decision data.  Keeping them
-# in the artifact lets an old group/date leak beside the current Stage/Phase.
+# Legacy projection fields are not canonical MVP decision data. Keeping them
+# in compatibility artifacts preserves audit evidence without letting an old
+# group/date leak beside the canonical setup-candidate decision.
 LEGACY_PROJECTION_FIELDS = frozenset({
     "evidence_summary",
     "old_group_mapping",
     "lifecycle_badge",
 })
 
+CANONICAL_SETUP_FIELDS = frozenset({
+    "symbol", "as_of", "data_status", "trend", "wave", "setup",
+    "context", "bonus_evidence", "provenance",
+})
+
+# These fields describe the retired dashboard/VCP taxonomy.  They may remain
+# useful to audit consumers, but must not compete with setup-candidate
+# ``decision``/``wave``/``setup`` on the primary MVP item.
+LEGACY_PRIMARY_FIELDS = frozenset({
+    "group", "baseGroup", "primary_group", "primaryGroup", "primary_label",
+    "primaryLabel", "primary_action", "primaryAction", "status", "action",
+    "primary_state", "primaryState",
+    "lifecycle_badge", "lifecycleState", "action_queue", "actionQueue",
+    "setup_proximity", "setupProximity", "legacy_alias", "legacyAlias",
+    "evidence_summary", "old_group_mapping",
+})
+
+
+def _is_setup_candidate(item: dict) -> bool:
+    return (CANONICAL_SETUP_FIELDS <= set(item)
+            and bool({"decision", "decision_lane"}.intersection(item)))
+
+
+def _nest_legacy_fields(item: dict) -> dict:
+    """Move competing labels aside while retaining their exact raw values."""
+    result = copy.deepcopy(item)
+    audit = dict(result.get("audit") or {})
+    legacy = dict(audit.get("legacy_projection") or {})
+    for key in LEGACY_PRIMARY_FIELDS:
+        if key in result:
+            legacy[key] = result.pop(key)
+    if legacy:
+        audit["legacy_projection"] = legacy
+
+    # A producer may still attach the old VCP detector directly.  Keep it as
+    # optional supporting evidence, never as a second primary decision.
+    bonus = dict(result.get("bonus_evidence") or {})
+    if "vcp" in result:
+        vcp = result.pop("vcp")
+        if "vcp" in bonus:
+            audit["legacy_vcp"] = copy.deepcopy(vcp)
+        else:
+            bonus["vcp"] = vcp
+    if "evidence" in result:
+        raw_evidence = result.pop("evidence")
+        vcp = bonus.setdefault("vcp", {})
+        if isinstance(vcp, dict):
+            vcp.setdefault("raw_evidence", raw_evidence)
+        else:
+            audit.setdefault("raw_evidence", {})["evidence"] = raw_evidence
+    result["bonus_evidence"] = bonus
+    if audit:
+        audit["raw_item"] = copy.deepcopy(item)
+        result["audit"] = audit
+    return result
+
 
 def sanitize_mvp_item(raw: dict) -> dict:
-    """Keep canonical scan fields; remove stale legacy presentation labels."""
+    """Sanitize canonical items without deleting legacy/raw audit evidence.
+
+    Legacy-only rows retain their historical shape for the retired/audit
+    callers.  Once a row is a setup-candidate item, however, the canonical
+    contract is the only primary surface and retired labels are nested.
+    """
     if not isinstance(raw, dict):
         raise ValueError("MVP item must be an object")
+    if _is_setup_candidate(raw):
+        return _nest_legacy_fields(raw)
     return {key: value for key, value in raw.items() if key not in LEGACY_PROJECTION_FIELDS}
 
 

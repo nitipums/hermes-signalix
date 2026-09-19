@@ -35,7 +35,7 @@ def _count(needle: str) -> int:
 
 
 class TestDailyShortlistDefaultSurface:
-    """The default dashboard.html must be the Daily Shortlist, not the full stage screener."""
+    """The default MVP surface is the Daily Shortlist, not the full screener."""
 
     def test_default_page_title_reflects_shortlist(self):
         assert "Daily Shortlist" in TEMPLATE or "daily-shortlist" in TEMPLATE.lower()

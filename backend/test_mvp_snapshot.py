@@ -17,6 +17,29 @@ def test_build_mvp_snapshot_has_stable_root_contract():
     assert "dashboard_meta" not in result
 
 
+def test_snapshot_preserves_additive_vcp_decision_and_raw_evidence():
+    from mvp_snapshot import build_mvp_snapshot
+
+    decision = {
+        "state": "READY",
+        "decision": "WAIT",
+        "quality": "PASS",
+        "data_sufficient": True,
+        "evidence": {"trigger": 50.0, "invalidation": 48.0},
+    }
+    raw_evidence = {"price_contraction_pass": True, "base_pass": True}
+    result = build_mvp_snapshot([{
+        "symbol": "PTT",
+        "state": "READY",
+        "evidence": raw_evidence,
+        "decision": decision,
+    }], run_id="run-1", scan_time="now", freshness={})
+
+    assert result["items"][0]["state"] == "READY"
+    assert result["items"][0]["evidence"] == raw_evidence
+    assert result["items"][0]["decision"] == decision
+
+
 def test_load_mvp_artifact_validates_contract(tmp_path):
     import json
     from mvp_snapshot import load_mvp_artifact

@@ -1,25 +1,482 @@
 """Focused source contract tests for the owner-only MVP frontend."""
 from pathlib import Path
+import json
+import subprocess
 
 
 ROOT = Path(__file__).parent / "frontend"
 
 
-def test_stage_colors_and_rising_lane_are_declared():
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
+def _extract_function(source, name):
+    start = source.index("function " + name)
+    brace = source.index("{", start)
+    depth = 0
+    quote = None
+    escaped = False
+    for index in range(brace, len(source)):
+        char = source[index]
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in "'\"`":
+            quote = char
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return source[start:index + 1]
+    raise AssertionError("unclosed JavaScript function: " + name)
+
+
+def _run_node(functions, expression):
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    script = "var window = globalThis;\n" + client + "\n" + "\n".join(functions) + "\nconsole.log(JSON.stringify(" + expression + "));"
+    result = subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
+    return json.loads(result.stdout)
+
+
+def test_v2_serving_contract_has_explicit_marginable_long_requests_and_metadata():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert js.count("universe=marginable_long") >= 1
+    for marker in (
+        "decision_shadow_v2", "decision_lane", "actionability",
+        "eligible_count", "universe_filter", "margin_source_document",
+        "margin_effective_date", "selected",
+    ):
+        assert marker in js
+    assert "Marginable long universe" in html
+    assert 'id="daily-vcp-retry"' in html
+
+
+def test_request_cache_script_loads_before_app_script():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    cache_script = html.index('<script src="request_cache.js"></script>')
+    app_script = html.index('<script src="app.js"></script>')
+    assert cache_script < app_script
+
+
+def test_shared_drawer_has_one_implementation_and_both_surfaces_call_it():
+    app = (ROOT / "app.js").read_text(encoding="utf-8")
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    shadow = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    index = (ROOT / "index.html").read_text(encoding="utf-8")
+    assert shared.count("function openSharedDrawer") == 1
+    assert shared.count("function drawChart") == 1
+    assert "window.SignalixSharedDrawer.openSharedDrawer({" in app
+    assert "window.SignalixSharedDrawer.openSharedDrawer({" in shadow
+    assert index.index('<script src="shared-drawer.js"></script>') < index.index('<script src="app.js"></script>')
+    assert 'id="drawer"' not in index
+
+
+def test_shadow_surface_has_explicit_freshness_and_retry_error_contract():
+    shadow = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'id="error"' in shadow and 'id="retry"' in shadow
+    assert 'data.freshness.status!=="FRESH"' in shadow
+    assert 'DATA_BLOCKED · production read-only Daily Trend Map unavailable' in shadow
+
+
+def test_shared_drawer_resets_shadow_setup_fields_and_guards_stale_requests():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'dom.drawerTrigger.textContent = "Not applicable"' in shared
+    assert 'seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe' in shared
+    assert 'chartRequestSeq += 1; if (chartAbort) chartAbort.abort()' in shared
+
+
+def test_shared_drawer_selects_custom_initial_chart_url_only_for_daily():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(shared, "chartRequestUrl")
+    envelope = {"chartUrl": "/custom/TEAM?timeframe=1D"}
+    assert _run_node([helper], "[chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '1D'), chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '60M'), chartRequestUrl(" + json.dumps(envelope) + ", 'TEAM', '1W')]") == [
+        "/custom/TEAM?timeframe=1D&view=chart",
+        "/api/chart-db/TEAM?timeframe=60M&view=chart",
+        "/api/chart-db/TEAM?timeframe=1W&view=chart",
+    ]
+
+
+def test_shared_drawer_chart_cache_is_scoped_to_chart_view():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'var key = symbol + "|" + timeframe + "|chart";' in shared
+    assert "view=chart" in shared
+
+
+def test_shared_drawer_explicit_metadata_ids_and_open_path_are_bound():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'drawer52W:"drawer-52w"' in shared
+    assert 'drawerATH:"drawer-ath"' in shared
+    assert 'drawerProv:"drawer-provenance"' in shared
+    script = r'''
+const fs = require("fs");
+const vm = require("vm");
+const elements = {};
+function element(id) {
+  return elements[id] || (elements[id] = {
+    id, textContent: "", hidden: false, style: {}, parentElement: null,
+    classList: {add(){}, remove(){this.removed = true;}, toggle(){}, removed: false},
+    addEventListener(){}, setAttribute(){}, getAttribute(){ return null; },
+    closest(){ return null; }, querySelectorAll(){ return []; }
+  });
+}
+const mount = element("drawer-mount");
+Object.defineProperty(mount, "innerHTML", {set(value) {
+  for (const match of value.matchAll(/id="([^"]+)"/g)) element(match[1]);
+  element("drawer-action").parentElement = element("drawer-action-parent");
+}});
+const document = {
+  body: {style: {}},
+  querySelector(selector) { return selector === "#drawer-mount" ? mount : selector[0] === "#" ? elements[selector.slice(1)] || null : null; },
+  querySelectorAll() { return []; },
+  getElementById(id) { return elements[id] || null; },
+  createElement() { return {appendChild(){}, innerHTML: ""}; },
+  createTextNode(value) { return {textContent: value}; },
+  addEventListener() {}
+};
+const window = globalThis;
+window.document = document;
+window.addEventListener = function() {};
+window.fetch = function() { return Promise.resolve({ok: true, json: () => Promise.resolve({candles: []})}); };
+vm.runInThisContext(fs.readFileSync("backend/frontend/shared-drawer.js", "utf8"));
+window.SignalixSharedDrawer.openSharedDrawer({
+  source: "trend-map", lane: "DATA_BLOCKED", trend: "DATA_BLOCKED",
+  item: {symbol: "AAA", as_of: "2026-09-11", quote: {source: "price_data"}}
+});
+if (elements["drawer-provenance"].textContent !== "11 Sept 2026 time unavailable (Bangkok)") process.exit(1);
+if (!elements.drawer.classList.removed) process.exit(1);
+console.log("shared drawer open path passed");
+'''
+    result = subprocess.run(["node", "-e", script], check=True, capture_output=True, text=True)
+    assert "shared drawer open path passed" in result.stdout
+
+
+def test_v2_primary_label_and_drawer_keep_raw_lifecycle_evidence():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'return decisionLane(result) + " · " + actionability(result);' in js
+    assert 'id="drawer-v2-decision"' in html
+    assert 'id="drawer-raw-state"' in html
+    assert "function renderSharedDetail" in js
+    assert "function renderDrawerDetail" not in js
+
+
+def test_v2_success_empty_and_transport_error_states_are_distinct():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "zero candidates matched the current presentation filters" in js
+    assert 'show(dom.dailyVcpError)' in js
+    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message' in js
+    assert 'dom.vcpErrorMsg.textContent = "Unable to load VCP Finder: " + err.message' in js
+
+
+def test_daily_wave_presentation_uses_canonical_state_and_compact_confidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    wave_state = _extract_function(js, "canonicalWaveState")
+    wave_confidence = _extract_function(js, "compactWaveConfidence")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    context = _extract_function(js, "waveContextForItem")
+    assert _run_node(
+        [states, context, wave_state, wave_confidence],
+        "({state: canonicalWaveState({wave: {primary_state:'EARLY_WAVE_3', confidence:'MEDIUM', context:{mapped_state:'WAVE_1_ADVANCE'}}}), confidence: compactWaveConfidence({wave: {primary_state:'EARLY_WAVE_3', confidence:'MEDIUM', context:{mapped_state:'WAVE_1_ADVANCE'}}})})",
+    ) == {"state": "EARLY_WAVE_3", "confidence": "MEDIUM"}
+    assert _run_node(
+        [states, context, wave_state, wave_confidence],
+        "({unknown: canonicalWaveState({wave: {primary_state:'NOT_VERIFIABLE', context:{mapped_state:'WAVE_3_CONTINUATION'}}}), wave2: canonicalWaveState({wave: {primary_state:'WAVE_2_FORMING', context:{mapped_state:'WAVE_1_ADVANCE'}}}), confidence: compactWaveConfidence({wave: {primary_state:'WAVE_2_FORMING', confidence:'UNSURE', context:{confidence:'HIGH'}}})})",
+    ) == {"unknown": "Unknown / Not verified", "wave2": "WAVE_2_FORMING", "confidence": "NOT_VERIFIED"}
+    assert 'compactWaveLabel' in js and 'Confidence' in js
+
+
+def test_mvp_toolbar_composes_search_and_lane_without_daily_structure_filter():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "setupCandidateMatchesToolbar")
+    context = _extract_function(js, "waveContextForItem")
+    dom = 'var dom = {dailySetupSearch:{value:"alpha"}, dailySetupLane:{value:"DAILY_CANDIDATE"}};'
+    expression = "[setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_3_CONTINUATION',context:{mapped_state:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'BETA',name:'Beta Co',decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'EARLY_WAVE_3',context:{mapped_state:'EARLY_WAVE_3'}}}), setupCandidateMatchesToolbar({symbol:'ALPHA',name:'Alpha Co',decision_lane:'WAIT',wave:{primary_state:'EARLY_WAVE_3'}})]"
+    assert _run_node([context, dom, helper], expression) == [True, False, False]
+    assert "dailyStructurePhase" not in js and "daily-setup-wave" not in js
+
+
+def test_lane_filter_is_sent_to_server_and_resets_to_first_page():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    assert 'requestOptions.decision_lane = dom.dailySetupLane.value' in js
+    assert 'params.set("decision_lane", options.decision_lane)' in client
+    assert 'dailySetupPage = 1;' in js
+    assert 'loadDailyVcp(true, 1);' in js
+
+
+def test_daily_structure_phase_is_hidden_from_mvp_surface():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for forbidden in ("dailyStructurePhase", "compactDailyStructureLabel", "Daily structure phase", "daily-setup-wave", "structure-badge", "Daily structural context", "drawer-context-info", "drawer-daily-context"):
+        assert forbidden not in js and forbidden not in html
+
+
+def test_primary_card_projection_has_distinct_exact_labels_and_no_primary_daily_structure_alias():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    assert "Primary Daily Wave" in card
+    assert "deepPullbackBadge(item)" in card
+    assert "compactDailyStructureLabel(item)" not in card
+    assert "setup-candidate__structure-badge" not in card
+    assert "Primary Daily Structure" not in card
+    assert "Primary Daily Structure" not in js
+
+
+def test_deep_pullback_badge_is_separate_non_actionable_and_uses_api_retracement():
+    app = (ROOT / "app.js").read_text()
+    active = "{wave:{primary_state:'NOT_VERIFIABLE',deep_pullback_evidence:{status:'DEEP_PULLBACK_W3_EVIDENCE',actionability:'NONE',source_timeframe:'daily',retracement:0.753846,anchors:{w1_low:{price:2.02},w1_high:{price:3.32},w2_low:{price:2.34}}}}}"
+    none = "{wave:{primary_state:'NOT_VERIFIABLE',deep_pullback_evidence:{status:'NONE',actionability:'NONE',source_timeframe:'daily',retracement:0.6,anchors:{}}}}"
+    result = _run_node([
+        "function escapeHTML(value) { return String(value); }",
+        _extract_function(app, "deepPullbackEvidence"),
+        _extract_function(app, "deepPullbackRetracementText"),
+        _extract_function(app, "deepPullbackBadge"),
+    ], "({active:deepPullbackBadge(" + active + "),none:deepPullbackBadge(" + none + ")})")
+    assert "Deep pullback evidence · 75.3846%" in result["active"]
+    assert "Non-actionable · Daily evidence" in result["active"]
+    assert result["none"] == ""
+    assert "Primary Daily Wave" in _extract_function(app, "setupCandidateCard")
+    assert "deepPullbackBadge(item)" in _extract_function(app, "setupCandidateCard")
+
+
+def test_deep_pullback_drawer_uses_exact_api_ratio_and_anchor_fields():
+    app = (ROOT / "app.js").read_text() + (ROOT / "shared-drawer.js").read_text()
+    renderer = _extract_function(app, "renderDeepPullbackEvidence")
+    for token in ("evidence.retracement", "anchors.w1_low", "anchors.w1_high", "anchors.w2_low", "Non-actionable · Daily evidence"):
+        assert token in renderer
+    assert "drawer-deep-pullback" in app
+
+
+def test_mvp_grouping_uses_decision_lane_only_and_preserves_lane_totals():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "groupSetupCandidates")
+    stable = _extract_function(js, "stableSetupCandidateOrder")
+    items = "[{symbol:'ZZZ',decision_lane:'WAIT'},{symbol:'AAA',decision_lane:'REVIEW_NOW',setup:{status:'TRIGGERED'}},{symbol:'ONE',decision_lane:'AVOID'},{symbol:'BAD',decision_lane:'DATA_BLOCKED'}]"
+    result = _run_node([stable, helper], "(function(g){return {order:g.order, wait:g.groups.WAIT[0].symbol, review:g.groups.REVIEW_NOW[0].symbol, avoid:g.groups.AVOID[0].symbol, blocked:g.groups.DATA_BLOCKED[0].symbol, laneCounts:g.order.map(function(lane){return g.groups[lane].length;})};})(groupSetupCandidates(" + items + "))")
+    assert result == {"order": ["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"], "wait": "ZZZ", "review": "AAA", "avoid": "ONE", "blocked": "BAD", "laneCounts": [1, 0, 0, 1, 1, 1]}
+    assert "phaseGroups" not in js and "DAILY STRUCTURE · " not in js
+
+
+def test_t08_wave_control_and_filter_render_preserve_counts_empty_and_drawer_reconciliation():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="daily-setup-wave"' not in html
+    assert "Daily structure phase" not in html
+    assert "dailySetupWave" not in js
+    assert "laneItems.length + ' / ' + Number(laneTotals[lane] || 0)" in js
+    assert "No setup candidates matched the current presentation filters." in js
+    assert "reconcileDailyDrawerNavigation();" in js
+    assert 'id="panel-daily-vcp"' in html and 'setup-candidate-card' in js
+
+
+def test_review_cockpit_primary_toolbar_is_lane_wave_only_and_cards_have_compact_risk_direction_fields():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    toolbar = html[html.index('id="daily-setup-toolbar"'):html.index('</div>', html.index('id="daily-setup-toolbar"')) + 6]
+    assert 'id="daily-setup-search"' not in toolbar
+    assert 'id="daily-setup-refresh"' not in toolbar
+    assert 'id="daily-setup-lane"' in toolbar and 'id="daily-setup-wave"' not in toolbar
+    assert 'summary>More filters</summary>' in html
+    card = _extract_function(js, "setupCandidateCard")
+    for token in ("Trigger", "Stop", "Target", "R:R", "setup-candidate__wave-badge", "setup-candidate__confidence", "setupLaneLabel"):
+        assert token in card
+    for forbidden in ("Daily context", "Secondary", "Trigger readiness"):
+        assert forbidden not in card
+    assert "compactWaveLabel(item)" in card
+    assert "Primary Daily Wave" in card and "compactDailyStructureLabel(item)" not in card
+    assert 'id="drawer-chart-context"' in html
+    assert "chart.provenance && (chart.provenance.source || chart.provenance.interval)" in js
+
+
+def test_review_cockpit_drawer_follows_identity_price_chart_setup_evidence_hierarchy():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    identity = html.index('id="drawer-symbol"')
+    lane = html.index('id="drawer-lane"')
+    price = html.index('id="drawer-price"')
+    action = html.index('id="drawer-wave"')
+    chart = html.index('id="drawer-chart"')
+    timeframes = html.index('class="chart-timeframe-controls"')
+    setup = html.index('id="drawer-setup-title"')
+    company = html.index('id="drawer-company-title"')
+    details = html.index('class="drawer-details"')
+    assert identity < lane < price < action < chart < timeframes < setup < company < details
+    for marker in ('id="drawer-prev"', 'id="drawer-next"', 'id="drawer-close"', 'id="drawer-chart-status"', 'id="drawer-chart-context"', 'id="drawer-chart-legend"', 'id="drawer-trigger"', 'id="drawer-stop"', 'id="drawer-target"', 'id="drawer-rr"', 'id="drawer-evidence-details"', 'id="drawer-market-cap"', 'id="drawer-sector"', 'id="drawer-industry"'):
+        assert marker in html
+    assert 'dom.drawerLane' in js and 'dom.drawerCurrent' in js
+    assert 'dom.drawerDailyContext' not in js and 'compactWaveLabel(item)' in js
+    assert 'id="drawer-context-info"' not in html and 'id="drawer-daily-context"' not in html
+
+
+def test_canonical_chart_semantic_palette_keeps_direction_colors_and_non_direction_evidence_neutral():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
-    assert 'id="shortlist-rising"' in html
-    assert 'id="explorer-stage"' in html
+    draw = _extract_function(js, "drawChart")
+    legend = _extract_function(js, "renderChartLegend")
+    assert 'up: "#26a69a", down: "#ef5350"' in draw
+    assert 'ma20: "#93c5fd", ma50: "#60a5fa"' in draw
+    assert 'decisionLine(chart.stop, "#8896a6", [2, 4], "Stop")' in draw
+    assert 'decisionLine(chart.trigger, "#60a5fa", [7, 5], "Required close")' in draw
+    assert 'dailyWaveMarkerPresentation(marker.kind)' in draw
+    assert 'aria-label="Show full chart legend"' in legend
+    assert '#f4c95d' not in draw and '#ffa726' not in draw
+    assert '.freshness-dot--stale   { background: var(--text-3); }' in css
+    assert '.setup-candidate__decision { color:var(--text-2);' in css
+
+
+def test_compact_setup_card_does_not_infer_missing_current_or_change_and_keeps_canonical_rr():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    direction = _extract_function(js, "setupCandidateDirection")
+    quote_change = _extract_function(js, "primaryDailyQuoteChange")
+    fmt_change = _extract_function(js, "fmtChange")
+    result = _run_node(
+        [quote_change, direction, fmt_change],
+        "({missing: setupCandidateDirection({change_pct: null}, false), up: setupCandidateDirection({change_pct: 2.5}, false), absent: fmtChange(null)[0]})",
+    )
+    assert result == {"missing": "neutral", "up": "bullish", "absent": "Not verified"}
+    assert 'valueOrUnavailable(quote.price, "Not verified")' in card
+    assert 'fmtChange(dailyChange)[0]' in card
+    assert 'valueOrUnavailable(rr.to_target_1)' in card
+
+
+def test_canonical_quote_drives_card_and_drawer_with_absent_quote_fallback():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    drawer = _extract_function(js, "renderSharedDetail")
+    direction = _extract_function(js, "setupCandidateDirection")
+    quote_change = _extract_function(js, "primaryDailyQuoteChange")
+    assert 'item.quote' in card
+    assert 'quote.price' in drawer and 'quote.change_pct' in drawer
+    assert 'Quote · 60m provisional' in drawer and 'Quote · Daily close' in drawer
+    assert 'quoteEnvelope(item)' in card
+    assert 'quoteSource' in card
+    assert 'dom.drawerTradeValue.textContent = shadow ? "Trade value Not applicable"' in drawer
+    result = _run_node(
+        [quote_change, direction],
+        "({daily: primaryDailyQuoteChange({change_pct:-5,change_basis:'previous_daily_close'}), legacy60m: primaryDailyQuoteChange({change_pct:2.5,change_basis:'previous_completed_60m_close'}), up: setupCandidateDirection({quote:{change_pct:2.5,change_basis:'previous_daily_close'}}, false), absent: setupCandidateDirection({quote:{}}, false)})",
+    )
+    assert result == {"daily": -5, "legacy60m": None, "up": "bullish", "absent": "neutral"}
+    assert 'Change vs previous Daily close' in card
+    assert 'quote.source === "price_data"' in drawer
+
+
+def test_daily_wave_card_and_drawer_keep_daily_structural_provenance_separate_from_60m():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="drawer-wave"' in html
+    assert 'id="drawer-wave-confidence"' in html
+    assert 'id="drawer-wave-source"' in html
+    assert 'Daily structural' in html
+    card = _extract_function(js, "setupCandidateCard")
+    assert 'compactWaveLabel(item)' in card
+    assert 'compactWaveConfidence(item)' in card
+    drawer = _extract_function(js, "renderSharedDetail")
+    assert 'dom.drawerWave.textContent = shadow ? "Not applicable · Daily classification"' in drawer
+    assert 'dom.drawerWaveSource.textContent = shadow ? "Production read-only Daily evidence"' in drawer
+    assert "Primary Daily Wave" in html and "Daily structural context" not in html
+    assert "compactDailyStructureLabel(item)" not in drawer
+    assert 'setup.minor_structure' not in drawer
+    assert '60m' in js
+
+
+def test_canonical_chart_overlay_uses_trade_stop_not_thesis_invalidation():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    result = _run_node(
+        [overlay],
+        'canonicalChartOverlay({setup: {trigger: 12, invalidation: 8, trade_stop: 10, target_1: 20}})',
+    )
+    assert result == {"trigger": 12, "stop": 10, "target": 20}
+
+
+def test_stage_colors_and_rising_lane_are_declared():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="shortlist-rising"' not in html
+    assert 'id="explorer-stage"' not in html
     for token in ("--s1", "--s2", "--s3", "--s4", "stage--s1", "stage--s2", "stage--s3", "stage--s4"):
         assert token in css
     assert "function isRising" in js
     assert "S2_uptrend" in js
 
 
+def test_mobile_freshness_stays_inside_viewport_and_ellipsizes():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    mobile = css[css.index("@media (max-width: 620px)"):]
+    assert ".freshness" in mobile
+    assert "box-sizing: border-box" in mobile
+    assert "padding-right: 4px" in mobile
+    assert "overflow: hidden" in mobile
+    assert "text-overflow: ellipsis" in css
+
+
+def test_desktop_drawer_matches_shell_and_mobile_remains_a_bottom_sheet():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    desktop = css[css.index("@media (min-width: 601px)"):css.index("@media (max-width: 767px)")]
+    mobile = css[css.index("@media (max-width: 600px)"):css.index("/* ── reduced motion")]
+    assert "position: fixed; inset: 0; z-index: 1000" in css
+    assert "justify-content:center" in desktop
+    assert "align-items:center" in desktop
+    assert "width:min(calc(100% - 32px), 960px)" in desktop
+    assert "max-width:960px" in desktop
+    assert "height:min(calc(100dvh - 32px), 1100px)" in desktop
+    assert "max-height:calc(100dvh - 32px)" in desktop
+    assert "overflow-y:auto" in css
+    assert "drawer-body { padding:16px; overflow-y:auto" in css
+    assert ".drawer-chart { height:min(560px, 58dvh); min-height:400px; aspect-ratio:auto; }" in desktop
+    assert ".drawer-body { padding:24px 28px 40px; font-size:15px; }" in desktop
+    assert "align-items:flex-end" in mobile
+    assert "max-height:88dvh" in mobile and "border-radius:var(--radius) var(--radius) 0 0" in mobile
+
+
+def test_filter_refresh_keeps_existing_content_and_guards_stale_responses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    load = _extract_function(js, "loadDailyVcp")
+    assert "setDailySetupRefreshing(true)" in load
+    assert "if (!hasRenderedContent)" in load
+    assert "hide(dom.dailyVcpContent)" in load
+    assert "requestSeq !== dailyVcpRequestSeq" in load
+    assert "dailySetupPage = 1;" in js
+    assert "loadDailyVcp(true, 1);" in js
+    assert "daily-vcp-content--refreshing" in js
+    assert 'id="daily-vcp-content" class="state--hidden" aria-busy="false"' in (ROOT / "index.html").read_text(encoding="utf-8")
+
+
+def test_drawer_chart_uses_available_width_with_useful_aspect_and_mobile_minimum():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    chart = css[css.index(".drawer-chart {"):css.index(".drawer-chart .drawer-indicator-legend")]
+    mobile = css[css.index("@media (max-width: 600px)"):css.index("/* ── reduced motion")]
+    assert "width: 100%" in chart
+    assert "min-height: 360px" in chart
+    assert "aspect-ratio: 16 / 10" in chart
+    assert ".drawer-chart { height:min(360px, 54dvh); min-height:280px" in mobile
+
+
+def test_chart_canvas_resizes_backing_store_and_draws_in_logical_pixels():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "resizeCanvasToDisplaySize")
+    result = _run_node(
+        [helper],
+        "(function(){window.devicePixelRatio=2;var context={setTransform:function(){this.transform=Array.from(arguments);}};var canvas={width:720,height:440,clientWidth:0,clientHeight:0,getBoundingClientRect:function(){return {width:900,height:500};},getContext:function(){return context;}};var size=resizeCanvasToDisplaySize(canvas);return {size:size,width:canvas.width,height:canvas.height,transform:context.transform};})()",
+    )
+    assert result == {
+        "size": {"width": 900, "height": 500, "pixelRatio": 2},
+        "width": 1800,
+        "height": 1000,
+        "transform": [2, 0, 0, 2, 0, 0],
+    }
+    assert "var displaySize = resizeCanvasToDisplaySize(canvas);" in _extract_function(js, "drawChart")
+    assert "window.addEventListener(\"resize\"" in js
+
+
 def test_explorer_filters_are_sent_to_api():
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     assert 'params += "&stage="' in js
     assert 'params += "&search="' in js
     assert "explorer-apply" not in html
@@ -27,44 +484,1275 @@ def test_explorer_filters_are_sent_to_api():
 
 
 def test_chart_timeframes_are_real_controls_not_labels_only():
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for timeframe in ("1D", "1W", "60M"):
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for timeframe in ("1D", "1W", "60M", "1M"):
         assert f'data-timeframe="{timeframe}"' in html
     assert "?timeframe=" in js
     assert "chart-timeframe" in js
+
+
+def test_canonical_technical_payload_drives_chart_layers_and_latest_summary():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    for period in (5, 10, 20, 50, 100, 200):
+        assert f'data-ma-period="{period}"' in html
+    for period in (60, 120, 240, 260):
+        assert f'data-ma-period="{period}"' not in html
+    for marker in ('id="technical-latest"', 'id="technical-macd"',
+                   'id="technical-rsi"', 'id="technical-atr"',
+                   'id="rolling-high-low"'):
+        assert marker in html
+    assert 'id="technical-ma"' not in html
+    assert "OHLCV Window Summary (candles)" in html
+    assert '<div class="rolling-high-low__table-wrap"><table>' in html
+    for column in ("Candles", "Open", "High", "Low", "Close", "Avg Vol", "MA"):
+        assert f'<th>{column}</th>' in html
+    assert "<tr data-rolling-period=\"' + p + '\">" in html
+    assert "chart.indicators.series.ma" in js
+    assert "chart.indicators.series.macd" in js
+    assert "chart.indicators.series.rsi" in js
+    assert "latest.atr" in js
+    assert "latest.window_summary" in js
+    assert "renderTechnicalSummary" in js
+    assert ".technical-summary" in css
+    assert ".rolling-high-low__table-wrap { width:100%; max-width:100%; min-width:0; overflow-x:auto; }" in css
+    assert ".rolling-high-low table { width:100%; min-width:560px;" in css
+    assert "body {" in css and "overflow-x: hidden;" in css
+    assert "overflow-x:auto" not in css[css.index(".technical-summary"):css.index(".technical-summary") + 500]
+    assert 'let chartTimeframe = "1D"' in js
+    assert 'chartTimeframe = "1D"' in js
+    assert "setChartTimeframeButtons(chartTimeframe)" in js
     assert "position:absolute; right:8px" not in (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
+def test_window_summary_table_consumes_only_canonical_latest_values():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    compact_volume = _extract_function(js, "formatCompactVolume")
+    render = _extract_function(js, "renderTechnicalSummary")
+    expression = "(function(){renderTechnicalSummary({indicators:{latest:{window_summary:{'5':{open:10.125,high:12.345,low:8,close:11,volume_total:1120000000,volume_average:223563658,change_pct:8.642,range_pct:54.3125,ma:9.5,availability:{status:'AVAILABLE'}},'260':{open:null,high:null,low:null,close:null,volume_total:null,volume_average:null,change_pct:null,range_pct:null,ma:null,availability:{status:'NOT_VERIFIED'}}}}}});return {open:rows[0].children[1].textContent,high:rows[0].children[2].textContent,low:rows[0].children[3].textContent,close:rows[0].children[4].textContent,avg:rows[0].children[5].textContent,ma:rows[0].children[6].textContent,detail:rows[0].detail.textContent,blocked:rows[1].children[1].textContent};})()"
+    setup = "function row(period){var detail={textContent:''};return {dataset:{rollingPeriod:period},children:[{}, {}, {}, {}, {}, {}, {}],detail:detail,querySelector:function(){return detail;}}} var rows=[row('5'),row('260')]; var dom={rollingHighLow:{querySelectorAll:function(){return rows;}},technicalHighLow:null,technicalMacd:null,technicalRsi:null,technicalAtr:null};"
+    assert _run_node([setup, compact_volume, render], expression) == {
+        "open": "10.13", "high": "12.35", "low": "8.00", "close": "11.00",
+        "avg": "223.56M", "ma": "9.50",
+        "detail": "Total 1.12B · Change 8.64% · Range 54.31%", "blocked": "Not verified",
+    }
+    assert _run_node(
+        [compact_volume],
+        "[formatCompactVolume(950000), formatCompactVolume(null), formatCompactVolume(Number.NaN)]",
+    ) == ["950K", "Not verified", "Not verified"]
+    assert "chart.candles" not in render
+
+
+def test_drawer_timeframe_switch_preserves_surface_item_and_discards_stale_chart():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "var chartTimeframe = \"1D\", chartSymbol = null, drawerItem = null" in js
+    assert "requestChart(envelope, chartSymbol, chartTimeframe, chartRequestSeq)" in js
+    assert "var chartRequestSeq = 0, chartAbort = null, chartCache = {}, swipeStart = null;" in js
+    assert "chartCache[key]" in js
+    assert "seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe" in js
+    assert "if (cached) { renderDrawerChart(cached); return; }" in js
+    assert "VCP charts support 60M only" not in js
+    assert "btn.disabled = !supported" not in js
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function drawerItemForSymbol(symbol)" in js
+    assert "window.SignalixSharedDrawer.openSharedDrawer({" in js
+    assert "item: item, lane: item.decision_lane" in js
+    assert "function renderSharedDetail" in js and "function renderDrawerDetail" not in js
+
+
+def test_vcp_drawer_fetches_canonical_metadata_without_overwriting_vcp_fields():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function mergeCanonicalDailyMetadata(item, canonical)" in js
+    assert '"high52", "low52", "ath_high", "ath_low", "rr", "target"' in js
+    assert 'detailUrl: "/api/symbol/" + encodeURIComponent(symbol)' in js
+    assert "envelope.item = Object.assign({}, envelope.item, detail || {}); renderSharedDetail(envelope);" in js
+    assert "seq !== chartRequestSeq || symbol !== chartSymbol" in js
+    assert "VCP remains authoritative for intraday price/action/trigger/invalidation" in js
+    assert "function vcpChartOverlay(item)" in js
+    assert "trigger: breakout.required_close != null ? breakout.required_close : item.trigger" in js
+    assert "stop: price.invalidation != null ? price.invalidation : item.risk_stop" in js
+    assert "function mergeChartDecisionOverlay(chart, item)" in js
+    assert "mergeChartDecisionOverlay(chart, envelope.item);" in js
+    assert "Required close" in js
+
+
+def test_vcp_drawer_distinguishes_pending_metadata_from_unverified_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function displayMetadataValue(value, pending)" in js
+    assert 'return pending ? "Loading…" : "Unavailable";' in js
+    assert "item._canonicalMetadataPending = false;" in js
+    assert "function renderSharedDetail" in js
+    assert "function renderDrawerDetail" not in js
+
+
+def test_daily_vcp_surfaces_rejection_telemetry():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "rejection_counts" in js
+    assert "rejected:" in js
+
+
+def test_daily_vcp_renders_explicit_event_watch_lane_as_watch_only():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert '"event_watch"' in js
+    assert 'event_watch: "EVENT_WATCH"' in js
+    assert '"EVENT_WATCH · WATCH_ONLY"' in js
+    assert 'var subhead = groupHasCaps[status] ?' in js
+    assert 'if (cap != null)' in js
+
+
+def test_vcp_refreshes_abort_previous_requests_and_ignore_stale_results():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "let dailyVcpRequestSeq = 0;" in js
+    assert "let vcpRequestSeq = 0;" in js
+    assert "SignalixRequestCache()" in js
+    assert "requestFactory(entry.controller.signal)" in (ROOT / "request_cache.js").read_text(encoding="utf-8")
+    assert 'var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";' in js
+    assert "if (requestSeq !== dailyVcpRequestSeq) return;" in js
+    assert "if (requestSeq !== vcpRequestSeq) return;" in js
+    assert 'err.name === "AbortError"' in js
+
+
+def test_vcp_drawer_keeps_not_verified_for_decision_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'NOT_VERIFIED: "NOT VERIFIED"' in js
+    assert 'return decision.state || "NOT_VERIFIED";' in js
+    assert 'data.feed_status || "NOT_VERIFIED"' in js
+
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function vcpQualityFlags(result)" in js
+    assert 'flags.push("NO VOLUME DRY-UP")' in js
+    assert 'flags.push("DAILY CONTEXT FAIL")' in js
+    assert 'return "TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
+    assert "function vcpPrimaryStatus" in js
+    assert "function renderDrawerDetail" not in js
+    assert "action: vcpDecisionLabel(vr)" not in js
+    assert "action: vcpDecisionLabel(vcp)" not in js
+    assert "function renderSharedDetail" in js
+    assert '"TRIGGER CONFIRMED · QUALITY INCOMPLETE"' in js
+
+
+def test_vcp_type_filter_and_badges_are_presentation_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="daily-vcp-type"' not in html
+    assert 'id="vcp-type"' not in html
+    assert 'value="low_cheat_vcp">Low-Cheat' not in html
+    assert 'value="standard_vcp">VCP' not in html
+    assert 'return base === "low_cheat_vcp" ? "Low-Cheat"' in js
+    assert "vcpTypeMatches" in js
+    assert '"STANDARD"' not in js
+    assert 'var state = canonicalDecisionState(result);' in js
+    assert 'canonicalDataSufficiency(result) !== "SUFFICIENT"' in js
+    assert "No Low-Cheat setups in focused review." in js
+    assert "Switch to All states." in js
+
+
+def test_vcp_defaults_to_all_states_and_keeps_focused_query_explicit():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="panel-vcp"' not in html
+    assert 'id="tab-vcp"' not in html
+    assert 'var selected = dom.vcpState.value || "ALL";' in js
+    assert 'if (selected === "actionable") endpoint += "&focused=true";' in js
+
+
+def test_vcp_cards_label_52_week_high_overlay_and_distance_without_state_change():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'if (type === "near_52w_high") { hasNear52wHigh = true; return; }' in js
+    assert 'var high52Label = hasNear52wHigh || (Number.isFinite(high52Distance) && high52Distance >= -5 && high52Distance <= 0) ? "NEAR 52W HIGH" : "52W HIGH";' in js
+    assert 'return decision.state || "NOT_VERIFIED";' in js
+
+
+def test_daily_vcp_default_filters_are_literal_presentation_filters():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "dom.dailyFilterMarginable.checked" in js
+    assert "dom.dailyFilterTradeValue.checked" in js
+    assert "dom.dailyFilterPrice.checked" in js
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return;"
+    ) in js
+    assert "&& !r.reviewable" not in js
+
+
 def test_freshness_surface_keeps_daily_and_intraday_timestamps_separate():
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     source = (Path(__file__).parent / "build_dashboard.py").read_text(encoding="utf-8")
     assert "intraday_fetched_at" in source
-    assert "setFreshness(fStatus, freshness.data_fetched_at || freshness.as_of, freshness.intraday_fetched_at)" in js
+    assert "setFreshness(freshness.status || \"unknown\", freshness.data_fetched_at || data.as_of, intradayFetchedAt, dailyStatus, intradayStatus, freshness.daily_unavailable_count)" in js
+    assert 'id="freshness-daily"' in html
+    assert 'id="freshness-60m"' in html
+    assert "Daily EOD" in js
+    assert "intraday_60m_as_of" in js
+    assert "latest completed 60m candle" in js
+    assert "freshness.intraday_fetched_at" in js
+    assert 'function formatProvenance(iso)' in js
     assert "60m " in js
 
 
+def test_setup_candidate_freshness_reports_mixed_timeframes_without_collapsing_to_unavailable():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    normalizer = _extract_function(js, "normalizeFreshnessStatus")
+    summary = _extract_function(js, "freshnessSummary")
+    assert _run_node([normalizer, summary], 'freshnessSummary("expected_previous_session", "fresh")') == "mixed"
+    assert _run_node([normalizer, summary], 'freshnessSummary("unknown", "fresh")') == "partial"
+    assert '"Freshness mixed by timeframe"' in js
+    assert 'expected previous completed session' in js
+    assert 'prefix + ": fresh"' in js
+
+
+def test_freshness_time_label_renders_partial_with_timestamp_and_keeps_unknown_unavailable():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    normalizer = _extract_function(js, "normalizeFreshnessStatus")
+    time_ago = _extract_function(js, "timeAgo")
+    label = _extract_function(js, "freshnessTimeLabel")
+    result = _run_node(
+        [normalizer, time_ago, label],
+        "({partial:freshnessTimeLabel('60m','partial',new Date(Date.now()-120000).toISOString()), unavailable:freshnessTimeLabel('60m','unavailable','2026-09-08T09:00:00+07:00'), unknown:freshnessTimeLabel('60m','unknown','2026-09-08T09:00:00+07:00')})",
+    )
+    assert result["partial"].startswith("60m: partial · ")
+    assert "ago" in result["partial"]
+    assert result["unavailable"] == "60m: unavailable"
+    assert result["unknown"] == "60m: unavailable"
+
+
+def test_setup_candidate_freshness_prefers_full_universe_aggregate_statuses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "freshness.daily_status" in js
+    assert "freshness.intraday_status" in js
+
+
+def test_canonical_setup_refresh_failure_clears_cached_rows_and_retry_is_forced():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "dailyVcpRequests.clear(endpoint);" in js
+    assert "if (hasRenderedContent) show(dom.dailyVcpContent);" in js
+    assert 'dom.dailyVcpErrorMsg.textContent = "Unable to load setup candidates: " + err.message' in js
+    assert 'dom.dailyVcpRetry.addEventListener("click", function() { loadDailyVcp(true); });' in js
+    assert "}, !!force);" in js
+    # A cached response is still guarded by the request generation, so a
+    # stale cached completion cannot repaint rows after a failed refresh.
+    assert "cachedRequestSeq === dailyVcpRequestSeq" in js
+
+
 def test_unavailable_hour_chart_is_explicit_not_blank():
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     assert "60m unavailable · Daily EOD remains the decision source" in js
     assert 'chart.provenance && chart.provenance.note' in js
     assert "AbortController" in js
     assert "chartRequestSeq" in js
 
 
+def test_chart_provisional_status_is_visible_and_timestamped():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="drawer-chart-status"' in html
+    assert "function renderChartStatus(chart)" in js
+    assert "Provisional" in js
+    assert "latest_time" in js
+    assert "chart.candles[chart.candles.length - 1].provisional" in js
+
+
+def test_wave_evidence_layer_is_toggleable_and_explains_payload_without_frontend_rules():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="chart-wave-evidence"' in html
+    assert "chartLayers.waveEvidence" in js
+    assert "window.__signalixWaveMarkerHits" in js
+    assert "showWaveExplanation" in js
+    for field in ("details.rule", "details.evidence", "details.alternative", "details.missing", "details.policy",
+                  "marker.timeframe", "marker.source", "marker.confidence", "marker.evidence_refs",
+                  "marker.snapshot_identity"):
+        assert field in js
+    for label in ("How this wave was identified", "Supporting evidence", "Contradicting evidence", "Missing evidence", "Alternative state", "Snapshot identity"):
+        assert label in js or label in html
+    assert 'if (evidence && timeframe === "1D") projectedEvidence = evidence.daily;' in js
+    assert 'if (sourceTimeframe !== "1D")' in _extract_function(js, "selectChartWaveEvidence")
+
+
+def test_wave_drawer_projects_daily_contract_and_toggle_has_visible_fail_closed_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceForItem")
+    result = _run_node([helper], "waveEvidenceForItem({wave:{confidence:'MEDIUM',supporting_evidence:['advance'],contradicting_evidence:[],missing_evidence:['60m'],alternative_state:'WAVE_2_FORMING',snapshot_id:'snap-1'},provenance:{daily_source:'price_data'}})")
+    assert result["timeframe"] == "1D"
+    assert result["snapshot_identity"] == "snap-1"
+    assert result["supporting_evidence"] == ["advance"]
+    assert _run_node([helper], "waveEvidenceForItem({wave:[]})") == {}
+    assert 'guide.textContent = "No wave evidence is available for this candidate."' in js
+    assert "window.__signalixWaveMarkerHits = [];" in js
+
+
+def test_wave_drawer_projects_evidence_explanation_and_marker_aliases():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceForItem")
+    result = _run_node([helper], "waveEvidenceForItem({wave:{confidence:'HIGH',evidence_explanation:{rule:'Daily close rule',evidence:['close_above_high'],policy:'elliott-v1'},evidence_markers:[{kind:'WAVE_3_CLOSE_CONFIRMATION'}],snapshot_id:'daily:2026-08-31'},provenance:{daily_source:'price_data'}})")
+    assert result["rule"] == "Daily close rule"
+    assert result["evidence"] == ["close_above_high"]
+    assert result["markers"] == [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}]
+    assert result["snapshot_identity"] == "daily:2026-08-31"
+
+
+def test_setup_retry_recovers_from_transport_error_without_changing_contract():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="daily-vcp-error"' in html and 'id="daily-vcp-retry"' in html
+    assert "show(dom.dailyVcpError)" in js
+    assert "loadDailyVcp(true)" in js
+    assert "hide(dom.dailyVcpError); hide(dom.dailyVcpContent);" in js
+    assert "renderSetupCandidates(data);" in js
+
+
+def test_wave_marker_window_alignment_uses_source_candle_index():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    projection = _extract_function(js, "dailyWaveMarkersForChart")
+    assert "var candles = chart.candles.slice(-120);" in js
+    assert "var start = chart.candles.length - candles.length;" in js
+    assert "sourceIndex < start || sourceIndex >= start + candles.length" in js
+    assert "sourceIndex - start" in js
+    assert 'marker && typeof marker === "object" && !Array.isArray(marker)' in projection
+    assert "chartTimestampKey(c.date) === chartTimestampKey(marker.timestamp)" in js
+    assert 'marker.timeframe === "daily"' in projection
+    assert 'marker.timestamp != null' in projection and 'marker.price != null' in projection
+    assert 'chart.timeframe === "1D"' in js
+    draw = _extract_function(js, "drawChart")
+    assert 'visibleCandleKeys.indexOf(chartTimestampKey(marker.timestamp)) >= 0' in draw
+    assert 'levels = levels.concat(dailyWaveMarkers.map' in draw
+
+
+def test_wave_context_cards_and_drawer_consume_nested_contract_without_creating_review_lane():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    context = _extract_function(js, "waveContextForItem")
+    presentation = _extract_function(js, "waveContextPresentation")
+    wave_state = _extract_function(js, "canonicalWaveState")
+    confidence = _extract_function(js, "compactWaveConfidence")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    item = "{decision_lane:'DAILY_CANDIDATE',wave:{primary_state:'WAVE_2_FORMING',confidence:'HIGH',context:{mapped_state:'WAVE_1_ADVANCE',secondary_markers:[],confidence:'LOW',rule_version:'ctx-v1',source_timeframe:'daily',supporting_evidence:['pullback'],contradicting_evidence:['volume'],missing_evidence:['60m'],rationale:'Daily pullback'}}}"
+    result = _run_node([states, context, wave_state, confidence, presentation], "waveContextPresentation(" + item + ")")
+    assert result["state"] == "WAVE_2_FORMING"
+    assert result["source"] == "Daily structural · daily"
+    assert result["actionability"] == "Non-actionable context · backend lane DAILY_CANDIDATE"
+    assert result["supporting"] == ["pullback"]
+    assert result["contextState"] == "WAVE_1_ADVANCE"
+    assert "firstDate" not in result and result["transitions"] == []
+    assert 'id="drawer-wave-context"' not in html
+    assert "first_context_date" in js
+    assert 'item.decision_lane === "REVIEW_NOW"' in presentation
+    assert "primary_state" in wave_state
+    assert "context.mapped_state" in presentation
+
+
+def test_wave_3_extended_is_secondary_only_and_missing_marker_coordinates_are_not_inferred():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    presentation = _extract_function(js, "waveContextPresentation")
+    context = _extract_function(js, "waveContextForItem")
+    wave_state = _extract_function(js, "canonicalWaveState")
+    confidence = _extract_function(js, "compactWaveConfidence")
+    states = 'var canonicalDailyWaveStates = ["WAVE_1_ADVANCE", "WAVE_2_FORMING", "WAVE_2_NEAR_COMPLETION", "EARLY_WAVE_3", "WAVE_3_CONTINUATION", "WAVE_4_CORRECTION", "WAVE_5_ADVANCE"];'
+    result = _run_node([states, context, wave_state, confidence, presentation], "waveContextPresentation({decision_lane:'WAIT',wave:{primary_state:'WAVE_3_CONTINUATION',confidence:'HIGH',context:{mapped_state:'WAVE_1_ADVANCE',secondary_markers:['WAVE_3_EXTENDED'],confidence:'LOW',source_timeframe:'daily'}}})")
+    assert result["state"] == "WAVE_3_CONTINUATION"
+    assert result["secondary"] == ["WAVE_3_EXTENDED"]
+    draw = _extract_function(js, "drawChart")
+    assert "marker.timestamp" in draw and "marker.price" in draw
+    for forbidden in ("marker.date", "marker.close", "marker.high", "marker.label.split", "item.high52"):
+        assert forbidden not in draw
+
+
+def test_daily_marker_legend_and_60m_setup_levels_are_timeframe_separated():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert 'id="drawer-chart-legend"' in html
+    assert 'data-timeframe="1D">1D' in html
+    assert 'data-timeframe="60M">60m' in html
+    assert 'if (chart.timeframe === "60M")' in _extract_function(js, "drawChart")
+    legend = _extract_function(js, "renderChartLegend")
+    assert 'dailyWaveMarkersForChart(chart).length' in legend
+    assert "escapeHTML(markerState)" in legend
+    assert "OHLC" in legend and "MA20" in legend and "MA50" in legend
+    assert all(label not in legend for label in ("MA60", "MA120", "MA240", "MA260"))
+    assert ".wave-chart-legend" in css and "flex-wrap:wrap" in css
+    merge = _extract_function(js, "mergeChartDecisionOverlay")
+    assert 'projectedEvidence = waveEvidenceForItem(item)' in merge
+    assert 'selectChartWaveEvidence(chart.wave_evidence, projectedEvidence, timeframe)' in merge
+    assert 'timeframe === "1D" && item && item.decision_lane' in merge
+
+
+def test_chart_wave_merge_preserves_nonempty_api_daily_markers_over_compact_item():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    vcp_overlay = _extract_function(js, "vcpChartOverlay")
+    item_evidence = _extract_function(js, "waveEvidenceForItem")
+    select_evidence = _extract_function(js, "selectChartWaveEvidence")
+    merge = _extract_function(js, "mergeChartDecisionOverlay")
+    api_markers = [
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "2026-08-01", "price": 10.0},
+        {"kind": "WAVE_1_HIGH", "timeframe": "daily", "timestamp": "2026-08-08", "price": 14.0},
+        {"kind": "WAVE_2_PULLBACK_LOW", "timeframe": "daily", "timestamp": "2026-08-15", "price": 11.5},
+        {"kind": "WAVE_3_CLOSE_CONFIRMATION", "timeframe": "daily", "timestamp": "2026-08-22", "price": 14.2},
+    ]
+    chart = {"timeframe": "1D", "wave_evidence": {"timeframe": "daily", "markers": api_markers}}
+    compact = {
+        "symbol": "AAA", "decision_lane": "REVIEW_NOW",
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
+        "setup": {"trigger": 14.2, "trade_stop": 11.5,
+                  "chart_evidence": {"daily": {"timeframe": "daily", "markers": []}}},
+        "provenance": {"source": "setup-candidates"},
+    }
+    result = _run_node(
+        [overlay, vcp_overlay, item_evidence, select_evidence, merge],
+        "mergeChartDecisionOverlay(" + json.dumps(chart) + ", " + json.dumps(compact) + ").wave_evidence.markers",
+    )
+    assert result == api_markers
+
+
+def test_chart_wave_merge_keeps_daily_markers_out_of_60m_and_setup_levels_separate():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    vcp_overlay = _extract_function(js, "vcpChartOverlay")
+    item_evidence = _extract_function(js, "waveEvidenceForItem")
+    select_evidence = _extract_function(js, "selectChartWaveEvidence")
+    merge = _extract_function(js, "mergeChartDecisionOverlay")
+    chart = {"timeframe": "60M", "wave_evidence": {"timeframe": "60m", "markers": []}}
+    compact = {
+        "decision_lane": "REVIEW_NOW",
+        "wave": {"markers": [
+            {"kind": "WAVE_1_HIGH", "timeframe": "daily", "timestamp": "2026-08-08", "price": 14.0}
+        ]},
+        "setup": {"trigger": 14.2, "trade_stop": 11.5, "target_1": 18.0,
+                  "chart_evidence": {"60m": {"timeframe": "60m", "markers": [
+                      {"kind": "TRIGGER", "timeframe": "60m", "timestamp": "2026-08-22T10:00:00+07:00", "price": 14.2}
+                  ]}}},
+    }
+    result = _run_node(
+        [overlay, vcp_overlay, item_evidence, select_evidence, merge],
+        "(function(chart){var value=mergeChartDecisionOverlay(chart," + json.dumps(compact) + ");return {markers:value.wave_evidence.markers,trigger:value.trigger,stop:value.stop,target:value.target};})(" + json.dumps(chart) + ")",
+    )
+    assert result == {"markers": [], "trigger": 14.2, "stop": 11.5, "target": 18.0}
+
+
+def test_daily_wave_marker_projection_supports_known_kinds_and_rejects_missing_coordinates():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    presentation = _extract_function(js, "dailyWaveMarkerPresentation")
+    markers_for_chart = _extract_function(js, "dailyWaveMarkersForChart")
+    kinds = ["WAVE_1_LOW", "WAVE_1_HIGH", "WAVE_2_PULLBACK_LOW",
+             "WAVE_3_CLOSE_CONFIRMATION", "TESTED_HIGH", "STRUCTURE_BREAK",
+             "THESIS_INVALIDATION", "TRIGGER", "TRADE_STOP"]
+    markers = [
+        {"kind": kind, "timeframe": "daily", "timestamp": "2026-08-01", "price": index + 10}
+        for index, kind in enumerate(kinds)
+    ]
+    markers.extend([
+        {"kind": "UNKNOWN", "timeframe": "daily", "timestamp": "2026-08-01", "price": 1},
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "", "price": 1},
+        {"kind": "WAVE_1_LOW", "timeframe": "daily", "timestamp": "2026-08-01", "price": ""},
+        {"kind": "WAVE_1_LOW", "timeframe": "60m", "timestamp": "2026-08-01", "price": 1},
+    ])
+    result = _run_node(
+        [presentation, markers_for_chart],
+        "(function(){var daily=dailyWaveMarkersForChart({timeframe:'1D',wave_evidence:{markers:" + json.dumps(markers) + "}});var hourly=dailyWaveMarkersForChart({timeframe:'60M',wave_evidence:{markers:" + json.dumps(markers) + "}});return {kinds:daily.map(function(marker){return marker.kind;}),labels:daily.map(function(marker){return dailyWaveMarkerPresentation(marker.kind).label;}),hourly:hourly};})()",
+    )
+    assert result["kinds"] == kinds
+    assert result["labels"][:4] == [
+        "Wave 1 low", "Wave 1 high", "Wave 2 pullback low",
+        "Wave 3 close confirmation",
+    ]
+    assert all(label and "_" not in label for label in result["labels"])
+    assert result["hourly"] == []
+
+
+def test_canonical_chart_overlay_selects_target_1_without_target_2_fallback():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    overlay = _extract_function(js, "canonicalChartOverlay")
+    result = _run_node(
+        [overlay],
+        "canonicalChartOverlay({setup:{trigger:12, invalidation:10, target_1:20, target_2:30}})",
+    )
+    assert result["target"] == 20
+    missing = _run_node([overlay], "canonicalChartOverlay({setup:{target_2:30}})")
+    assert "target" not in missing or missing["target"] is None
+    assert "target_2" in overlay  # documented fail-closed rationale
+
+
+def test_wave_explanation_deduplicates_metadata_and_normalizes_optional_values():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "waveEvidenceText")
+    assert _run_node([helper], "waveEvidenceText([null, 'close', {source: 'daily'}])") == 'close · {"source":"daily"}'
+    assert _run_node([helper], "waveEvidenceText([])") == "Unavailable"
+    explanation = _extract_function(js, "showWaveExplanation")
+    assert explanation.count('"<div>Timeframe: "') == 1
+    assert explanation.count('"<div>Confidence: "') == 1
+    assert explanation.count('"<div>Evidence refs: "') == 1
+    assert explanation.count('"<div>Snapshot: "') == 1
+    assert "marker.explanation && typeof marker.explanation === \"object\"" in explanation
+    assert 'if (!marker || typeof marker !== "object" || Array.isArray(marker)) {' in explanation
+    assert 'panel.hidden = true; panel.textContent = ""; return;' in explanation
+
+
+def test_wave_controls_guard_optional_dom_nodes():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for listener in ("drawerClose", "drawerOverlay", "drawerPrev", "drawerNext", "drawer", "drawerCanvas", "chartWaveEvidence"):
+        assert f"dom.{listener}" in js or ('"' + listener + '"' in js)
+    assert "if (!dom.drawer) return;" in js
+
+
+def test_setup_targets_render_ordered_metadata_and_malformed_targets_fail_closed():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "targets = Array.isArray(setup.targets) ? setup.targets : [];" in js
+    assert 'target.name === "target_1"' in js
+    assert "target1 = firstTarget && firstTarget.price;" in js
+    assert 'Target 1 <b>' not in js
+    assert 'id="drawer-target"' in (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+
+
 def test_chart_contract_has_real_layers_and_fail_closed_runtime():
-    html = (ROOT / "index.html").read_text(encoding="utf-8")
-    js = (ROOT / "app.js").read_text(encoding="utf-8")
-    for marker in ('data-layer="candles"', 'data-layer="volume"', 'data-layer="ma"', 'data-layer="rsi"'):
-        assert marker in html
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
     for marker in ("function drawChart", "chartLayers.candles", "chartLayers.volume", "chartLayers.ma", "chartLayers.rsi"):
         assert marker in js
+    for marker in ("decisionLine", 'data-timeframe="60M"', 'data-timeframe="1D"', 'data-timeframe="1W"'):
+        assert marker in html or marker in js
+    for marker in ('data-layer="candles"', 'data-layer="volume"', 'data-layer="ma"', 'data-layer="rsi"'):
+        assert marker not in html
+    assert 'id="drawer-indicator-legend"' not in html
     assert "tryFixtureShortlist" not in js
     assert "tryFixtureExplorer" not in js
+
+
+def test_shared_drawer_chart_requires_two_usable_candles():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    usable = _extract_function(shared, "usableChartCandles")
+    render = _extract_function(shared, "renderDrawerChart")
+    assert "usableChartCandles(chart).length >= 2" in render
+    assert 'Chart unavailable: insufficient candle history' in render
+    assert _run_node(
+        [usable],
+        "[usableChartCandles({candles: []}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: 1.5}]}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: 1.5}, "
+        "{open: 2, high: 3, low: 1, close: 2.5}]}).length, "
+        "usableChartCandles({candles: [{open: 1, high: 2, low: 0, close: null}, "
+        "{open: 2, high: 3, low: 1, close: 2.5}]}).length]",
+    ) == [0, 1, 2, 1]
 
 
 def test_mobile_interactive_targets_are_touch_safe():
     css = (ROOT / "styles.css").read_text(encoding="utf-8")
     assert ".chart-timeframe { min-height:44px; min-width:44px;" in css
-    assert ".chart-toggle { min-height:44px; min-width:44px;" in css
+    assert ".ma-controls label { display:inline-flex; align-items:center; gap:3px; min-height:44px;" in css
+
     assert ".explorer-control select, .explorer-control input { min-height:44px;" in css
+    assert ".vcp-table th:first-child, .vcp-table td:first-child { width:42%; min-width:0; }" in css
+    assert ".vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:16%; }" in css
+    assert ".vcp-row__symbol-content { flex-direction:column; align-items:flex-start;" in css
+
+
+def test_watchlist_table_and_filters_are_contained_on_mobile():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert ".vcp-table-wrap { width:100%; max-width:100%; min-width:0; overflow:hidden;" in css
+    assert ".vcp-table { display:table; width:100%; max-width:100%;" in css
+    assert "min-width:0; max-width:0; padding:10px 12px;" in css
+    assert "text-overflow:ellipsis;" in css
+    assert ".vcp-row__symbol { display:flex;" not in css
+    assert ".vcp-row__symbol-content { display:flex; align-items:flex-start; gap:8px; min-width:0; max-width:100%; overflow:hidden; }" in css
+    assert ".vcp-card__tags { display:flex; flex-wrap:wrap; gap:4px; min-width:0; max-width:100%;" in css
+    assert ".watchlist-default-filters { display:flex; align-items:center; flex-wrap:wrap;" in css
+    assert ".watchlist-default-filters > label { display:inline-flex; align-items:center;" in css
+
+
+def test_symbol_table_cell_keeps_table_layout_and_inner_content_owns_flex():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert ".vcp-row__symbol { display:flex;" not in css
+    assert ".vcp-row__symbol-content { display:flex;" in css
+    assert '<td class="vcp-row__symbol"><div class="vcp-row__symbol-content">' in js
+    assert '</div></td>' in js
+
+
+def test_mobile_vcp_table_keeps_status_readable_and_rr_in_detail_drawer():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert '.vcp-card__decision { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;' in css
+    assert '.vcp-table .vcp-row__rr { display:none; }' in css
+    assert '.vcp-table { table-layout:fixed; }' in css
+    assert '.vcp-table th:nth-child(2), .vcp-table td:nth-child(2) { width:16%; }' in css
+    assert 'class="vcp-row__details" aria-label="View details for ' in js
+    assert 'class="vcp-row__rr">' in js
+    assert '<th class="vcp-row__rr">R/R</th>' in js
+    assert '<div class="drawer-setup-field"><dt>R:R</dt><dd id="drawer-rr">Unavailable</dd></div>' in (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+
+
+def test_mobile_vcp_secondary_evidence_and_freshness_have_containment_contracts():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert ".vcp-card__primary { display:flex; flex-direction:column; width:100%; max-width:100%; min-width:0;" in css
+    assert ".vcp-card__primary .vcp-card__evidence { display:block; width:100%; max-width:100%; min-width:0;" in css
+    assert "overflow:hidden; text-overflow:ellipsis;" in css
+    assert ".freshness { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 58%;" in css
+    assert ".freshness-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }" in css
+
+
+def test_vcp_mobile_390_contract_uses_fixed_five_column_layout_without_page_overflow():
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "body {" in css and "overflow-x: hidden;" in css
+    assert ".vcp-table-wrap { width:100%; max-width:100%; min-width:0; overflow:hidden;" in css
+    assert ".vcp-table { display:table; width:100%; max-width:100%;" in css
+    assert ".vcp-table th, .vcp-table td { min-width:0; max-width:0;" in css
+    assert ".vcp-table { table-layout:fixed; }" in css
+    assert ".vcp-table th:nth-child(4), .vcp-table td:nth-child(4) { width:22%; }" in css
+    assert 'class="vcp-row__rr">' in js and '<th class="vcp-row__rr">R/R</th>' in js
+    assert "<th>%</th>" in js
+    assert 'aria-label="View details for ' in js
+    assert 'meta name="viewport"' in html
+
+
+def test_vcp_payloads_are_cached_and_presentation_filters_do_not_duplicate_fetches():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    cache = (ROOT / "request_cache.js").read_text(encoding="utf-8")
+    assert "SignalixRequestCache" in cache
+    assert "if (!force && Object.prototype.hasOwnProperty.call(cache, key))" in cache
+    assert "if (inFlight[key]) inFlight[key].controller.abort();" in cache
+    assert "if (force) delete cache[key];" in cache
+    assert "if (inFlight[key] === entry) cache[key] = data;" in cache
+    assert "if (inFlight[key] === entry) delete inFlight[key];" in cache
+    assert "function renderDailyVcpData(data)" in js
+    assert "renderVcpData(data);" in js
+    assert "loadDailyVcp(true);" in js
+    assert 'loadVcp(true);' in js
+
+
+def test_vcp_tables_use_canonical_rr_and_compact_tags():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "function vcpRiskReward(result)" in js
+    assert "var value = result && result.rr;" in js
+    assert "risk_reward_ratio" not in js
+    assert 'Number(result.margin_rate_pct).toFixed(0) + "%"' in js
+    assert '"NEAR 52W HIGH"' in js
+    assert ".vcp-table .vcp-card__tags" in css
+
+
+def test_vcp_filter_events_render_the_selected_client_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'dom.dailySetupRefresh.addEventListener("click", function() { loadDailyVcp(true, 1); });' in js
+    assert 'dom.dailyVcpType.addEventListener("change", loadDailyVcp)' not in js
+    assert "dom.vcpState.addEventListener(\"change\", loadVcp)" in js
+    assert "dom.vcpType.addEventListener(\"change\", loadVcp)" in js
+    assert "results = results.filter(priceMatches)" in js
+    assert "if (marginRates.length) results = results.filter" in js
+    assert 'if (dom.vcpFilterApply) dom.vcpFilterApply.addEventListener("click", function() {' in js
+    assert 'if (!apply && surface === "vcp") return;' in js
+    assert 'updateMarginRates("vcp", true);' in js
+
+
+def test_vcp_drawer_membership_and_chart_overlay_contracts():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    db = (Path(__file__).parent / "vcp_finder_db.py").read_text(encoding="utf-8")
+    assert "function renderSharedDetail" in js
+    assert "function renderDrawerDetail" not in js
+    assert "var decisionLabelYs = [];" in js
+    assert "Math.abs(previous - labelY) < 14" in js
+    assert "FROM index_memberships" in db
+    assert 'result["index_membership"] = memberships.get' in db
+
+
+def test_vcp_primary_cards_use_unified_state_decision_and_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'decision_shadow_v2' in js
+    assert 'return decisionLane(result) + " · " + actionability(result);' in js
+    assert 'function canonicalDecision(result)' in js
+    assert 'return canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in js
+    assert 'canonicalDataSufficiency(result)' in js
+    assert 'return "V2 " + decisionLane(result) + " · " + actionability(result)' in js
+    assert 'var entry = shadow.entry || {};' in js
+    assert 'entry.pivot' in js
+    assert 'vcpPrimaryStatus(result)' in js
+    assert 'vcpPrimaryEvidence(result)' in js
+    assert 'var groups = {};' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    assert 'escapeHTML(status)' in js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    assert 'var trigger = entry.pivot == null ? "—"' in js
+    assert 'var invalidation = entry.invalidation == null ? "—"' in js
+    assert '(price.last_close == null || price.last_close === "" ? "—" : displayValue(price.last_close))' in js
+    primary_group = js[js.index('function vcpDisplayGroup'):js.index('function vcpEmptyState')]
+    for legacy in (
+        'TRIGGER CONFIRMED',
+        'PRICE-VOLUME BREAKOUT',
+        'PIVOT TOUCH',
+        'DO NOT CHASE',
+        'STALE DATA',
+        'NOT VERIFIED',
+        'BREAKOUT_WATCH · WAIT',
+        'NEAR_TRIGGER · WAIT',
+        'FAILED · AVOID',
+        'DATA UNAVAILABLE',
+    ):
+        assert legacy not in primary_group
+    primary_helpers = js[js.index('function vcpPrimaryStatus'):js.index('function vcpCard')]
+    for implementation_label in ('DATA UNAVAILABLE', 'NOT_VERIFIED', 'STALE DATA', 'INSUFFICIENT DATA'):
+        assert implementation_label not in primary_helpers
+    daily_render = js[js.index('function renderDailyVcpWatchlist'):js.index('function loadDailyVcp')]
+    for implementation_label in ('ACTION / REVIEW', 'NEAR TRIGGER · VOLUME CHECK', 'BREAKOUT WATCH · INTRABAR'):
+        assert implementation_label not in daily_render
+
+
+def test_vcp_primary_render_cannot_read_legacy_decision_fields():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    primary = js[js.index("function vcpPrimaryStatus"):js.index("function vcpEmptyState")]
+    for legacy_field in (
+        "trade_readiness",
+        "daily_state",
+        "setup_proximity",
+        "action_queue",
+        "shortlist_lane",
+        "review_lane",
+        "insurance_context_watch",
+        "late_watch",
+    ):
+        assert legacy_field not in primary
+    assert "function vcpDisplayGroup(result)" in js
+    display_group = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
+    assert 'var legacyPair = canonicalDecisionState(result) + " · " + canonicalDecisionValue(result);' in display_group
+    assert 'var pair = decisionLane(result) + " · " + actionability(result);' in display_group
+    assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in display_group
+
+
+def test_daily_watchlist_consolidates_duplicate_primary_status_sections():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    render = js[js.index("function renderDailyVcpWatchlist"):js.index("function loadDailyVcp")]
+
+    # Daily lanes are grouped into canonical state buckets before rendering.
+    assert render.index("var groups = {};") < render.index("order.forEach(function(key)")
+    assert render.index("items.forEach(function(item)") < render.index("[\"REVIEW_NOW · ACTIONABLE_REVIEW\"")
+    assert render.count("html += '<section class=\"vcp-lane\">") == 1
+    assert "(groups[status] || (groups[status] = [])).push(item);" in render
+    assert "groupCaps[status] = (groupCaps[status] || 0) + Number(cap);" in render
+
+
+def test_canonical_vcp_controls_exist_on_both_surfaces_and_filter_client_side():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for field in ("decision-state", "decision", "quality"):
+        assert f'id="daily-vcp-{field}"' in html
+    for field in ("decision-state", "decision", "quality"):
+        assert f'id="vcp-{field}"' not in html
+    for value in ("ALL", "FORMING", "READY", "CONFIRMED", "EXTENDED", "INVALIDATED", "REVIEW", "WAIT", "AVOID", "PASS", "PARTIAL", "FAIL", "UNKNOWN"):
+        assert f'value="{value}"' in html
+    assert "function canonicalFilterMatches(result" in js
+    assert "canonicalFilterMatches(r, dom.dailyVcpDecisionState, dom.dailyVcpDecision, dom.dailyVcpQuality)" in js
+    assert "canonicalFilterMatches(r, dom.vcpDecisionState, dom.vcpDecision, dom.vcpQuality)" in js
+    assert 'var results = (data.results || [])' in js
+    assert 'results = results.filter(function(r){ return canonicalFilterMatches' in js
+
+
+def test_daily_watchlist_hides_non_sufficient_data_and_reports_coverage():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'var insufficientCount = 0;' in js
+    assert 'if (canonicalDataSufficiency(r) !== "SUFFICIENT") { insufficientCount += 1; return; }' in js
+    assert 'hidden: insufficient/unknown data' in js
+    assert 'reviewable / ' in js
+
+
+def test_canonical_card_evidence_and_mobile_controls_are_visible_and_touch_safe():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert 'V2 " + decisionLane(result)' in js
+    assert 'Structure " + passCount' in js
+    assert 'var pair = decisionLane(result) + " · " + actionability(result);' in js
+    assert '.watchlist-default-filters select { min-height:44px;' in css
+    assert '.explorer-control select, .explorer-control input { min-height:44px;' in css
+    assert 'flex-wrap:wrap' in css
+
+
+def test_vcp_grouping_uses_canonical_state_decision_pairs_on_both_surfaces():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = js[js.index("function vcpDisplayGroup"):js.index("function vcpEmptyState")]
+    for pair in (
+        "FORMING · WAIT",
+        "READY · WAIT",
+        "CONFIRMED · REVIEW",
+        "EXTENDED · WAIT",
+        "INVALIDATED · AVOID",
+    ):
+        assert f'"{pair}"' in helper
+    assert 'return allowed.indexOf(pair) >= 0 ? pair : "UNKNOWN";' in helper
+    assert 'var status = vcpDisplayGroup(item);' in js
+    assert 'var key = vcpDisplayGroup(result);' in js
+    assert '"REVIEW_NOW · ACTIONABLE_REVIEW"' in js
+    assert '"DATA_BLOCKED · NO_ACTION"' in js
+
+
+def test_vcp_type_presentation_fails_closed_on_canonical_data_and_state():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    type_label = js[js.index("function vcpTypeLabel"):js.index("function vcpTypeMatches")]
+    assert "var state = canonicalDecisionState(result);" in type_label
+    assert 'if (canonicalDataSufficiency(result) !== "SUFFICIENT") return null;' in type_label
+    assert 'if (["INVALIDATED", "NOT_VERIFIED"].indexOf(state) >= 0) return null;' in type_label
+
+
+def test_daily_trade_value_filter_callback_fails_without_return_value():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return;"
+    ) in js
+    assert (
+        "if (dom.dailyFilterTradeValue.checked && "
+        "!(Number(metrics.avg_trade_value_20) > 10000000)) return false;"
+    ) not in js
+
+
+def test_primary_mvp_requests_canonical_setup_candidates_and_renders_layers():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in js
+    assert "function renderSetupCandidates(data)" in js
+    assert "setupCandidateCard" in js
+    assert "setupCandidateCard" in js
+    assert "R:R" in js and "Target 1" in html and "Stop" in html
+
+
+def test_review_cockpit_card_and_drawer_use_compact_plan_and_company_context():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    assert all(label in card for label in ("Trigger", "Stop", "Target", "R:R"))
+    assert "valueOrUnavailable(target1)" in card
+    assert 'class="drawer-info"' not in html and 'aria-controls="drawer-evidence-details"' not in html
+    assert "Company context" in html and "drawer-market-cap" in html
+    assert "dom.drawerMarketCap" in js
+    assert '"market_cap"' in js
+    assert "isInvalidationNear" in js
+
+
+def test_drawer_info_preserves_not_verified_honesty_and_collapsed_evidence():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="drawer-evidence-details" class="drawer-details"' in html
+    assert 'id="drawer-context-info"' not in html
+    assert 'dom.drawerEvidenceDetails.open = false' in js
+    assert '"Not ready"' in js and '"Not verified"' in js and '"Unavailable"' in js
+
+
+def test_shared_canonical_client_is_loaded_by_both_surfaces_and_owns_policy():
+    client = (ROOT / "canonical-client.js").read_text(encoding="utf-8")
+    classic = (ROOT / "index.html").read_text(encoding="utf-8")
+    wave = (ROOT / "wave-context.html").read_text(encoding="utf-8")
+    assert 'window.SignalixCanonicalClient' in client
+    assert 'fetchSetupCandidatesPage' in client and 'fetchAllCandidates' in client and 'dailyMarkers' in client
+    assert 'setupCandidatesRequestKey' in client
+    assert '<script src="canonical-client.js"></script>' in classic
+    assert '<script src="canonical-client.js"></script>' in wave
+    assert classic.index('canonical-client.js') < classic.index('app.js')
+    assert wave.index('canonical-client.js') < wave.index('wave-context.js')
+    assert 'var fetchAllCandidates=window.SignalixCanonicalClient.fetchAllCandidates;' in (ROOT / "wave-context.js").read_text(encoding="utf-8")
+    assert 'window.SignalixCanonicalClient.markers(item)' in (ROOT / "app.js").read_text(encoding="utf-8")
+    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in (ROOT / "app.js").read_text(encoding="utf-8")
+
+
+def test_t03_compact_card_keeps_decision_hierarchy_and_moves_evidence_to_drawer():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    card = _extract_function(js, "setupCandidateCard")
+    assert 'class="setup-candidate__readiness"' in card
+    assert 'class="setup-candidate__plan"' in card
+    for marker in ("Trigger", "Target", "R:R", "Stop"):
+        assert marker in card
+    assert "Trigger readiness" not in card and "Invalidation / Stop" not in card
+    for evidence_marker in ("setup-candidate__evidence", "Market / sector", "Peers", "VCP bonus", "as of"):
+        assert evidence_marker not in card
+    assert "function openSharedDrawer" in js
+    assert "waveEvidenceForItem" in js and "formatProvenance" in js
+    assert ".setup-candidate__plan {" in css
+    assert ".setup-candidate__plan span {" in css
+    assert ".setup-candidate__plan b {" in css
+
+
+def test_setup_candidate_review_uses_explicit_compact_toolbar_and_collapsed_advanced_filters():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="daily-setup-toolbar"' in html
+    assert 'id="daily-setup-search"' in html
+    assert 'id="daily-setup-lane"' in html
+    assert 'id="daily-setup-refresh"' in html
+    assert 'id="daily-setup-advanced"' in html
+    assert 'id="daily-setup-live-refresh"' in html
+    assert 'id="daily-setup-updated"' in html
+    assert 'dom.dailySetupRefresh.addEventListener("click"' in js
+    assert 'dom.dailySetupSearch.addEventListener("input"' in js
+    assert 'dom.dailySetupLane.addEventListener("change"' in js
+    assert 'dailySetupData' in js
+    assert 'dom.dailyFilterMarginable, dom.dailyFilterTradeValue, dom.dailyFilterPrice' in js
+    assert 'liveRefreshTimer = liveRefreshEnabled ? setTimeout' in js
+    assert 'setInterval(function()' not in js
+
+
+def test_mobile_review_surface_uses_fullscreen_drawer_guide_and_state_aware_copy():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert 'id="method-guide"' in html
+    assert 'id="drawer-method-link"' in html
+    assert "@media (max-width: 600px)" in css
+    assert ".drawer-panel { width:100%; max-width:512px; max-height:88dvh; height:88dvh;" in css
+    assert "methodGuideContent" in js and "drawerMethodLink" in js
+    assert "Awaiting 60m structure" in js and "Setup forming" in js
+    helper = _extract_function(js, "setupReadinessLabel")
+    result = _run_node(
+        [helper],
+        "[setupReadinessLabel({decision_lane:'DAILY_CANDIDATE'}, {status:'FORMING'}), "
+        "setupReadinessLabel({decision_lane:'SETUP_FORMING'}, {status:'FORMING', minor_structure:true}), "
+        "setupReadinessLabel({decision_lane:'DATA_BLOCKED'}, {status:'DATA_BLOCKED'})]"
+    )
+    assert result == ["Setup forming", "Awaiting 60m structure", "Data blocked"]
+
+
+def test_setup_candidate_refresh_is_the_update_boundary_and_idle_is_not_live_by_default():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'Refresh' in html
+    assert 'aria-live="polite"' in html
+    assert "liveRefreshEnabled" in js
+    assert "dailySetupUpdated.textContent" in js
+    assert 'liveRefreshTimer = liveRefreshEnabled ? setTimeout' in js
+    assert 'setInterval(function()' not in js
+
+
+def test_vcp_is_not_primary_navigation_and_api_is_marked_audit_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'id="tab-vcp"' not in html
+    assert "VCP Audit · Compatibility / Rollback" not in html
+    assert "Audit / compatibility / rollback only" not in html
+    assert 'id="tab-daily-vcp"' in html
+    assert 'if (dom.tabVcp) dom.tabVcp.addEventListener' in js
+    assert 'id="daily-setup-sector"' in html
+    assert 'var endpoint = "/api/vcp-finder?interval=60m&market=TH&universe=marginable_long";' in js
+
+
+def test_setup_candidate_payload_validation_fails_closed_and_checks_lane_totals():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateSetupCandidatePayload")
+    base = {
+        "items": [{"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"}],
+        "counts": {"DAILY_CANDIDATE": 1, "DATA_BLOCKED": 0},
+        "evaluated_count": 1,
+    }
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(base) + ")") is True
+    malformed = dict(base, items={"symbol": "AAA"})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(malformed) + ")") is False
+    negative = dict(base, counts={"DAILY_CANDIDATE": -1, "DATA_BLOCKED": 2})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(negative) + ")") is False
+    inconsistent = dict(base, counts={"DAILY_CANDIDATE": 0, "DATA_BLOCKED": 1})
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(inconsistent) + ")") is False
+
+
+def test_setup_candidate_compact_items_and_canonical_detail_merge_are_safe():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateSetupCandidatePayload")
+    compact = {
+        "items": [{"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"}],
+        "counts": {"DAILY_CANDIDATE": 1},
+        "evaluated_count": 1,
+    }
+    assert _run_node([validator], "validateSetupCandidatePayload(" + json.dumps(compact) + ")") is True
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    fields = ("trend", "wave", "setup", "context", "bonus_evidence", "chart_evidence")
+    item = {field: {"source": "list"} for field in fields}
+    item.update({"symbol": "AAA", "decision_lane": "DAILY_CANDIDATE"})
+    detail = {field: {"source": "detail"} for field in fields}
+    detail["name"] = "Alpha"
+    result = _run_node([merge], "mergeCanonicalSetupDetail(" + json.dumps(item) + ", " + json.dumps(detail) + ")")
+    for field in fields:
+        assert result[field] == {"source": "list"}
+    assert result["name"] == "Alpha"
+
+
+def test_canonical_detail_merge_enriches_compact_nested_evidence_without_overwrite():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    item = {
+        "symbol": "AAA",
+        "decision_lane": "REVIEW_NOW",
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
+        "setup": {"trigger": 12, "trade_stop": 10, "target_1": 20},
+        "provenance": {"snapshot_id": "snap-canonical", "source": "setup-candidates"},
+        "name": "Canonical name",
+    }
+    detail = {
+        "name": "Legacy name",
+        "sector": "Technology",
+        "wave": {"primary_state": "WAVE_1_ADVANCE", "snapshot_id": "snap-legacy"},
+        "setup": {"trigger": 99, "chart_evidence": {"daily": {"markers": ["detail-marker"]}}},
+        "provenance": {"snapshot_id": "snap-legacy"},
+        "decision_lane": "AVOID",
+        "unexpected_legacy_field": "must not enter canonical item",
+    }
+    result = _run_node([merge], "mergeCanonicalSetupDetail(" + json.dumps(item) + ", " + json.dumps(detail) + ")")
+    assert result["name"] == "Canonical name"
+    assert result["sector"] == "Technology"
+    assert result["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert result["wave"]["snapshot_id"] == "snap-legacy"
+    assert result["setup"]["trigger"] == 12
+    assert result["setup"]["chart_evidence"] == detail["setup"]["chart_evidence"]
+    assert result["provenance"] == item["provenance"]
+    assert result["decision_lane"] == "REVIEW_NOW"
+    assert "unexpected_legacy_field" not in result
+
+
+def test_compact_item_plus_canonical_detail_provides_full_drawer_evidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    merge = _extract_function(js, "mergeCanonicalSetupDetail")
+    wave_evidence = _extract_function(js, "waveEvidenceForItem")
+    compact = {
+        "symbol": "AAA", "decision_lane": "REVIEW_NOW",
+        "wave": {"primary_state": "EARLY_WAVE_3", "confidence": "HIGH"},
+        "setup": {"trigger": 12, "trade_stop": 10},
+        "provenance": {"source": "setup-candidates"},
+    }
+    detail = {
+        "wave": {
+            "primary_state": "WAVE_1_ADVANCE",
+            "evidence_explanation": {"rule": "Daily close above Wave 1 high", "policy": "elliott-v1"},
+            "supporting_evidence": ["prior advance"],
+            "contradicting_evidence": ["weak volume"],
+            "missing_evidence": ["60m confirmation"],
+            "markers": [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}],
+            "evidence_markers": [{"kind": "WAVE_1_HIGH"}],
+            "snapshot_identity": "daily:2026-08-31",
+            "snapshot_id": "daily:2026-08-31",
+        },
+        "setup": {"chart_evidence": {"daily": {"markers": ["daily-marker"]}, "60m": {"markers": ["60m-marker"]}}},
+        "provenance": {"policy_version": "setup-candidates-v1", "snapshot_identity": "daily:2026-08-31"},
+    }
+    result = _run_node([merge, wave_evidence], "(function(){var item = mergeCanonicalSetupDetail(" + json.dumps(compact) + ", " + json.dumps(detail) + "); return {item:item, evidence:waveEvidenceForItem(item)};})()")
+    assert result["item"]["wave"]["primary_state"] == "EARLY_WAVE_3"
+    assert result["evidence"]["rule"] == "Daily close above Wave 1 high"
+    assert result["evidence"]["supporting_evidence"] == ["prior advance"]
+    assert result["evidence"]["contradicting_evidence"] == ["weak volume"]
+    assert result["evidence"]["missing_evidence"] == ["60m confirmation"]
+    assert result["evidence"]["markers"] == [{"kind": "WAVE_3_CLOSE_CONFIRMATION"}]
+    assert result["evidence"]["snapshot_identity"] == "daily:2026-08-31"
+    assert result["item"]["setup"]["chart_evidence"]["60m"]["markers"] == ["60m-marker"]
+
+
+def test_canonical_chart_failure_never_uses_snapshot_fallback():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    helper = _extract_function(js, "shouldUseSnapshotChartFallback")
+    assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA","decision_lane":"DAILY_CANDIDATE"})') is False
+    assert _run_node([helper], 'shouldUseSnapshotChartFallback({"symbol":"AAA"})') is True
+    assert "function shouldUseSnapshotChartFallback(item)" in js
+    assert 'detailUrl: "/api/symbol/" + encodeURIComponent(symbol)' in js
+
+
+def test_setup_candidate_pagination_is_reachable_and_accessible():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for marker in ('id="daily-setup-pagination"', 'id="daily-setup-prev"',
+                   'id="daily-setup-next"', 'aria-live="polite"'):
+        assert marker in html
+    assert "dailySetupPage - 1" in js
+    assert "dailySetupPage + 1" in js
+    assert "data.total_pages || 0" in js
+    assert 'loadDailyVcp(true, 1)' in js
+    assert 'if (force && typeof force === "object")' not in js
+
+
+def test_primary_setup_states_keep_empty_error_and_data_blocked_distinct_and_mobile_safe():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "empty result, not an API failure" in js
+    assert "Unable to load setup candidates:" in js
+    assert 'decision = item.decision_lane || "DATA_BLOCKED"' in js
+    assert ".setup-candidate-card { width: 100%; max-width: 100%; }" in css
+    assert "overflow-x: hidden" in css
+    assert "390px" not in html or 'meta name="viewport"' in html
+
+
+def test_setup_candidates_use_canonical_lane_and_wave_evidence_projection():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "item.decision ||" not in (ROOT / "app.js").read_text(encoding="utf-8")
+    for marker in ("item.decision_lane", "rr.to_target_1", "function waveEvidenceForItem", "function openSharedDrawer"):
+        assert marker in js
+    card = _extract_function(js, "setupCandidateCard")
+    assert "wave.primary_state" not in card
+    assert "setup.entry_zone" not in card
+
+
+def test_setup_candidates_group_in_canonical_lane_order_and_block_unknown_lanes():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    lane_order = '["REVIEW_NOW", "SETUP_FORMING", "DAILY_CANDIDATE", "WAIT", "AVOID", "DATA_BLOCKED"]'
+    assert lane_order in js
+    assert "function groupSetupCandidates(items)" in js
+    assert 'var lane = laneOrder.indexOf(item.decision_lane) >= 0 ? item.decision_lane : "DATA_BLOCKED"' in js
+    assert "groups.REVIEW_NOW" in js and '"PRE_TRIGGER", "TESTED_TRIGGER", "TRIGGERED"' in js
+    assert "laneItems.map(setupCandidateCard).join(\"\")" in js
+    assert "DAILY STRUCTURE · " not in js
+
+
+def test_setup_candidate_layout_has_no_horizontal_overflow_at_390px():
+    """Use a real layout engine for the mobile overflow contract."""
+    import glob
+    import pytest
+    playwright = pytest.importorskip("playwright.sync_api")
+    executables = glob.glob("/root/.cache/ms-playwright/*/chrome-linux64/chrome")
+    if not executables:
+        pytest.skip("Chromium executable is not installed")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    markup = """
+      <main class="app"><article class="decision-card setup-candidate-card">
+        <div class="decision-card__top"><strong>LONGSYMBOL</strong><b>DATA_BLOCKED</b></div>
+        <p class="setup-candidate__evidence">Trend emerging_uptrend · 20D 18.4% · 60D 42.1% · RS 91 · 52W BREAKOUT · ATH NO BREAKOUT</p>
+        <div class="setup-candidate__wave"><span class="setup-candidate__wave-badge">Primary Daily Wave · W3 ↑ · continuation</span></div>
+        <div class="setup-candidate__grid"><span>Wave <b>EARLY_WAVE_3 · structure intact</b></span><span>Setup <b>DATA_BLOCKED · trigger – · invalidation –</b></span><span>Targets <b>– / –</b></span><span>R:R <b>–</b></span><span>Market / sector <b>UNKNOWN · Electronic Components</b></span><span>Peers <b>6/10</b></span></div>
+      </article></main>
+    """
+    with playwright.sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=True, executable_path=executables[0])
+        except Exception as error:
+            pytest.skip("Chromium cannot start in this sandbox: " + str(error).splitlines()[0])
+        page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+        page.set_content(f"<style>{css}</style>{markup}")
+        result = page.evaluate("""() => ({
+          viewport: document.documentElement.clientWidth,
+          scroll: document.documentElement.scrollWidth,
+          card: document.querySelector('.setup-candidate-card').getBoundingClientRect().width,
+          grid: document.querySelector('.setup-candidate__grid').getBoundingClientRect().width
+        })""")
+        browser.close()
+    assert result["scroll"] <= result["viewport"]
+    assert result["card"] <= 390
+    assert result["grid"] <= result["card"]
+
+
+def test_t07_drawer_navigation_uses_filtered_deterministic_collection_and_boundaries():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    collection = _extract_function(js, "setupDrawerCollection")
+    grouping = _extract_function(js, "groupSetupCandidates")
+    stable = _extract_function(js, "stableSetupCandidateOrder")
+    context = _extract_function(js, "waveContextForItem")
+    navigation = _extract_function(js, "drawerNavigationState")
+    items = [
+        {"symbol": "ZZZ", "decision_lane": "DAILY_CANDIDATE"},
+        {"symbol": "AAA", "decision_lane": "REVIEW_NOW", "setup": {"status": "TRIGGERED"}},
+        {"symbol": "AAA", "decision_lane": "REVIEW_NOW", "setup": {"status": "PRE_TRIGGER"}},
+        {"symbol": "MID", "decision_lane": "SETUP_FORMING"},
+    ]
+    states = 'var canonicalDailyWaveStates = ["EARLY_WAVE_3", "WAVE_3_CONTINUATION"];'
+    assert _run_node([states, context, grouping, stable, collection], "setupDrawerCollection(" + json.dumps(items) + ").map(function(item) { return item.symbol; })") == ["AAA", "MID", "ZZZ"]
+    assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 0)") == {"index": 0, "count": 3, "position": "1 of 3", "previousDisabled": True, "nextDisabled": False}
+    assert _run_node([navigation], "drawerNavigationState(['AAA','MID','ZZZ'], 2)") == {"index": 2, "count": 3, "position": "3 of 3", "previousDisabled": False, "nextDisabled": True}
+    assert 'id="drawer-position"' in html
+    assert "drawerItems[next] || {symbol: drawerSymbols[next]}" in js
+    assert "items = items.filter(setupCandidateMatchesToolbar)" in js
+    assert "drawerItems = setupDrawerCollection(items)" in js
+
+
+def test_t07_drawer_navigation_atomically_guards_stale_enrichment_and_chart_responses():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    assert "drawerItem = item;" in js
+    assert "seq !== chartRequestSeq || symbol !== chartSymbol" in js
+    assert "seq !== chartRequestSeq || symbol !== chartSymbol || timeframe !== chartTimeframe" in js
+    assert "envelope.item = Object.assign({}, envelope.item, detail || {}); renderSharedDetail(envelope);" in js
+    assert ".drawer-position" in css
+
+
+def test_private_shadow_buy_tab_is_visible_and_market_only():
+    html = (ROOT / "index.html").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    for marker in (
+        'id="tab-shadow-buy"', 'Shadow Buy Signals · 7D',
+        'id="panel-shadow-buy"',
+        'id="shadow-load"', 'id="shadow-cards"',
+    ):
+        assert marker in html
+    assert "No portfolio, alert, or broker order is used." in html
+    assert 'fetch("/api/shadow-buy-signals?days=7"' in js
+    assert "shadow-owner-token" not in html
+    assert "X-Portfolio-Token" not in js
+    assert 'tab === "shadow-buy"' in js
+
+
+def test_shadow_ui_validates_no_execution_and_uncalibrated_confidence():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    validator = _extract_function(js, "validateShadowSignalPayload")
+    assert 'data.schema_version === "shadow-market-buy-signals-v1"' in validator
+    assert 'item.signal === "BUY_NOW"' in validator
+    assert 'item.execution.authorized === false' in validator
+    assert 'item.confidence.calibration_status === "NOT_CALIBRATED"' in validator
+    assert 'data.execution.broker_execution_enabled === false' in validator
+    assert "confidence is evidence strength, not win probability" in js
+
+
+def test_shadow_cards_are_mobile_bounded_and_show_decision_levels():
+    js = (ROOT / "app.js").read_text(encoding="utf-8") + (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    css = (ROOT / "styles.css").read_text(encoding="utf-8")
+    card = _extract_function(js, "shadowSignalCard")
+    for marker in ("BUY NOW · PAPER SHADOW", "First target", "plan.trigger", "plan.trade_stop",
+                   "plan.target_1", "plan.rr_to_target_1", "first_signaled_at"):
+        assert marker in card
+    assert ".shadow-signal-card { width:100%; max-width:100%; min-width:0;" in css
+    assert ".shadow-signal-card__plan { grid-template-columns:repeat(2,minmax(0,1fr)); }" in css
+
+
+def test_trend_map_drawer_failure_has_separate_retry_and_resets_single_flight():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'id="drawer-retry"' in template
+    assert "sharedDrawerPromise=null" in template
+    assert "pendingDrawerOpen" in template
+    assert "Retry detail drawer" in template
+    assert 'id="retry" hidden>Retry page data' in template
+    assert 'sharedDrawerPromise=null;throw error' in template
+    assert "function clearPendingDrawerOpen()" in template
+
+
+def test_trend_map_invalidates_stale_drawer_and_chart_has_actionable_retry():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "function invalidateDrawer(rows)" in template
+    assert "closeSharedDrawer()" in template
+    assert 'id="drawer-chart-retry"' in shared
+    assert "Retry chart" in shared
+    assert "requestChart(envelope, symbol, timeframe, seq)" in shared
+    assert 'seq !== chartRequestSeq || symbol !== chartSymbol' in shared
+    assert "if(pendingDrawerOpen)clearPendingDrawerOpen();" in template
+    assert 'addEventListener("click",clearPendingDrawerOpen,true)' in template
+
+
+def test_trend_map_provenance_and_drawer_source_labels_keep_quote_as_of_separate():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert "Classification: Daily EOD" in template
+    assert "latest completed 60m provisional" in template
+    assert "Classification/EOD as-of remains separate from quote as-of" in template
+    for label in ("price_data", "derived_daily_price_data", "intraday_price_data"):
+        assert label in shared
+    assert "Daily official" in shared and "Daily derived" in shared
+
+
+def test_trend_map_drawer_focus_is_labelled_trapped_and_restored():
+    shared = (ROOT / "shared-drawer.js").read_text(encoding="utf-8")
+    assert 'aria-labelledby="drawer-symbol"' in shared
+    assert "drawerTriggerElement" in shared
+    assert "drawerClose.focus()" in shared
+    assert "drawerTriggerElement.focus()" in shared
+    assert 'event.key !== "Tab"' in shared
+    assert "event.shiftKey" in shared
+    assert 'return !element.hidden && element.getAttribute("aria-hidden") !== "true"' in shared
+    assert 'element.closest("[hidden],[aria-hidden=\\"true\\"]")' in shared
+
+
+def test_trend_map_blocked_filter_reason_and_mobile_full_value_affordance_are_visible():
+    template = (ROOT.parent / "shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'value="BLOCKED">Not verified / blocked' in template
+    assert 'mainTrend==="BLOCKED"?value===null' in template
+    assert 'data_quality_status==="INVALID_DATA"' in template
+    assert 'class="main-trend-value" title="' in template
+    assert 'aria-label="' in template
+    assert ".main-trend-value" in template

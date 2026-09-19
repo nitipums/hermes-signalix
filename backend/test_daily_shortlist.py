@@ -130,9 +130,34 @@ class TestDevelopingImmature:
 
 
 class TestPublicationState:
-    def test_fresh_breakout_is_ready(self):
+    def test_fresh_breakout_is_ready_when_confirmed(self):
         result = classify_shortlist(
             card(action_queue="fresh_breakout", avgDailyValue20=20_000_000))
+        assert result["eligible"] is True
+        assert result["publication_state"] == "READY"
+
+    def test_fresh_breakout_unconfirmed_quality_fail_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout",
+                 setup_quality={"pass": False, "reasons": ["range_too_wide"]}))
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_unconfirmed_close_below_level_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", close=51.0, breakoutLevel=52.0))
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_unconfirmed_missing_level_is_excluded(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", breakoutLevel=None))
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_fresh_breakout_confirmed_exactly_at_level(self):
+        result = classify_shortlist(
+            card(action_queue="fresh_breakout", close=52.0, breakoutLevel=52.0))
         assert result["eligible"] is True
         assert result["publication_state"] == "READY"
 
@@ -441,6 +466,104 @@ class TestProjectShortlist:
         assert r["publication_state"] == "PRE_READY"
         assert r["why_now"] is not None
         assert "confirm" in r["why_now"].lower()
+
+    def test_pullback_why_now_does_not_call_breakout(self):
+        """qualified_pullback why_now must not label the setup as a breakout."""
+        item = card(symbol="PB", action_queue="qualified_pullback",
+                    action="HOLD IF SUPPORT DEFENDS")
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert r["why_now"] is not None
+        assert "breakout" not in r["why_now"].lower()
+        assert "support" in r["why_now"].lower()
+
+    def test_retest_why_now_does_not_call_breakout(self):
+        """retest_watch why_now must not label the setup as a breakout."""
+        item = card(symbol="RT", action_queue="retest_watch",
+                    action="WAIT FOR RETEST")
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert r["why_now"] is not None
+        assert "breakout" not in r["why_now"].lower()
+        assert "retest" in r["why_now"].lower()
+
+
+class TestWhyNowEvidenceHardening:
+    """Regression: READY why_now must not claim confirmed breakout unless
+    the item's close and quality evidence actually supports it.
+    """
+
+    def test_ready_close_below_breakout_is_not_published(self):
+        """close < breakoutLevel => fail closed, not READY."""
+        item = card(symbol="BELOW_BO",
+                    close=48.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_ready_quality_fail_is_not_published(self):
+        """setup_quality.pass=False => fail closed, not READY."""
+        item = card(symbol="QUALITY_FAIL",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": False, "reasons": ["loose_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_ready_valid_confirmed_case_keeps_confirmed_language(self):
+        """close >= breakoutLevel + quality pass => READY why_now MAY claim confirmed."""
+        item = card(symbol="VALID_BO",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "action"})
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "READY"
+        assert "confirmed" in r["why_now"].lower()
+        assert "breakout" in r["why_now"].lower()
+
+    def test_near_trigger_without_breakout_close_is_not_published_ready(self):
+        """close below breakout => no READY publication."""
+        item = card(symbol="NEAR_NO_CONFIRM",
+                    close=51.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "near_trigger"})
+        out = project_shortlist([item])
+        assert out == []
+        result = classify_shortlist(item)
+        assert result["eligible"] is False
+        assert "TRIGGER_NOT_CONFIRMED" in result["exclusion_reasons"]
+
+    def test_pre_ready_wording_preserved(self):
+        """PRE_READY wording stays confirmation-oriented regardless of evidence."""
+        item = card(symbol="PRE_PRESERVE",
+                    action_queue="pre_breakout",
+                    close=54.0,
+                    breakoutLevel=52.0,
+                    setup_quality={"pass": True, "reasons": ["tight_range"]},
+                    setup_proximity={"state": "near_trigger"})
+        out = project_shortlist([item])
+        assert len(out) == 1
+        r = out[0]
+        assert r["publication_state"] == "PRE_READY"
+        assert "confirm" in r["why_now"].lower()
+        assert "confirmed" not in r["why_now"].lower()
 
 
 if __name__ == "__main__":

@@ -6,11 +6,16 @@
 - **Phase 1 — Webhook ingestion + storage + Redis pub/sub** ✅
 - **Phase 2 — Deterministic screening (TT/VCP/RS/Position sizing)** ✅
 - **Phase 3 — LLM summarization** ✅ (2026-08-12)
-- **Phase 4 — Bot delivery** ✅ (Telegram; LINE dropped)
+- **Phase 4 — Bot delivery** ✅ implemented, currently paused (Telegram; LINE dropped)
 - **User layer (multi-tenant routing)** ✅ (2026-08-12)
+- **Phase 5 — Elliott/Trend/Trade-Setup spine:** ✅ source implemented and promoted 2026-08-31; served API and 390px failure→Retry→recovery browser gate verified.
+- **Phase 6 — Lifecycle persistence:** ✅ source + test-DB integration; evaluator auto-caller remains `PENDING / OWNER DECISION` and is evidence persistence only.
+
+## Current operating boundary — 2026-09-01
+The active stock-setup product is the promoted Elliott/Trend/Trade-Setup spine: Daily trend/strength/Elliott → 60m setup → Arm review. VCP is bonus/compatibility evidence. Source promotion, served API, and 390px failure→Retry→recovery browser acceptance are complete; Arm manual Wave-identification review is next. Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain off.
+
 
 ## User layer (DONE 2026-08-12)
-Multi-tenant routing so Signalix can serve many subscribers, not one hardcoded chat.
 - `backend/users.py` — tables `users` (telegram_chat_id unique, tier) +
   `user_watchlists` (user_id, symbol). Empty watchlist = receive ALL signals.
 - API: `POST /register?chat_id=&tier=` , `POST /watch?chat_id=&symbols=` (csv,
@@ -27,11 +32,10 @@ Multi-tenant routing so Signalix can serve many subscribers, not one hardcoded c
   `TIER_ALERT_CAP = {free:10, paid:200, owner:None}`. A Redis counter
   `alerts:{chat_id}:{YYYY-MM-DD}` increments per push; over-cap alerts are skipped
   (logged). Counter TTL 2 days.
-- **Frontend glue (2026-08-12)**: portal ↔ dashboard now connected. `portal.html` links
-  to `/dashboard.html`; alerts carry both a Dashboard deep-link and a `/portal`
+- **Frontend glue (2026-08-12; retired route updated 2026-08-28)**: portal ↔ MVP now connected. Alerts carry an `/mvp` deep-link and a `/portal`
   manage link. `build_dashboard.py` injects JS that, when loaded with `?chat=ID`,
   fetches `/me` and syncs the watchlist from the backend (instead of localStorage
-  only) — so portal selections appear in the dashboard Watchlist tab.
+  only) — so portal selections appear in the MVP Watchlist tab.
 
 ## Phase 3 — LLM summarization (DONE)
 LLM summarizes ONLY — never computes Trend Template / RS / position size. The
@@ -70,11 +74,11 @@ See [[2026-08-13-Intraday-Dashboard-Handoff]] for the full verified technical ha
 ## Open gaps vs SaaS goal
 | Gap | Why it matters |
 |-----|----------------|
-| User management / auth | Multi-tenant SaaS needs accounts |
 | Subscription / payment | Monetization layer absent |
-| Multi-user signal routing | Today: one hardcoded Telegram chat |
-| Webhook idempotency/retry/dedup | `signals` table dedupes by hash; redis consume is at-most-once (no ack replay) |
-| Frontend app | Dashboard is read-only HTML; no login/UI |
+| Full SaaS login frontend | Owner-only deep links; public auth hardening remains |
+| Webhook retry/replay | Redis consume remains at-most-once; durable replay is future hardening |
+| Evaluator lifecycle auto-caller | T9 adapter exists, automatic invocation remains an owner-scoped follow-up |
+| Public served browser acceptance | Desktop/mobile/error journey for promoted spine remains NOT VERIFIED |
 
 ## Proposed next roadmap — Market View to Action
 

@@ -1,35 +1,39 @@
 # Signalix Memory Cleanup Candidates
 
-> **STATUS: REVIEW_REQUIRED**
-> This note is a candidate list only. It does not delete or rewrite fact_store entries.
-> Last reviewed: 2026-08-23.
+> **STATUS: CURRENT**
+> This note records cleanup already completed and remaining candidates only.
+> **Last reviewed:** 2026-09-01 · Level-1 memory consolidated; Level-3 fact_store reduced to 25 compact facts; Wallet detail and obsolete Signalix progress facts removed.
 
 ## Keep / current candidates
 
-- Stage-first / FULL ORD / LAYER1-LAYER2 architecture: facts 117, 121, 112.
-- Current feed-availability boundary: fact 142.
-- Current generated-artifact safety lesson: fact 156.
-- Current dashboard provenance: fact 135.
-- Current team/review model: facts 145, 147, 149, 158.
-- Product direction: canonical strategy note; fact 58/45 are supporting context only.
-- English-only product UI preference: fact 15, subject to current product strategy.
+- User identity/preferences and memory policy: facts 23, 25, 200, 208, 211.
+- Current Signalix contract/Wave semantics: facts 215, 219, 220, 226.
+- Current release/automation boundary: facts 227, 229; canonical detail is in the current handoff and Execution-Pipeline.
+- Browser/Git safety: facts 71, 228 and current verification skills.
+- Portfolio Copilot bounded-context direction: fact 50; detailed execution remains future work.
 
-## Superseded candidates to compact/remove after replacement check
+## Superseded/removed cleanup record
 
-- Fact 5 — original Signalix architecture, explicitly superseded.
-- Fact 29 — older Portfolio Copilot boundary, explicitly superseded.
-- Fact 55 — five-group daily screener, superseded by stage-first.
-- Fact 56 — old breakout lifecycle, superseded by stage-first.
-- Fact 60 — old 718-symbol / price-floor policy, superseded by FULL ORD.
-- Fact 76 — old taxonomy repair backlog, superseded by stage-first.
+- Old VCP-first serving, old 15m/stage/L2 details, old checkpoint/provider/margin duplicates, Wallet transaction/account details, and contradictory quota/liquidity facts were removed from fact_store after current replacements were verified.
+- Old Daily Shortlist/All Explorer product contract remains in vault as `STATUS: SUPERSEDED`, preserving historical design evidence.
+- Old implementation handoffs and postmortems remain historical unless their header says `STATUS: CURRENT`.
 
-## Task-progress / operational facts to review
+## Skill consolidation — 2026-09-13
 
-Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, and old provider states should not be promoted to permanent memory.
+- Legacy Signalix procedures were consolidated into a small active set and archived reversibly through Hermes Curator.
+- Current core: `signalix-skill-router`, `signalix-product-strategy`, `signalix-trend-map`, `signalix-data-lineage`, `signalix-screening-research`, `signalix-dashboard-acceptance`, and `signalix-production-ops`.
+- Support: `signalix-lite-codex-owner-loop`, `signalix-local-development-environment`, and `signalix-documentation-governance`.
+- Archived originals remain available for restore if a focused procedure is later proven necessary.
+
+
+Facts about Kanban adoption, provider allocation, worker monitoring, browser quirks, and completed fixes should remain only when they are durable operating rules. One-off task outcomes, card IDs, old counts, old provider states, and profile-specific bookkeeping should not be promoted to Lite permanent memory.
 
 ## Work-management fact — resolved
+Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as the product-scope and acceptance authority. Kanban is the active durable execution/orchestration state for the current gated run; live card status is not mirrored into vault notes. Older audit-only wording is superseded by the 2026-08-28 terminal-reporting decision.
 
-Arm chose Markdown `vault/Execution-Pipeline.md` plus linked focused plans as the active work source. Kanban is audit/archive only. Any older fact saying Kanban is operational source should be removed/compacted after this replacement is confirmed.
+## Profile cleanup — 2026-09-13
+
+Signalix uses Lite as orchestrator/final gate. Worker selection is task-dependent; no project-wide sub-agent prohibition applies. Ploy remains optional advisory input. Wallie remains outside Signalix.
 
 ## Safety
 

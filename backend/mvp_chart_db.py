@@ -1,11 +1,11 @@
 """MVP Chart DB Adapter — read-only PostgreSQL price_data query layer.
 
 Fills the chart overlay contract with real DB candles and computed
-indicators (MA20/50/200, MACD, RSI) when the database is available.
+indicators (MA5/10/20/50/100/200, MACD, RSI) when the database is available.
 Never writes, never mutates.
 
   GET /api/chart-db/{symbol} → {symbol, candles, ma20, ma50, ma200,
-                                 macd, rsi, source, as_of, provenance}
+                                 macd, rsi, source, as_of, latest_time, provenance}
 
 All fields are null (None) when no authoritative data exists.
 NOT_VERIFIED when computed values are unavailable due to insufficient data.
@@ -23,6 +23,13 @@ import os
 import datetime as dt
 from typing import Any, Optional
 from threading import Lock
+
+from canonical_chart_read import (DEFAULT_CHART_CANDLE_LIMIT, ChartReadResult,
+                                  read_chart_result)
+from chart_wave_evidence import (build_legacy_chart_wave_evidence,
+                                 canonical_chart_wave_evidence,
+                                 neutral_chart_wave_evidence)
+from technical_indicators import MA_PERIODS, build_technical_indicators
 
 
 _POOL = None
@@ -67,54 +74,35 @@ def _release_db_connection(pg: Any, *, close: bool = False) -> None:
 
 # ── Queries (SELECT only, never write) ─────────────────────────────────
 
-def _fetch_candles(cur: Any, symbol: str, market: str = "TH", limit: int = 250,
+def _fetch_candles(cur: Any, symbol: str, market: str = "TH",
+                   limit: int = DEFAULT_CHART_CANDLE_LIMIT,
                    timeframe: str = "1D") -> list[dict]:
     """Fetch/aggregate OHLCV candles for the explicit MVP timeframe."""
-    timeframe = (timeframe or "1D").upper()
-    if timeframe == "60M":
-        cur.execute("""
-            SELECT ts, open, high, low, close, volume
-            FROM intraday_price_data
-            WHERE UPPER(symbol) = UPPER(%s) AND interval = '60m'
-            ORDER BY ts DESC LIMIT %s
-        """, (symbol, limit))
-        rows = cur.fetchall()
-    else:
-        daily_limit = limit if timeframe == "1D" else min(limit * (25 if timeframe == "1M" else 5), 1500)
-        cur.execute("""
-            SELECT date, open, high, low, close, volume
-            FROM price_data
-            WHERE market = %s AND UPPER(symbol) = UPPER(%s) AND instrument_type = 'ORD'
-            ORDER BY date DESC LIMIT %s
-        """, (market, symbol, daily_limit))
-        rows = cur.fetchall()
-        if timeframe in {"1W", "1M"}:
-            periods = {}
-            for stamp, open_, high, low, close, volume in reversed(rows):
-                day = stamp if isinstance(stamp, dt.date) else stamp.date()
-                key = day - dt.timedelta(days=day.weekday()) if timeframe == "1W" else day.replace(day=1)
-                if key not in periods:
-                    periods[key] = [key, open_, high, low, close, float(volume or 0)]
-                else:
-                    p = periods[key]
-                    p[2] = max(p[2], high)
-                    p[3] = min(p[3], low)
-                    p[4] = close
-                    p[5] += float(volume or 0)
-            rows = sorted(periods.values(), key=lambda r: r[0])[-limit:]
-    candles: list[dict] = []
-    for row in rows:
-        candles.append({
-            "date": str(row[0]),
-            "open": float(row[1]) if row[1] is not None else None,
-            "high": float(row[2]) if row[2] is not None else None,
-            "low": float(row[3]) if row[3] is not None else None,
-            "close": float(row[4]) if row[4] is not None else None,
-            "volume": float(row[5]) if row[5] is not None else None,
-        })
-    if timeframe in {"1D", "60M"}:
-        candles.reverse()
-    return candles
+    return read_chart_result(cur, symbol, timeframe, limit, market=market).candles
+
+
+def _fetch_candles_with_metadata(cur: Any, symbol: str, market: str = "TH",
+                                 limit: int = DEFAULT_CHART_CANDLE_LIMIT,
+                                 timeframe: str = "1D") -> tuple[list[dict], dict]:
+    """Fetch candles and preserve the latest stored intraday source timestamp."""
+    result: ChartReadResult = read_chart_result(cur, symbol, timeframe, limit, market=market)
+    return result.candles, {"latest_time": result.latest_time, "as_of": result.as_of,
+                            "provisional": result.provisional, "source": result.source}
+
+
+def _chart_timestamp(value: Any, timeframe: str = "1D") -> str | None:
+    """Serialize Daily dates and 60m datetimes in the same ISO form as markers."""
+    if value is None:
+        return None
+    raw = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    raw = raw.strip()
+    if not raw:
+        return None
+    if str(timeframe).upper() != "60M":
+        return raw[:10] if len(raw) >= 10 else raw
+    if len(raw) > 10 and raw[10] == " ":
+        raw = raw[:10] + "T" + raw[11:]
+    return raw
 
 
 
@@ -231,7 +219,77 @@ def _compute_rsi(closes: list[float], period: int = 14) -> list[Optional[float]]
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[dict]:
+def _chart_source(timeframe: str) -> str:
+    """Return the authoritative storage relation for a chart timeframe."""
+    return "intraday_price_data" if str(timeframe).upper() == "60M" else "price_data"
+
+
+_CHART_VIEW_CANDLE_LIMIT = 120
+
+
+def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VIEW_CANDLE_LIMIT) -> Optional[dict]:
+    """Project the full chart contract into the drawer's bounded chart view.
+
+    Indicators are still calculated from the full source window. The drawer
+    receives only the aligned series used by its renderer, while
+    ``indicators.latest`` and its window summaries remain the full-window
+    values required by the drawer. The default (non-``view=chart``) response
+    does not pass through this projection.
+    """
+    if payload is None:
+        return None
+    # Published read-model overlays can contain read-only mapping wrappers;
+    # copy only the mutable containers this projection changes.
+    compact = dict(payload)
+    candles = compact.get("candles")
+    if isinstance(candles, list):
+        start = max(0, len(candles) - limit)
+        compact["candles"] = [dict(candle) if isinstance(candle, dict) else candle
+                               for candle in candles[start:]]
+    else:
+        start = 0
+
+    indicators = compact.get("indicators")
+    if isinstance(indicators, dict):
+        indicators = dict(indicators)
+        compact["indicators"] = indicators
+    series = indicators.get("series") if isinstance(indicators, dict) else None
+    if isinstance(series, dict):
+        # Keep this allow-list in sync with the shared drawer renderer. In
+        # particular, do not serialize the source OHLC-derived aligned series
+        # (ATR, rolling highs/lows, and raw high/low/window-summary series).
+        # ``latest`` below remains authoritative for summary/window details.
+        compact_series = {}
+        ma = series.get("ma")
+        if isinstance(ma, dict):
+            compact_series["ma"] = {
+                period: values[start:]
+                for period, values in ma.items()
+                if isinstance(values, list)
+            }
+        macd = series.get("macd")
+        if isinstance(macd, dict):
+            compact_series["macd"] = {
+                name: values[start:]
+                for name in ("line", "signal", "histogram")
+                if isinstance(values := macd.get(name), list)
+            }
+        rsi = series.get("rsi")
+        if isinstance(rsi, list):
+            compact_series["rsi"] = rsi[start:]
+        indicators["series"] = compact_series
+
+    for key in ("ma20", "ma50", "ma200", "macd", "rsi"):
+        compact.pop(key, None)
+    provenance = dict(compact.get("provenance") or {})
+    provenance["representation"] = "chart_view"
+    provenance["representation_authoritative"] = False
+    compact["provenance"] = provenance
+    return compact
+
+
+def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None,
+                              connection: Any | None = None) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
     Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
@@ -239,18 +297,25 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
     timeframe = (timeframe or "1D").upper()
     if timeframe not in {"1D", "1W", "60M", "1M"}:
         raise ValueError("timeframe must be 1D, 1W, 60M, or 1M")
-    pg = _get_db_connection()
+    chart_source = _chart_source(timeframe)
+    owns_connection = connection is None
+    pg = connection if connection is not None else _get_db_connection()
     if pg is None:
         return {
             "symbol": symbol.upper(),
+            "timeframe": timeframe,
             "candles": None,
+            "indicators": build_technical_indicators([], timeframe),
             "ma20": None,
             "ma50": None,
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
                 "source": None,
                 "as_of": None,
@@ -260,31 +325,43 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     try:
         cur = pg.cursor()
-        candles = _fetch_candles(cur, symbol, timeframe=timeframe)
+        candles, chart_metadata = _fetch_candles_with_metadata(cur, symbol, timeframe=timeframe)
         cur.close()
     except Exception as e:
         # Fail-graceful: return NOT_VERIFIED
+        # psycopg2 connections are transactional; return a clean connection
+        # to the pool so a failed query cannot poison the next chart request.
+        try:
+            pg.rollback()
+        except Exception:
+            pass
         return {
             "symbol": symbol.upper(),
+            "timeframe": timeframe,
             "candles": None,
+            "indicators": build_technical_indicators([], timeframe),
             "ma20": None,
             "ma50": None,
             "ma200": None,
             "macd": None,
             "rsi": None,
+            "wave_evidence": {"timeframe": timeframe.lower(), "markers": [],
+                              "mapping": {"daily": "not_available", "60m": "not_available"}},
             "source": None,
             "as_of": None,
+            "latest_time": None,
             "provenance": {
-                "source": "price_data",
+                "source": chart_source,
                 "as_of": None,
                 "note": f"NOT_VERIFIED: DB query failed — {str(e)[:200]}",
             },
         }
     finally:
-        try:
-            _release_db_connection(pg)
-        except Exception:
-            pass
+        if owns_connection:
+            try:
+                _release_db_connection(pg)
+            except Exception:
+                pass
 
     if not candles:
         if timeframe == "60M":
@@ -292,13 +369,18 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
                 "symbol": symbol.upper(),
                 "timeframe": timeframe,
                 "candles": [],
+                "indicators": build_technical_indicators([], timeframe),
                 "ma20": None,
                 "ma50": None,
                 "ma200": None,
                 "macd": None,
                 "rsi": None,
+                "wave_evidence": {"timeframe": "60m", "markers": [],
+                                  "mapping": {"daily": "not_projected", "60m": "setup_only"},
+                                  "missing": ["daily_markers_not_projected"]},
                 "source": None,
                 "as_of": None,
+                "latest_time": None,
                 "availability": "unavailable",
                 "provenance": {
                     "source": None,
@@ -310,44 +392,85 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D") -> Optional[di
 
     closes: list[float] = [c["close"] for c in candles if c["close"] is not None]
     as_of: Optional[str] = candles[-1]["date"] if candles else None
+    chart_source = chart_metadata.get("source") or chart_source
+    latest_time = (
+        chart_metadata.get("latest_time")
+        or _chart_timestamp(chart_metadata.get("latest_intraday_time"), "60M")
+        or _chart_timestamp(chart_metadata.get("latest_confirmed_time"), "1D")
+        or as_of
+    )
 
-    # Build NOT_VERIFIED notes
+    indicators = build_technical_indicators(candles, timeframe)
+    input_available = indicators["availability"]["input"]["status"] == "AVAILABLE"
+    # Build compatibility notes while reporting every canonical requirement.
     notes: list[str] = []
-    if len(closes) < 20:
-        notes.append("MA20 NOT_VERIFIED: insufficient data (< 20 candles)")
-    if len(closes) < 50:
-        notes.append("MA50 NOT_VERIFIED: insufficient data (< 50 candles)")
-    if len(closes) < 200:
-        notes.append("MA200 NOT_VERIFIED: insufficient data (< 200 candles)")
-    if len(closes) < 35:
-        notes.append("MACD NOT_VERIFIED: insufficient data (< 35 candles)")
+    if not input_available:
+        notes.append("Indicators NOT_VERIFIED: missing or non-finite High/Low/Close input")
+    for period in MA_PERIODS:
+        if len(closes) < period:
+            notes.append(f"MA{period} NOT_VERIFIED: insufficient data (< {period} candles)")
+    unavailable_windows = [
+        period for period, summary in indicators["latest"]["window_summary"].items()
+        if summary["availability"]["status"] != "AVAILABLE"
+    ]
+    if unavailable_windows:
+        notes.append("OHLCV windows NOT_VERIFIED: " + ",".join(unavailable_windows))
+    if len(closes) < 34:
+        notes.append("MACD signal NOT_VERIFIED: insufficient data (< 34 candles)")
     if len(closes) < 15:
         notes.append("RSI NOT_VERIFIED: insufficient data (< 15 candles)")
+    if len(closes) < 14:
+        notes.append("ATR NOT_VERIFIED: insufficient data (< 14 candles)")
 
-    # Compute indicators if enough data
-    ma20 = _compute_sma(closes, 20) if len(closes) >= 20 else ([None] * len(closes))
-    ma50 = _compute_sma(closes, 50) if len(closes) >= 50 else ([None] * len(closes))
-    ma200 = _compute_sma(closes, 200) if len(closes) >= 200 else ([None] * len(closes))
-    macd = _compute_macd(closes) if len(closes) >= 35 else None
-    rsi = _compute_rsi(closes, 14) if len(closes) >= 15 else None
+    # Compatibility/audit aliases. The canonical UI contract is ``indicators``.
+    ma20 = indicators["series"]["ma"]["20"]
+    ma50 = (_compute_sma(closes, 50) if input_available and len(closes) >= 50
+            else [None] * len(candles))
+    ma200 = (_compute_sma(closes, 200) if input_available and len(closes) >= 200
+             else [None] * len(candles))
+    canonical_macd = indicators["series"]["macd"]
+    macd = ({"macd_line": canonical_macd["line"],
+             "signal_line": canonical_macd["signal"],
+             "histogram": canonical_macd["histogram"]}
+            if input_available and len(closes) >= 35 else None)
+    rsi = indicators["series"]["rsi"] if input_available and len(closes) >= 15 else None
 
-    note = (", ".join(notes) if notes else
-            "Computed from price_data (SELECT only). All indicators available.")
+    provisional_note = ("Current session is represented by provisional 60m aggregation; "
+                        "Daily EOD decision data is unchanged. "
+                        if any(c.get("provisional") for c in candles) else "")
+    note = (provisional_note + (", ".join(notes) if notes else
+            f"Computed from {chart_source} (SELECT only). All indicators available."))
 
+    wave_evidence = (canonical_chart_wave_evidence(canonical_item)
+                     if timeframe != "60M" else None)
+    if wave_evidence is None:
+        # The primary field is never generated from chart candles. Preserve
+        # the historical projection only as explicitly labelled audit data.
+        wave_evidence = neutral_chart_wave_evidence(timeframe)
+        if timeframe != "60M":
+            wave_evidence["audit_compatibility"] = {
+                "status": "audit_only",
+                "source": "legacy_chart_generated",
+                "wave_evidence": build_legacy_chart_wave_evidence(candles, timeframe, as_of),
+            }
     return {
         "symbol": symbol.upper(),
         "timeframe": timeframe,
         "candles": candles,
+        "indicators": indicators,
         "ma20": ma20,
         "ma50": ma50,
         "ma200": ma200,
         "macd": macd,
         "rsi": rsi,
-        "source": "price_data",
+        "wave_evidence": wave_evidence,
+        "source": chart_source,
         "as_of": as_of,
+        "latest_time": latest_time,
         "provenance": {
-            "source": "price_data",
+            "source": chart_source,
             "as_of": as_of,
+            "indicator_policy_version": indicators["policy_version"],
             "note": note,
         },
     }
