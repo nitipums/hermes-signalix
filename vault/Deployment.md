@@ -43,11 +43,23 @@
   `down_trigger`, and `trigger_basis`; fixture selection used the expected
   status/freshness/universe identity without a production database or
   artifact path.
-- Public served runtime, production data freshness, browser,
-  deployment/promotion, and rollback remain `NOT VERIFIED`: no deploy,
-  restart, or public-route read-back was exercised. No migration, database
-  write, production artifact rewrite, push, or release promotion was
-  performed or claimed.
+- Production served runtime, deployment/promotion, and rollback remain `NOT VERIFIED`: no production deploy, restart, database write, push, or release promotion was performed or claimed.
+
+### Review Gate #56 isolated public preview evidence — 2026-09-19
+
+- Preview source: local isolated wave head `7fec50d` plus uncommitted-equivalent
+  review evidence; production stable was not changed.
+- Public preview: `/trend-map` and `/api/trend-map` returned
+  `PRODUCTION_READ_ONLY`, `VERIFIED`, `as_of=2026-09-18`, `237` rows, and
+  exactly 3 snapshot options. API read-back showed `237/237` numeric up/down
+  references and the preview-clock intraday test showed `4 UP_TRIGGER_REACHED`,
+  `4 DOWN_TRIGGER_REACHED`, `229 NO_MARKER`, `0 NOT_VERIFIED`.
+- Browser: desktop and 390px public journeys verified lean rows, visible age and
+  trigger columns, lower snapshot selector, drawer reached-marker/chart path,
+  and `scrollWidth=390`/`bodyScrollWidth=390`. These are isolated preview
+  results, not production-serving evidence.
+- Chart read-model: SSP public API returned `PREBUILT` for `1D`, `60M`, `1W`,
+  and `1M`; all four preview artifacts covered `237` symbols.
 
 ### Review Gate #56 source-fixture selection evidence — 2026-09-19
 

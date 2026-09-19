@@ -350,6 +350,49 @@ def test_current_and_historical_api_compact_history_fields_are_read_model_only(m
     assert current["actionability"] == historical["actionability"] == "NONE"
 
 
+def test_manifest_generation_survives_missing_compatibility_snapshots(monkeypatch, tmp_path):
+    original = trend_map.build_shadow_report
+    captured = {}
+
+    def report_with_duration(**kwargs):
+        captured["history"] = kwargs.get("history_observations_by_symbol")
+        report = original(adapter=Adapter(), conn=object(), as_of=kwargs.get("as_of"),
+                          source="publisher")
+        row = report["rows"][0]
+        row.update({
+            "trend_changed_date": "2026-09-08",
+            "trend_duration_sessions": 3,
+            "up_trigger": 112.0,
+            "down_trigger": 88.0,
+            "trigger_basis": "current_classifier_evidence",
+        })
+        return report
+
+    monkeypatch.setattr(trend_map, "build_shadow_report", report_with_duration)
+    publisher.publish_shadow_read_model(root=tmp_path, as_of="2026-09-10",
+                                        published_at="2026-09-12T01:00:00+00:00")
+    (tmp_path / "snapshots.json").unlink()
+    publisher.publish_shadow_read_model(root=tmp_path, as_of="2026-09-11",
+                                        published_at="2026-09-12T02:00:00+00:00")
+    (tmp_path / "snapshots.json").unlink()
+
+    assert [row["as_of"] for row in captured["history"]["AAA"]] == ["2026-09-10"]
+
+    monkeypatch.setenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", str(tmp_path))
+    monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
+    monkeypatch.setattr(trend_map, "build_shadow_report", original)
+
+    current = trend_map.build_shadow_report()
+    historical = trend_map.build_shadow_report(snapshot_date="2026-09-10")
+
+    assert [item["as_of"] for item in current["snapshots"]] == ["2026-09-11", "2026-09-10"]
+    assert current["snapshot"]["sessions_verification"] == {"status": "VERIFIED", "reason": None}
+    assert current["rows"][0]["trend_duration_sessions"] == 3
+    assert historical["snapshot"]["as_of"] == "2026-09-10"
+    assert historical["rows"][0]["trend_duration_sessions"] == 3
+    assert historical["snapshot"]["sessions"] == current["snapshot"]["sessions"]
+
+
 def test_api_exposes_only_validated_snapshot_index_sessions_without_history(monkeypatch, tmp_path):
     monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
     publish(tmp_path)

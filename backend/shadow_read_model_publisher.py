@@ -274,8 +274,8 @@ def _validate_pointer(root: Path, pointer: Mapping[str, Any]) -> dict[str, Any]:
 def _read_validated_snapshot_sessions(root: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Read only sessions whose index entries and immutable artifacts verify."""
     store = TrendMapEodSnapshotStore(root, validator=_validate_published_artifact)
-    if not store.index_path.exists():
-        return [], {"status": "NOT_VERIFIED", "reason": "index_missing"}
+    if not store.manifest_path.exists():
+        return [], {"status": "NOT_VERIFIED", "reason": "manifest_missing"}
     try:
         index = store.read_index()
         sessions = []
@@ -300,7 +300,7 @@ def _read_validated_snapshot_sessions(root: Path) -> tuple[list[dict[str, Any]],
 def _read_validated_prior_history(root: Path, current_as_of: Any) -> dict[str, list[dict[str, Any]]]:
     """Load ordered prior row observations from validated immutable artifacts."""
     store = TrendMapEodSnapshotStore(root, validator=_validate_published_artifact)
-    if not store.index_path.exists():
+    if not store.manifest_path.exists():
         return {}
     cutoff = str(current_as_of)[:10] if current_as_of is not None else None
     try:

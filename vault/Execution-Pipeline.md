@@ -38,7 +38,15 @@ guard. The current and historical compact projections expose
 `trend_changed_date`, `trend_duration_sessions`, `up_trigger`, `down_trigger`,
 and `trigger_basis`. Public served runtime, production data freshness,
 browser, deployment/promotion, and rollback acceptance remain `NOT VERIFIED`
-because no deploy, restart, or public-route read-back was exercised.
+because production was not deployed or restarted.
+
+Review Gate #56 isolated preview evidence (2026-09-19): public `/trend-map` and
+`/api/trend-map` returned `PRODUCTION_READ_ONLY`, `VERIFIED`,
+`as_of=2026-09-18`, `237` rows, and exactly 3 snapshot options. The preview
+clock test produced 4 `UP_TRIGGER_REACHED`, 4 `DOWN_TRIGGER_REACHED`, 229
+`NO_MARKER`, and 0 `NOT_VERIFIED`; desktop/390px browser verified lean rows,
+visible age/triggers, lower snapshot history, drawer/chart, and no overflow.
+This is preview evidence only and does not establish production promotion.
 
 The bounded producer computes the current EOD classifier and trigger evidence
 once per symbol. It prefers verified classifier-transition boundaries. When a
