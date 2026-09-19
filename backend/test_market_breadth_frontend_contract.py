@@ -14,6 +14,15 @@ def test_market_breadth_route_and_template_are_separate_from_trend_map():
     assert 'template_path = os.path.join(_BACKEND_DIR, "market_breadth_template.html")' in server
 
 
+def test_market_breadth_template_has_accessible_cross_page_navigation_with_breadth_active():
+    html = TEMPLATE.read_text(encoding="utf-8")
+    assert '<nav class="page-nav" aria-label="Primary navigation">' in html
+    assert '<a class="page-nav__link" href="/trend-map">Trend Map</a>' in html
+    assert '<a class="page-nav__link page-nav__link--active" href="/market-breadth" aria-current="page">Market Breadth</a>' in html
+    assert '.page-nav__link:focus-visible' in html
+    assert 'overflow-x:hidden' in html
+
+
 def test_mb3_is_one_editorial_visual_per_metric_with_beginner_copy():
     html = TEMPLATE.read_text(encoding="utf-8")
     for marker in (

@@ -449,6 +449,15 @@ def test_template_has_main_trend_accordion_filter_drawer_chart_and_shadow_marker
     assert 'r.status===s' not in html
 
 
+def test_template_has_accessible_cross_page_navigation_with_trend_map_active():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert '<nav class="page-nav" aria-label="Primary navigation">' in html
+    assert '<a class="page-nav__link page-nav__link--active" href="/trend-map" aria-current="page">Trend Map</a>' in html
+    assert '<a class="page-nav__link" href="/market-breadth">Market Breadth</a>' in html
+    assert '.trend-page .page-nav__link:focus-visible' in html
+    assert 'overflow-x:hidden' in html
+
+
 def test_trend_map_accordion_is_closed_single_open_and_defers_symbol_rows_until_open():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     assert "Main Trend shows the Daily direction. Open a group to see its evidence." in html
