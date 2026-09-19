@@ -1,11 +1,12 @@
 import json
+import time
 from datetime import date, timedelta
 
 import pytest
 
 import shadow_trend_map
 from trend_map_history import (MAX_SNAPSHOT_SESSIONS, SnapshotSelectionError,
-                               TrendMapEodSnapshotStore)
+                               MANIFEST_NAME, TrendMapEodSnapshotStore)
 
 
 def artifact(date, value=None):
@@ -57,6 +58,53 @@ def test_publish_is_immutable_and_index_update_is_atomic(tmp_path):
                       artifact_path="versions/artifact-2026-09-18.json",
                       is_current=True)
     assert (tmp_path / "versions/artifact-2026-09-18.json").read_bytes() == original
+    manifest = json.loads((tmp_path / MANIFEST_NAME).read_text())
+    assert manifest["current"]["artifact_id"] == "artifact-2026-09-18"
+    assert sum(item["is_current"] for item in manifest["sessions"]) == 1
+
+
+def test_new_publication_clears_prior_current_and_historical_entries_are_false(tmp_path):
+    store = TrendMapEodSnapshotStore(tmp_path)
+    publish(store, "2026-09-17")
+    publish(store, "2026-09-18")
+    sessions = store.read_index()["sessions"]
+    assert [(item["as_of"], item["is_current"]) for item in sessions] == [
+        ("2026-09-18", True), ("2026-09-17", False)]
+    assert store.select("2026-09-17")["snapshot"]["kind"] == "historical"
+
+
+def test_manifest_replace_failure_keeps_previous_reader_generation(tmp_path, monkeypatch):
+    store = TrendMapEodSnapshotStore(tmp_path)
+    publish(store, "2026-09-18")
+    before = (tmp_path / MANIFEST_NAME).read_bytes()
+    import trend_map_history
+    original = trend_map_history.atomic_write_json
+
+    def fail_manifest(path, value):
+        if path == tmp_path / MANIFEST_NAME:
+            raise OSError("interrupted manifest replace")
+        return original(path, value)
+
+    monkeypatch.setattr(trend_map_history, "atomic_write_json", fail_manifest)
+    with pytest.raises(OSError, match="interrupted"):
+        publish(store, "2026-09-19")
+    assert (tmp_path / MANIFEST_NAME).read_bytes() == before
+    assert store.select_current()["artifact"]["as_of"] == "2026-09-18"
+
+
+def test_bounded_current_vs_historical_selection_benchmark(tmp_path):
+    store = TrendMapEodSnapshotStore(tmp_path)
+    publish(store, "2026-09-16")
+    publish(store, "2026-09-17")
+    publish(store, "2026-09-18")
+    started = time.perf_counter()
+    store.select_current()
+    current_ms = (time.perf_counter() - started) * 1000
+    started = time.perf_counter()
+    store.select("2026-09-17")
+    historical_ms = (time.perf_counter() - started) * 1000
+    print(f"selection_benchmark current_ms={current_ms:.3f} historical_ms={historical_ms:.3f}")
+    assert current_ms < 1000 and historical_ms < 1000
 
 
 def test_same_date_publication_selects_newest_artifact_and_preserves_old_file(tmp_path):
@@ -99,15 +147,16 @@ def test_invalid_selected_entry_never_falls_back_to_current(tmp_path, mutation, 
 
 
 def _mismatch(root):
-    index = json.loads((root / "snapshots.json").read_text())
+    index = json.loads((root / MANIFEST_NAME).read_text())
     index["sessions"][-1]["artifact_id"] = "wrong"
-    (root / "snapshots.json").write_text(json.dumps(index))
+    (root / MANIFEST_NAME).write_text(json.dumps(index))
 
 
 def _stale(root):
-    index = json.loads((root / "snapshots.json").read_text())
+    index = json.loads((root / MANIFEST_NAME).read_text())
     index["sessions"][-1]["artifact_path"] = "versions/missing.json"
-    (root / "snapshots.json").write_text(json.dumps(index))
+    index["current"] = index["sessions"][0]
+    (root / MANIFEST_NAME).write_text(json.dumps(index))
 
 
 def test_historical_metadata_preserves_universe_and_no_history_callback(tmp_path):

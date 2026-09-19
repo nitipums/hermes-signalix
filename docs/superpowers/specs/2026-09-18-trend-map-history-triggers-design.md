@@ -1,8 +1,8 @@
 # Trend Map Historical EOD Snapshots and Trigger Evidence
 
-> **STATUS: OWNER-APPROVED DESIGN — SPEC DRAFT FOR REVIEW**
+> **STATUS: OWNER-APPROVED DESIGN**
 > **Date:** 2026-09-18
-> **Scope:** Extend the canonical Daily Trend Mapping surface at `/trend-map` and `/api/trend-map` with up to 3 completed EOD trading-session snapshots, trend duration/change-date evidence, deterministic EOD trigger levels, and current-session intraday trigger markers.
+> **Scope:** Extend the canonical Daily Trend Mapping surface at `/trend-map` and `/api/trend-map` with exactly the latest 3 completed EOD trading-session snapshots when available, trend duration/change-date evidence, deterministic EOD trigger levels, and current-session intraday trigger markers.
 
 ## Problem Statement
 
@@ -12,7 +12,7 @@ The feature must preserve the existing Trend Map contract: deterministic, read-o
 
 ## Solution
 
-At each EOD publication boundary, build and validate an immutable Trend Map snapshot artifact for that completed trading session. Retain an index of at most 3 completed EOD trading sessions. The API selects the current snapshot by default or an explicitly requested historical session. Historical snapshots use the universe resolved for that EOD session and expose their own as-of, coverage, quality, and provenance metadata.
+At each EOD publication boundary, build and validate an immutable Trend Map snapshot artifact for that completed trading session. Retain exactly the latest 3 completed EOD trading sessions when at least 3 exist (and fewer while history is filling). A single atomic manifest contains the schema/version, current pointer entry, and bounded session entries; it is the reader-visible publication generation. The API selects the current snapshot by default or an explicitly requested historical session. Historical snapshots use the universe resolved for that EOD session and expose their own as-of, coverage, quality, and provenance metadata.
 
 The EOD artifact stores the deterministic trend state, the date the current trend began, the number of completed sessions in that trend, and the up/down trigger levels calculated from the same EOD state. The current snapshot may receive a display-only intraday quote overlay and trigger-reached markers. Historical snapshots do not receive today's intraday quote or trigger marker.
 
@@ -47,6 +47,7 @@ The EOD artifact stores the deterministic trend state, the date the current tren
 - The latest snapshot remains the API default when no snapshot selector is supplied. Historical selection is explicit by EOD session date.
 - The historical read path selects a validated immutable artifact from a bounded snapshot index. It must not query raw market history, rescan the universe, or rebuild indicators for a valid artifact.
 - Artifact publication and index update must be atomic from the reader's perspective. A failed or incomplete EOD publication must not advertise a new snapshot.
+- The deterministic trigger producer prefers a verified classifier-transition boundary. If that boundary cannot be proven, it may use `STRUCTURAL_REFERENCE_FALLBACK` from the nearest finite Daily MA/support/ATR reference; if no structural reference exists but the EOD close is finite and positive, it may use `PRICE_REFERENCE_FALLBACK`. Both fallback bases are partial references and do not guarantee that the classifier will change; the completed EOD close and classifier remain authoritative.
 - Each row carries snapshot/as-of identity, symbol, trend state, trend changed date, trend duration in completed sessions, up trigger, down trigger, trigger basis, and row-level quality/provenance fields.
 - Trend changed date is the completed EOD session date on which the deterministic classifier first entered the current trend. It is the only user-facing change date required by this design; no separate publication timestamp is part of the display contract.
 - Trend duration is `1` on the change session and increments by one for each subsequent completed session that retains the same trend. A transition resets the count to `1`.

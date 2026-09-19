@@ -6,6 +6,7 @@ import pytest
 import shadow_read_model_publisher as publisher
 import shadow_trend_map as trend_map
 import update_data
+from trend_map_history import TrendMapEodSnapshotStore
 
 
 def bars(count=75):
@@ -192,19 +193,25 @@ def test_pointer_readback_missing_corrupt_and_mismatched_are_blocked(tmp_path):
     publish(tmp_path)
     loaded = publisher.read_current_shadow_report(tmp_path)
     assert loaded["artifact"]["id"] == loaded["artifact_id"]
-    (tmp_path / "current.json").write_text("not json")
+    valid_manifest = (tmp_path / "manifest.json").read_text()
+    (tmp_path / "manifest.json").write_text("not json")
     assert publisher.read_current_shadow_report(tmp_path)["verification_status"] == "NOT_VERIFIED"
-    publish(tmp_path)
-    pointer = json.loads((tmp_path / "current.json").read_text())
-    pointer["policy_hash"] = "stale"
-    (tmp_path / "current.json").write_text(json.dumps(pointer))
+    # A corrupt manifest is not repaired by a later publication; the writer
+    # also fails closed rather than deriving a new generation from a damaged
+    # reader-visible index.
+    with pytest.raises(Exception):
+        publish(tmp_path)
+    (tmp_path / "manifest.json").write_text(valid_manifest)
+    manifest = json.loads(valid_manifest)
+    manifest["current"]["policy_hash"] = "stale"
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
     blocked = publisher.read_current_shadow_report(tmp_path)
     assert blocked["status"] == "DATA_BLOCKED" and blocked["rows"] == []
 
 
 def test_pointer_readback_rejects_persisted_content_and_measurement_tampering(tmp_path):
     publish(tmp_path)
-    pointer = json.loads((tmp_path / "current.json").read_text())
+    pointer = json.loads((tmp_path / "manifest.json").read_text())["current"]
     artifact_path = tmp_path / pointer["artifact_path"]
     artifact = json.loads(artifact_path.read_text())
     artifact["rows"][0]["quote"]["price"] += 1
@@ -214,8 +221,7 @@ def test_pointer_readback_rejects_persisted_content_and_measurement_tampering(tm
     assert blocked["verification_status"] == "NOT_VERIFIED"
     assert blocked["rows"] == []
 
-    publish(tmp_path)
-    pointer = json.loads((tmp_path / "current.json").read_text())
+    pointer = json.loads((tmp_path / "manifest.json").read_text())["current"]
     artifact_path = tmp_path / pointer["artifact_path"]
     artifact = json.loads(artifact_path.read_text())
     artifact["timing"]["total_ms"] += 1
@@ -361,32 +367,32 @@ def test_api_exposes_only_validated_snapshot_index_sessions_without_history(monk
     assert result["snapshots"] == result["snapshot"]["sessions"]
     assert result["snapshot"]["sessions_verification"] == {"status": "VERIFIED", "reason": None}
     assert set(result["snapshots"][0]) >= {"as_of", "row_count", "artifact_id", "is_current"}
-    assert result["snapshots"][0]["is_current"] is True
+    assert result["snapshots"][0]["is_current"] is False
     assert result["snapshots"][1]["is_current"] is True
 
 
 def test_corrupt_snapshot_index_keeps_current_report_and_marks_sessions_unverified(tmp_path, monkeypatch):
     monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "999999999")
     publish(tmp_path)
-    (tmp_path / "snapshots.json").write_text("not json")
+    (tmp_path / "manifest.json").write_text("not json")
 
     result = publisher.read_current_shadow_report(tmp_path)
 
-    assert result["status"] == trend_map.PRODUCTION_READ_ONLY
-    assert result["rows"]
+    assert result["status"] == "DATA_BLOCKED"
+    assert result["rows"] == []
     assert result["snapshots"] == []
     assert result["snapshot"]["sessions"] == []
     assert result["snapshot"]["sessions_verification"] == {
-        "status": "NOT_VERIFIED", "reason": "index_corrupt"}
+        "status": "NOT_VERIFIED", "reason": "manifest_corrupt"}
 
     missing_root = tmp_path / "missing-index"
     publish(missing_root)
-    (missing_root / "snapshots.json").unlink()
+    (missing_root / "manifest.json").unlink()
     missing = publisher.read_current_shadow_report(missing_root)
-    assert missing["status"] == trend_map.PRODUCTION_READ_ONLY
+    assert missing["status"] == "DATA_BLOCKED"
     assert missing["snapshots"] == []
     assert missing["snapshot"]["sessions_verification"] == {
-        "status": "NOT_VERIFIED", "reason": "index_missing"}
+        "status": "NOT_VERIFIED", "reason": "manifest_missing"}
 
 
 def test_historical_response_exposes_same_validated_sessions(tmp_path):
@@ -400,6 +406,20 @@ def test_historical_response_exposes_same_validated_sessions(tmp_path):
     assert [item["as_of"] for item in result["snapshots"]] == ["2026-09-11", "2026-09-10"]
     assert result["snapshots"] == result["snapshot"]["sessions"]
     assert result["snapshot"]["sessions_verification"]["status"] == "VERIFIED"
+
+
+def test_historical_response_uses_exact_nonstandard_indexed_artifact_path(tmp_path):
+    publish(tmp_path)
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    artifact = json.loads((tmp_path / manifest["current"]["artifact_path"]).read_text())
+    custom = tmp_path / "archive" / "eod" / f"{artifact['artifact_id']}.json"
+    custom.parent.mkdir(parents=True)
+    custom.write_bytes(publisher._json_bytes(artifact))
+    TrendMapEodSnapshotStore(tmp_path, validator=publisher._validate_report).publish(
+        artifact, artifact_path="archive/eod/" + custom.name, is_current=True)
+
+    result = publisher.read_historical_shadow_report(artifact["as_of"], tmp_path)
+    assert result["artifact"]["path"] == str(custom.resolve())
 
 
 def test_publisher_rejects_unverified_or_incomplete_build(tmp_path, monkeypatch):

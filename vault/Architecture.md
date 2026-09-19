@@ -44,12 +44,14 @@ states, and fail-closed behavior.
 ### Historical EOD snapshot boundary — Issue #47, source closeout 2026-09-18
 
 The approved history contract extends this same read-only boundary with a
-bounded index of at most 3 completed EOD session artifacts. The selected
+single atomic manifest containing the current pointer entry and a bounded
+index of exactly the latest 3 completed EOD session artifacts when available.
+The selected
 artifact owns its `as_of`, resolved historical universe, row count, quality,
 and provenance. The request path reads the validated index and immutable JSON
 artifact only; it does not query PostgreSQL, raw market history, rescan the
 universe, or rebuild indicators. A missing, stale, corrupt, or mismatched
-index/artifact is `NOT_VERIFIED` and must not fall back to the current session.
+manifest/index/artifact is `NOT_VERIFIED` and must not fall back to the current session. Compatibility `current.json` and `snapshots.json` projections are not reader authority.
 
 The approved row contract also includes deterministic trend change date,
 completed-session duration, up/down trigger levels, comparison operators, and
@@ -57,6 +59,11 @@ trigger basis. Current-session intraday markers are a display-only provisional
 overlay on the current EOD snapshot; historical snapshots never receive
 today's quote or marker. `status=PRODUCTION_READ_ONLY`,
 `research_only=false`, and `actionability=NONE` remain unchanged.
+
+Trigger selection prefers a verified classifier transition. When unavailable,
+`STRUCTURAL_REFERENCE_FALLBACK` and then `PRICE_REFERENCE_FALLBACK` are
+explicit partial references; neither guarantees a classifier change, which
+requires the completed EOD close and deterministic classifier.
 
 Closeout evidence: the history/classifier, artifact/index seams, and compact
 public projection are present in the source checkout. The current and

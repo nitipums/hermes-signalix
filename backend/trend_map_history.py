@@ -17,6 +17,8 @@ from artifact_writer import atomic_write_json
 MAX_SNAPSHOT_SESSIONS = 3
 INDEX_SCHEMA_VERSION = "signalix.trend-map.eod-snapshot-index.v1"
 INDEX_NAME = "snapshots.json"
+MANIFEST_SCHEMA_VERSION = "signalix.trend-map.eod-snapshot-manifest.v1"
+MANIFEST_NAME = "manifest.json"
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -59,13 +61,12 @@ class TrendMapEodSnapshotStore:
     def index_path(self) -> Path:
         return self.root / INDEX_NAME
 
-    def _read_index(self) -> dict[str, Any]:
-        try:
-            value = json.loads(self.index_path.read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return {"schema_version": INDEX_SCHEMA_VERSION, "sessions": []}
-        except (OSError, json.JSONDecodeError) as error:
-            raise SnapshotSelectionError("index_corrupt") from error
+    @property
+    def manifest_path(self) -> Path:
+        return self.root / MANIFEST_NAME
+
+    @staticmethod
+    def _validate_index_shape(value: Any) -> dict[str, Any]:
         if (not isinstance(value, dict)
                 or value.get("schema_version") != INDEX_SCHEMA_VERSION
                 or not isinstance(value.get("sessions"), list)):
@@ -76,6 +77,51 @@ class TrendMapEodSnapshotStore:
         if len(value["sessions"]) > MAX_SNAPSHOT_SESSIONS:
             raise SnapshotSelectionError("index_invalid")
         return value
+
+    @classmethod
+    def _validate_manifest_shape(cls, value: Any) -> dict[str, Any]:
+        if (not isinstance(value, dict)
+                or value.get("schema_version") != MANIFEST_SCHEMA_VERSION
+                or value.get("max_sessions") != MAX_SNAPSHOT_SESSIONS
+                or not isinstance(value.get("sessions"), list)):
+            raise SnapshotSelectionError("manifest_invalid")
+        sessions = value["sessions"]
+        if len(sessions) > MAX_SNAPSHOT_SESSIONS:
+            raise SnapshotSelectionError("manifest_invalid")
+        if any(not isinstance(entry, Mapping) or not isinstance(entry.get("is_current"), bool)
+               for entry in sessions):
+            raise SnapshotSelectionError("manifest_invalid")
+        if len({entry.get("as_of") for entry in sessions}) != len(sessions):
+            raise SnapshotSelectionError("manifest_invalid")
+        current_entries = [entry for entry in sessions
+                           if isinstance(entry, dict) and entry.get("is_current") is True]
+        current = value.get("current")
+        if current is not None and not isinstance(current, dict):
+            raise SnapshotSelectionError("manifest_mismatch")
+        if len(current_entries) > 1 or (current is None) != (not current_entries):
+            raise SnapshotSelectionError("manifest_mismatch")
+        if current is not None and current != current_entries[0]:
+            raise SnapshotSelectionError("manifest_mismatch")
+        return value
+
+    def _read_index(self) -> dict[str, Any]:
+        # The manifest is the sole reader-visible generation.  snapshots.json
+        # remains a compatibility projection for older tooling only.
+        if self.manifest_path.exists():
+            try:
+                return self._validate_manifest_shape(json.loads(
+                    self.manifest_path.read_text(encoding="utf-8")))
+            except FileNotFoundError:
+                return {"schema_version": MANIFEST_SCHEMA_VERSION,
+                        "max_sessions": MAX_SNAPSHOT_SESSIONS,
+                        "current": None, "sessions": []}
+            except (OSError, json.JSONDecodeError) as error:
+                raise SnapshotSelectionError("manifest_corrupt") from error
+        if self.index_path.exists():
+            raise SnapshotSelectionError("manifest_missing")
+        return {"schema_version": MANIFEST_SCHEMA_VERSION,
+                "max_sessions": MAX_SNAPSHOT_SESSIONS,
+                "current": None, "sessions": []}
 
     def read_index(self) -> dict[str, Any]:
         """Return the validated bounded index (primarily for publisher/tests)."""
@@ -140,7 +186,9 @@ class TrendMapEodSnapshotStore:
 
         index = self._read_index()
         sessions = list(index["sessions"])
-        entry = self._entry(artifact, artifact_path, is_current=is_current)
+        # A publication that becomes current clears the old current bit in
+        # the same generation as it promotes the new entry.
+        entry = self._entry(artifact, artifact_path, is_current=bool(is_current))
         existing = [item for item in sessions if isinstance(item, dict) and item.get("as_of") == entry["as_of"]]
         if existing:
             # A repeated publication may produce a new validated artifact for
@@ -149,23 +197,25 @@ class TrendMapEodSnapshotStore:
             sessions = [item for item in sessions if item.get("as_of") != entry["as_of"]]
         sessions.append(entry)
         sessions.sort(key=lambda item: item.get("as_of", ""), reverse=True)
-        index = {"schema_version": INDEX_SCHEMA_VERSION,
-                 "max_sessions": MAX_SNAPSHOT_SESSIONS,
-                 "sessions": sessions[:MAX_SNAPSHOT_SESSIONS]}
-        atomic_write_json(self.index_path, index)
+        if is_current:
+            sessions = [{**item, "is_current": item is entry or item.get("artifact_id") == entry["artifact_id"]}
+                        for item in sessions]
+            entry = next(item for item in sessions if item.get("artifact_id") == entry["artifact_id"])
+        manifest = {"schema_version": MANIFEST_SCHEMA_VERSION,
+                    "max_sessions": MAX_SNAPSHOT_SESSIONS,
+                    "current": entry if is_current else next(
+                        (item for item in sessions if item.get("is_current") is True), None),
+                    "sessions": sessions[:MAX_SNAPSHOT_SESSIONS]}
+        # This replace is the only publication point visible to current and
+        # historical readers. Compatibility files are deliberately derived.
+        atomic_write_json(self.manifest_path, manifest)
+        atomic_write_json(self.index_path, {
+            "schema_version": INDEX_SCHEMA_VERSION,
+            "max_sessions": MAX_SNAPSHOT_SESSIONS,
+            "sessions": manifest["sessions"]})
         return entry
 
-    def select(self, requested_date: str) -> dict[str, Any]:
-        """Return exactly the requested verified artifact, or raise a reasoned error."""
-        try:
-            requested = _snapshot_date(requested_date)
-        except ValueError as error:
-            raise SnapshotSelectionError("invalid_snapshot_date") from error
-        index = self._read_index()
-        entry = next((item for item in index["sessions"]
-                      if isinstance(item, dict) and item.get("as_of") == requested), None)
-        if entry is None:
-            raise SnapshotSelectionError("snapshot_not_found")
+    def _select_entry(self, entry: Mapping[str, Any], *, kind: str) -> dict[str, Any]:
         try:
             required = ("as_of", "artifact_id", "artifact_path", "content_hash", "universe_hash", "row_count")
             if any(not entry.get(key) and key != "row_count" for key in required):
@@ -174,7 +224,7 @@ class TrendMapEodSnapshotStore:
             artifact = json.loads(path.read_text(encoding="utf-8"))
             self._validate_artifact_shape(artifact)
             identity = artifact["identity"]
-            if (artifact.get("as_of") != requested
+            if (artifact.get("as_of") != entry["as_of"]
                     or artifact.get("artifact_id") != entry["artifact_id"]
                     or identity.get("content_hash") != entry["content_hash"]
                     or identity.get("universe_hash") != entry["universe_hash"]
@@ -191,7 +241,28 @@ class TrendMapEodSnapshotStore:
             if "mismatch" in str(error):
                 reason = "index_artifact_mismatch"
             raise SnapshotSelectionError(reason) from error
-        metadata = {"as_of": requested, "kind": "historical", "row_count": len(artifact["rows"]),
+        metadata = {"as_of": entry["as_of"], "kind": kind, "row_count": len(artifact["rows"]),
                     "universe": artifact["universe"], "quality": artifact.get("quality") or artifact.get("data_quality_summary"),
-                    "provenance": artifact.get("provenance"), "artifact_id": artifact["artifact_id"]}
+                    "provenance": artifact.get("provenance"), "artifact_id": artifact["artifact_id"],
+                    "artifact_path": entry["artifact_path"]}
         return {"artifact": artifact, "snapshot": metadata}
+
+    def select(self, requested_date: str) -> dict[str, Any]:
+        """Return exactly the requested verified artifact, or raise a reasoned error."""
+        try:
+            requested = _snapshot_date(requested_date)
+        except ValueError as error:
+            raise SnapshotSelectionError("invalid_snapshot_date") from error
+        index = self._read_index()
+        entry = next((item for item in index["sessions"]
+                      if isinstance(item, dict) and item.get("as_of") == requested), None)
+        if entry is None:
+            raise SnapshotSelectionError("snapshot_not_found")
+        return self._select_entry(entry, kind="historical")
+
+    def select_current(self) -> dict[str, Any]:
+        index = self._read_index()
+        entry = index.get("current")
+        if not isinstance(entry, Mapping):
+            raise SnapshotSelectionError("current_not_found")
+        return self._select_entry(entry, kind="current")
