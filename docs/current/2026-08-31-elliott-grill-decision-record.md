@@ -11,8 +11,8 @@ This note preserves the owner grilling session, prototype/replay evidence, imple
 ## 2. Owner decisions locked during the grill
 
 - Product universe: `marginable_long = active Thai ORD ∩ owner-supplied marginable list ∩ can_buy=true`.
-  - Current reference counts: 931 active ORD; 237 product-eligible; 694 excluded.
-  - The 931-symbol path remains explicit audit/rollback coverage, not default candidate serving.
+  - Current reference counts: 929 active ORD; 237 product-eligible; 692 excluded.
+  - The 929-symbol path remains explicit audit/rollback coverage, not default candidate serving.
 - Product spine:
 
 ```text
@@ -155,7 +155,7 @@ Treat these as unverified AI advisory, not owner decisions:
 - **Do not restart implementation from ticket 01:** the later T1/T2 closeout notes below are retained evidence, not an outstanding task list.
 
 - **Retracement gate fixed:** `backend/elliott_structure_engine.py` adds `retrace_ok_for_w3` (retrace ≤60 AND holds) — blocks W3 promotion when retrace >60% or Wave1-low broken. Verified: CRC 85.71%→WAVE_1_ADVANCE, AWC 91.18%→WAVE_1_ADVANCE, BGRIM 29.17%→WAVE_3_CONTINUATION (correct).
-- **Universe resolver fixed:** `replay_lab.resolve_universe` now queries `symbol_master` (931 active ORD) instead of `price_data` (1,219) — eligible now 237. Verified 237/237.
+- **Universe resolver fixed:** `replay_lab.resolve_universe` now queries `symbol_master` (929 active ORD) instead of `price_data` (1,219) — eligible now 237. Verified 237/237.
 - **Focused tests:** `backend/test_elliott_setup_engine.py` 30/30 PASS (Lite rerun).
 - **Chart gate:** replayed CRC/BGRIM/AWC 1Y no-lookahead; `engine_evidence_chart.py` emits honest detection-date charts; owner chart review: **Arm approved** 2026-08-31.
 - **Opus challenger review (review.md) analyzed:** aligns with documentation reconciliation; standalone stress-test suggestion noted but not started.

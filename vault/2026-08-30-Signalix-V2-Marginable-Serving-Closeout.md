@@ -10,7 +10,7 @@
 
 - Serve `signalix/vcp-decision-shadow-v2` as the decision-facing projection now.
 - Use `marginable_long` as the real operational universe: active Thai ORD intersected with the owner-supplied marginable dataset and `can_buy=true`.
-- Current universe: 237 eligible symbols; 694 of the 931 active ORD symbols are outside this temporary operational scope.
+- Current universe: 237 eligible symbols; 692 of the 929 active ORD symbols are outside this temporary operational scope.
 - Do not expand the replay to three months.
 - Do not promote Low-Cheat, enable alerts, or enable auto-trading.
 - Do not wait for sequence-v2 A/B superiority evidence; keep sequence-policy shadow research-only.

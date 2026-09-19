@@ -182,7 +182,7 @@ decision spine:
       └─ DATA_BLOCKED
 ```
 
-`/api/setup-candidates` remains the setup-trial API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted but is not the current delivery focus. Browser scopes are owner-confirmed PASS; complete fresh setup coverage remains separate/not verified. The `marginable_long` scope is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
+`/api/setup-candidates` remains the setup-trial API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted but is not the current delivery focus. Browser scopes are owner-confirmed PASS; complete fresh setup coverage remains separate/not verified. The `marginable_long` scope is 237 eligible symbols; 929 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
 
 ### Deterministic chart and OHLCV window summary — 2026-09-10
 

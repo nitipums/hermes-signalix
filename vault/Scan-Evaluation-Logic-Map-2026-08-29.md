@@ -40,7 +40,7 @@ Current served verification after the latest release:
   surface; `READY · WAIT` cards show `Quality` and `Data` evidence.
 - Public VCP API defaults to `marginable_long` and reports `237` evaluated
   symbols with the valid `full_success` run `vcp60-20260828T094803Z-db4c9073`;
-  explicit `active_ord` remains the 931-symbol audit/rollback mode.
+  explicit `active_ord` remains the 929-symbol audit/rollback mode.
 - Public mobile target at 390px reports `clientWidth=390`,
   `scrollWidth=390`, and `bodyScrollWidth=390`.
 - Local analytical readiness reports `{"status":"ok","db":"up","redis":"up"}`.

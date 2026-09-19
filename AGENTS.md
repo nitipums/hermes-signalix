@@ -99,7 +99,7 @@ The canonical served product is `/trend-map` with `/api/trend-map`. The setup/MV
 routes are retained historical/audit material and are not active product routes.
 Do not route work there without a new owner-approved product decision.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
-- Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **931 active ORD**, **237 eligible**, **694 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
+- Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **929 active ORD**, **237 eligible**, **692 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
 - `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.
 - Private paper/shadow actionable signals are owner-approved. Alerts and auto-trading remain `PENDING / FUTURE FEATURE` and OFF. Do not enable alerts, evaluator auto-caller persistence, broker execution, or expand beyond Thai ORD without explicit owner scope.
 

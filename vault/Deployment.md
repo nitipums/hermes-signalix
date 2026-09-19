@@ -276,7 +276,7 @@ be separately approved and gated.
 
 At that 2026-09-02 baseline, the promoted Elliott/Trend/Trade-Setup spine was the product surface. `signalix_backend`, `signalix_dashboard`, PostgreSQL, and Redis were healthy at rebaseline; `/mvp` returned 200, `/api/setup-candidates` returned the live DB-built contract, `/health/readiness` was on backend `:8000`, and retired `/dashboard.html` returned 404. The public 390px failure→Retry→recovery journey was verified. The UI showed `60m fetched` separately from `latest completed 60m candle`; session evidence was verified after runtime reload. Alerts, auto-trading, and broker execution remained off.
 
-`marginable_long` is 237 eligible symbols; 931 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
+`marginable_long` is 237 eligible symbols; 929 active ORD is explicit audit/rollback coverage. VCP routes/artifacts remain compatibility/audit only.
 
 ### Current Team Facts policy and runtime — 2026-09-10
 

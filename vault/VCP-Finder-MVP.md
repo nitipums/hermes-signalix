@@ -7,7 +7,7 @@
 ## Product surface
 
 - `/mvp` opens on **Daily VCP Watchlist**, the fast review view.
-- **All VCP · 60m** defaults to the current `marginable_long` operational universe (237 active Thai ORD symbols with `can_buy=true`); explicit `active_ord` remains the full 931-symbol audit/rollback view with forming/state filters.
+- **All VCP · 60m** defaults to the current `marginable_long` operational universe (237 active Thai ORD symbols with `can_buy=true`); explicit `active_ord` remains the full 929-symbol audit/rollback view with forming/state filters.
 - The current visible MVP focus is dashboard-only: Daily VCP Watchlist is the fast review view; All VCP · 60m / Explorer defaults to `marginable_long` and exposes the selected universe metadata. Former Daily Shortlist and legacy All Stocks Explorer labels are retired from visible MVP navigation; backend/API and historical notes remain preserved for rollback/audit.
 - Alert delivery is paused. The delivery source remains preserved, but the Docker service is gated under Compose profile `alerts` and is not started by default.
 

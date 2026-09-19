@@ -139,7 +139,7 @@ The product must let a user answer, quickly and honestly:
 - The canonical API is `/api/setup-candidates`; it preserves all 237 `marginable_long` rows and six fail-closed lanes: `REVIEW_NOW`, `SETUP_FORMING`, `DAILY_CANDIDATE`, `WAIT`, `AVOID`, `DATA_BLOCKED`.
 - T1–T9 source and release promotion are complete. Live `:3001` serves the new DB-built contract with honest blocked/avoid states; public 390px failure→Retry→recovery journey is `PASS` with direct DOM/screenshot evidence. Broader desktop/drawer regression evidence and evaluator auto-caller remain separate.
 - VCP, contraction, and breakout-volume are bonus/compatibility evidence. `/api/vcp-finder` and old VCP surfaces are audit/rollback only.
-- 931 active ORD remains explicit audit/rollback coverage; `marginable_long` = 237 eligible symbols. Alerts, auto-trading, and broker execution remain off.
+- 929 active ORD remains explicit audit/rollback coverage; `marginable_long` = 237 eligible symbols. Alerts, auto-trading, and broker execution remain off.
 - Alerts, automatic trading, and broker execution are `PENDING / FUTURE FEATURE` and remain OFF. The evaluator auto-caller is a separate `PENDING / OWNER DECISION` for automatic lifecycle-evidence persistence only; it is not order execution.
 - Intraday service defaults to canonical `marginable_long`, runs 60m fetch/evaluation with `--no-scan`, and retains `active_ord` only as explicit audit/rollback scope. Daily scan remains the after-close operation to avoid overlapping 30-minute rounds.
 - `/api/setup-candidates` overlays the latest completed intraday run while preserving immutable read-model identity and Daily lineage. Current runtime evidence: `237 evaluated`, latest run `fb01ef8fbe70408e82ad3f78b2700fe8`, `full_success`.
