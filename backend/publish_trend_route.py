@@ -13,11 +13,12 @@ import datetime as dt
 import json
 import math
 import time
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
+from daily_history import DailyHistoryAdapter
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
 from main_trend_mapping import classify_main_trend
-from shadow_trend_map import BackendDailyAdapter, RETRIEVAL_CAP
+from shadow_trend_map import RETRIEVAL_CAP
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
 from trend_route import MAX_SESSIONS, ROUTE_POLICY_VERSION, build_route
@@ -186,7 +187,11 @@ def _cutoff(adapter: Any, conn: Any) -> Any:
 
 def build_publication(*, adapter: Any | None = None, conn: Any | None = None,
                       cutoff: Any = None, max_sessions: int = MAX_SESSIONS) -> dict[str, Any]:
-    adapter = adapter or BackendDailyAdapter()
+    if adapter is None:
+        from shadow_trend_map import BackendDailyAdapter
+
+        adapter = BackendDailyAdapter()
+    history_adapter = cast(DailyHistoryAdapter, adapter)
     owns_conn = conn is None
     conn = conn or adapter._get_conn()
     try:
@@ -198,7 +203,7 @@ def build_publication(*, adapter: Any | None = None, conn: Any | None = None,
         cutoff_date = _date(cutoff)
         if cutoff_date is None:
             raise RuntimeError("no completed Daily cutoff available")
-        loaded = adapter.load_daily_pit_batch(conn, symbols, cutoff_date)
+        loaded = history_adapter.load_daily_pit_batch(conn, symbols, cutoff_date)
         expected_sessions = sorted({row_date for symbol in symbols
                                     for row in ((loaded.get(symbol, ([], None, {}))[0]
                                                 if isinstance(loaded.get(symbol, ([], None, {})), (tuple, list))

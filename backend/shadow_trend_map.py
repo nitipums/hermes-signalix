@@ -18,11 +18,12 @@ import time
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
+from daily_history import DailyHistoryAdapter
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
 from main_trend_mapping import classify_main_trend
 from mvp_api import resolve_universe
@@ -649,8 +650,9 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
     output = []
     batch_error = False
     retrieval_error = False
-    batch_loader = getattr(adapter, "load_daily_pit_batch", None)
-    per_symbol_loader = getattr(adapter, "load_daily_pit", None)
+    history_adapter = cast(DailyHistoryAdapter, adapter)
+    batch_loader = getattr(history_adapter, "load_daily_pit_batch", None)
+    per_symbol_loader = getattr(history_adapter, "load_daily_pit", None)
     per_symbol_is_default = per_symbol_loader is None or (
         getattr(per_symbol_loader, "__func__", per_symbol_loader) is BackendDailyAdapter.load_daily_pit
     )
@@ -659,7 +661,7 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
     if callable(batch_loader) and per_symbol_is_default:
         db_read_started = time.perf_counter()
         try:
-            loaded = batch_loader(conn, symbols, as_of)
+            loaded = history_adapter.load_daily_pit_batch(conn, symbols, as_of)
         except Exception as error:
             loaded = None
             batch_error = True
@@ -692,7 +694,7 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
         for symbol in symbols:
             db_read_started = time.perf_counter()
             try:
-                frame, latest = adapter.load_daily_pit(conn, symbol, as_of)
+                frame, latest = history_adapter.load_daily_pit(conn, symbol, as_of)
                 db_read_ms += (time.perf_counter() - db_read_started) * 1000
                 classify_started = time.perf_counter()
                 row = evaluate_symbol(symbol, frame, as_of, RETRIEVAL_CAP)

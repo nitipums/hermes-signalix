@@ -1,6 +1,7 @@
 import json
 import datetime as dt
 
+from daily_history import DailyHistoryAdapter
 import trend_route
 import trend_route_api
 import trend_route_publisher as publisher
@@ -214,6 +215,26 @@ def test_publisher_replays_one_cutoff_and_publishes_resolved_bounded_universe(tm
     assert sum(route["status"] == "FULL" for route in artifact["routes"].values()) == 236
     assert all(all(point["date"] <= "2026-01-31" for point in route["observations"])
                for route in artifact["routes"].values())
+
+
+def test_publisher_consumes_named_daily_history_interface_without_concrete_adapter():
+    class InMemoryDailyHistory:
+        def resolve_universe(self, conn, universe):
+            return ["AAA"], {"universe_filter": universe}
+
+        def load_daily_pit(self, conn, symbol, as_of):
+            return indicator_rows(35), as_of
+
+        def load_daily_pit_batch(self, conn, symbols, as_of):
+            return {symbol: self.load_daily_pit(conn, symbol, as_of) for symbol in symbols}
+
+    adapter = InMemoryDailyHistory()
+    assert isinstance(adapter, DailyHistoryAdapter)
+    assert not hasattr(publish_trend_route, "BackendDailyAdapter")
+    result = publish_trend_route.build_publication(adapter=adapter, conn=object(), cutoff="2026-02-01")
+
+    assert result["universe"]["symbols"] == ["AAA"]
+    assert result["routes"]["AAA"]["coverage"]["no_lookahead"] is True
 
 
 def test_optimized_history_builds_indicators_once_per_symbol(monkeypatch):
