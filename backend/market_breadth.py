@@ -284,7 +284,8 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
     advancers = sum(current > prior for _, current, prior in valid_price)
     decliners = sum(current < prior for _, current, prior in valid_price)
     unchanged = sum(current == prior for _, current, prior in valid_price)
-    valid_count, coverage = len(valid_price), coverage_expected or len(session_rows)
+    valid_count = len(valid_price)
+    coverage = coverage_expected if coverage_expected is not None else len(session_rows)
     ratio_status = "AVAILABLE"
     ratio = None
     if valid_count == 0:
@@ -312,10 +313,10 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
     volume_quality = _quality(volume_valid, volume_coverage, volume_coverage > 0,
                               "no_valid_advancer_or_decliner_volume" if volume_valid == 0 else None)
     participation = {
-        "advancing": {"count": advancers, "percentage": (advancers / valid_count * 100) if valid_count else None},
-        "declining": {"count": decliners, "percentage": (decliners / valid_count * 100) if valid_count else None},
-        "unchanged": {"count": unchanged, "percentage": (unchanged / valid_count * 100) if valid_count else None},
-        "valid_count": valid_count, "declared_count": coverage, "denominator": valid_count,
+        "advancing": {"count": advancers, "percentage": (advancers / coverage * 100) if coverage > 0 else None},
+        "declining": {"count": decliners, "percentage": (decliners / coverage * 100) if coverage > 0 else None},
+        "unchanged": {"count": unchanged, "percentage": (unchanged / coverage * 100) if coverage > 0 else None},
+        "valid_count": valid_count, "declared_count": coverage, "denominator": coverage,
         "quality": price_quality,
     }
     trend_rows = []
@@ -365,7 +366,7 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
                                    "quality": {"new_high": _quality(high_valid, coverage, True),
                                                "new_low": _quality(low_valid, coverage, True)}}
     return {"price": {"advancers": advancers, "decliners": decliners, "unchanged": unchanged,
-                       "valid_rows": valid_count, "coverage_rows": coverage, "denominator": valid_count,
+                       "valid_rows": valid_count, "coverage_rows": coverage, "denominator": coverage,
                        "quality": price_quality},
             "participation": participation,
             "ad_ratio": {"value": ratio, "status": ratio_status},

@@ -213,8 +213,9 @@ fields. The public v2 representation contains aggregate `new_high_low` values
 plus quality/reason fields; MB-1 builder details remain available in the
 retained source/audit artifact. The read path selects one validated prebuilt
 field and caches only a pointer/content-addressed artifact, invalidating it
-when the pointer or file identity changes. It consumes an injected MB-1 build
-or read-only artifact source and never uses
+when the pointer or file identity changes. Its publisher accepts an injected
+MB-1 build or read-only source/build; this artifact module owns the schema,
+hash, pointer, and validated read path, not an injected MB-1 source itself. It never uses
 `marginable_long`, Trend Map, a database rebuild, ingestion, or a request-time
 scan. Missing, corrupt, mismatched, stale, empty, undersized, or invalid
 artifacts fail closed with a visible `DATA_BLOCKED` response; invalid ranges
@@ -225,8 +226,11 @@ single session. Direction is deterministic A/D-line evidence only: it uses
 the first and last valid `ad_line`, valid `net_advances` steps, and explicit
 AVAILABLE/PARTIAL/DATA_BLOCKED quality without thresholds, ratios, or trade
 meaning. Artifacts without the direction envelope fail closed. Source and
-fixture-backed contract tests are complete; served/runtime and browser
-verification remain **NOT VERIFIED**.
+fixture-backed contract tests are complete. Wave 1 served/runtime and browser
+verification is complete; the production artifact read-back is `929` declared
+active ORD, `841` observed, `88` blocked, `quality=PARTIAL`, and
+`freshness=AVAILABLE`. PARTIAL preserves the declared denominator while
+excluding invalid price rows from category counts.
 
 ## `market_breadth_publisher.py` — bounded MB-4A replay publisher
 
@@ -240,7 +244,7 @@ metadata, and MA50/MA200 participation; full technical series are symbol-local
 scratch data released before the next symbol. The CLI requires an explicit
 `--read-only` acknowledgement and accepts bounded `since`, `until`, and `as_of`
 controls. It has no request-time rebuild or scheduler/deployment side effect;
-live source/runtime verification is **NOT VERIFIED** here. Artifact universe
+live source/runtime verification is complete for the Wave 1 read-back. Artifact universe
 metadata keeps the compatibility `observed_count` historical union separate
 from point-in-time `current_observed_count`, `current_blocked_count`, and
 `current_declared_count`; the public coverage header uses the current fields.
@@ -253,8 +257,7 @@ preserves null/reason/quality states, and keeps the page explicitly
 read-only/non-actionable. The hero metadata separates point-in-time `Quality`
 from data `Freshness`; it has no symbol drawer, setup lane, alert, order,
 broker, or auto-trading control. Isolated desktop/390px success, range-switch,
-and empty-artifact Retry checks are verified; public deployment remains
-**NOT VERIFIED**.
+and empty-artifact Retry checks, and the Wave 1 public deployment are verified.
 
 The first beginner-facing slice renders `Daily Market Participation` as an
 aggregate active-ORD advancing/declining/unchanged bar with visible partial
@@ -266,8 +269,8 @@ MB-UI-2 extends the beginner-first presentation for cumulative participation,
 Main Trend distribution, MA50/MA200 participation, new highs/lows, and
 up/down volume. These are display-only explanations over deterministic API
 values; they do not alter breadth calculations, create action states, or add
-SET50 semantics. Live browser/runtime promotion remains **NOT VERIFIED** until
-the feature branch is promoted through the deployment gate.
+SET50 semantics. Live browser/runtime promotion is verified for Wave 1; the
+feature remains read-only and non-actionable.
 
 MB-UI-4 applies the approved High-Fashion Monochrome visual direction:
 black/white editorial typography, one lime accent, hairline rules, oversized

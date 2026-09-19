@@ -57,9 +57,12 @@ It uses the fixed current active-ORD universe, completed Daily sessions,
 Main Trend 1–4 evidence, A/D, moving-average participation, highs/lows, and
 raw volume breadth. It does not modify `/api/trend-map`, create symbol setup
 decisions, or expose alerts/orders/broker semantics. Source, fixture/API, and
-390px/desktop isolated browser checks are verified; production artifact
-publication and public runtime promotion remain **NOT VERIFIED** until a
-separate deployment/data gate is completed.
+390px/desktop isolated browser checks and the Wave 1 production artifact/public
+runtime promotion are verified. The 2026-09-19 read-back showed artifact
+`signalix.market-breadth.artifact.v2`, `as_of=2026-09-18`, `929` active symbols,
+`841` observed, `88` blocked, `quality=PARTIAL`, and `freshness=AVAILABLE`.
+PARTIAL remains explicit: the declared active-ORD denominator includes symbols
+without valid current/prior prices; category counts include only valid rows.
 
 The first beginner-facing UI slice adds a `Daily Market Participation` bar
 (advancing/declining/unchanged within the active-ORD denominator) and a small
@@ -285,8 +288,8 @@ identity changes. It does not rebuild, query, write, scan, or fall back to
 Trend Map or marginable-long data.
 The envelope is `PRODUCTION_READ_ONLY`, `research_only=false`, and
 `actionability=NONE`, with active-ORD universe identity and explicit null
-reasons. Source/tests are implemented; runtime/deployment and served endpoint
-verification are **NOT VERIFIED** in MB-2.
+reasons. Source/tests and the Wave 1 runtime/deployment and served endpoint
+verification are complete; the artifact retains explicit `PARTIAL` quality.
 
 ## Market Breadth MB-4A live replay publisher (2026-09-16)
 

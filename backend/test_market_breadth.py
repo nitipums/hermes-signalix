@@ -27,23 +27,37 @@ def test_official_first_selection_is_a_separate_deterministic_seam():
         ("2026-09-10", 10, "price_data"), ("2026-09-11", 12, "derived_daily_price_data")]
 
 
-def test_price_breadth_ratio_and_quality_use_valid_price_denominator():
+def test_price_breadth_uses_declared_active_ord_denominator_and_preserves_valid_count():
     data = [row("A", "2026-09-09", 10), row("B", "2026-09-09", 20), row("C", "2026-09-09", 30),
             row("A", "2026-09-10", 11), row("B", "2026-09-10", 19), row("C", "2026-09-10", 30),
             row("D", "2026-09-10", 40)]
     current = build_market_breadth(data)["current"]
     assert current["price"] == {"advancers": 1, "decliners": 1, "unchanged": 1,
-                                  "valid_rows": 3, "coverage_rows": 4, "denominator": 3,
+                                  "valid_rows": 3, "coverage_rows": 4, "denominator": 4,
                                   "quality": {"status": "PARTIAL", "reason": "incomplete_input_coverage",
                                               "valid_rows": 3, "coverage_rows": 4}}
     assert current["ad_ratio"] == {"value": 1.0, "status": "AVAILABLE"}
     assert current["participation"]["valid_count"] == 3
-    assert current["participation"]["denominator"] == 3
+    assert current["participation"]["denominator"] == 4
     assert current["participation"]["declared_count"] == 4
     for category in ("advancing", "declining", "unchanged"):
         assert current["participation"][category]["count"] == 1
-        assert current["participation"][category]["percentage"] == pytest.approx(100 / 3)
+        assert current["participation"][category]["percentage"] == pytest.approx(25)
     assert current["participation"]["quality"] == current["price"]["quality"]
+
+
+def test_missing_observed_symbol_contributes_to_denominator_not_category_counts():
+    current = build_market_breadth([
+        row("A", "2026-09-09", 10), row("B", "2026-09-09", 20),
+        row("C", "2026-09-09", 30), row("D", "2026-09-10", 40),
+        row("A", "2026-09-10", 11), row("B", "2026-09-10", 19),
+        row("C", "2026-09-10", 30),
+    ])["current"]
+    assert current["price"]["denominator"] == 4
+    assert current["price"]["valid_rows"] == 3
+    assert current["price"]["advancers"] == 1
+    assert current["price"]["decliners"] == 1
+    assert current["price"]["unchanged"] == 1
 
 
 def test_ad_ratio_and_line_no_decliners_no_valid_and_continuation():
