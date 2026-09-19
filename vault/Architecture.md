@@ -44,7 +44,7 @@ states, and fail-closed behavior.
 ### Historical EOD snapshot boundary — Issue #47, source closeout 2026-09-18
 
 The approved history contract extends this same read-only boundary with a
-bounded index of at most 30 completed EOD session artifacts. The selected
+bounded index of at most 3 completed EOD session artifacts. The selected
 artifact owns its `as_of`, resolved historical universe, row count, quality,
 and provenance. The request path reads the validated index and immutable JSON
 artifact only; it does not query PostgreSQL, raw market history, rescan the

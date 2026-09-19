@@ -59,6 +59,21 @@ def test_publish_is_immutable_and_index_update_is_atomic(tmp_path):
     assert (tmp_path / "versions/artifact-2026-09-18.json").read_bytes() == original
 
 
+def test_same_date_publication_selects_newest_artifact_and_preserves_old_file(tmp_path):
+    store = TrendMapEodSnapshotStore(tmp_path)
+    publish(store, "2026-09-18", value="old")
+    old_path = tmp_path / "versions/artifact-old.json"
+    old_bytes = old_path.read_bytes()
+
+    publish(store, "2026-09-18", value="new")
+
+    selected = store.select("2026-09-18")
+    assert selected["artifact"]["artifact_id"] == "artifact-new"
+    assert (tmp_path / "versions/artifact-new.json").is_file()
+    assert old_path.read_bytes() == old_bytes
+    assert [entry["artifact_id"] for entry in store.read_index()["sessions"]] == ["artifact-new"]
+
+
 def test_exact_selection_and_fail_closed_reasons(tmp_path):
     store = TrendMapEodSnapshotStore(tmp_path)
     publish(store, "2026-09-17")
@@ -125,3 +140,21 @@ def test_api_selector_is_explicit_and_does_not_use_current_fallback(monkeypatch)
         "/api/trend-map?snapshot_date=2026-09-17", handler)
     assert calls == [{"snapshot_date": "2026-09-17"}]
     assert handler.payload["snapshot"]["kind"] == "historical"
+
+
+def test_api_snapshot_failure_returns_compact_not_verified_fallback(monkeypatch):
+    class Handler:
+        def send_bytes(self, body, **kwargs):
+            self.payload = json.loads(body)
+
+    def unavailable(**kwargs):
+        raise SnapshotSelectionError("snapshot_not_found")
+
+    monkeypatch.setattr(shadow_trend_map, "build_shadow_report", unavailable)
+    handler = Handler()
+    assert shadow_trend_map.handle_shadow_trend_map_api(
+        "/api/trend-map?snapshot_date=2026-09-16", handler)
+    assert handler.payload["status"] == "DATA_BLOCKED"
+    assert handler.payload["verification_status"] == "NOT_VERIFIED"
+    assert handler.payload["verification_reason"] == "snapshot_not_found"
+    assert handler.payload["rows"] == []

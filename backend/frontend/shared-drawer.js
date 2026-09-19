@@ -169,15 +169,6 @@
     return "Main Trend " + display + " · " + quality;
   }
 
-  function shadowTriggerPriceEvidence(item) {
-    var reason = item && (item.trigger_reason || item.reason) || "";
-    var labels = ["up", "down"].map(function (direction) {
-      var value = item && item[direction+"_trigger"];
-      return direction.toUpperCase() + " trigger " + (typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "Not verified");
-    });
-    return labels.join(" · ") + (reason ? " · " + reason : "");
-  }
-
   function normalizeDrawerTrendDisplay(item, trend) {
     var itemTrend = item && item.trend;
     var candidate = itemTrend && typeof itemTrend === "object" && !Array.isArray(itemTrend)

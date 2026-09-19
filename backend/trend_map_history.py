@@ -143,10 +143,9 @@ class TrendMapEodSnapshotStore:
         entry = self._entry(artifact, artifact_path, is_current=is_current)
         existing = [item for item in sessions if isinstance(item, dict) and item.get("as_of") == entry["as_of"]]
         if existing:
-            # A repeated publication may produce a new current pointer because
-            # measurement metadata changed.  The historical session remains
-            # the first validated immutable artifact for that EOD date.
-            entry = existing[0]
+            # A repeated publication may produce a new validated artifact for
+            # the same EOD date. Keep the old immutable file, but point the
+            # bounded index at the newest artifact.
             sessions = [item for item in sessions if item.get("as_of") != entry["as_of"]]
         sessions.append(entry)
         sessions.sort(key=lambda item: item.get("as_of", ""), reverse=True)
