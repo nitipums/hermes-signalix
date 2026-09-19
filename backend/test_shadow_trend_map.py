@@ -46,7 +46,7 @@ def test_current_eod_path_computes_indicators_once_and_marks_missing_history_not
     assert result["trend_duration_sessions"] is None
     assert result["history_quality"] == "NOT_VERIFIED"
     assert result["history_reason"] == "ordered_history_unavailable"
-    assert result["main_trend"]["trigger_basis"].startswith("main-trend-classifier-transition-v1") or result["main_trend"]["trigger_basis"] == "NOT_VERIFIED"
+    assert result["main_trend"]["trigger_basis"] in {"STRUCTURAL_REFERENCE_FALLBACK", "NOT_VERIFIED"}
 
 
 def test_supplied_ordered_history_is_consumed_without_recomputing_indicators():
@@ -390,6 +390,26 @@ def test_published_overlay_reads_artifact_without_request_database(monkeypatch):
     assert report["intraday_quote_overlay"]["query_mode"] == "PREBUILT_READ_MODEL"
 
 
+def test_published_overlay_uses_preview_clock_only_with_explicit_mode(monkeypatch):
+    calls = []
+    artifact = {"generated_at": "2026-09-15T09:00:00+00:00", "quotes": [{
+        "symbol": "AAA", "status": "UNAVAILABLE"}]}
+
+    def read_current(**kwargs):
+        calls.append(kwargs)
+        return artifact
+
+    monkeypatch.setattr("intraday_quote_read_model.read_current", read_current)
+    monkeypatch.setenv("SIGNALIX_PREVIEW_NOW", "2026-09-15T09:30:00Z")
+    subject.overlay_intraday_quotes(_published_quote_report())
+    assert calls == [{}]
+
+    calls.clear()
+    monkeypatch.setenv("SIGNALIX_PREVIEW_MODE", "1")
+    subject.overlay_intraday_quotes(_published_quote_report())
+    assert calls == [{"now": datetime(2026, 9, 15, 9, 30, tzinfo=timezone.utc)}]
+
+
 def _trigger_report(*, up=110, down=90, price=100):
     return {
         "status": subject.PRODUCTION_READ_ONLY,
@@ -718,6 +738,7 @@ def test_trend_map_renders_finite_trigger_prices_and_fails_closed_with_reason():
         'UP trigger ', 'DOWN trigger ', 'Not verified', 'trigger_reason',
         'Number.isFinite', 'class="trigger-summary"',
         'id="drawer-trigger-evidence"', 'shadowTriggerPriceEvidence',
+        'Reference does not guarantee classifier trend change; EOD close/classification remains authoritative',
     ):
         assert marker in combined
     assert 'trigger_marker' in html and 'Provisional; confirmation requires a completed EOD close/classification' in html

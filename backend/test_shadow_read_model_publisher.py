@@ -337,7 +337,7 @@ def test_current_and_historical_api_compact_history_fields_are_read_model_only(m
     assert {key: historical["rows"][0][key] for key in fields} == {
         "trend_changed_date": "2026-09-09", "trend_duration_sessions": 2,
         "up_trigger": 111.0, "down_trigger": 89.0,
-        "trigger_basis": "NOT_VERIFIED",
+        "trigger_basis": "historical_classifier_evidence",
     }
     assert current["status"] == historical["status"] == trend_map.PRODUCTION_READ_ONLY
     assert current["research_only"] is historical["research_only"] is False

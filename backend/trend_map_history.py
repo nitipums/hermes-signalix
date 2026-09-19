@@ -14,7 +14,7 @@ from typing import Any, Callable, Mapping
 
 from artifact_writer import atomic_write_json
 
-MAX_SNAPSHOT_SESSIONS = 30
+MAX_SNAPSHOT_SESSIONS = 3
 INDEX_SCHEMA_VERSION = "signalix.trend-map.eod-snapshot-index.v1"
 INDEX_NAME = "snapshots.json"
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

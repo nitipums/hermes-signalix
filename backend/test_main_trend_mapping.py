@@ -104,7 +104,7 @@ def test_classifier_transition_triggers_are_nearest_inclusive_and_verified(monke
 
     monkeypatch.setattr(subject, "classify_main_trend", fake_classifier)
     current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
-               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+               "moving_averages": {"5": 110.0, "20": 90.0}}
     result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
     assert result["up_trigger"] == pytest.approx(110.0)
     assert result["down_trigger"] == pytest.approx(90.0)
@@ -112,21 +112,58 @@ def test_classifier_transition_triggers_are_nearest_inclusive_and_verified(monke
     assert result["trigger_basis"].startswith("main-trend-classifier-transition-v1")
 
 
-def test_classifier_transition_triggers_fail_closed_for_no_transition_and_partial_evidence():
+def test_classifier_transition_triggers_use_structural_fallback_for_partial_evidence():
     current = {"main_trend": 2, "close": 100.0, "evidence_quality": "PARTIAL",
-               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
-    partial = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
-    assert partial["trigger_quality"] == "NOT_VERIFIED"
+               "moving_averages": {"5": 105.0, "20": 95.0}}
+    snapshot = transition_snapshot()
+    snapshot["latest"]["ma"] = {"5": 105.0, "20": 95.0}
+    partial = subject.build_main_trend_trigger_evidence(snapshot, current)
+    assert partial["up_trigger"] == 105.0
+    assert partial["down_trigger"] == 95.0
+    assert partial["trigger_quality"] == "PARTIAL"
+    assert partial["trigger_basis"] == "STRUCTURAL_REFERENCE_FALLBACK"
     assert partial["trigger_reason"] == "partial_or_missing_classifier_evidence"
 
 
 def test_classifier_transition_triggers_fail_closed_when_classifier_never_changes(monkeypatch):
     monkeypatch.setattr(subject, "classify_main_trend", lambda snapshot: {"main_trend": 2})
     current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
-               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
-    result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
-    assert result["up_trigger"] is None and result["down_trigger"] is None
+               "moving_averages": {"5": 110.0, "20": 90.0}}
+    snapshot = transition_snapshot()
+    snapshot["latest"]["ma"]["5"] = 110.0
+    snapshot["latest"]["explicit_support"] = 90.0
+    result = subject.build_main_trend_trigger_evidence(snapshot, current)
+    assert result["up_trigger"] == 110.0
+    assert result["down_trigger"] == 90.0
+    assert result["trigger_quality"] == "PARTIAL"
+    assert result["trigger_basis"] == "STRUCTURAL_REFERENCE_FALLBACK"
     assert result["trigger_reason"] == "no_verified_classifier_transition_in_bounded_domain"
+
+
+@pytest.mark.parametrize("close", [0.001, 0.01, 1.0, 100.0, 12345.6789])
+def test_price_reference_fallback_covers_every_finite_positive_close(close):
+    current = {"main_trend": 2, "close": 100.0, "evidence_quality": "PARTIAL",
+               "moving_averages": {"5": 0, "20": float("nan")}}
+    current["close"] = close
+    result = subject.build_main_trend_trigger_evidence(
+        {"latest": {"close": close, "ma": {"5": 0, "20": float("nan")}}}, current)
+    assert result["up_trigger"] > 0 and result["down_trigger"] > 0
+    assert result["trigger_quality"] == "PARTIAL"
+    assert result["trigger_basis"] == "PRICE_REFERENCE_FALLBACK"
+    assert result["trigger_reason"] == "up_price_reference_fallback;down_price_reference_fallback"
+    assert result["up_trigger_reason"] == "up_price_reference_fallback"
+    assert result["down_trigger_reason"] == "down_price_reference_fallback"
+
+
+def test_price_reference_fallback_remains_not_verified_without_positive_close():
+    current = {"main_trend": 2, "close": 0.0, "evidence_quality": "PARTIAL",
+               "moving_averages": {"5": 0, "20": float("nan")}}
+    result = subject.build_main_trend_trigger_evidence(
+        {"latest": {"close": 0.0, "ma": {"5": 0, "20": float("nan")}}}, current)
+    assert result["up_trigger"] is None and result["down_trigger"] is None
+    assert result["trigger_quality"] == "NOT_VERIFIED"
+    assert result["trigger_basis"] == "NOT_VERIFIED"
+    assert result["trigger_reason"] == "no_numeric_structural_reference"
 
 
 @pytest.mark.parametrize(
@@ -142,24 +179,25 @@ def test_classifier_transition_triggers_are_directionally_independent(monkeypatc
 
     monkeypatch.setattr(subject, "classify_main_trend", fake_classifier)
     current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
-               "moving_averages": {str(period): 100.0 for period in MA_PERIODS}}
+               "moving_averages": {"5": 110.0, "20": 90.0}}
     result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
 
     assert result[f"{direction}_trigger"] == pytest.approx(expected)
-    assert result[f"{missing}_trigger"] is None
+    assert result[f"{missing}_trigger"] is not None
     assert result["trigger_quality"] == "PARTIAL"
     assert result["quality"] == "PARTIAL"
     assert result["trigger_reason"] == f"{missing}_transition_not_verified"
-    assert result["trigger_basis"].startswith("main-trend-classifier-transition-v1")
+    assert result["trigger_basis"] == "STRUCTURAL_REFERENCE_FALLBACK"
 
 
 def test_classifier_transition_triggers_never_use_non_finite_search_evidence():
     current = {"main_trend": 2, "close": 100.0, "evidence_quality": "FULL",
                "moving_averages": {"5": float("nan")}}
     result = subject.build_main_trend_trigger_evidence(transition_snapshot(), current)
-    assert result["up_trigger"] is None
-    assert result["down_trigger"] is None
-    assert result["trigger_quality"] == "NOT_VERIFIED"
+    assert result["up_trigger"] == pytest.approx(101.0)
+    assert result["down_trigger"] == pytest.approx(99.0)
+    assert result["trigger_quality"] == "PARTIAL"
+    assert result["trigger_basis"] == "PRICE_REFERENCE_FALLBACK"
 
 
 def test_transition_probe_is_shallow_copy_on_write_and_does_not_look_ahead():

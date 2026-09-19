@@ -32,18 +32,18 @@ def publish(store, date, value=None):
                          is_current=date == "2026-09-18")
 
 
-def test_history_retains_at_most_30_sessions_and_handles_fewer_or_more(tmp_path):
+def test_history_retains_exactly_latest_3_sessions_and_handles_fewer_or_more(tmp_path):
     store = TrendMapEodSnapshotStore(tmp_path)
     first = date(2026, 1, 1)
     for day in range(2):
         publish(store, str(first + timedelta(days=day)))
     assert len(store.read_index()["sessions"]) == 2
-    for day in range(2, 32):
+    for day in range(2, 8):
         publish(store, str(first + timedelta(days=day)))
     sessions = store.read_index()["sessions"]
-    assert len(sessions) == MAX_SNAPSHOT_SESSIONS == 30
-    assert sessions[0]["as_of"] == "2026-02-01"
-    assert sessions[-1]["as_of"] == "2026-01-03"
+    assert len(sessions) == MAX_SNAPSHOT_SESSIONS == 3
+    assert [item["as_of"] for item in sessions] == [
+        "2026-01-08", "2026-01-07", "2026-01-06"]
 
 
 def test_publish_is_immutable_and_index_update_is_atomic(tmp_path):

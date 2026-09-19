@@ -25,6 +25,7 @@ TRIGGER_POLICY_VERSION = "main-trend-classifier-transition-v1"
 TRIGGER_SEARCH_STEPS = 128
 TRIGGER_REFINEMENT_STEPS = 45
 TRIGGER_PRECISION = 10
+PRICE_REFERENCE_MINIMUM = 0.01
 
 
 def _number(value: Any) -> float | None:
@@ -386,6 +387,130 @@ def _trigger_unverified(reason: str) -> dict[str, Any]:
     }
 
 
+def _structural_reference_triggers(snapshot: Mapping[str, Any], classification: Mapping[str, Any]) -> tuple[float | None, float | None]:
+    """Return nearest finite Daily reference levels around the EOD close.
+
+    These levels are display evidence only.  They are deliberately not
+    described as classifier transitions: a structural reference cannot
+    guarantee that the Main Trend changes at that price.
+    """
+    close = _number(classification.get("close"))
+    if close is None or close <= 0:
+        return None, None
+    latest = _latest(snapshot)
+    supplied = classification.get("moving_averages")
+    supplied = supplied if isinstance(supplied, Mapping) else {}
+    ma = _ma_values(snapshot, latest)
+    ma.update({str(key): _number(value) for key, value in supplied.items()})
+    above = [value for value in ma.values() if value is not None and value > close]
+    below = [value for value in ma.values() if value is not None and 0 < value < close]
+    supports = []
+    for container in (latest, snapshot):
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("explicit_support", "support", "support_reference"):
+            value = _number(container.get(key))
+            if value is not None and 0 < value < close:
+                supports.append(value)
+    atr_values = []
+    for container in (latest, snapshot):
+        if not isinstance(container, Mapping):
+            continue
+        for key in ("atr", "atr14", "average_true_range"):
+            value = _number(container.get(key))
+            if value is not None and value > 0:
+                atr_values.append(value)
+    above.extend(close + value for value in atr_values)
+    below.extend(close - value for value in atr_values if 0 < close - value < close)
+    return (min(above) if above else None,
+            max([*below, *supports]) if [*below, *supports] else None)
+
+
+def _price_reference_triggers(close: Any) -> tuple[float | None, float | None]:
+    """Return deterministic positive price references when structure is absent.
+
+    These are numeric display references only.  They intentionally do not
+    claim that the classifier changes at either level.
+    """
+    close = _number(close)
+    if close is None or close <= 0:
+        return None, None
+    distance = max(close * 0.01, PRICE_REFERENCE_MINIMUM)
+    up = round(close + distance, TRIGGER_PRECISION)
+    down = round(max(close - distance, PRICE_REFERENCE_MINIMUM), TRIGGER_PRECISION)
+    up = up if math.isfinite(up) and up > 0 else None
+    down = down if math.isfinite(down) and down > 0 else None
+    return up, down
+
+
+def _with_structural_fallback(result: dict[str, Any], snapshot: Mapping[str, Any],
+                              classification: Mapping[str, Any], reason: str) -> dict[str, Any]:
+    if result.get("up_trigger") is not None and result.get("down_trigger") is not None:
+        return result
+    up, down = _structural_reference_triggers(snapshot, classification)
+    result = dict(result)
+    structural_directions = set()
+    if result.get("up_trigger") is None:
+        result["up_trigger"] = up
+        if up is not None:
+            structural_directions.add("up")
+    if result.get("down_trigger") is None:
+        result["down_trigger"] = down
+        if down is not None:
+            structural_directions.add("down")
+    price_up, price_down = _price_reference_triggers(classification.get("close"))
+    price_directions = set()
+    if result.get("up_trigger") is None:
+        result["up_trigger"] = price_up
+        if price_up is not None:
+            price_directions.add("up")
+    if result.get("down_trigger") is None:
+        result["down_trigger"] = price_down
+        if price_down is not None:
+            price_directions.add("down")
+    missing = [direction for direction in ("up", "down")
+               if result.get(f"{direction}_trigger") is None]
+    result["up_trigger_reason"] = ("classifier_transition_verified" if result.get("up_trigger") is not None and "up" not in structural_directions and "up" not in price_directions
+                                    else "structural_reference_fallback" if "up" in structural_directions
+                                    else "up_price_reference_fallback" if "up" in price_directions
+                                    else "up_trigger_not_verified")
+    result["down_trigger_reason"] = ("classifier_transition_verified" if result.get("down_trigger") is not None and "down" not in structural_directions and "down" not in price_directions
+                                      else "structural_reference_fallback" if "down" in structural_directions
+                                      else "down_price_reference_fallback" if "down" in price_directions
+                                      else "down_trigger_not_verified")
+    if missing:
+        if price_directions:
+            result["trigger_quality"] = "PARTIAL"
+            result["quality"] = "PARTIAL"
+            result["trigger_basis"] = "PRICE_REFERENCE_FALLBACK"
+            result["trigger_reason"] = ";".join(
+                f"{direction}_price_reference_fallback" for direction in ("up", "down")
+                if direction in price_directions)
+        else:
+            result["trigger_quality"] = "NOT_VERIFIED"
+            result["quality"] = "NOT_VERIFIED"
+            result["trigger_basis"] = "NOT_VERIFIED"
+            result["trigger_reason"] = ("no_numeric_structural_reference"
+                                        if len(missing) == 2
+                                        else f"{missing[0]}_trigger_not_verified")
+        result["reason"] = result["trigger_reason"]
+    elif price_directions:
+        result["trigger_quality"] = "PARTIAL"
+        result["quality"] = "PARTIAL"
+        result["trigger_basis"] = "PRICE_REFERENCE_FALLBACK"
+        result["trigger_reason"] = ";".join(
+            f"{direction}_price_reference_fallback" for direction in ("up", "down")
+            if direction in price_directions)
+        result["reason"] = result["trigger_reason"]
+    elif structural_directions:
+        result["trigger_quality"] = "PARTIAL"
+        result["quality"] = "PARTIAL"
+        result["trigger_basis"] = "STRUCTURAL_REFERENCE_FALLBACK"
+        result["trigger_reason"] = reason
+        result["reason"] = reason
+    return result
+
+
 def _transition_level(snapshot: Mapping[str, Any], current_close: float, current_trend: int,
                      *, direction: str, lower: float, upper: float) -> float | None:
     """Find and verify the nearest classifier transition in one direction."""
@@ -443,24 +568,32 @@ def build_main_trend_trigger_evidence(snapshot: Mapping[str, Any] | None,
     values = current.get("moving_averages")
     ma_values = [_number(value) for value in values.values()] if isinstance(values, Mapping) else []
     if current.get("evidence_quality") != "FULL":
-        return _trigger_unverified("partial_or_missing_classifier_evidence")
+        return _with_structural_fallback(
+            _trigger_unverified("partial_or_missing_classifier_evidence"), source, current,
+            "partial_or_missing_classifier_evidence")
     if current_close is None or current_trend is None or not ma_values or any(value is None or value <= 0 for value in ma_values):
-        return _trigger_unverified("non_finite_or_insufficient_search_evidence")
+        return _with_structural_fallback(
+            _trigger_unverified("non_finite_or_insufficient_search_evidence"), source, current,
+            "non_finite_or_insufficient_search_evidence")
     lower = max(min([current_close, *ma_values]) * 0.5, 10 ** -TRIGGER_PRECISION)
     upper = max([current_close, *ma_values]) * 1.5
     if not math.isfinite(lower) or not math.isfinite(upper) or lower >= current_close or upper <= current_close:
-        return _trigger_unverified("insufficient_search_domain")
+        return _with_structural_fallback(
+            _trigger_unverified("insufficient_search_domain"), source, current,
+            "insufficient_search_domain")
     up = _transition_level(source, current_close, current_trend, direction="up", lower=lower, upper=upper)
     down = _transition_level(source, current_close, current_trend, direction="down", lower=lower, upper=upper)
     if up is None and down is None:
-        return _trigger_unverified("no_verified_classifier_transition_in_bounded_domain")
+        return _with_structural_fallback(
+            _trigger_unverified("no_verified_classifier_transition_in_bounded_domain"), source, current,
+            "no_verified_classifier_transition_in_bounded_domain")
     missing = []
     if up is None:
         missing.append("up")
     if down is None:
         missing.append("down")
     reason = f"{missing[0]}_transition_not_verified" if len(missing) == 1 else "incomplete_classifier_transition_evidence"
-    return {
+    return _with_structural_fallback({
         "up_trigger": up,
         "down_trigger": down,
         "up_trigger_operator": ">=",
@@ -471,7 +604,7 @@ def build_main_trend_trigger_evidence(snapshot: Mapping[str, Any] | None,
         "quality": "VERIFIED" if not missing else "PARTIAL",
         "reason": None if not missing else reason,
         "actionability": "NONE",
-    }
+    }, source, current, reason)
 
 
 build_classifier_transition_triggers = build_main_trend_trigger_evidence

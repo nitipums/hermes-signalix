@@ -19,7 +19,7 @@ acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
 
 ### Historical EOD snapshots and trigger evidence — Issue #47 closeout boundary
 
-The approved extension is limited to the latest 30 completed EOD session
+The approved extension is limited to the latest 3 completed EOD session
 artifacts. Each selected historical artifact must retain its own `as_of`,
 resolved universe, quality, provenance, duration/change-date evidence, and
 deterministic trigger fields. The current snapshot may receive a provisional,
@@ -40,11 +40,22 @@ and `trigger_basis`. Public served runtime, production data freshness,
 browser, deployment/promotion, and rollback acceptance remain `NOT VERIFIED`
 because no deploy, restart, or public-route read-back was exercised.
 
-The bounded producer computes the current EOD classifier and verified trigger
-once per symbol. Historical duration evidence is accepted only through an
-ordered, bounded caller/read-model/replay history seam; when that evidence is
-unavailable, duration remains explicitly `NOT_VERIFIED`/null and no historical
-indicator reconstruction is performed.
+The bounded producer computes the current EOD classifier and trigger evidence
+once per symbol. It prefers verified classifier-transition boundaries. When a
+direction cannot be proven, it may emit the nearest finite Daily MA,
+support, or ATR-derived structural reference with
+`trigger_quality=PARTIAL` and
+`trigger_basis=STRUCTURAL_REFERENCE_FALLBACK`; this is not a guarantee of a
+trend change. If no structural reference exists but the EOD close is finite
+and positive, it emits a deterministic positive price reference with
+`trigger_quality=PARTIAL` and `trigger_basis=PRICE_REFERENCE_FALLBACK`, with a
+direction-specific reason. The UI must state that this reference does not
+guarantee a classifier trend change and that EOD close/classification remains
+authoritative. If the close itself is unavailable or non-positive, the row
+remains visibly `NOT_VERIFIED` with a reason. Historical duration evidence is accepted only
+through an ordered, bounded caller/read-model/replay history seam; when that
+evidence is unavailable, duration remains explicitly `NOT_VERIFIED`/null and
+no historical indicator reconstruction is performed.
 
 ### Trend Route acceptance — 2026-09-17
 

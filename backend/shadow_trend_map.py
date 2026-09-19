@@ -12,6 +12,7 @@ import hashlib
 import importlib.util
 import json
 import math
+import os
 import re
 import threading
 import time
@@ -31,6 +32,7 @@ from mvp_api import resolve_universe
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
 from team_facts_api import _is_completed
+from trend_map_history import MAX_SNAPSHOT_SESSIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 ADAPTER_PATH = ROOT / "prototypes" / "elliott-state-replay" / "replay_lab.py"
@@ -601,7 +603,7 @@ def evaluate_symbol(symbol: str, frame: Any, as_of: Any, retrieval_cap: int = RE
     current_trigger_fields = {key: current_trigger.get(key) for key in (
         "up_trigger", "down_trigger", "up_trigger_operator", "down_trigger_operator",
         "trigger_basis", "trigger_quality", "trigger_reason", "quality", "reason", "actionability")}
-    prior_history = (list(history_observations)[-30:]
+    prior_history = (list(history_observations)[-MAX_SNAPSHOT_SESSIONS:]
                      if isinstance(history_observations, (list, tuple)) else [])
     current_observation = {"as_of": as_of, "main_trend": main_trend,
                            **current_trigger_fields}
@@ -857,7 +859,18 @@ def overlay_intraday_quotes(report: dict[str, Any], *, adapter=None, conn=None, 
         artifact = None
         try:
             from intraday_quote_read_model import read_current
-            artifact = read_current(now=now)
+            preview_now = None
+            if os.getenv("SIGNALIX_PREVIEW_MODE") == "1":
+                preview_value = os.getenv("SIGNALIX_PREVIEW_NOW")
+                if preview_value:
+                    try:
+                        preview_now = datetime.fromisoformat(preview_value.replace("Z", "+00:00"))
+                        if preview_now.tzinfo is None:
+                            preview_now = preview_now.replace(tzinfo=timezone.utc)
+                    except (TypeError, ValueError, OverflowError):
+                        preview_now = None
+            artifact = (read_current(now=preview_now) if preview_now is not None
+                        else read_current())
             by_symbol = {item["symbol"]: item for item in artifact["quotes"]}
             applied = 0
             for row in rows:
@@ -1108,7 +1121,15 @@ def compact_public_trend_map_report(report: Mapping[str, Any]) -> dict[str, Any]
         else:
             row["main_trend"] = None
         for key in history_trigger_fields:
-            if key in original and original.get(key) is not None:
+            historical_nested = (
+                isinstance(projected.get("snapshot"), Mapping)
+                and projected["snapshot"].get("kind") == "historical"
+                and isinstance(main_trend, Mapping)
+                and key in main_trend
+            )
+            if historical_nested:
+                row[key] = deepcopy(main_trend.get(key))
+            elif key in original and original.get(key) is not None:
                 row[key] = deepcopy(original.get(key))
             elif isinstance(main_trend, Mapping) and key in main_trend:
                 row[key] = deepcopy(main_trend.get(key))

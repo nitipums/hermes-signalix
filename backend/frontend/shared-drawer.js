@@ -274,11 +274,14 @@
     var evidence = item && item.main_trend && typeof item.main_trend === "object" ? item.main_trend : item || {};
     var reason = evidence.trigger_reason || item.trigger_reason || item.reason || "Not verified";
     var basis = evidence.trigger_basis || item.trigger_basis || "Not verified";
+    var caveat = basis === "STRUCTURAL_REFERENCE_FALLBACK" || basis === "PRICE_REFERENCE_FALLBACK"
+      ? " · Reference does not guarantee classifier trend change; EOD close/classification remains authoritative"
+      : "";
     var labels = ["up", "down"].map(function (direction) {
       var value = item && item[direction+"_trigger"];
       return direction.toUpperCase() + " trigger " + (typeof value === "number" && Number.isFinite(value) ? value.toFixed(2) : "Not verified");
     });
-    return labels.join(" · ") + " · Basis " + basis + " · Reason " + reason;
+    return labels.join(" · ") + " · Basis " + basis + " · Reason " + reason + caveat;
   }
 
   function renderShadowMarkerEvidence(item, historical) {

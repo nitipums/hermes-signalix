@@ -23,7 +23,9 @@
 
 ## Issue #47 Trend Map history closeout — 2026-09-18 source/read-back boundary
 
-- Approved contract: retain up to 30 completed EOD session artifacts under a
+- Superseded contract: the former 30-session retention is replaced by the
+  current owner-approved limit of exactly the latest 3 completed EOD session
+  artifacts under a
   validated index; the selected artifact owns its historical universe and
   `as_of`, quality, provenance, trend duration/change date, and deterministic
   up/down trigger fields. The latest snapshot remains the default.
