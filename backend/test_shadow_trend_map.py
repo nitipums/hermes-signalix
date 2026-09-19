@@ -748,6 +748,28 @@ def test_trend_map_renders_finite_trigger_prices_and_fails_closed_with_reason():
     assert 'trigger-summary' not in shared
 
 
+def test_trend_map_compact_rows_qualify_partial_and_fallback_triggers_and_mark_reached_current_rows_only():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'label:"REF"' in html
+    assert 'label:"PARTIAL"' in html
+    assert 'Reference fallback; an EOD close and classifier remain authoritative' in html
+    assert 'Partial trigger evidence; an EOD close and classifier remain authoritative' in html
+    assert 'status==="UP_TRIGGER_REACHED"' in html
+    assert 'status==="DOWN_TRIGGER_REACHED"' in html
+    assert 'UP REACHED' in html and 'DOWN REACHED' in html
+    assert 'if(snapshotIsHistorical())return ""' in html
+
+
+def test_history_cue_focuses_lower_selector_and_filters_current_snapshot_date():
+    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    assert 'id="snapshot-history-cue"' in html
+    assert 'EOD snapshots available · View history' in html
+    assert 'target.scrollIntoView({behavior:"smooth",block:"center"})' in html
+    assert 'target.focus()' in html
+    assert 'function currentSnapshotDate(data)' in html
+    assert 'filter(function(item){return snapshotDate(item)!==currentDate;})' in html
+
+
 def test_trigger_price_evidence_is_top_level_and_mobile_contained_for_current_and_historical_rows():
     html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
     shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
@@ -1598,8 +1620,8 @@ elements["error"].hidden = true; elements["retry"].hidden = true;
 const current = {
   status: "PRODUCTION_READ_ONLY", research_only: false, actionability: "NONE",
   verification_status: "VERIFIED", freshness: {status: "FRESH"}, rows: [],
-  snapshots: ["2026-09-15", "2026-09-14", "2026-09-11"],
-  snapshot: {kind: "current", row_count: 0}, universe: {declared_count: 0}, policy: {},
+      snapshots: ["2026-09-15", "2026-09-14", "2026-09-11"], as_of: "2026-09-15",
+      snapshot: {kind: "current", as_of: "2026-09-15", row_count: 0}, universe: {declared_count: 0}, policy: {},
 };
 const historical = Object.assign({}, current, {
   freshness: {status: "HISTORICAL"},
@@ -1626,7 +1648,7 @@ const context = {
 };
 vm.runInNewContext(INLINE, context);
 setTimeout(function () {
-  if (options.join(",") !== ",2026-09-15,2026-09-14,2026-09-11") process.exit(1);
+  if (options.join(",") !== ",2026-09-14,2026-09-11") process.exit(1);
   if (elements["snapshot-banner"].innerHTML.indexOf("Latest EOD") < 0 || elements["snapshot-banner"].innerHTML.indexOf("0 rows in this snapshot") < 0 || elements["snapshot-banner"].innerHTML.indexOf("Current session markers are provisional") < 0) process.exit(6);
   elements["snapshot-select"].value = "2026-09-14";
   elements["snapshot-select"].onchange();
