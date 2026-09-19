@@ -1,7 +1,7 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; source/release commit is `cf85be67d15f9e189b7d73bce6e29a576244859a`. Automated EOD publication wiring and Trend Route rollback remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only and retained as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
+> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; final stable closeout is recorded in the Git release branch. Automated EOD publication wiring and Trend Route rollback remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only and retained as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
@@ -98,7 +98,7 @@ truncated Main Trend labels.
 ### Current acceptance reconciliation — 2026-09-13
 
 - **Current focus gate:** Daily Trend Mapping production-served read-only closeout in GitHub Issue #17 is complete; broader setup/Elliott work remains separate.
-- **Source/release:** `NOT VERIFIED` for this drawer slice's release promotion — local/remote release HEAD is `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004`, while the drawer fix and related evidence remain uncommitted in the working tree; Issue #22 implementation remains committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`.
+- **Historical source/release reconciliation (2026-09-13):** this drawer slice recorded local/remote release HEAD `ebedae5d0d15cbbfbbd599ed18dcabad0a76a004` and an uncommitted drawer fix; Issue #22 implementation was committed/pushed at `f99becb5d5d50a49331419bb8d878ae6b9f6d979`. This historical status is superseded by the current final stable closeout.
 - **Runtime/API:** `PASS` for the served `/api/trend-map` production-read-only contract and readiness; `/mvp` and `/api/setup-candidates` are dropped/paused and are not current acceptance targets.
 - **Data freshness/coverage:** `PASS` for the published Trend Map artifact (`FRESH`, 237 declared/evaluated/returned with explicit quality states). Official Daily remains unavailable for `3BBIF`, `COM7`, and `PR9`; their Trend Map rows use explicitly non-official derived Daily evidence from complete Settrade 60m sessions.
 - **Browser/UI:** `PASS` for Trend Map desktop, drawer/chart, 390px no-overflow, and failure→Retry→recovery; Hermes `browser_exec` helper syntax also verified.
