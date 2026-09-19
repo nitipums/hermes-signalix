@@ -74,6 +74,34 @@
   one three-session temporary fixture). These are source/fixture measurements
   only, not production or public API latency claims.
 
+### Production promotion read-back — 2026-09-19
+
+- Promotion source: isolated branch `promote/trend-map-history`, commit
+  `51f9641` plus the reviewed UX correction `6bbca32`; production containers
+  were recreated from the promotion worktree bind mount. The stable checkout
+  `/root/signalix` and its owner-dirty paths were not modified.
+- Authorized action: `docker compose ... up -d --build --no-deps backend dashboard`
+  using the existing root `.env`; PostgreSQL and Redis were not restarted,
+  migrated, or written.
+- Runtime: `signalix_backend` and `signalix_dashboard` running; readiness
+  returned `{"status":"ok","db":"up","redis":"up"}`.
+- Public API: `http://91.98.72.120:3001/api/trend-map` returned HTTP 200,
+  `PRODUCTION_READ_ONLY`, `VERIFIED`, `as_of=2026-09-18`, `237` rows, and
+  exactly 3 snapshot options. Numeric up/down trigger references were present
+  for `237/237` rows.
+- Public browser: `/trend-map` desktop and 390px journeys showed the lean
+  table, lower snapshot selector, drawer/chart, and no horizontal overflow
+  (`scrollWidth=390`, `bodyScrollWidth=390`). SSP 1D chart API returned
+  `PREBUILT` with 120 candles.
+- Intraday marker: production correctly returned `NOT_VERIFIED` for all rows
+  because the latest validated intraday artifact is outside its 2-hour freshness
+  window after the completed 2026-09-18 session. No stale quote was promoted as
+  a current marker. The next completed intraday publication must be read back
+  separately for `UP_TRIGGER_REACHED`/`DOWN_TRIGGER_REACHED` evidence.
+- Rollback: prior production source/artifact identities remain preserved; an
+  explicit production rollback drill is `NOT VERIFIED` and remains a follow-up
+  gate.
+
 ## Stable release
 
 ```text
