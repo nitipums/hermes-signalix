@@ -201,3 +201,11 @@ def test_market_breadth_template_has_no_symbol_level_action_controls():
     assert "data-symbol" not in html
     assert "opensharedrawer" not in html
     assert "broker" in html
+
+
+def test_market_breadth_participation_uses_api_owned_denominator_percentages():
+    html = TEMPLATE.read_text(encoding="utf-8")
+    assert "participation(c.participation,payload.universe||{})" in html
+    assert "valid=item.valid_count" in html
+    assert "pct=x.percentage" in html
+    assert "Number(x.count)/valid*100" not in html
