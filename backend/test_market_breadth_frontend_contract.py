@@ -209,3 +209,18 @@ def test_market_breadth_participation_uses_api_owned_denominator_percentages():
     assert "valid=item.valid_count" in html
     assert "pct=x.percentage" in html
     assert "Number(x.count)/valid*100" not in html
+
+
+def test_market_breadth_all_visible_percentages_are_api_owned():
+    html = TEMPLATE.read_text(encoding="utf-8")
+    for marker in (
+        "ma.above_ma50&&ma.above_ma50.percentage",
+        "ma.above_ma200&&ma.above_ma200.percentage",
+        "e.new_high_percentage", "e.new_low_percentage",
+        "v.up_percentage", "v.down_percentage",
+        'String(n),"percentage"',
+        "a.x.percentage",
+    ):
+        assert marker in html
+    for expression in ("v/d*100", "x.total/total*100", "a.x.total/total*100", "v.up+v.down"):
+        assert expression not in html

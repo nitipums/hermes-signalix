@@ -132,7 +132,8 @@ def test_volume_excludes_invalid_values_and_only_counts_advancers_decliners():
             row("A", "2026-09-10", 11, volume=5), row("B", "2026-09-10", 19, volume=0),
             row("C", "2026-09-10", 30, volume="bad"), row("D", "2026-09-10", 40, volume=100)]
     volume = build_market_breadth(data)["current"]["volume"]
-    assert volume == {"up": 5.0, "down": 0.0, "up_rows": 1, "down_rows": 0,
+    assert volume == {"up": 5.0, "down": 0.0, "up_percentage": 100.0, "down_percentage": 0.0,
+                      "up_rows": 1, "down_rows": 0,
                       "price_valid_advancer_decliner_rows": 2,
                       "unchanged_or_blocked_rows": 2, "invalid_volume_rows": 2,
                       "invalid_or_excluded_rows": 2, "quality": {"status": "PARTIAL",
@@ -145,9 +146,10 @@ def test_main_trend_full_partial_counts_and_missing_ma_is_not_false():
             row("B", "2026-09-09", 20), row("B", "2026-09-10", 19, trend=3, quality="PARTIAL",
                 above_ma50=False)]
     current = build_market_breadth(data)["current"]
-    assert current["main_trend"]["totals"] == {"1": {"total": 0, "full": 0, "partial": 0},
-        "2": {"total": 1, "full": 1, "partial": 0}, "3": {"total": 1, "full": 0, "partial": 1},
-        "4": {"total": 0, "full": 0, "partial": 0}}
+    assert current["main_trend"]["totals"] == {"1": {"total": 0, "full": 0, "partial": 0, "percentage": None},
+        "2": {"total": 1, "full": 1, "partial": 0, "percentage": 50.0},
+        "3": {"total": 1, "full": 0, "partial": 1, "percentage": 50.0},
+        "4": {"total": 0, "full": 0, "partial": 0, "percentage": None}}
     assert current["moving_average_breadth"]["above_ma200"]["valid_rows"] == 0
 
 
@@ -194,9 +196,23 @@ def test_ma_numeric_contract_counts_invalid_and_missing_as_blocked():
     data = [row("A", "2026-09-09", 10), row("A", "2026-09-10", 11, ma50=10, ma200="bad"),
             row("B", "2026-09-09", 10), row("B", "2026-09-10", 9, ma50=None, ma200=10)]
     ma = build_market_breadth(data)["current"]["moving_average_breadth"]
-    assert ma["above_ma50"] == {"count": 1, "below_count": 0, "blocked_rows": 1, "valid_rows": 1,
+    assert ma["above_ma50"] == {"count": 1, "below_count": 0, "percentage": 50.0, "blocked_rows": 1, "valid_rows": 1,
                                  "coverage_rows": 2, "quality": {"status": "PARTIAL", "reason": "incomplete_input_coverage", "valid_rows": 1, "coverage_rows": 2}}
     assert ma["above_ma200"]["blocked_rows"] == 1
+    assert ma["above_ma200"]["percentage"] == 0.0
+
+
+def test_api_percentages_preserve_partial_coverage_and_null_unavailable_inputs():
+    data = [row("A", "2026-09-09", 10), row("B", "2026-09-09", 20),
+            row("A", "2026-09-10", 11, volume=5, trend=2, above_ma50=True, above_ma200=10),
+            row("B", "2026-09-10", 19, volume="bad", trend=None, above_ma50=False, above_ma200=None)]
+    current = build_market_breadth(data)["current"]
+    assert current["moving_average_breadth"]["above_ma50"]["percentage"] == pytest.approx(50)
+    assert current["moving_average_breadth"]["above_ma200"]["percentage"] is None
+    assert current["volume"]["up_percentage"] == pytest.approx(100)
+    assert current["volume"]["down_percentage"] == pytest.approx(0)
+    assert current["main_trend"]["totals"]["2"]["percentage"] == pytest.approx(50)
+    assert current["main_trend"]["totals"]["1"]["percentage"] is None
 
 
 def test_new_high_low_aggregates_are_deterministic_and_sparse_history_is_blocked():
@@ -208,6 +224,8 @@ def test_new_high_low_aggregates_are_deterministic_and_sparse_history_is_blocked
     window = result["current"]["new_high_low"]["aggregate"]["20"]
     assert window["new_high_count"] == 0 and window["new_low_count"] == 0
     assert window["quality"]["new_high"]["status"] == "DATA_BLOCKED"
+    assert window["new_high_percentage"] is None
+    assert window["new_low_percentage"] is None
     assert result["current"]["new_high_low"]["A"]["20"]["new_high"] is None
 
 

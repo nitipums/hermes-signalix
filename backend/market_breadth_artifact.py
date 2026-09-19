@@ -166,6 +166,24 @@ def _validate(payload: Any, *, content_hash: str | None = None) -> dict:
             details = session.get("new_high_low")
             if not isinstance(details, dict) or set(details) != {"aggregate", "quality", "reason"} or not isinstance(details["aggregate"], dict) or not isinstance(details["quality"], dict):
                 raise ValueError("market breadth public new_high_low projection is invalid")
+            current = session.get("moving_average_breadth")
+            if not isinstance(current, dict) or any(
+                    not isinstance(current.get(key), dict) or "percentage" not in current[key]
+                    for key in ("above_ma50", "above_ma200")):
+                raise ValueError("market breadth moving-average percentages are invalid")
+            volume = session.get("volume")
+            if not isinstance(volume, dict) or any(key not in volume for key in ("up_percentage", "down_percentage")):
+                raise ValueError("market breadth volume percentages are invalid")
+            trend = session.get("main_trend")
+            if not isinstance(trend, dict) or not isinstance(trend.get("totals"), dict) or any(
+                    not isinstance(trend["totals"].get(str(stage)), dict)
+                    or "percentage" not in trend["totals"][str(stage)] for stage in (1, 2, 3, 4)):
+                raise ValueError("market breadth main-trend percentages are invalid")
+            for window in ("20", "60", "260"):
+                aggregate = details["aggregate"].get(window)
+                if not isinstance(aggregate, dict) or any(
+                        key not in aggregate for key in ("new_high_percentage", "new_low_percentage")):
+                    raise ValueError("market breadth extreme percentages are invalid")
     if identities["current"] != _range_identity("current", [payload["current"]], 1):
         raise ValueError("market breadth current identity is invalid")
     if content_hash is not None and content_hash != _hash(payload):

@@ -108,6 +108,10 @@ def test_public_projection_has_aggregate_only_new_high_low_and_bounded_size(tmp_
         assert "AAA" not in details
         assert "by_symbol" not in details
     assert payload["current"]["new_high_low"]["aggregate"]["20"]["new_high_count"] == 1
+    assert payload["current"]["new_high_low"]["aggregate"]["20"]["new_high_percentage"] == 100.0
+    assert payload["current"]["moving_average_breadth"]["above_ma50"]["percentage"] == 100.0
+    assert payload["current"]["volume"]["up_percentage"] == 100.0
+    assert payload["current"]["main_trend"]["totals"]["2"]["percentage"] == 100.0
     assert len(json.dumps(payload, separators=(",", ":"))) < 1_000_000
 
 

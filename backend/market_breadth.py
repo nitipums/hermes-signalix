@@ -312,6 +312,8 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
     volume_coverage = advancers + decliners
     volume_quality = _quality(volume_valid, volume_coverage, volume_coverage > 0,
                               "no_valid_advancer_or_decliner_volume" if volume_valid == 0 else None)
+    volume_total = volume_up + volume_down
+    volume_percentage = lambda value: (value / volume_total * 100) if volume_total > 0 else None
     participation = {
         "advancing": {"count": advancers, "percentage": (advancers / coverage * 100) if coverage > 0 else None},
         "declining": {"count": decliners, "percentage": (decliners / coverage * 100) if coverage > 0 else None},
@@ -344,6 +346,7 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
                 below += close <= ma
         valid = above + below
         ma_counts[f"above_ma{period}"] = {"count": above, "below_count": below,
+                                            "percentage": (above / coverage * 100) if valid > 0 and coverage > 0 else None,
                                             "blocked_rows": blocked, "valid_rows": valid,
                                             "coverage_rows": coverage,
                                             "quality": _quality(valid, coverage, True)}
@@ -361,6 +364,8 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
         high_count = sum(item["new_high"] is True for item in values)
         low_count = sum(item["new_low"] is True for item in values)
         aggregates[str(window)] = {"new_high_count": high_count, "new_low_count": low_count,
+                                   "new_high_percentage": (high_count / coverage * 100) if high_valid > 0 and coverage > 0 else None,
+                                   "new_low_percentage": (low_count / coverage * 100) if low_valid > 0 and coverage > 0 else None,
                                    "new_high_valid_rows": high_valid, "new_low_valid_rows": low_valid,
                                    "coverage_rows": coverage,
                                    "quality": {"new_high": _quality(high_valid, coverage, True),
@@ -371,13 +376,20 @@ def _session_metrics(session_rows: Sequence[Mapping[str, Any]], prior_rows: Sequ
             "participation": participation,
             "ad_ratio": {"value": ratio, "status": ratio_status},
             "net_advances": advancers - decliners,
-            "volume": {"up": volume_up, "down": volume_down, "up_rows": volume_up_rows,
+            "volume": {"up": volume_up, "down": volume_down,
+                       "up_percentage": volume_percentage(volume_up),
+                       "down_percentage": volume_percentage(volume_down),
+                       "up_rows": volume_up_rows,
                        "down_rows": volume_down_rows, "price_valid_advancer_decliner_rows": volume_coverage,
                        "unchanged_or_blocked_rows": unchanged_or_blocked_rows,
                        "invalid_volume_rows": invalid_volume_rows,
                        "invalid_or_excluded_rows": invalid_volume_rows,
                        "quality": volume_quality},
-            "main_trend": stage, "moving_average_breadth": ma_counts,
+            "main_trend": {**stage, "totals": {
+                key: {**value, "percentage": (value["total"] / coverage * 100)
+                      if value["total"] > 0 and coverage > 0 else None}
+                for key, value in stage["totals"].items()}},
+            "moving_average_breadth": ma_counts,
             "new_high_low": {**by_symbol, **aggregates, "by_symbol": by_symbol, "aggregate": aggregates},
             "quality": {"price": price_quality, "volume": volume_quality,
                         "main_trend": _quality(len(trend_rows), coverage, bool(session_rows), "main_trend_evidence_absent"),
