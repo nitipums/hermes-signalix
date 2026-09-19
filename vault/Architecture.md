@@ -41,6 +41,32 @@ setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
 publisher and API preserve Daily as-of, provenance, quote basis, data-quality
 states, and fail-closed behavior.
 
+## Market Breadth — source/UI slice
+
+Market Breadth is a separate aggregate read-only surface:
+
+```text
+active Thai ORD Daily observations
+→ deterministic breadth builder
+→ immutable Market Breadth artifact/pointer
+→ GET /api/market-breadth
+→ GET /market-breadth
+```
+
+It uses the fixed current active-ORD universe, completed Daily sessions,
+Main Trend 1–4 evidence, A/D, moving-average participation, highs/lows, and
+raw volume breadth. It does not modify `/api/trend-map`, create symbol setup
+decisions, or expose alerts/orders/broker semantics. Source, fixture/API, and
+390px/desktop isolated browser checks are verified; production artifact
+publication and public runtime promotion remain **NOT VERIFIED** until a
+separate deployment/data gate is completed.
+
+The first beginner-facing UI slice adds a `Daily Market Participation` bar
+(advancing/declining/unchanged within the active-ORD denominator) and a small
+SET Index benchmark context strip from `price_data.symbol='SET'`. SET is
+context only and never changes the breadth denominator. SET50 is explicitly
+out of scope for this slice.
+
 ## Retained setup/shadow trial flow — 2026-09-01
 
 The 2026-09-11 private signal transition adds a read-only local shadow consumer
@@ -242,6 +268,40 @@ Chart timeframe changes use an abortable request generation guard so an older
 selected timeframe with Daily candles.
 
 See [[Components]] for detail, [[Deployment]] for ops.
+
+## Market Breadth MB-2 source boundary (2026-09-14)
+
+Market Breadth is a separate deterministic, public read-only artifact line. The
+MB-1 builder feeds `backend/market_breadth_artifact.py`, which publishes an
+immutable content-addressed v2 version and atomically selected pointer under a
+dedicated root. The publisher prebuilds bounded `current`, `history_20`,
+`history_60`, `history_260`, and `history_all` aggregate-only slices; raw MB-1
+per-symbol detail remains retained as source/audit evidence and is not exposed
+by the public route. `mvp_server.py` exposes only `GET /api/market-breadth`;
+its `range=20|60|260|all` path validates the referenced artifact and selects
+one prebuilt field before serialization. A bounded in-process cache reuses
+only unchanged, previously validated content and invalidates on pointer/file
+identity changes. It does not rebuild, query, write, scan, or fall back to
+Trend Map or marginable-long data.
+The envelope is `PRODUCTION_READ_ONLY`, `research_only=false`, and
+`actionability=NONE`, with active-ORD universe identity and explicit null
+reasons. Source/tests are implemented; runtime/deployment and served endpoint
+verification are **NOT VERIFIED** in MB-2.
+
+## Market Breadth MB-4A live replay publisher (2026-09-16)
+
+`backend/market_breadth_publisher.py` adds the bounded read-only Postgres
+replay seam. It snapshots active ORD from `symbol_master`, resolves up to 520
+completed market sessions, emits only the final 260, applies the existing
+official-`price_data`-first then eligible derived-Daily policy, enriches
+point-in-time Main Trend v6 evidence, and attaches a `price_data` SET-only
+benchmark. It publishes through the MB-2 immutable artifact writer; it does
+not query or rebuild on requests, write market data, change Trend Map routes,
+or introduce SET50 semantics. `universe.observed_count` remains the historical
+union for compatibility; `current_observed_count`, `current_blocked_count`,
+and `current_declared_count` are the resolved-as-of coverage contract. Live
+Postgres replay and runtime promotion remain **NOT VERIFIED** when no source
+container is available.
 
 ## Current intraday E2E reliability contract (2026-08-21)
 

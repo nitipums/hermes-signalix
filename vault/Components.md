@@ -202,3 +202,88 @@ stage of the demo pipeline.
 
 ## `upload_server.py` — owner CSV drop
 HTTP receiver so the owner can push EOD CSV files into the drop dirs.
+
+## `market_breadth_artifact.py` — immutable MB-2 read path
+
+Owns the separate Market Breadth artifact schema, content hash, immutable
+version publication, pointer validation, range projection, and
+`GET /api/market-breadth` dispatcher seam. Publication prebuilds explicit
+`current`, `history_20`, `history_60`, `history_260`, and bounded `history_all`
+fields. The public v2 representation contains aggregate `new_high_low` values
+plus quality/reason fields; MB-1 builder details remain available in the
+retained source/audit artifact. The read path selects one validated prebuilt
+field and caches only a pointer/content-addressed artifact, invalidating it
+when the pointer or file identity changes. It consumes an injected MB-1 build
+or read-only artifact source and never uses
+`marginable_long`, Trend Map, a database rebuild, ingestion, or a request-time
+scan. Missing, corrupt, mismatched, stale, empty, undersized, or invalid
+artifacts fail closed with a visible `DATA_BLOCKED` response; invalid ranges
+return an explicit client error. Section 02 publishes content-addressed
+`directions` for `history_20`, `history_60`, `history_260`, and `history_all`;
+the API returns the selected direction while `current` remains the latest
+single session. Direction is deterministic A/D-line evidence only: it uses
+the first and last valid `ad_line`, valid `net_advances` steps, and explicit
+AVAILABLE/PARTIAL/DATA_BLOCKED quality without thresholds, ratios, or trade
+meaning. Artifacts without the direction envelope fail closed. Source and
+fixture-backed contract tests are complete; served/runtime and browser
+verification remain **NOT VERIFIED**.
+
+## `market_breadth_publisher.py` — bounded MB-4A replay publisher
+
+Owns the injected read-only source seam and production SELECT-only Postgres
+adapter for active-ORD Market Breadth replay. It preserves universe/session
+snapshot identity, 520-session pre-roll versus 260-session publication,
+official-first lineage, Main Trend v6 observation evidence, and SET benchmark
+quality before delegating to `market_breadth_artifact.py`. Observation
+projection retains only OHLCV/source lineage, compact Main Trend decision
+metadata, and MA50/MA200 participation; full technical series are symbol-local
+scratch data released before the next symbol. The CLI requires an explicit
+`--read-only` acknowledgement and accepts bounded `since`, `until`, and `as_of`
+controls. It has no request-time rebuild or scheduler/deployment side effect;
+live source/runtime verification is **NOT VERIFIED** here. Artifact universe
+metadata keeps the compatibility `observed_count` historical union separate
+from point-in-time `current_observed_count`, `current_blocked_count`, and
+`current_declared_count`; the public coverage header uses the current fields.
+
+## `market_breadth_template.html` — aggregate MB-3 review page
+
+Serves the separate `/market-breadth` aggregate evidence page. It reads only
+`/api/market-breadth`, renders current metrics plus 20/60/260/all history,
+preserves null/reason/quality states, and keeps the page explicitly
+read-only/non-actionable. The hero metadata separates point-in-time `Quality`
+from data `Freshness`; it has no symbol drawer, setup lane, alert, order,
+broker, or auto-trading control. Isolated desktop/390px success, range-switch,
+and empty-artifact Retry checks are verified; public deployment remains
+**NOT VERIFIED**.
+
+The first beginner-facing slice renders `Daily Market Participation` as an
+aggregate active-ORD advancing/declining/unchanged bar with visible partial
+coverage, plus a separate SET Index context strip. The SET benchmark is
+display-only context and does not create a second breadth universe; SET50 is
+not part of this feature slice.
+
+MB-UI-2 extends the beginner-first presentation for cumulative participation,
+Main Trend distribution, MA50/MA200 participation, new highs/lows, and
+up/down volume. These are display-only explanations over deterministic API
+values; they do not alter breadth calculations, create action states, or add
+SET50 semantics. Live browser/runtime promotion remains **NOT VERIFIED** until
+the feature branch is promoted through the deployment gate.
+
+MB-UI-4 applies the approved High-Fashion Monochrome visual direction:
+black/white editorial typography, one lime accent, hairline rules, oversized
+masthead, and full-width visual figures. It removes the legacy dark dashboard
+palette/card-grid treatment while preserving compact SET context, aggregate
+active-ORD evidence, deterministic API/data semantics, and non-actionable
+boundaries.
+
+MB-UI-5 adds the shared semantic trend palette: acid lime for Up/Main 2,
+vermilion for Down/Main 4, amber for Pullback/Main 3, slate for Base/Main 1
+and neutral, and cobalt for SET Index reference. The same tokens are reused
+across participation, Main Trend, high/low, volume, and benchmark visuals.
+
+MB-UI-6 moves system/data status and expandable details below the primary
+readings while retaining local as-of/quality/coverage qualifiers. It merges
+Daily Market Participation into one count/share visual and uses beginner-facing
+neutral vocabulary for Main Trend composition, moving-average coverage, rolling
+new highs/lows, and up/down volume shares. Section 02 direction/baseline remains
+an API contract decision and is intentionally unchanged in this slice.
