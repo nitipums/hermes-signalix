@@ -37,6 +37,7 @@ from marginable import (
     normalize_rates,
 )
 import instruments
+from active_universe import resolve_active_universe
 from eod_healthcheck import expected_market_date
 from set_market_day_guard import SET_CLOSED_DATES
 from freshness_assessment import (assess_projection_freshness as _resolve_freshness,
@@ -54,29 +55,19 @@ from canonical_setup_projection import (
     _validate_canonical_setup_candidate,
     project_setup_candidates_response,
 )
-from read_model_publisher import canonical_membership_digest
 
 
 def resolve_universe(pg, universe_filter="marginable_long", *, active_symbols=None):
-    """Resolve the bounded serving universe from the authoritative master."""
-    if universe_filter not in {"marginable_long", "active_ord"}:
-        raise ValueError(f"unknown universe filter: {universe_filter}")
-    active = list(active_symbols if active_symbols is not None
-                  else instruments.active_ord_symbols(pg))
+    """Compatibility wrapper for historical setup callers."""
+    if active_symbols is None:
+        active_symbols = instruments.active_ord_symbols(pg)
+    symbols, manifest = resolve_active_universe(
+        pg, universe_filter, active_symbols=active_symbols,
+        marginable_resolver=eligible_symbols,
+    )
     if universe_filter == "active_ord":
-        symbols = sorted({str(symbol).strip().upper() for symbol in active if str(symbol).strip()})
-        return symbols, {
-            "universe_filter": "active_ord", "audit_only": True,
-            "base_active_ord_count": len(symbols), "eligible_count": len(symbols),
-            "excluded_count": 0, "excluded_reason": None,
-        }
-    symbols, manifest = eligible_symbols(active)
-    manifest = dict(manifest)
-    manifest["universe_filter"] = "marginable_long"
-    manifest["universe_membership"] = {
-        "symbols": list(symbols), "digest": canonical_membership_digest(symbols),
-    }
-    manifest["audit_only"] = False
+        manifest = dict(manifest)
+        manifest.pop("universe_membership", None)
     return symbols, manifest
 
 

@@ -15,7 +15,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from instruments import active_ord_symbols
+from active_universe import resolve_active_universe
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
 from main_trend_mapping import classify_main_trend
 from market_breadth import build_market_breadth, select_official_first_daily
@@ -140,7 +140,7 @@ class PostgresMarketBreadthSource:
             cur.close()
 
     def resolve_universe(self) -> dict[str, Any]:
-        symbols = sorted({str(symbol).upper() for symbol in active_ord_symbols(self.conn)})
+        symbols, _manifest = resolve_active_universe(self.conn, "active_ord")
         return {"name": "active_ord", "symbols": symbols, "count": len(symbols),
                 "symbol_hash": _hash(symbols), "source": "symbol_master"}
 

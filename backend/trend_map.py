@@ -26,7 +26,7 @@ from daily_trend_mapping import POLICY_VERSION, classify_daily_trend
 from daily_history import DailyHistoryAdapter
 from main_trend_mapping import POLICY_VERSION as MAIN_TREND_POLICY_VERSION
 from main_trend_mapping import classify_main_trend
-from mvp_api import resolve_universe
+from active_universe import resolve_active_universe
 from technical_indicators import POLICY_VERSION as INDICATOR_POLICY_VERSION
 from technical_indicators import build_technical_indicators
 from team_facts_api import _is_completed
@@ -129,7 +129,7 @@ class BackendDailyAdapter:
             cur.close()
 
     def resolve_universe(self, conn, universe_filter):
-        return resolve_universe(conn, universe_filter)
+        return resolve_active_universe(conn, universe_filter)
 
     def load_daily_pit(self, conn, symbol, as_of):
         rows, _ = self._exec_select(
