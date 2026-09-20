@@ -725,11 +725,75 @@ def _handle_legacy_routes(route, qs, handler) -> bool:
     return False
 
 
+def _handle_active_chart_routes(route, qs, handler) -> bool:
+    """Dispatch only the chart/detail requests issued by the active drawer."""
+    from active_chart_adapter import (
+        InvalidActiveChartRequest,
+        chart_response,
+        is_active_route,
+        symbol_detail_response,
+    )
+
+    if not is_active_route(route, qs):
+        return False
+    if route.startswith("/api/chart-db/"):
+        symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
+        if not symbol:
+            json_response(handler, {"error": "symbol required"}, status=400)
+            return True
+        try:
+            from chart_read_model import read_current
+            import mvp_chart_db
+            status, result = chart_response(
+                symbol,
+                qs.get("timeframe", ["1D"])[0],
+                read_prebuilt=read_current,
+                load_canonical_item=_load_active_chart_item,
+                project_db=mvp_chart_db.project_chart_db_response,
+                compact=mvp_chart_db.compact_chart_db_response,
+            )
+        except InvalidActiveChartRequest:
+            status, result = 400, {"error": "invalid_request", "reason": "invalid_timeframe"}
+        json_response(handler, result, status=status)
+        return True
+
+    symbol = route[len("/api/symbol/"):].strip().rstrip("/")
+    try:
+        from read_model_publisher import load_current_read_model
+        status, result = symbol_detail_response(
+            symbol,
+            load_model=load_current_read_model,
+            validate_model=_validate_canonical_serving_model,
+            snapshot_meta=_read_model_snapshot_meta,
+            overlay_intraday=_overlay_latest_intraday_metadata,
+        )
+    except Exception:
+        status, result = 503, {"error": "setup_candidates_unavailable"}
+    json_response(handler, result, status=status)
+    return True
+
+
+def _load_active_chart_item(symbol):
+    """Load the canonical item used only for chart compatibility evidence."""
+    try:
+        from read_model_publisher import load_current_read_model
+        model = _validate_canonical_serving_model(load_current_read_model())
+        return next(
+            (item for item in model.get("items", [])
+             if str(item.get("symbol", "")).upper() == str(symbol).upper()),
+            None,
+        )
+    except Exception:
+        return None
+
+
 def handle_mvp_api(path, handler) -> bool:
     """Handle MVP /api routes. Return False only for unknown API paths."""
     parsed = urlsplit(path)
     route = parsed.path
     qs = parse_qs(parsed.query or "")
+    if _handle_active_chart_routes(route, qs, handler):
+        return True
     if _handle_canonical_routes(route, qs, handler):
         return True
     return _handle_legacy_routes(route, qs, handler)
