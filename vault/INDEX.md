@@ -6,15 +6,10 @@
 
 ## Current active-only navigation — 2026-09-20
 
-Current public routing is limited to `/trend-map`, `/api/trend-map`,
-`/market-breadth`, and `/api/market-breadth`: deterministic, read-only,
-non-actionable evidence surfaces. `/mvp`, `/api/setup-candidates`,
-Wave/Elliott/VCP, private signals, alerts, broker execution, and auto-trading
-remain historical, deferred, or audit-only. Use the [active-only contract
-freeze](../docs/current/2026-09-20-active-only-contract-freeze.md) for the
-boundary and the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
-for promotion evidence; runtime/API, freshness, browser, deployment, and
-rollback verdicts remain separate.
+The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+owns the boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+owns evidence. The [active cleanup review](../docs/current/2026-09-20-active-cleanup-review.md)
+records the final review verdicts and residual NOT VERIFIED gates. This index remains routing only.
 
 ## How to use
 

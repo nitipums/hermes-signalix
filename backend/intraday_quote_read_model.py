@@ -96,7 +96,8 @@ def _validate_item(item: Mapping[str, Any]) -> None:
             raise ValueError("daily baseline source is invalid")
 
 
-def validate_artifact(artifact: Mapping[str, Any], *, now: dt.datetime | None = None) -> dict[str, Any]:
+def validate_artifact(artifact: Mapping[str, Any], *, now: dt.datetime | None = None,
+                      check_freshness: bool = True) -> dict[str, Any]:
     if artifact.get("schema_version") != SCHEMA_VERSION or artifact.get("query_mode") != "SELECT_ONLY":
         raise ValueError("intraday quote artifact schema/provenance is invalid")
     if artifact.get("universe", {}).get("scope") != UNIVERSE:
@@ -114,22 +115,23 @@ def validate_artifact(artifact: Mapping[str, Any], *, now: dt.datetime | None = 
     generated = dt.datetime.fromisoformat(str(artifact["generated_at"]).replace("Z", "+00:00"))
     if generated.tzinfo is None:
         generated = generated.replace(tzinfo=dt.timezone.utc)
-    observed = now or dt.datetime.now(dt.timezone.utc)
-    if observed.tzinfo is None:
-        observed = observed.replace(tzinfo=dt.timezone.utc)
-    if generated > observed:
-        raise ValueError("intraday quote artifact was generated in the future")
-    age = max(0.0, (observed - generated).total_seconds())
-    if age > float(artifact.get("freshness_policy", {}).get("expires_after_seconds", 0)):
-        raise ValueError("intraday quote artifact is stale")
-    for item in quotes:
-        stamp = item.get("latest_completed_60m") if isinstance(item, Mapping) else None
-        if stamp:
-            latest = dt.datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
-            if latest.tzinfo is None:
-                latest = latest.replace(tzinfo=dt.timezone.utc)
-            if latest > observed:
-                raise ValueError("intraday quote artifact contains a future observation")
+    if check_freshness:
+        observed = now or dt.datetime.now(dt.timezone.utc)
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=dt.timezone.utc)
+        if generated > observed:
+            raise ValueError("intraday quote artifact was generated in the future")
+        age = max(0.0, (observed - generated).total_seconds())
+        if age > float(artifact.get("freshness_policy", {}).get("expires_after_seconds", 0)):
+            raise ValueError("intraday quote artifact is stale")
+        for item in quotes:
+            stamp = item.get("latest_completed_60m") if isinstance(item, Mapping) else None
+            if stamp:
+                latest = dt.datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                if latest.tzinfo is None:
+                    latest = latest.replace(tzinfo=dt.timezone.utc)
+                if latest > observed:
+                    raise ValueError("intraday quote artifact contains a future observation")
     return dict(artifact)
 
 

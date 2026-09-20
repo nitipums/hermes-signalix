@@ -2,7 +2,7 @@
 
 > **STATUS: CURRENT** · Canonical decision ledger. Markdown owns product/acceptance scope; Kanban is an execution-state system only when an active bounded run exists and is never mirrored into vault notes.
 >
-> **Current reconciliation (2026-09-14):** Daily Trend Mapping is the canonical Signalix product line and public read-only evidence surface at `/trend-map` and `/api/trend-map`. The former shadow route naming is retired. `/mvp` and `/api/setup-candidates` are retired from active scope and retained only as historical/audit source. No setup, BUY/SELL, alert, order, broker, portfolio, or auto-trading semantics are active. Older entries below are retained decision history and do not reopen completed work unless a current decision explicitly says so.
+> **Current reconciliation (2026-09-20):** The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md) is the current boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md) is evidence. Older entries below remain decision history and do not override that boundary.
 
 ## 2026-09-14 — Trend Mapping becomes the canonical product line
 

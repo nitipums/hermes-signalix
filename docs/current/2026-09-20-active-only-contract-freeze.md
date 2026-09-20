@@ -72,6 +72,14 @@ The active-only repository contract does not create or route work through an
 no deletion or movement of existing history; any future cleanup needs its own
 owner-approved bounded decision and reference scan.
 
+## Protected-authority residual
+
+`AGENTS.md` and `vault/Product-Strategy-Market-to-Action.md` retain
+incompatible legacy/current identity wording under owner-protected authority.
+This is an explicit **OWNER-DECISION / NOT VERIFIED** residual: this freeze is
+the canonical active-only boundary, but those two protected documents are not
+rewritten by this reconciliation.
+
 ## Explicitly unresolved
 
 The following remain `OWNER-DECISION / NOT VERIFIED` in this documentation-only

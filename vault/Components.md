@@ -8,15 +8,9 @@ components below are retained only as explicitly labelled audit/history.
 
 ## Current active-only boundary — 2026-09-20
 
-Only the Trend Map route pair (`/trend-map`, `/api/trend-map`) and Market
-Breadth route pair (`/market-breadth`, `/api/market-breadth`) are current
-public components. Both are deterministic, read-only, and non-actionable.
-`/mvp`, `/api/setup-candidates`, Team Facts, Wave/Elliott/VCP, private signals,
-alerts, broker execution, and auto-trading are historical, deferred, or
-audit-only. See the [contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
-and [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md);
-their evidence does not merge source/test, artifact, runtime/API, freshness,
-browser, deployment, or rollback verdicts.
+The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+owns the component boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+records evidence without merging verdicts.
 
 ## Daily Trend Mapping — current delivery surface
 

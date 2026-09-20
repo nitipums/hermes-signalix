@@ -6,15 +6,10 @@
 
 ## Current active-only boundary — 2026-09-20
 
-The only current public product targets are the deterministic, read-only,
-non-actionable routes `/trend-map`, `/api/trend-map`, `/market-breadth`, and
-`/api/market-breadth`. `/mvp`, `/api/setup-candidates`, Team Facts,
-Wave/Elliott/VCP research, private signals, alerts, broker execution, and
-auto-trading are historical, deferred, or audit-only and are not navigation
-targets. See the [active-only contract freeze](current/2026-09-20-active-only-contract-freeze.md)
-for the boundary and the [pointer/artifact inventory](current/2026-09-20-pointer-artifact-inventory.md)
-for promotion evidence. Source/tests, artifact, runtime/API, freshness,
-browser, deployment, and rollback verdicts remain separate.
+Use the [active-only contract freeze](current/2026-09-20-active-only-contract-freeze.md)
+for the single current boundary and the [pointer/artifact inventory](current/2026-09-20-pointer-artifact-inventory.md)
+for evidence. Verdicts remain separate; the [active cleanup review](current/2026-09-20-active-cleanup-review.md)
+records the final Standards/Spec/Ponytail verdicts and residual NOT VERIFIED gates.
 
 ## Signalix in one minute
 

@@ -1,8 +1,9 @@
 """Signalix Daily Trend Map server.
 
-Serves the canonical public read-only Trend Map at /trend-map and the
-presentation-only Wave Context app at /wave-context. Retired setup/MVP routes
-remain compatibility history and are not the active product surface.
+Serves the canonical public read-only Trend Map at /trend-map. Wave Context is
+retired and its compatibility route returns 404; it is not an executable
+served app. Retired setup/MVP routes remain compatibility history and are not
+the active product surface.
 """
 from __future__ import annotations
 

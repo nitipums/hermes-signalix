@@ -6,16 +6,10 @@
 
 ## Current active-only acceptance boundary — 2026-09-20
 
-Current acceptance targets are only the public, deterministic, read-only,
-non-actionable routes `/trend-map`, `/api/trend-map`, `/market-breadth`, and
-`/api/market-breadth`. `/mvp`, `/api/setup-candidates`, Wave/Elliott/VCP,
-private signals, alerts, broker execution, and auto-trading are historical,
-deferred, or audit-only and are not current acceptance targets. Use the
-[contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
-for active-universe semantics and the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
-for promotion evidence. Source/tests, artifact, runtime/API, freshness, browser,
-deployment, and rollback verdicts must remain separate; documentation does
-not make unresolved gates PASS.
+Use the [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+for the boundary and the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+for evidence. Acceptance verdicts remain separate and unresolved gates remain
+`NOT VERIFIED`.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >

@@ -43,9 +43,21 @@ def test_trend_map_and_intraday_valid_fixtures_are_identity_and_hash_bound(tmp_p
     from test_intraday_quote_read_model import Adapter, NOW
     intraday_quote_read_model.publish(object(), {"run_id": "run-1", "status": "full_success"},
                                       root=quote_root, adapter=Adapter(), generated_at=NOW)
-    result = inventory.inspect_intraday_quotes(quote_root)
+    result = inventory.inspect_intraday_quotes(quote_root, now=NOW)
     assert result["status"] == "VERIFIED"
+    assert result["freshness_status"] == "FRESH"
     assert result["target_exists"] is True
+
+
+def test_intraday_integrity_is_verified_separately_from_stale_freshness(tmp_path):
+    from test_intraday_quote_read_model import Adapter, NOW
+    root = tmp_path / "quotes"
+    intraday_quote_read_model.publish(object(), {"run_id": "run-1", "status": "full_success"},
+                                      root=root, adapter=Adapter(), generated_at=NOW)
+    result = inventory.inspect_intraday_quotes(
+        root, now=dt.datetime(2026, 9, 20, tzinfo=dt.timezone.utc))
+    assert result["status"] == "VERIFIED"
+    assert result["freshness_status"] == "STALE"
 
 
 def test_tampered_target_and_escape_pointer_fail_closed(tmp_path):
@@ -180,3 +192,19 @@ def test_inventory_does_not_create_or_modify_valid_fixture_roots(tmp_path, monke
         for path in tmp_path.rglob("*") if path.is_file()
     }
     assert after == before
+
+
+def test_chart_candidates_exclude_all_current_timeframe_targets(tmp_path, monkeypatch):
+    root = tmp_path / "charts"
+    current = {}
+    for timeframe in ("1D", "60M", "1W", "1M"):
+        current[timeframe] = _publish_chart(root, monkeypatch, timeframe)
+    extra = root / "versions" / "chart-unused.json"
+    extra.write_text("{}")
+
+    results = inventory.inspect_charts(root)
+    protected = {item["target"] for item in results}
+    assert all(item["status"] == "VERIFIED" for item in results)
+    assert all(set(item["candidates"]).isdisjoint(
+        {path.rsplit("/", 1)[-1] for path in protected}) for item in results)
+    assert all("chart-unused.json" in item["candidates"] for item in results)

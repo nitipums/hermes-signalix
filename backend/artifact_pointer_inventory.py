@@ -56,6 +56,7 @@ def _result(kind: str, root: Path, pointer_name: str, *, status: str,
     return {
         "kind": kind,
         "status": status,
+        "freshness_status": "NOT_VERIFIED",
         "blocked": status != "VERIFIED",
         "reason": reason,
         "root": str(root),
@@ -67,13 +68,41 @@ def _result(kind: str, root: Path, pointer_name: str, *, status: str,
     }
 
 
-def _candidates(root: Path, pattern: str, target: Path | None = None) -> list[str]:
+def _candidates(root: Path, pattern: str, target: Path | None = None,
+                excluded: set[Path] | None = None) -> list[str]:
     versions = root / "versions"
     if not versions.is_dir():
         return []
+    excluded = excluded or set()
     target_name = target.name if target is not None else None
     return sorted(path.name for path in versions.glob(pattern)
-                  if path.is_file() and path.name != target_name)
+                  if path.is_file() and path.name != target_name
+                  and path.resolve() not in excluded)
+
+
+def _freshness_status(artifact: dict[str, Any], now: dt.datetime | None) -> str:
+    try:
+        observed = now or dt.datetime.now(dt.timezone.utc)
+        if observed.tzinfo is None:
+            observed = observed.replace(tzinfo=dt.timezone.utc)
+        generated = dt.datetime.fromisoformat(str(artifact["generated_at"]).replace("Z", "+00:00"))
+        if generated.tzinfo is None:
+            generated = generated.replace(tzinfo=dt.timezone.utc)
+        if generated > observed:
+            return "NOT_VERIFIED"
+        for item in artifact.get("quotes", []):
+            stamp = item.get("latest_completed_60m") if isinstance(item, dict) else None
+            if stamp:
+                latest = dt.datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                if latest.tzinfo is None:
+                    latest = latest.replace(tzinfo=dt.timezone.utc)
+                if latest > observed:
+                    return "NOT_VERIFIED"
+        age = (observed - generated).total_seconds()
+        expiry = float(artifact["freshness_policy"]["expires_after_seconds"])
+        return "FRESH" if age <= expiry else "STALE"
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return "NOT_VERIFIED"
 
 
 def inspect_trend_map(root: str | Path | None = None) -> dict[str, Any]:
@@ -104,7 +133,8 @@ def inspect_trend_map(root: str | Path | None = None) -> dict[str, Any]:
                        target=target, candidates=_candidates(root_path, "*.json", target))
 
 
-def inspect_intraday_quotes(root: str | Path | None = None) -> dict[str, Any]:
+def inspect_intraday_quotes(root: str | Path | None = None,
+                            *, now: dt.datetime | None = None) -> dict[str, Any]:
     root_path = _base("intraday_quotes", root)
     pointer_name = intraday_quote_read_model.CURRENT_NAME
     target = None
@@ -124,12 +154,13 @@ def inspect_intraday_quotes(root: str | Path | None = None) -> dict[str, Any]:
         content = _json({key: value for key, value in artifact.items() if key != "artifact_id"})
         if _hash_bytes(content) != pointer.get("content_hash"):
             raise ValueError("pointer content hash does not match target")
-        generated = dt.datetime.fromisoformat(str(artifact["generated_at"]).replace("Z", "+00:00"))
-        intraday_quote_read_model.validate_artifact(artifact, now=generated)
-        return _result("intraday_quotes", root_path, pointer_name, status="VERIFIED",
+        intraday_quote_read_model.validate_artifact(artifact, check_freshness=False)
+        result = _result("intraday_quotes", root_path, pointer_name, status="VERIFIED",
                        reason="pointer_target_identity_schema_content_hash_verified",
                        pointer=pointer, target=target,
                        candidates=_candidates(root_path, "*.json", target))
+        result["freshness_status"] = _freshness_status(artifact, now)
+        return result
     except Exception as error:
         pointer = None
         try:
@@ -176,8 +207,25 @@ def inspect_market_breadth(root: str | Path | None = None) -> dict[str, Any]:
                        candidates=_candidates(root_path, "market-breadth-*.json", target))
 
 
+def _current_chart_targets(root: Path) -> set[Path]:
+    versions_root = (root / "versions").resolve()
+    targets = set()
+    for timeframe in ("1D", "60M", "1W", "1M"):
+        try:
+            pointer = _read_json(root / f"current-{timeframe}.json")
+            relative = Path(pointer["artifact_path"])
+            target = (root / relative).resolve()
+            if (not relative.is_absolute() and _inside(versions_root, target)
+                    and target.parent == versions_root):
+                targets.add(target)
+        except (OSError, TypeError, ValueError, KeyError, json.JSONDecodeError):
+            continue
+    return targets
+
+
 def inspect_charts(root: str | Path | None = None) -> list[dict[str, Any]]:
     root_path = _base("charts", root)
+    protected_targets = _current_chart_targets(root_path)
     results = []
     for timeframe in ("1D", "60M", "1W", "1M"):
         pointer_name = f"current-{timeframe}.json"
@@ -208,15 +256,15 @@ def inspect_charts(root: str | Path | None = None) -> list[dict[str, Any]]:
             result = _result("chart", root_path, pointer_name, status="VERIFIED",
                              reason="pointer_target_identity_schema_content_hash_verified",
                              pointer=pointer, target=target,
-                             candidates=_candidates(root_path, "*.json", target))
+                             candidates=_candidates(root_path, "*.json", target, protected_targets))
         except FileNotFoundError:
             result = _result("chart", root_path, pointer_name, status="NOT_VERIFIED",
                              reason="current_pointer_missing_blocked", target=target,
-                             candidates=_candidates(root_path, "*.json", target))
+                             candidates=_candidates(root_path, "*.json", target, protected_targets))
         except Exception as error:
             result = _result("chart", root_path, pointer_name, status="NOT_VERIFIED",
                              reason=type(error).__name__ + ": " + str(error), target=target,
-                             candidates=_candidates(root_path, "*.json", target))
+                             candidates=_candidates(root_path, "*.json", target, protected_targets))
         result["timeframe"] = timeframe
         results.append(result)
     return results

@@ -5,19 +5,9 @@
 
 ## Current routing boundary
 
-Active routes are `/trend-map`, `/api/trend-map`, `/market-breadth`, and
-`/api/market-breadth`. `/mvp` and `/api/setup-candidates` are `HISTORICAL /
-SUPERSEDED / DROPPED`; do not route current work to them, the old
-dashboard builder/server, or shadow-named active modules. Generated artifacts
-are runtime inputs, not documentation authorities or a retention policy.
-
-The active-only contract and pointer/artifact evidence are linked from the
-[freeze](../docs/current/2026-09-20-active-only-contract-freeze.md) and
-[inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md).
-Their promotion evidence does not claim served runtime, freshness, browser,
-deployment, or rollback acceptance. The setup/MVP, Wave/Elliott, VCP, private
-signal, alert, broker, and auto-trading material below is retained history or
-deferred scope, not current architecture routing.
+The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+owns current routing semantics; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+is evidence only. The historical architecture below does not override them.
 
 ## Production-served Daily Trend Mapping
 

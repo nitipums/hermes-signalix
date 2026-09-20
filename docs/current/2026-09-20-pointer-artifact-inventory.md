@@ -11,7 +11,7 @@
 | Surface | Current pointer | Pointer status | Target status / metadata |
 |---|---|---|---|
 | Trend Map | `backend/trend-map-read-model/current.json` | `VERIFIED`; `shadow-trend-map-quote-envelope-v2-2026-09-18-87dce5718dd0784a-e76ebcbf1637fac9-f34bcb3ad1244662-f3783cb9724c81a5` | `as_of=2026-09-18`; 237 rows; target exists and pointer/artifact identity, schema, report validation, content hash, and measurement hash match |
-| Intraday quotes | `backend/trend-map-read-model/intraday-quotes/current.json` | `VERIFIED`; `intraday-quotes-02f113b87e784369bd3807099bda46fa-36ffbec7a6be76099883b2b2` | `generated_at=2026-09-15T09:45:43.425426+00:00`; 237 quotes; target exists and pointer/artifact identity, schema, validation, and content hash match |
+| Intraday quotes | `backend/trend-map-read-model/intraday-quotes/current.json` | Integrity `VERIFIED`; `intraday-quotes-02f113b87e784369bd3807099bda46fa-36ffbec7a6be76099883b2b2` | `generated_at=2026-09-15T09:45:43.425426+00:00`; 237 quotes; target exists and pointer/artifact identity, schema, validation, and content hash match; freshness `STALE` as of 2026-09-20 ICT |
 | Market Breadth | `backend/market-breadth-read-model/current.json` | `VERIFIED`; `market-breadth-c19d4ed5a7db3e522ea3f5e0ff4f151643895bdcb47eaf4d9d4de8dcdcf020d2` | `as_of=2026-09-18`; 929 active, 841 observed, 88 blocked; target exists and pointer/artifact validation matches |
 | Chart `1D` | `backend/read-model/charts/current-1D.json` | `VERIFIED`; `chart-1d-0afc7f97f794114d5ab6f829` | `as_of=2026-09-18`; 237 entries; target exists and pointer/artifact validation matches |
 | Chart `60M` | `backend/read-model/charts/current-60M.json` | `VERIFIED`; `chart-60m-22a9c9294266ce1a0f8a5fd3` | `as_of=2026-09-18T09:00:00+00:00`; 237 entries; target exists and pointer/artifact validation matches |
@@ -42,11 +42,14 @@ checkpoint and are not deleted or moved by Ticket #66.
 
 `backend/artifact_pointer_inventory.py` performs read-only pointer and target
 inspection. It fails closed for missing, escaping, identity-mismatched,
-schema-mismatched, or tampered targets. Tests use only temporary fixtures:
-`backend/test_artifact_pointer_inventory.py`.
+schema-mismatched, or tampered targets. Intraday integrity and freshness are
+separate fields: integrity is `VERIFIED`, while freshness is `FRESH`, `STALE`,
+or `NOT_VERIFIED` at the supplied/actual review time. Tests use only temporary
+fixtures: `backend/test_artifact_pointer_inventory.py`.
 
-- Artifact/pointer promotion evidence: **PASS** for all four surfaces and all
-  four chart timeframes listed above.
+- Artifact/pointer integrity evidence: **PASS** for all four surfaces and all
+  four chart timeframes listed above. Intraday freshness is **STALE** as of
+  2026-09-20; this ledger does not claim all promotion evidence is fresh.
 - Public API current read-back: **PENDING LITE**; this ledger does not claim
   served-route evidence.
 - Browser/runtime/deployment verdict: **SEPARATE / NOT CLAIMED**.
@@ -56,22 +59,83 @@ schema-mismatched, or tampered targets. Tests use only temporary fixtures:
 ## Owner-authorized deletion checkpoint — Ticket #67 prerequisite
 
 Arm authorized deletion of exactly eight unreferenced immutable versions in the
-isolated promotion worktree. No current pointer target was selected or deleted;
-no source, database, service, public route, or stable checkout was changed.
+isolated promotion worktree. Six tracked files were deleted in commit `aa6175f`;
+two ignored runtime chart candidate files were removed from that isolated
+promotion worktree with their pre-delete SHA/size retained below. No current
+pointer target was selected or deleted; no source, database, service, public
+route, or stable checkout was changed.
+
+### Final review provenance
+
+The reviewed checkout identity is `20d764b` plus the working-tree remediation
+diff. `aa6175f` is the deletion checkpoint parent/commit. The six tracked
+deletions are recoverable by Git commit `aa6175f`; Git alone does not restore
+all eight candidates. The two ignored chart candidates were removed only from
+the isolated promotion worktree and remain present as rollback copies in
+`/root/signalix/backend/read-model/charts/versions/`. Their cleanup rollback is
+**NOT VERIFIED** until a separate promotion cleanup.
+
+### Bounded pre-delete scan
+
+The scan was bounded to current-pointer protection and exact candidate
+selection: `git show aa6175f^`, current-pointer guard for Trend Map,
+intraday, Market Breadth, and chart `1D/60M/1W/1M`, followed by the exact eight
+paths below. Repository `git grep` plus import/route/publisher/timer/operator
+reference scans found no current reference to a candidate, no current target
+was selected, and the focused tests passed after deletion. The scan did not
+authorize deletion outside these eight paths.
+
+Recorded commands/results:
+
+<pre>
+git diff-tree --no-commit-id --name-status -r aa6175f
+→ 6 tracked D entries
+for current in backend/trend-map-read-model/current.json backend/trend-map-read-model/intraday-quotes/current.json backend/market-breadth-read-model/current.json backend/read-model/charts/current-1D.json backend/read-model/charts/current-60M.json backend/read-model/charts/current-1W.json backend/read-model/charts/current-1M.json; do test -f "$current"; done
+→ all seven exact current pointer paths present; no candidate target selected
+git grep -n -F 'intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json' aa6175f^ -- ':!backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json'
+git grep -n -F 'intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json' aa6175f^ -- ':!backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json'
+git grep -n -F 'intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json' aa6175f^ -- ':!backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json'
+git grep -n -F 'shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json' aa6175f^ -- ':!backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json'
+git grep -n -F 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json' aa6175f^ -- ':!backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json'
+git grep -n -F 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json' aa6175f^ -- ':!backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json'
+→ no references for each tracked candidate
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json'
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json'
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json'
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json'
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json'
+rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json'
+→ no candidate references for each tracked candidate
+current pointer target extraction:
+`PYTHONPATH=backend python -c 'import json; from pathlib import Path; ps=[Path("backend/trend-map-read-model/current.json"),Path("backend/trend-map-read-model/intraday-quotes/current.json"),Path("backend/market-breadth-read-model/current.json"),Path("backend/read-model/charts/current-1D.json"),Path("backend/read-model/charts/current-60M.json"),Path("backend/read-model/charts/current-1W.json"),Path("backend/read-model/charts/current-1M.json")]; print([str((p.parent/((json.loads(p.read_text()).get("artifact_path") or json.loads(p.read_text()).get("path"))).resolve()) if p.exists() else "MISSING:"+str(p)) for p in ps])'`
+→ all seven exact current pointer targets present; none equals a candidate path
+TMPDIR=/dev/shm PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider backend/test_artifact_pointer_inventory.py backend/test_mvp_server_transport.py backend/test_active_chart_adapter.py backend/test_trend_map.py backend/test_market_breadth_artifact.py backend/test_market_breadth_frontend_contract.py
+→ 134 passed after deletion
+git diff --check
+→ PASS
+</pre>
+
+The exact eight candidate paths and their pre-delete byte size/SHA-256 are the
+bounded list immediately below; six are tracked in `aa6175f` and two ignored
+runtime chart candidates were removed from the isolated promotion worktree.
 
 Pre-delete evidence (bytes — SHA-256):
 
 - `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json` — 1198344 — `2f02ef90d57d9a740e5e369d2533864ba0aa34a8a461f30b4bc6be692a4225da`
 - `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json` — 1198154 — `473b3171c484cafeec2ddf1cb4b5ccd0d15ce28c562f6150fc201170df8faadd`
-- `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca340be4e6d86a974b.json` — 1212360 — `e0b20f5dec73c30a5045fd46d0ba6e6b366429bae536367bbbf07000eb964dff`
+- `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json` — 1212360 — `e0b20f5dec73c30a5045fd46d0ba6e6b366429bae536367bbbf07000eb964dff`
 - `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json` — 74876 — `55cdc60215d3708331edadd0677af2d8731f888926b7ab34a6ab25ce86187d85`
 - `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json` — 74819 — `0513a6dd92da61bccf436ed7f1d3b795df968ba52e60f30e8a5a978cbc0c3a65`
 - `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json` — 74669 — `0597838357ed4101856d52ddf6628e4c3d513dcd33f47756bd465db9881163c7`
-- `backend/read-model/charts/versions/chart-1d-5c072cf2d61552cbffac2f0f.json` — 9347143 — `c2790cce3d60ae424bc27b4fae3745bb759858d7344796d9d0054c1dd44306e`
+- `backend/read-model/charts/versions/chart-1d-5c072cf2d61552cbffac2f0f.json` — 9347143 — `c2790cce3d60ae424bc27b4fae3745bb759858d7344796d9d00554c1dd44306b`
 - `backend/read-model/charts/versions/chart-60m-26c333c22db4f27bda0521f5.json` — 9105454 — `7355c7bd67aa51d25c2b68451e31cdda2702d28f326d31ac43213264e8070f47`
 
-After deletion, pointer inventory remained VERIFIED for Trend Map,
-intraday, Market Breadth, and chart `1D/60M/1W/1M`. The post-delete focused
-suite returned 134 passed and `git diff --check` passed. Rollback is the
-isolated Git deletion checkpoint; stable checkout deletion and deployment are
-separate promotion actions.
+After deletion, pointer inventory remained integrity-VERIFIED for Trend Map,
+intraday, Market Breadth, and chart `1D/60M/1W/1M`; intraday freshness was
+reported separately as stale/not verified at review time. The post-delete
+focused suite returned 134 passed and `git diff --check` passed. The six
+tracked deletions are recoverable by Git commit `aa6175f`; the two ignored chart
+candidates remain present as rollback copies in
+`/root/signalix/backend/read-model/charts/versions/`, and their cleanup
+rollback is **NOT VERIFIED** until a separate promotion cleanup. Stable
+checkout deletion and deployment are separate promotion actions.
