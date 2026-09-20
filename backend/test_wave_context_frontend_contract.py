@@ -6,12 +6,7 @@ import subprocess
 ROOT = Path(__file__).parent / "frontend"
 
 
-def test_wave_context_route_is_explicit_and_classic_mvp_mapping_is_preserved():
-    source = (Path(__file__).parent / "mvp_server.py").read_text(encoding="utf-8")
-    assert 'path in ("/mvp", "/mvp/")' in source
-    assert 'self.path = "/index.html" + suffix' in source
-    assert 'path in ("/wave-context", "/wave-context/")' in source
-    assert 'self.path = "/wave-context.html" + suffix' in source
+def test_retired_wave_context_frontend_does_not_reenter_classic_aliases():
     classic = (ROOT / "index.html").read_text(encoding="utf-8")
     assert "wave-context.js" not in classic
     assert "wave-context.css" not in classic

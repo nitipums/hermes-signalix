@@ -9,7 +9,9 @@ from __future__ import annotations
 import gzip
 import http.server
 import math
+import mimetypes
 import os
+import re
 import socketserver
 from urllib.parse import urlsplit
 
@@ -22,6 +24,17 @@ PORT = int(os.getenv("DASHBOARD_PORT", "3001"))
 HOST = os.getenv("DASHBOARD_BIND_HOST", "127.0.0.1")
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 DIR = os.getenv("FRONTEND_DIR", os.path.join(_BACKEND_DIR, "frontend"))
+
+_SYMBOL_SEGMENT = r"[A-Za-z0-9][A-Za-z0-9._-]*"
+_RETAINED_CHART_API = re.compile(rf"^/api/(?:symbol|chart-db)/{_SYMBOL_SEGMENT}/?$")
+_RETAINED_TREND_ROUTE_API = re.compile(
+    rf"^/api/trend-map/{_SYMBOL_SEGMENT}/route$"
+)
+_ACTIVE_STATIC_ASSETS = {
+    "/styles.css": "styles.css",
+    "/canonical-client.js": "canonical-client.js",
+    "/shared-drawer.js": "shared-drawer.js",
+}
 
 
 
@@ -78,6 +91,14 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def redirect(self, location, status=302):
+        self.send_response(status)
+        self.send_header("Location", location)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self._cache_control_sent = True
+        self.end_headers()
+
 
     def do_GET(self):
         parsed = urlsplit(self.path)
@@ -103,6 +124,17 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
                 return
             self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
+        if path in _ACTIVE_STATIC_ASSETS:
+            asset_path = os.path.join(DIR, _ACTIVE_STATIC_ASSETS[path])
+            try:
+                with open(asset_path, "rb") as asset:
+                    body = asset.read()
+            except OSError:
+                self.send_error(404, "Static asset unavailable")
+                return
+            content_type = mimetypes.guess_type(asset_path)[0] or "application/octet-stream"
+            self.send_bytes(body, content_type=f"{content_type}; charset=utf-8")
+            return
         if path.startswith("/api/"):
             if path in ("/api/setup-candidates", "/api/setup-candidates/"):
                 body = __import__("json").dumps(
@@ -110,15 +142,17 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
                 ).encode("utf-8")
                 self.send_bytes(body, content_type="application/json; charset=utf-8", status=410)
                 return
-            if handle_trend_route_api(self.path, self):
+            if _RETAINED_TREND_ROUTE_API.fullmatch(path) and handle_trend_route_api(self.path, self):
                 return
             if path == "/api/market-breadth" and handle_market_breadth_api(self.path, self):
                 return
             if path == "/api/trend-map" and handle_trend_map_api(self.path, self):
                 return
-            if handle_mvp_api(self.path, self):
+            # The active Trend Map drawer retains only these tested, current
+            # chart/detail APIs; no broad MVP API dispatch is exposed.
+            if _RETAINED_CHART_API.fullmatch(path) and handle_mvp_api(self.path, self):
                 return
-            self.send_error(404, "MVP API route not found")
+            self.send_error(404, "API route not found")
             return
         if path == "/dashboard.html":
             self.send_error(404, "dashboard.html retired; use /trend-map")
@@ -130,15 +164,12 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_bytes(body, content_type="application/json; charset=utf-8", status=410)
             return
         if path in ("/wave-context", "/wave-context/"):
-            self.path = "/wave-context.html" + suffix
-        elif path in ("/", "/index", "/index.html"):
-            self.path = "/index.html" + suffix
-        else:
-            # No compatibility route is exposed by the MVP server.
-            if path in ("/portal", "/portfolio"):
-                self.send_error(404, "legacy route unavailable")
-                return
-        return super().do_GET()
+            self.send_error(404, "wave-context retired; use /trend-map")
+            return
+        if path in ("/", "/index", "/index.html"):
+            self.redirect("/trend-map" + suffix)
+            return
+        self.send_error(404, "Route not found")
 
     def end_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")

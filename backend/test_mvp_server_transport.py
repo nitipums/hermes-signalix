@@ -106,3 +106,183 @@ def test_retired_route_payload_is_small_historical_non_actionable_response():
         "replacement": "/trend-map",
         "route": "/mvp",
     }
+
+
+class _TransportProbe(MVPHandler):
+    def __init__(self, path):
+        self.path = path
+        self.request_version = "HTTP/1.1"
+        self.headers = {"Accept-Encoding": ""}
+        self.status = None
+        self.response_headers = []
+        self.body = b""
+        self.wfile = self
+
+    def header_value(self, name):
+        return self.headers.get(name, "")
+
+    def send_response(self, status):
+        self.status = status
+
+    def send_header(self, name, value):
+        self.response_headers.append((name, value))
+
+    def write(self, body):
+        self.body = body
+
+    def end_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        if not getattr(self, "_cache_control_sent", False):
+            self.send_header("Cache-Control", "no-store")
+
+    def send_error(self, status, message=None):
+        self.send_response(status)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.body = (message or "error").encode("utf-8")
+
+
+def request(path):
+    probe = _TransportProbe(path)
+    MVPHandler.do_GET(probe)
+    return {
+        "status": probe.status,
+        "headers": dict(probe.response_headers),
+        "body": probe.body,
+    }
+
+
+def test_transport_has_explicit_active_allowlist_and_rejects_fallthrough(monkeypatch):
+    def active_api(path, handler):
+        handler.send_bytes(b"{}", content_type="application/json; charset=utf-8")
+        return True
+
+    monkeypatch.setattr("mvp_server.handle_trend_map_api", active_api)
+    monkeypatch.setattr("mvp_server.handle_market_breadth_api", active_api)
+    for path in ("/trend-map", "/market-breadth", "/api/trend-map", "/api/market-breadth"):
+        response = request(path)
+        assert response["status"] == 200
+        assert response["headers"]["Cache-Control"] == "no-store"
+    for path in ("/unknown", "/frontend/app.js", "/request_cache.js", "/api/unknown"):
+        response = request(path)
+        assert response["status"] == 404
+        assert response["headers"]["Cache-Control"] == "no-store"
+
+
+def test_active_static_assets_are_served_with_content_and_unknown_assets_404():
+    expected_markers = {
+        "/styles.css": b".trend-route",
+        "/canonical-client.js": b"fetchAllCandidates",
+        "/shared-drawer.js": b"openSharedDrawer",
+    }
+    for path, marker in expected_markers.items():
+        response = request(path)
+        assert response["status"] == 200
+        assert response["body"]
+        assert marker in response["body"]
+        assert response["headers"]["Content-Type"].startswith(
+            "text/"
+        ) or response["headers"]["Content-Type"].startswith(
+            "application/javascript"
+        )
+    assert request("/not-an-active-asset.js")["status"] == 404
+
+
+def test_root_and_index_aliases_redirect_with_query_and_no_store():
+    for path in ("/", "/index", "/index.html"):
+        response = request(path + "?from=test")
+        assert response["status"] == 302
+        assert response["headers"]["Location"] == "/trend-map?from=test"
+        assert response["headers"]["Cache-Control"] == "no-store"
+
+
+def test_retired_routes_are_explicitly_unavailable():
+    assert request("/mvp")["status"] == 410
+    assert request("/api/setup-candidates")["status"] == 410
+    assert request("/wave-context")["status"] == 404
+    assert request("/dashboard.html")["status"] == 404
+
+
+def test_active_api_callers_use_retained_explicit_chart_and_trend_route_shapes(monkeypatch):
+    calls = []
+
+    def trend_route(path, handler):
+        calls.append(("trend", path))
+        handler.send_bytes(b"{}", content_type="application/json; charset=utf-8")
+        return True
+
+    def mvp(path, handler):
+        calls.append(("chart", path))
+        handler.send_bytes(b"{}", content_type="application/json; charset=utf-8")
+        return True
+
+    monkeypatch.setattr("mvp_server.handle_trend_route_api", trend_route)
+    monkeypatch.setattr("mvp_server.handle_mvp_api", mvp)
+    for path in (
+        "/api/trend-map/aAa/route?window=260",
+        "/api/trend-map/AA-BB/route?window=260",
+        "/api/trend-map/AA.BB/route?window=260",
+        "/api/trend-map/AA_BB/route?window=260",
+        "/api/symbol/aAa?view=detail",
+        "/api/chart-db/AAA?timeframe=1D",
+        "/api/symbol/AA-BB?view=detail",
+        "/api/symbol/AA.BB?view=detail",
+        "/api/symbol/AA_BB?view=detail",
+    ):
+        response = request(path)
+        assert response["status"] == 200
+    assert calls == [
+        ("trend", "/api/trend-map/aAa/route?window=260"),
+        ("trend", "/api/trend-map/AA-BB/route?window=260"),
+        ("trend", "/api/trend-map/AA.BB/route?window=260"),
+        ("trend", "/api/trend-map/AA_BB/route?window=260"),
+        ("chart", "/api/symbol/aAa?view=detail"),
+        ("chart", "/api/chart-db/AAA?timeframe=1D"),
+        ("chart", "/api/symbol/AA-BB?view=detail"),
+        ("chart", "/api/symbol/AA.BB?view=detail"),
+        ("chart", "/api/symbol/AA_BB?view=detail"),
+    ]
+    assert request("/api/chart/AAA")["status"] == 404
+
+
+def test_market_breadth_query_is_preserved_at_transport_boundary(monkeypatch):
+    calls = []
+
+    def market_breadth(path, handler):
+        calls.append(path)
+        handler.send_bytes(b"{}", content_type="application/json; charset=utf-8")
+        return True
+
+    monkeypatch.setattr("mvp_server.handle_market_breadth_api", market_breadth)
+    assert request("/api/market-breadth?range=20D")["status"] == 200
+    assert calls == ["/api/market-breadth?range=20D"]
+
+
+def test_malformed_retained_api_symbol_shapes_are_deterministic_404(monkeypatch):
+    def unexpected_handler(path, handler):
+        raise AssertionError(f"dispatcher must reject {path!r}")
+
+    monkeypatch.setattr("mvp_server.handle_trend_route_api", unexpected_handler)
+    monkeypatch.setattr("mvp_server.handle_mvp_api", unexpected_handler)
+    for path in (
+        "/api/trend-map/AA A/route",
+        "/api/trend-map/AA%2FBB/route",
+        "/api/trend-map/AA!%40/route",
+        "/api/trend-map/AA/extra/route",
+        "/api/symbol/AA A",
+        "/api/symbol/AA%2FBB",
+        "/api/symbol/AA!%40",
+        "/api/symbol/AA/extra",
+        "/api/chart-db/.AABB",
+        "/api/chart-db/AA!BB",
+        "/api/chart-db/AA/extra",
+    ):
+        assert request(path)["status"] == 404
+
+
+def test_dispatcher_false_fallthrough_is_a_deterministic_404(monkeypatch):
+    monkeypatch.setattr("mvp_server.handle_trend_route_api", lambda path, handler: False)
+    monkeypatch.setattr("mvp_server.handle_mvp_api", lambda path, handler: False)
+    assert request("/api/trend-map/AAA/route")["status"] == 404
+    assert request("/api/symbol/AAA")["status"] == 404
