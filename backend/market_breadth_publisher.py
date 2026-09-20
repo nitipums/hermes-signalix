@@ -8,6 +8,7 @@ request handler: requests consume the immutable artifact made here.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import hashlib
 import json
 import math
@@ -57,6 +58,29 @@ def _valid_derived(row: Mapping[str, Any]) -> bool:
             and row.get("source_timeframe") == "60m"
             and row.get("source_bar_count") == 8
             and row.get("derivation_method") == DERIVED_METHOD)
+
+
+def _completed_derived_for_as_of(row: Mapping[str, Any], as_of: str) -> bool:
+    """Require an explicit Bangkok EOD completion cutoff within the PIT bound."""
+    if not _valid_derived(row):
+        return False
+    session_date = _as_date(row.get("session_date"))
+    if not session_date or session_date > _as_date(as_of):
+        return False
+    raw_cutoff = row.get("source_completion_cutoff")
+    if raw_cutoff is None:
+        return False
+    try:
+        cutoff = raw_cutoff if isinstance(raw_cutoff, dt.datetime) else dt.datetime.fromisoformat(
+            str(raw_cutoff).replace("Z", "+00:00"))
+        if cutoff.tzinfo is None or cutoff.utcoffset() is None:
+            return False
+        bangkok = dt.timezone(dt.timedelta(hours=7))
+        session_cutoff = dt.datetime.fromisoformat(f"{session_date}T17:00:00+07:00")
+        as_of_cutoff = dt.datetime.fromisoformat(f"{_as_date(as_of)}T17:00:00+07:00")
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return session_cutoff <= cutoff.astimezone(bangkok) <= as_of_cutoff
 
 
 def _indicator_observations(rows: Iterable[Mapping[str, Any]], symbols: Iterable[str],
@@ -150,6 +174,9 @@ class PostgresMarketBreadthSource:
         params: tuple[Any, ...] = (cutoff,) if cutoff else ()
         where = " AND date <= %s" if cutoff else ""
         derived_where = " AND session_date <= %s" if cutoff else ""
+        completion_where = (" AND source_completion_cutoff <= "
+                            "((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')"
+                            if cutoff else " AND source_completion_cutoff <= NOW()")
         rows = self._select(f"""
             SELECT day FROM (
               SELECT DISTINCT date AS day FROM price_data
@@ -160,9 +187,10 @@ class PostgresMarketBreadthSource:
                 AND source_timeframe='60m' AND source_bar_count=8
                 AND derivation_method=%s
                 AND source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
-                AND source_completion_cutoff <= NOW() {derived_where}
+                {completion_where} {derived_where}
             ) dates ORDER BY day DESC LIMIT %s
-        """, ((cutoff,) if cutoff else ()) + (DERIVED_METHOD,) + ((cutoff,) if cutoff else ()) + (limit,))
+        """, ((cutoff,) if cutoff else ()) + (DERIVED_METHOD,) +
+            ((cutoff,) if cutoff else ()) + ((cutoff,) if cutoff else ()) + (limit,))
         return sorted(_as_date(row[0]) for row in rows)
 
     def load_daily(self, symbols: list[str], *, since: str, until: str) -> list[dict[str, Any]]:
@@ -184,11 +212,11 @@ class PostgresMarketBreadthSource:
                 AND is_official=FALSE AND source='settrade' AND source_timeframe='60m'
                 AND source_bar_count=8 AND derivation_method=%s
                 AND source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
-                AND source_completion_cutoff <= NOW()
+                AND source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')
                 AND NOT EXISTS (SELECT 1 FROM official o WHERE o.symbol=derived_daily_price_data.symbol AND o.session_date=derived_daily_price_data.session_date)
             ) SELECT * FROM official UNION ALL SELECT * FROM derived
               ORDER BY symbol, session_date
-        """, (symbols, since, until, symbols, since, until, DERIVED_METHOD))
+        """, (symbols, since, until, symbols, since, until, DERIVED_METHOD, until))
         keys = ("symbol", "session_date", "open", "high", "low", "close", "volume", "source",
                 "source_timeframe", "derivation_method", "source_run_id", "source_first_ts",
                 "source_last_ts", "source_completion_cutoff", "source_bar_count")
@@ -233,7 +261,7 @@ def publish_market_breadth_replay(*, source: Any, root: str | Path, conn: Any = 
     report_dates = context_dates[-EMITTED_SESSIONS:]
     rows = source.load_daily(symbols, since=since or context_dates[0], until=resolved_as_of)
     official = (row for row in rows if row.get("source") == "price_data")
-    derived = (row for row in rows if _valid_derived(row))
+    derived = (row for row in rows if _completed_derived_for_as_of(row, resolved_as_of))
     selected = select_official_first_daily(official, derived, universe=symbols, as_of=resolved_as_of)
     observations = _indicator_observations(selected, symbols, context_dates)
     build = build_market_breadth(observations, universe_snapshot={**universe, "count": len(symbols), "completed_session_dates": context_dates},

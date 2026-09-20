@@ -183,7 +183,7 @@ def test_invalid_range_fails_closed(path):
     assert status == 400 and payload["reason"] == "invalid_range"
 
 
-@pytest.mark.parametrize("tamper", ["pointer", "pointer_missing", "pointer_corrupt", "content", "missing", "empty", "stale"])
+@pytest.mark.parametrize("tamper", ["pointer", "pointer_missing", "pointer_corrupt", "content", "missing", "empty", "stale", "unknown", "invalid", "data_blocked"])
 def test_pointer_content_and_unusable_artifact_fail_closed(tmp_path, tamper):
     published = publish_fixture(tmp_path)
     pointer = tmp_path / "current.json"
@@ -200,9 +200,12 @@ def test_pointer_content_and_unusable_artifact_fail_closed(tmp_path, tamper):
         artifact.unlink()
     elif tamper == "empty":
         artifact.write_text("{}")
-    else:
+    elif tamper in {"stale", "unknown", "invalid", "data_blocked"}:
         data = json.loads(artifact.read_text())
-        data["quality"] = {"status": "STALE"}
+        data["quality"] = {"status": {
+            "stale": "STALE", "unknown": "UNKNOWN", "invalid": "INVALID",
+            "data_blocked": "DATA_BLOCKED",
+        }[tamper]}
         artifact.write_text(json.dumps(data, separators=(",", ":"), sort_keys=True))
     payload, status = market_breadth_response("/api/market-breadth", loader=lambda: load_market_breadth_artifact(tmp_path))
     assert status == 503 and payload["status"] == "DATA_BLOCKED"

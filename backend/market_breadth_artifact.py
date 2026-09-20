@@ -118,7 +118,7 @@ def _validate(payload: Any, *, content_hash: str | None = None) -> dict:
         raise ValueError("market breadth requires the active_ord universe")
     if not isinstance(payload.get("quality"), dict) or not isinstance(payload.get("freshness"), dict):
         raise ValueError("market breadth quality is required")
-    if payload["quality"].get("status") in {"STALE", "UNKNOWN", "DATA_BLOCKED"} or payload["freshness"].get("status") in {"STALE", "UNKNOWN", "DATA_BLOCKED"}:
+    if payload["quality"].get("status") in {"STALE", "UNKNOWN", "INVALID", "DATA_BLOCKED"} or payload["freshness"].get("status") in {"STALE", "UNKNOWN", "INVALID", "DATA_BLOCKED"}:
         raise ValueError("market breadth artifact is stale or unusable")
     if not isinstance(payload.get("provenance"), dict) or not payload["provenance"].get("source"):
         raise ValueError("market breadth provenance is required")

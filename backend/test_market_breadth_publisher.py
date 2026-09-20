@@ -1,8 +1,9 @@
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from market_breadth_artifact import load_market_breadth_artifact
-from market_breadth_publisher import _indicator_observations, publish_market_breadth_replay
+from market_breadth_publisher import (PostgresMarketBreadthSource, _indicator_observations,
+                                      publish_market_breadth_replay)
 
 
 class Source:
@@ -45,6 +46,123 @@ class SourceMissingCurrentSymbol(Source):
                 if not (row["symbol"] == "BBB" and row["session_date"] == self.dates[-1])]
 
 
+def _derived_row(session_date, *, cutoff):
+    return {"symbol": "AAA", "session_date": session_date, "open": 100,
+            "high": 101, "low": 99, "close": 100, "volume": 1000,
+            "source": "derived_daily_price_data", "source_origin": "settrade",
+            "source_timeframe": "60m", "source_bar_count": 8,
+            "derivation_method": "settrade_60m_complete_bangkok_session_ohlcv_v1",
+            "source_completion_cutoff": cutoff}
+
+
+class CapturingCursor:
+    def __init__(self, rows=()):
+        self.rows = list(rows)
+        self.sql = None
+        self.params = None
+
+    def execute(self, sql, params):
+        self.sql = sql
+        self.params = params
+
+    def fetchall(self):
+        return self.rows
+
+    def close(self):
+        pass
+
+
+class CapturingConnection:
+    def __init__(self, rows=()):
+        self.cursor_instance = CapturingCursor(rows)
+
+    def set_session(self, **kwargs):
+        pass
+
+    def cursor(self):
+        return self.cursor_instance
+
+
+def test_derived_daily_requires_completed_bangkok_cutoff_and_pit_as_of():
+    from market_breadth_publisher import _completed_derived_for_as_of
+
+    as_of = "2025-06-03"
+    assert _completed_derived_for_as_of(
+        _derived_row(as_of, cutoff="2025-06-03T09:00:00+00:00"), as_of) is False
+    assert _completed_derived_for_as_of(
+        _derived_row(as_of, cutoff="2025-06-03T10:00:00+07:00"), as_of) is False
+    assert _completed_derived_for_as_of(
+        _derived_row(as_of, cutoff="2025-06-03T17:00:00+07:00"), as_of) is True
+    assert _completed_derived_for_as_of(
+        _derived_row("2025-06-04", cutoff="2025-06-04T17:00:00+07:00"), as_of) is False
+    assert _completed_derived_for_as_of(
+        _derived_row(as_of, cutoff="2025-06-03T17:00:00"), as_of) is False
+    assert _completed_derived_for_as_of(
+        _derived_row(as_of, cutoff=datetime(2025, 6, 3, 17, 0)), as_of) is False
+
+
+def test_completed_sessions_captures_explicit_as_of_sql_and_params():
+    connection = CapturingConnection(rows=[("2025-06-03",)])
+    source = PostgresMarketBreadthSource(connection)
+
+    assert source.completed_sessions(as_of="2025-06-03", limit=520) == ["2025-06-03"]
+
+    cursor = connection.cursor_instance
+    assert cursor.sql.count("%s") == len(cursor.params) == 5
+    assert cursor.params == ("2025-06-03", "settrade_60m_complete_bangkok_session_ohlcv_v1",
+                             "2025-06-03", "2025-06-03", 520)
+    assert "source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')" in cursor.sql
+    assert "source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')" in cursor.sql
+    assert "session_date <= %s" in cursor.sql
+
+
+def test_completed_sessions_captures_until_and_implicit_now_paths():
+    connection = CapturingConnection()
+    source = PostgresMarketBreadthSource(connection)
+
+    source.completed_sessions(until="2025-06-03", limit=10)
+    cursor = connection.cursor_instance
+    assert cursor.sql.count("%s") == len(cursor.params) == 5
+    assert cursor.params[0] == cursor.params[2] == cursor.params[3] == "2025-06-03"
+    assert "source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')" in cursor.sql
+
+    source.completed_sessions(limit=10)
+    assert cursor.sql.count("%s") == len(cursor.params) == 2
+    assert cursor.params == ("settrade_60m_complete_bangkok_session_ohlcv_v1", 10)
+    assert "source_completion_cutoff <= NOW()" in cursor.sql
+
+
+def test_load_daily_captures_bangkok_until_bound_and_no_lookahead_param():
+    connection = CapturingConnection()
+    source = PostgresMarketBreadthSource(connection)
+
+    assert source.load_daily(["AAA"], since="2025-05-01", until="2025-06-03") == []
+
+    cursor = connection.cursor_instance
+    assert cursor.sql.count("%s") == len(cursor.params) == 8
+    assert cursor.params == (["AAA"], "2025-05-01", "2025-06-03", ["AAA"],
+                             "2025-05-01", "2025-06-03",
+                             "settrade_60m_complete_bangkok_session_ohlcv_v1", "2025-06-03")
+    assert "source_completion_cutoff >= ((session_date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')" in cursor.sql
+    assert "source_completion_cutoff <= ((%s::date + TIME '17:00') AT TIME ZONE 'Asia/Bangkok')" in cursor.sql
+    assert "source_completion_cutoff <= NOW()" not in cursor.sql
+
+
+def test_official_daily_wins_over_completed_derived_same_symbol_date(tmp_path):
+    source = Source()
+    source.load_daily = lambda symbols, **kwargs: [
+        {"symbol": "AAA", "session_date": source.dates[-1], "open": 100,
+         "high": 101, "low": 99, "close": 100, "volume": 1000,
+         "source": "price_data"},
+        _derived_row(source.dates[-1], cutoff="2025-06-03T17:00:00+07:00"),
+    ]
+    selected = publish_market_breadth_replay(source=source, root=tmp_path)
+    assert selected["observed_count"] == 1
+    artifact = load_market_breadth_artifact(tmp_path)
+    assert artifact["counts"]["official"] == 1
+    assert artifact["counts"]["derived"] == 0
+
+
 def test_read_only_replay_is_bounded_lineaged_and_compact(tmp_path):
     result = publish_market_breadth_replay(source=Source(), root=tmp_path, run_id="fixture-run")
     artifact = load_market_breadth_artifact(tmp_path)
@@ -83,6 +201,8 @@ def test_current_coverage_does_not_fill_from_historical_union(tmp_path):
     assert universe["current_blocked_count"] == 1
     assert result["observed_count"] == 1
     assert result["blocked_count"] == 1
+    assert artifact["quality"]["status"] == "PARTIAL"
+    assert artifact["quality"]["status"] != "DATA_BLOCKED"
 
 
 def test_indicator_observations_project_evidence_and_bound_indicator_window():
