@@ -6,6 +6,18 @@
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 
+## Current active-only reconciliation — 2026-09-20
+
+Authority/navigation documents must route current work only to `/trend-map`,
+`/api/trend-map`, `/market-breadth`, and `/api/market-breadth`. These are
+public, deterministic, read-only, and non-actionable. `/mvp`,
+`/api/setup-candidates`, Wave/Elliott/VCP, private signals, alerts, broker
+execution, and auto-trading are historical, deferred, or audit-only. The
+[contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+defines the active-universe boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+records promotion evidence. Neither note changes the separate source/tests,
+artifact, runtime/API, freshness, browser, deployment, or rollback gates.
+
 ## Authority rules
 
 | Concern | Canonical authority | Must not be treated as authority |

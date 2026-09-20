@@ -11,6 +11,14 @@ SUPERSEDED / DROPPED`; do not route current work to them, the old
 dashboard builder/server, or shadow-named active modules. Generated artifacts
 are runtime inputs, not documentation authorities or a retention policy.
 
+The active-only contract and pointer/artifact evidence are linked from the
+[freeze](../docs/current/2026-09-20-active-only-contract-freeze.md) and
+[inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md).
+Their promotion evidence does not claim served runtime, freshness, browser,
+deployment, or rollback acceptance. The setup/MVP, Wave/Elliott, VCP, private
+signal, alert, broker, and auto-trading material below is retained history or
+deferred scope, not current architecture routing.
+
 ## Production-served Daily Trend Mapping
 
 The current architecture is:

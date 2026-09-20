@@ -4,6 +4,19 @@
 > **Reconciled:** 2026-09-19 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; runtime and commit claims require fresh read-back from the checkout and served route.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
+## Current active-only acceptance boundary — 2026-09-20
+
+Current acceptance targets are only the public, deterministic, read-only,
+non-actionable routes `/trend-map`, `/api/trend-map`, `/market-breadth`, and
+`/api/market-breadth`. `/mvp`, `/api/setup-candidates`, Wave/Elliott/VCP,
+private signals, alerts, broker execution, and auto-trading are historical,
+deferred, or audit-only and are not current acceptance targets. Use the
+[contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+for active-universe semantics and the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+for promotion evidence. Source/tests, artifact, runtime/API, freshness, browser,
+deployment, and rollback verdicts must remain separate; documentation does
+not make unresolved gates PASS.
+
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
 > Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused current specs under `../docs/superpowers/specs/` for contracts, and the Kanban board only for active named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
@@ -19,6 +32,10 @@ real desktop/mobile chart journey. The retired `/mvp` and
 acceptance targets. Generated artifacts are runtime inputs, not documentation
 authorities or a retention policy; only current pointers and validated
 artifacts serve, with Git history as rollback authority.
+
+The dated Trend Route section below is retained evidence for a historical
+extension inside the Trend Map drawer, not a fifth current public route or
+acceptance target.
 
 ### Trend Route acceptance — 2026-09-17
 

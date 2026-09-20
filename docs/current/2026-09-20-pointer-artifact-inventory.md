@@ -20,7 +20,7 @@
 
 ## Promotion checkpoint scope
 
-Only the eight current pointer/artifact references in the table above are in
+Only the seven current pointer/artifact references in the table above are in
 this promotion checkpoint. Obsolete candidate versions remain outside this
 checkpoint and are not deleted or moved by Ticket #66.
 

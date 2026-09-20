@@ -4,6 +4,18 @@
 > **Last reconciled:** 2026-09-19 ICT
 > Product, contract, runtime, and research truth live in the linked authorities below.
 
+## Current active-only boundary — 2026-09-20
+
+The only current public product targets are the deterministic, read-only,
+non-actionable routes `/trend-map`, `/api/trend-map`, `/market-breadth`, and
+`/api/market-breadth`. `/mvp`, `/api/setup-candidates`, Team Facts,
+Wave/Elliott/VCP research, private signals, alerts, broker execution, and
+auto-trading are historical, deferred, or audit-only and are not navigation
+targets. See the [active-only contract freeze](current/2026-09-20-active-only-contract-freeze.md)
+for the boundary and the [pointer/artifact inventory](current/2026-09-20-pointer-artifact-inventory.md)
+for promotion evidence. Source/tests, artifact, runtime/API, freshness,
+browser, deployment, and rollback verdicts remain separate.
+
 ## Signalix in one minute
 
 Signalix is Daily Trend Mapping: deterministic, public, read-only evidence for

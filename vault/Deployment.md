@@ -3,6 +3,19 @@
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
 > **Reconciled:** 2026-09-19 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard builder/server and shadow-named active modules are not current routing targets. Generated artifacts are runtime inputs only; current pointers and validated artifacts serve, and Git history is rollback authority.
 
+## Current active-only deployment boundary — 2026-09-20
+
+The only current deployment targets are `/trend-map`, `/api/trend-map`,
+`/market-breadth`, and `/api/market-breadth`, all public read-only and
+non-actionable. `/mvp`, `/api/setup-candidates`, Wave/Elliott/VCP, private
+signals, alerts, broker execution, and auto-trading are not deployment targets;
+their material below is historical, deferred, or audit-only. The [active-only
+freeze](../docs/current/2026-09-20-active-only-contract-freeze.md) and
+[pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+are linked evidence only: source/tests, artifact, runtime/API, freshness,
+browser, deployment, and rollback verdicts remain independent, and no runtime
+or deployment action was taken by this reconciliation.
+
 ## Dashboard canonical-mount repair — 2026-09-16 20:20 ICT
 
 - Root cause: `signalix_dashboard` had been recreated from `/root/signalix/.worktrees/trend-route-task1/backend`, while the EOD updater and backend publisher write to `/root/signalix/backend`; the public pointer therefore remained on the 2026-09-15 artifact despite a successful 2026-09-16 EOD run.
