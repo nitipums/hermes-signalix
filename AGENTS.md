@@ -1,14 +1,27 @@
 # AGENTS.md — Signalix collaboration contract
 
 > **STATUS: CURRENT** · Owner-aligned working instructions for Lite and Codex.
-> **Last reconciled:** 2026-09-14
-> **Authority:** owner-approved direction in `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`, with current acceptance/evidence rules in `vault/Execution-Pipeline.md`.
+> **Last reconciled:** 2026-09-20
+> **Authority:** current active-only direction is Daily Trend Mapping + Market Breadth; acceptance/evidence rules remain in `vault/Execution-Pipeline.md`.
+
+> **CURRENT AUTHORITY — 2026-09-20:** The active public product is deterministic,
+> read-only Daily Trend Mapping and Market Breadth at `/trend-map`,
+> `/api/trend-map`, `/market-breadth`, and `/api/market-breadth`. The envelope is
+> `PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+> Arm reviews evidence; there are no orders, alerts, broker actions, or
+> auto-trading. `/mvp`, `/api/setup-candidates`, Team Facts, Elliott/Wave/VCP
+> setup work, and private signals are `HISTORICAL / DEFERRED` and require a new
+> owner decision before resumption. See [`active-only contract freeze`](docs/current/2026-09-20-active-only-contract-freeze.md),
+> [`pointer/artifact inventory`](docs/current/2026-09-20-pointer-artifact-inventory.md),
+> and [`active cleanup review`](docs/current/2026-09-20-active-cleanup-review.md).
 
 ## Product identity
 
-Signalix is Arm's private setup-to-decision and actionable-signal system for Thai swing trading. It finds and prepares candidate setups and may emit deterministic market-only paper/shadow `BUY_NOW` signals under the owner-approved private signal policy; position-aware `SELL_NOW` remains a later contract. **Arm reviews the evidence, checks the chart, and makes the final execution decision**. It is not a generic market-information portal, public stock-tip list, or automatic trading system.
+**HISTORICAL / DEFERRED:** Signalix's former private setup-to-decision and
+actionable-signal identity, including paper/shadow `BUY_NOW` signals, is
+preserved below for audit only. It is not the current product authority.
 
-The product flow is:
+The former product flow (historical/deferred) was:
 
 ```text
 Verified Market View
@@ -34,7 +47,7 @@ source/history as historical/audit material only; do not route current work
 there. Elliott/Wave setup research, private signals, alerts, broker execution,
 and auto-trading are outside the active line.
 
-## Current product direction — clean replacement history
+## HISTORICAL / DEFERRED — clean replacement history
 
 The historical setup-to-decision spine remains preserved for audit and future
 reference. It is not the current delivery or product authority.
@@ -74,11 +87,11 @@ Before any task, Codex must:
 
 | Task concern | Read first | Update when the contract changes |
 |---|---|---|
-| Product thesis, user, surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` | Product strategy + focused design/spec |
+| Current product direction, user, active surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` + `docs/current/2026-09-20-active-only-contract-freeze.md` | Product strategy + active-only freeze + focused design/spec |
 | Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + `docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
 | Current Trend Mapping API and UI | `/trend-map`, `/api/trend-map` | source + focused tests |
 | Retained setup/API contract (historical only) | `/mvp`, `/api/setup-candidates` | inspect only for audit/future reactivation |
-| Private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities when signal semantics change |
+| Private market-buy shadow policy and 7-day UI (historical/deferred; reactivation-only) | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities only after a new owner reactivation decision |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
 | Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |
 | Current architecture/component behavior | `vault/Architecture.md`, `vault/Components.md` | The relevant architecture/component note |
@@ -103,7 +116,9 @@ Do not route work there without a new owner-approved product decision.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **929 active ORD**, **237 eligible**, **692 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
 - `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.
-- Private paper/shadow actionable signals are owner-approved. Alerts and auto-trading remain `PENDING / FUTURE FEATURE` and OFF. Do not enable alerts, evaluator auto-caller persistence, broker execution, or expand beyond Thai ORD without explicit owner scope.
+- Private paper/shadow actionable signals are `HISTORICAL / DEFERRED` and OFF.
+  Alerts, broker execution, and auto-trading are also outside the active line;
+  do not resume any of them without a new owner decision.
 
 ## Agent roles
 
@@ -186,11 +201,11 @@ issue/spec
 
 ## Acceptance gates owned by Lite
 
-- **Contract:** one primary setup-candidate contract; no competing legacy primary label.
-- **Data:** Thai ORD scope, freshness, timezone, provenance, lineage, missing-data handling, and no-lookahead boundaries are explicit.
-- **Backend/API:** verify the served endpoint and response contract, not only source/tests. For the new spine, check `/api/setup-candidates`; for transition work, check the relevant VCP route and its explicit legacy status.
-- **UI:** verify public URL/IP first at desktop and 390px mobile. Exercise the real candidate/card/drawer journey, readability/layout metrics, and at least one API/error or empty/data-blocked path. Source/CSS/tests alone are not visual acceptance.
-- **Decision safety:** no LLM-generated authoritative calculations, Elliott labels, or executable orders; no automatic BUY.
+- **Contract:** verify the active read-only Trend Map and Market Breadth contracts, including `PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+- **Data:** verify freshness, timezone, provenance, lineage, missing-data handling, and no-lookahead boundaries for the active Trend Map and Market Breadth evidence.
+- **Backend/API:** verify the served endpoint and response contract, not only source/tests. Check `/api/trend-map` and `/api/market-breadth`.
+- **UI:** verify public URL/IP first at desktop and 390px mobile. Exercise the active read-only Trend Map/Market Breadth chart journey, readability/layout metrics, and at least one API/error or empty/data-blocked path. Source/CSS/tests alone are not visual acceptance.
+- **Decision safety:** no LLM-generated authoritative calculations, setup labels, or executable orders; no automatic BUY.
 - **Final verdict:** missing runtime, freshness, browser, or failure-state evidence is `NOT VERIFIED`, never silently PASS.
 
 ## Handoff format
@@ -228,7 +243,8 @@ See `docs/agents/domain.md`.
 
 Read only the smallest relevant set, in this order:
 
-- Product direction and clean-replacement design:
+- HISTORICAL / DEFERRED — former product direction and clean-replacement design
+  (reactivation-only):
   `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
 - Product scope and acceptance/evidence policy:
   `vault/Execution-Pipeline.md`

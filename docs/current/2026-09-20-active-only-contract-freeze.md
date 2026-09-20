@@ -72,13 +72,14 @@ The active-only repository contract does not create or route work through an
 no deletion or movement of existing history; any future cleanup needs its own
 owner-approved bounded decision and reference scan.
 
-## Protected-authority residual
+## Protected-authority reconciliation — COMPLETE
 
-`AGENTS.md` and `vault/Product-Strategy-Market-to-Action.md` retain
-incompatible legacy/current identity wording under owner-protected authority.
-This is an explicit **OWNER-DECISION / NOT VERIFIED** residual: this freeze is
-the canonical active-only boundary, but those two protected documents are not
-rewritten by this reconciliation.
+Owner-authorized reconciliation updated `AGENTS.md` and
+`vault/Product-Strategy-Market-to-Action.md` in the clean promotion worktree.
+Both now identify Trend Map + Market Breadth as the active read-only product,
+route current acceptance to the four active routes, and mark setup/actionable
+signal prose historical/deferred without deleting historical evidence.
+The protected-authority wording residual is **PASS / VERIFIED**.
 
 ## Explicitly unresolved
 
