@@ -68,7 +68,7 @@ route, or stable checkout was changed.
 ### Final review provenance
 
 The reviewed checkout identity is clean final remediation commit
-`613fdf7a83b552b6ef1250ed3dd9998f2bcf6ab0`; `aa6175f` is the deletion
+`d254b8aefc0632bcaddc75c1658c8bf45de60f92`; `aa6175f` is the deletion
 checkpoint. The six tracked deletions are recoverable by Git commit `aa6175f`;
 Git alone does not restore all eight candidates. The two ignored chart candidates
 were removed only from the isolated promotion worktree and remain present as
@@ -106,8 +106,8 @@ rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-tre
 rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json'
 rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json'
 → no candidate references for each tracked candidate
-rg -n -F 'chart-1d-5c072cf2d61552cbffac2f0f.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer'
-rg -n -F 'chart-60m-26c333c22db4f27bda0521f5.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer'
+rg -n -F 'chart-1d-5c072cf2d61552cbffac2f0f.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer' --glob '!docs/current/2026-09-20-pointer-artifact-inventory.md' --glob '!docs/current/2026-09-20-active-cleanup-review.md'
+rg -n -F 'chart-60m-26c333c22db4f27bda0521f5.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer' --glob '!docs/current/2026-09-20-pointer-artifact-inventory.md' --glob '!docs/current/2026-09-20-active-cleanup-review.md'
 → no references; `test ! -e backend/read-model/charts/versions/chart-1d-5c072cf2d61552cbffac2f0f.json` and corresponding `chart-60m` test passed in isolated worktree
 `PYTHONPATH=backend python -c 'import json; from pathlib import Path; from artifact_pointer_inventory import inventory_active_read_models; r=inventory_active_read_models(); print({k:([(x["timeframe"],x["status"]) for x in v] if isinstance(v,list) else (v["status"],v.get("target"))) for k,v in r.items()})'`
 → `trend_map=VERIFIED`, `intraday_quotes=VERIFIED`, `market_breadth=VERIFIED`, charts `1D/60M/1W/1M=VERIFIED`; no candidate target selected
