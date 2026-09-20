@@ -16,6 +16,19 @@ are linked evidence only: source/tests, artifact, runtime/API, freshness,
 browser, deployment, and rollback verdicts remain independent, and no runtime
 or deployment action was taken by this reconciliation.
 
+## Final source/release closeout — 2026-09-20
+
+- Canonical checkout: `/root/signalix`, `release/signalix-mvp-stable`.
+- Promoted commit: `a0e02e50494cb30a4c641e32bdcf5a30bfd3acac`; local and remote
+  `release/signalix-mvp-stable` read-back match.
+- The checkout was reset to the verified remote promotion and was clean before
+  this documentation sync. Owner-authorized generated leftovers were removed;
+  `.env`, credentials, runtime secrets, and nested worktrees were not removed.
+- Public/API evidence remains separate: Trend Map returned 237 rows with
+  `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`; retired
+  `/mvp` and `/api/setup-candidates` returned HTTP 410.
+
+
 ## Dashboard canonical-mount repair — 2026-09-16 20:20 ICT
 
 - Root cause: `signalix_dashboard` had been recreated from `/root/signalix/.worktrees/trend-route-task1/backend`, while the EOD updater and backend publisher write to `/root/signalix/backend`; the public pointer therefore remained on the 2026-09-15 artifact despite a successful 2026-09-16 EOD run.

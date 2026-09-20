@@ -21,8 +21,8 @@
 ## Promotion checkpoint scope
 
 Only the seven current pointer/artifact references in the table above are in
-this promotion checkpoint. Obsolete candidate versions remain outside this
-checkpoint and are not deleted or moved by Ticket #66.
+this promotion checkpoint. Obsolete candidate versions are outside this
+checkpoint and are removed only by the separately authorized cleanup closeout.
 
 ## Publication and rollback boundary
 
@@ -70,10 +70,10 @@ route, or stable checkout was changed.
 The reviewed checkout identity is clean final remediation commit
 `d254b8aefc0632bcaddc75c1658c8bf45de60f92`; `aa6175f` is the deletion
 checkpoint. The six tracked deletions are recoverable by Git commit `aa6175f`;
-Git alone does not restore all eight candidates. The two ignored chart candidates
-were removed only from the isolated promotion worktree and remain present as
-rollback copies in `/root/signalix/backend/read-model/charts/versions/`. Their
-cleanup rollback is **NOT VERIFIED** until a separate promotion cleanup.
+Git alone does not restore all eight candidates. The two ignored chart candidates were removed from the canonical checkout after
+explicit owner confirmation. No rollback archive is retained by owner
+direction; current pointers remain protected and Git history is the rollback
+authority for tracked state.
 
 ### Bounded pre-delete scan
 
@@ -118,8 +118,8 @@ git diff --check
 </pre>
 
 The exact eight candidate paths and their pre-delete byte size/SHA-256 are the
-bounded list immediately below; six are tracked in `aa6175f` and two ignored
-runtime chart candidates were removed from the isolated promotion worktree.
+bounded list immediately below; six were tracked in `aa6175f` and two ignored
+runtime chart candidates were removed during the final cleanup closeout.
 
 Pre-delete evidence (bytes — SHA-256):
 
@@ -137,7 +137,5 @@ intraday, Market Breadth, and chart `1D/60M/1W/1M`; intraday freshness was
 reported separately as stale/not verified at review time. The post-delete
 focused suite returned 134 passed and `git diff --check` passed. The six
 tracked deletions are recoverable by Git commit `aa6175f`; the two ignored chart
-candidates remain present as rollback copies in
-`/root/signalix/backend/read-model/charts/versions/`, and their cleanup
-rollback is **NOT VERIFIED** until a separate promotion cleanup. Stable
-checkout deletion and deployment are separate promotion actions.
+candidates were verified absent from the canonical checkout. Stable checkout
+deletion and deployment are separate promotion actions.

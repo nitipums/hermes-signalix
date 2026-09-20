@@ -1,15 +1,16 @@
 # Signalix — Start Here
 
 > **STATUS: CURRENT** · Single entrypoint and routing map only.
-> **Last reconciled:** 2026-09-19 ICT
+> **Last reconciled:** 2026-09-20 ICT
 > Product, contract, runtime, and research truth live in the linked authorities below.
 
 ## Current active-only boundary — 2026-09-20
 
 Use the [active-only contract freeze](current/2026-09-20-active-only-contract-freeze.md)
 for the single current boundary and the [pointer/artifact inventory](current/2026-09-20-pointer-artifact-inventory.md)
-for evidence. Verdicts remain separate; the [active cleanup review](current/2026-09-20-active-cleanup-review.md)
-records the final Standards/Spec/Ponytail verdicts and residual NOT VERIFIED gates.
+for evidence. The [active cleanup review](current/2026-09-20-active-cleanup-review.md)
+records the final Standards/Spec/Ponytail verdicts and closeout state; remaining
+`NOT VERIFIED` text is limited to explicitly untested historical/runtime gates.
 
 ## Signalix in one minute
 
@@ -75,8 +76,8 @@ Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 
 - Release branch: `release/signalix-mvp-stable`
 - Current source/release: verify with `git status`, `git log`, and the live route before making a new claim.
-- **Cleanup integration status — `SOURCE_TEST_PASS / RUNTIME_REVIEW_REQUIRED`:** the owner-approved lean cleanup is staged in the canonical checkout but is not committed or deployed. Focused active-surface tests and isolated port-3011 read-back pass; the repository-wide suite is now `1,061 passed / 13 skipped / 0 failed` (2 warnings, 4 subtests).
-- Retired MVP/setup test suites were removed, obsolete active-surface assertions were aligned to current deterministic contracts, and PostgreSQL-dependent smoke tests skip honestly when the service is unavailable. This is a source/test PASS, not yet a production release PASS.
+- **Cleanup integration status — `PASS`:** the canonical checkout is clean on `release/signalix-mvp-stable` at `a0e02e50494cb30a4c641e32bdcf5a30bfd3acac`, and remote SHA matches. Active-only authority/docs reconciliation, generated-candidate cleanup, and public promotion closeout are complete.
+- Retired MVP/setup test suites and obsolete active-surface assertions remain aligned to current deterministic contracts; PostgreSQL-dependent smoke tests skip honestly when the service is unavailable. Source/release and documentation closeout are PASS; runtime/data/browser verdicts remain evidence-specific.
 - Current runtime/data freshness is not live telemetry in this page. Read `../vault/Deployment.md` and probe the relevant endpoint.
 - Missing, stale, partial, invalid, or empty data must be reported explicitly as `NOT VERIFIED`, not promoted by HTTP 200 alone.
 

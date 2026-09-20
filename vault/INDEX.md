@@ -1,7 +1,7 @@
 # INDEX — Signalix Project Vault
 
 > **STATUS: CURRENT** · Catalog and routing map for the Level-4 vault.
-> **Last reconciled:** 2026-09-19 ICT
+> **Last reconciled:** 2026-09-20 ICT
 > **Authority:** the linked concern-specific documents, not this catalog.
 
 ## Current active-only navigation — 2026-09-20
@@ -9,7 +9,7 @@
 The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
 owns the boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
 owns evidence. The [active cleanup review](../docs/current/2026-09-20-active-cleanup-review.md)
-records the final review verdicts and residual NOT VERIFIED gates. This index remains routing only.
+records the final review verdicts and closeout state. This index remains routing only.
 
 ## How to use
 
@@ -43,7 +43,7 @@ records the final review verdicts and residual NOT VERIFIED gates. This index re
 - `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`;
   do not route current work to them, the old dashboard builder/server, or
   shadow-named active modules.
-- `../docs/current/2026-09-17-1015-trend-route-closeout.md` — current Trend Route production evidence handoff; automated refresh wiring and rollback remain explicitly `NOT VERIFIED`
+- `../docs/current/2026-09-17-1015-trend-route-closeout.md` — historical Trend Route production evidence handoff; automated refresh wiring and rollback remain explicitly `NOT VERIFIED` for that separate feature
 - `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` — owner-approved spec for Daily Main Trend 1–4 multiple-MA calibration.
 - `../docs/current/2026-09-13-main-trend-calculation-contract.md` — exact current Main Trend v6 formulas, predicates, precedence, and verification contract.
 - `../docs/current/2026-09-14-1112-main-trend-display-ui-closeout.md` — superseded historical evidence for the former shadow-named display slice; current route authority is this index plus `Deployment.md`.
