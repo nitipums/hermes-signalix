@@ -1,34 +1,54 @@
 # Active pointer/artifact inventory — Ticket #66
 
-> **STATUS: PARTIAL / NOT VERIFIED** · Read-only evidence captured from
-> release HEAD `0bf2642` on 2026-09-20 ICT. No pointer, artifact, historical
-> filename, or Git history was deleted, moved, regenerated, or rewritten.
+> **STATUS: CURRENT — POINTER/ARTIFACT PROMOTION EVIDENCE** · Read-only
+> evidence captured from the owner-authorized canonical chart publication and
+> current checkout on 2026-09-20 ICT. No pointer, artifact contents,
+> historical filename, or Git history was deleted, moved, regenerated, or
+> rewritten by Ticket #66.
 
 ## Current protected targets
 
-| Surface | Current pointer | Pointer status | Target status |
+| Surface | Current pointer | Pointer status | Target status / metadata |
 |---|---|---|---|
-| Trend Map | `backend/trend-map-read-model/current.json` | `VERIFIED`; `shadow-trend-map-quote-envelope-v2-2026-09-18-87dce5718dd0784a-e76ebcbf1637fac9-f34bcb3ad1244662-f3783cb9724c81a5` | Exists; root-contained; schema, identity, report validation, content hash, and measurement hash match |
-| Intraday quotes | `backend/trend-map-read-model/intraday-quotes/current.json` | `VERIFIED`; `intraday-quotes-02f113b87e784369bd3807099bda46fa-36ffbec7a6be76099883b2b2` | Exists; root-contained; schema, identity, artifact validation, and content hash match |
-| Market Breadth | `backend/market-breadth-read-model/current.json` | `NOT_VERIFIED` | **Blocked:** current pointer is absent; no artifact was guessed or regenerated |
-| Chart `1D`, `60M`, `1W`, `1M` | `backend/read-model/charts/current-{timeframe}.json` | `NOT_VERIFIED` for each | **Blocked:** current pointers are absent; no chart pointer or artifact was invented |
+| Trend Map | `backend/trend-map-read-model/current.json` | `VERIFIED`; `shadow-trend-map-quote-envelope-v2-2026-09-18-87dce5718dd0784a-e76ebcbf1637fac9-f34bcb3ad1244662-f3783cb9724c81a5` | `as_of=2026-09-18`; 237 rows; target exists and pointer/artifact identity, schema, report validation, content hash, and measurement hash match |
+| Intraday quotes | `backend/trend-map-read-model/intraday-quotes/current.json` | `VERIFIED`; `intraday-quotes-02f113b87e784369bd3807099bda46fa-36ffbec7a6be76099883b2b2` | `generated_at=2026-09-15T09:45:43.425426+00:00`; 237 quotes; target exists and pointer/artifact identity, schema, validation, and content hash match |
+| Market Breadth | `backend/market-breadth-read-model/current.json` | `VERIFIED`; `market-breadth-c19d4ed5a7db3e522ea3f5e0ff4f151643895bdcb47eaf4d9d4de8dcdcf020d2` | `as_of=2026-09-18`; 929 active, 841 observed, 88 blocked; target exists and pointer/artifact validation matches |
+| Chart `1D` | `backend/read-model/charts/current-1D.json` | `VERIFIED`; `chart-1d-0afc7f97f794114d5ab6f829` | `as_of=2026-09-18`; 237 entries; target exists and pointer/artifact validation matches |
+| Chart `60M` | `backend/read-model/charts/current-60M.json` | `VERIFIED`; `chart-60m-22a9c9294266ce1a0f8a5fd3` | `as_of=2026-09-18T09:00:00+00:00`; 237 entries; target exists and pointer/artifact validation matches |
+| Chart `1W` | `backend/read-model/charts/current-1W.json` | `VERIFIED`; `chart-1w-e3323236abc1ea94299229d4` | `as_of=2026-09-14`; 237 entries; existing target validated |
+| Chart `1M` | `backend/read-model/charts/current-1M.json` | `VERIFIED`; `chart-1m-d2e69ce38f770c82bc7b8927` | `as_of=2026-09-01`; 237 entries; existing target validated |
 
-## Retained non-current candidates
+## Promotion checkpoint scope
 
-These are inventory results only. “Non-current” does not authorize deletion or
-movement and does not establish that a candidate is obsolete.
+Only the eight current pointer/artifact references in the table above are in
+this promotion checkpoint. Obsolete candidate versions remain outside this
+checkpoint and are not deleted or moved by Ticket #66.
 
-- Trend Map versions: `shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json`, `shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json`, `shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json`.
-- Intraday versions: `intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json`, `intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json`, `intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json`.
-- Market Breadth and chart candidate directories were absent in this checkout; no candidate versions were inferred.
+## Publication and rollback boundary
 
-## Validation seam and blockers
+- Canonical EOD chart publication for `1D` used the `update_data.py` EOD
+  publisher path `publish_eod_chart_read_models_after_commit()`; its explicit
+  chart publisher call is `publish_chart_read_model_after_commit(pg, "1D")`.
+- Canonical intraday chart publication for `60M` used the `update_data.py`
+  `--intraday-only --no-scan` path; its explicit chart publisher call is
+  `publish_chart_read_model_after_commit(pg, "60M")`.
+- Existing `1W` and `1M` targets were validated as current pointers/artifacts;
+  they were not regenerated by Ticket #66. No database schema or data mutation
+  occurred, and no runtime/deployment operation is claimed here.
+- Git history and the prior pointer/artifact pairing remain the rollback target;
+  deletion authorization is separate from this evidence update.
+
+## Validation seam and separate verdicts
 
 `backend/artifact_pointer_inventory.py` performs read-only pointer and target
 inspection. It fails closed for missing, escaping, identity-mismatched,
 schema-mismatched, or tampered targets. Tests use only temporary fixtures:
 `backend/test_artifact_pointer_inventory.py`.
 
-The release gate remains `PARTIAL / NOT VERIFIED` because Market Breadth and
-all chart current pointers are absent. This slice grants no cleanup authority;
-historical filenames and Git rollback remain preserved.
+- Artifact/pointer promotion evidence: **PASS** for all four surfaces and all
+  four chart timeframes listed above.
+- Public API current read-back: **PENDING LITE**; this ledger does not claim
+  served-route evidence.
+- Browser/runtime/deployment verdict: **SEPARATE / NOT CLAIMED**.
+- This slice grants no cleanup authority; historical filenames and Git rollback
+  remain preserved.
