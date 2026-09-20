@@ -67,13 +67,13 @@ route, or stable checkout was changed.
 
 ### Final review provenance
 
-The reviewed checkout identity is `20d764b` plus the working-tree remediation
-diff. `aa6175f` is the deletion checkpoint parent/commit. The six tracked
-deletions are recoverable by Git commit `aa6175f`; Git alone does not restore
-all eight candidates. The two ignored chart candidates were removed only from
-the isolated promotion worktree and remain present as rollback copies in
-`/root/signalix/backend/read-model/charts/versions/`. Their cleanup rollback is
-**NOT VERIFIED** until a separate promotion cleanup.
+The reviewed checkout identity is clean final remediation commit
+`613fdf7a83b552b6ef1250ed3dd9998f2bcf6ab0`; `aa6175f` is the deletion
+checkpoint. The six tracked deletions are recoverable by Git commit `aa6175f`;
+Git alone does not restore all eight candidates. The two ignored chart candidates
+were removed only from the isolated promotion worktree and remain present as
+rollback copies in `/root/signalix/backend/read-model/charts/versions/`. Their
+cleanup rollback is **NOT VERIFIED** until a separate promotion cleanup.
 
 ### Bounded pre-delete scan
 
@@ -106,9 +106,11 @@ rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-tre
 rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json'
 rg -n -i 'route|publisher|timer|operator' backend --glob '*.py' | rg 'shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca3405df2a2.json'
 → no candidate references for each tracked candidate
-current pointer target extraction:
-`PYTHONPATH=backend python -c 'import json; from pathlib import Path; ps=[Path("backend/trend-map-read-model/current.json"),Path("backend/trend-map-read-model/intraday-quotes/current.json"),Path("backend/market-breadth-read-model/current.json"),Path("backend/read-model/charts/current-1D.json"),Path("backend/read-model/charts/current-60M.json"),Path("backend/read-model/charts/current-1W.json"),Path("backend/read-model/charts/current-1M.json")]; print([str((p.parent/((json.loads(p.read_text()).get("artifact_path") or json.loads(p.read_text()).get("path"))).resolve()) if p.exists() else "MISSING:"+str(p)) for p in ps])'`
-→ all seven exact current pointer targets present; none equals a candidate path
+rg -n -F 'chart-1d-5c072cf2d61552cbffac2f0f.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer'
+rg -n -F 'chart-60m-26c333c22db4f27bda0521f5.json' backend docs vault --glob '*.py' --glob '*.md' --glob '*.service' --glob '*.timer'
+→ no references; `test ! -e backend/read-model/charts/versions/chart-1d-5c072cf2d61552cbffac2f0f.json` and corresponding `chart-60m` test passed in isolated worktree
+`PYTHONPATH=backend python -c 'import json; from pathlib import Path; from artifact_pointer_inventory import inventory_active_read_models; r=inventory_active_read_models(); print({k:([(x["timeframe"],x["status"]) for x in v] if isinstance(v,list) else (v["status"],v.get("target"))) for k,v in r.items()})'`
+→ `trend_map=VERIFIED`, `intraday_quotes=VERIFIED`, `market_breadth=VERIFIED`, charts `1D/60M/1W/1M=VERIFIED`; no candidate target selected
 TMPDIR=/dev/shm PYTHONDONTWRITEBYTECODE=1 pytest -q -p no:cacheprovider backend/test_artifact_pointer_inventory.py backend/test_mvp_server_transport.py backend/test_active_chart_adapter.py backend/test_trend_map.py backend/test_market_breadth_artifact.py backend/test_market_breadth_frontend_contract.py
 → 134 passed after deletion
 git diff --check
