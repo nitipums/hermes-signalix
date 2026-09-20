@@ -1582,16 +1582,16 @@ def _finish_successful_run(args, *, run_derived_fallback=False):
         # model.  It is deliberately EOD-only and fail-closed; intraday-only
         # runs never set args.scan and therefore never publish it.
         try:
-            from shadow_read_model_publisher import publish_shadow_read_model
-            result = publish_shadow_read_model()
+            from trend_map_read_model_publisher import publish_trend_map_read_model
+            result = publish_trend_map_read_model()
             print("SHADOW_TREND_MAP_PUBLISHED " + json.dumps(result, sort_keys=True))
         except Exception as exc:
             # A stale prior artifact remains readable; a failed/partial build
             # must not move current.json or make the ingestion job fail.
             global SHADOW_TREND_MAP_PUBLISH_FAILURES
             SHADOW_TREND_MAP_PUBLISH_FAILURES += 1
-            import shadow_read_model_publisher as shadow_publisher
-            read_current = getattr(shadow_publisher, "read_current_shadow_report", None)
+            import trend_map_read_model_publisher as shadow_publisher
+            read_current = getattr(shadow_publisher, "read_current_trend_map_report", None)
             prior = read_current() if callable(read_current) else {"verification_status": "NOT_VERIFIED"}
             preserved = prior.get("verification_status") == "VERIFIED"
             record_failure = getattr(shadow_publisher, "record_publish_failure", None)
@@ -1612,7 +1612,7 @@ def _finish_successful_run(args, *, run_derived_fallback=False):
                             "pointer_verification": "VERIFIED" if preserved else "NOT_VERIFIED",
                             "observability_error_type": type(observability_error).__name__}
             print("SHADOW_TREND_MAP_PUBLISH_FAILURE " + json.dumps({
-                "event": "shadow_trend_map_publish_failure",
+                "event": "trend_map_publish_failure",
                 **metadata,
             }, sort_keys=True))
     return 0

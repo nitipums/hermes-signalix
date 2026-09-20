@@ -2,7 +2,8 @@ import gzip
 import json
 
 from mvp_server import MVPHandler
-import shadow_trend_map
+import trend_map
+from mvp_routes import retired_route_payload
 
 
 class Handler:
@@ -69,7 +70,7 @@ def test_accepts_gzip_explicit_quality_overrides_wildcard_and_rejects_invalid_va
     assert not Handler("*;q=1, gzip;q")._accepts_gzip()
 
 
-def test_shadow_trend_map_route_uses_send_bytes_seam(monkeypatch):
+def test_trend_map_route_uses_send_bytes_seam(monkeypatch):
     payload = {
         "status": "PRODUCTION_READ_ONLY",
         "research_only": False,
@@ -85,12 +86,23 @@ def test_shadow_trend_map_route_uses_send_bytes_seam(monkeypatch):
             self.cache_control = cache_control
             self.content_length = len(body)
 
-    monkeypatch.setattr(shadow_trend_map, "build_shadow_report", lambda: payload)
+    monkeypatch.setattr(trend_map, "build_trend_map_report", lambda: payload)
     handler = RouteHandler()
 
-    assert shadow_trend_map.handle_shadow_trend_map_api("/api/trend-map", handler)
+    assert trend_map.handle_trend_map_api("/api/trend-map", handler)
     assert handler.status == 200
     assert handler.content_type == "application/json; charset=utf-8"
     assert handler.cache_control == "no-store"
     assert handler.content_length == len(handler.body)
     assert json.loads(handler.body) == payload
+
+
+def test_retired_route_payload_is_small_historical_non_actionable_response():
+    assert retired_route_payload("/mvp") == {
+        "status": "retired",
+        "historical": True,
+        "actionability": "NONE",
+        "message": "This historical Signalix setup surface is retired; use the current read-only Trend Map.",
+        "replacement": "/trend-map",
+        "route": "/mvp",
+    }

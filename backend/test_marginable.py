@@ -84,35 +84,3 @@ def test_price_band_filter_is_presentation_only():
     assert [x["symbol"] for x in filter_price_band(items, "below_2")] == ["LOW"]
     assert [x["symbol"] for x in filter_price_band(items, "2_to_10")] == ["MID"]
     assert [x["symbol"] for x in filter_price_band(items, "above_10")] == ["HIGH"]
-
-
-def test_frontend_has_both_filters_and_drawer_permissions():
-    html = (ROOT / "frontend/index.html").read_text(encoding="utf-8")
-    js = (ROOT / "frontend/app.js").read_text(encoding="utf-8")
-    client = (ROOT / "frontend/canonical-client.js").read_text(encoding="utf-8")
-    assert 'id="shortlist-marginable"' not in html
-    assert 'id="explorer-marginable"' not in html
-    assert 'id="vcp-price-band"' not in html
-    assert 'data-surface="vcp"' not in html
-    assert '<dt>Marginable</dt>' in html
-    # The current MVP drawer exposes the deterministic setup plan in English;
-    # the same levels also remain available as dashed chart overlays.
-    assert '<dt>Trigger</dt>' in html
-    assert '<dt>Stop</dt>' in html
-    assert '<dt>Target 1</dt>' in html
-    assert '<dt>R:R</dt>' in html
-    assert 'decisionLine(chart.trigger' in js
-    assert 'decisionLine(chart.stop' in js
-    assert 'decisionLine(chart.target' in js
-    assert 'drawer-margin-rights' not in html
-    assert 'id="drawer-prev"' in html
-    assert 'id="drawer-next"' in html
-    assert 'decision-card__risk' in js
-    assert 'visibleDrawerSymbols' in js
-    assert 'touchstart' in js
-    assert 'ArrowLeft' in js
-    assert '<script src="canonical-client.js"></script>' in html
-    assert "SignalixCanonicalClient.fetchSetupCandidatesPage(dailySetupPage, 50, signal, requestOptions)" in js
-    assert 'SignalixCanonicalClient.setupCandidatesRequestKey(dailySetupPage, 50, requestOptions)' in js
-    assert 'params.set("universe", (options && options.universe) || DEFAULT_UNIVERSE);' in client
-    assert 'params.set("page", String(page)); params.set("page_size", String(pageSize));' in client

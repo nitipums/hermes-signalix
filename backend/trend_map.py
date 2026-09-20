@@ -32,7 +32,7 @@ from technical_indicators import build_technical_indicators
 from team_facts_api import _is_completed
 
 ROOT = Path(__file__).resolve().parents[1]
-ADAPTER_PATH = ROOT / "prototypes" / "elliott-state-replay" / "replay_lab.py"
+TREND_MAP_REPLAY_ADAPTER_PATH = ROOT / "prototypes" / "elliott-state-replay" / "replay_lab.py"
 REPORT_VERSION = "daily-trend-map-shadow-v2-quotes"
 REPRESENTATION_REVISION = "quote-envelope-v2"
 PRODUCTION_READ_ONLY = "PRODUCTION_READ_ONLY"
@@ -69,7 +69,7 @@ _report_cache_lock = threading.Lock()
 
 
 def _research_adapter():
-    spec = importlib.util.spec_from_file_location("signalix_shadow_replay_lab", ADAPTER_PATH)
+    spec = importlib.util.spec_from_file_location("signalix_trend_map_replay_lab", TREND_MAP_REPLAY_ADAPTER_PATH)
     if spec is None or spec.loader is None:
         raise RuntimeError("approved replay adapter unavailable")
     module = importlib.util.module_from_spec(spec)
@@ -644,7 +644,7 @@ def clear_report_cache() -> None:
         _report_cache = None
 
 
-def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, Any]:
+def _build_trend_map_report(adapter, conn, symbols, manifest, as_of) -> dict[str, Any]:
     started = time.perf_counter()
     policy = _policy()
     output = []
@@ -728,7 +728,7 @@ def _build_shadow_report(adapter, conn, symbols, manifest, as_of) -> dict[str, A
             "limitations": ["Production-served read-only Daily evidence; no setup, signal, order, alert, broker, or production mutation."]}
 
 
-def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> dict[str, Any]:
+def build_trend_map_report(adapter=None, conn=None, as_of=None, *, source=None) -> dict[str, Any]:
     """Return the published report by default; build from DB only explicitly.
 
     The HTTP surface must not classify or query price history.  ``source`` is
@@ -738,10 +738,10 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
     if source is None:
         source = "database" if adapter is not None or conn is not None else "published"
     if source in {"published", "read_model", "current"}:
-        from shadow_read_model_publisher import read_current_shadow_report
+        from trend_map_read_model_publisher import read_current_trend_map_report
         # Keep the validated immutable artifact separate from display-only
         # overlay/projection work performed for this request.
-        report = deepcopy(read_current_shadow_report())
+        report = deepcopy(read_current_trend_map_report())
         overlay_intraday_quotes(report)
         return compact_public_trend_map_report(report)
     if source not in {"database", "builder", "publisher"}:
@@ -783,7 +783,7 @@ def build_shadow_report(adapter=None, conn=None, as_of=None, *, source=None) -> 
                     cached = deepcopy(_report_cache[2])
                     cached["cache"] = _report_cache_metadata("warm", as_of, policy)
                     return cached
-        report = _build_shadow_report(adapter, conn, symbols, manifest, as_of)
+        report = _build_trend_map_report(adapter, conn, symbols, manifest, as_of)
         if use_cache and report["status"] == PRODUCTION_READ_ONLY:
             with _report_cache_lock:
                 _report_cache = (time.monotonic() + REPORT_CACHE_TTL_SECONDS, key, report)
@@ -980,11 +980,11 @@ def unavailable_report(error: Exception) -> dict[str, Any]:
             "provenance": {**PROVENANCE, "adapter": "BackendDailyAdapter", "availability": "NOT_VERIFIED", "error_type": type(error).__name__}}
 
 
-def handle_shadow_trend_map_api(path: str, handler) -> bool:
+def handle_trend_map_api(path: str, handler) -> bool:
     if urlsplit(path).path != "/api/trend-map":
         return False
     try:
-        payload = build_shadow_report()
+        payload = build_trend_map_report()
         payload = compact_public_trend_map_report(payload)
         status = 200
     except Exception as error:  # fail closed with a visible envelope

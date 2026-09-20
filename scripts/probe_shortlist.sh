@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Canonical live probe for Signalix owner MVP.
+# Canonical live probe for Signalix read-only Trend Map.
 # Usage: ./scripts/probe_shortlist.sh [output_dir]
 # Exit 0 = all gates pass; 1 = contract/retirement/failure-state gate failed; 2 = endpoint unreachable.
 set -euo pipefail
@@ -37,11 +37,11 @@ echo "== canonical VCP audit coverage =="
 code=$(fetch_code "$DASHBOARD_URL/api/vcp-finder?interval=60m&market=TH" "$OUTDIR/vcp.json")
 require_code "VCP audit" 200 "$code"
 
-echo "== served MVP =="
-code=$(fetch_code "$DASHBOARD_URL/mvp" "$OUTDIR/mvp.html")
-require_code "MVP" 200 "$code"
-if ! grep -qi "Signalix" "$OUTDIR/mvp.html"; then
-  echo "FAIL: served MVP does not contain Signalix marker" >&2
+echo "== served Trend Map =="
+code=$(fetch_code "$DASHBOARD_URL/trend-map" "$OUTDIR/trend-map.html")
+require_code "Trend Map" 200 "$code"
+if ! grep -qi "Signalix" "$OUTDIR/trend-map.html"; then
+  echo "FAIL: served Trend Map does not contain Signalix marker" >&2
   exit 1
 fi
 

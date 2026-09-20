@@ -5,7 +5,6 @@ backend/app.py
 backend/update_data.py
 backend/dashboard_server.py
 backend/mvp_routes.py
-backend/mvp_projection.py
 backend/mvp_snapshot.py
 backend/mvp_api.py
 backend/mvp_chart.py
@@ -33,14 +32,13 @@ backend/stage_classifier.py
 backend/daily_setup_state.py
 backend/setup_state.py
 backend/ranking.py
-backend/market_regime.py
-backend/markets.py
+
 backend/action_queue.py
 backend/instruments.py
 backend/refresh_company_profiles.py
 backend/sync_settrade_master.py
 backend/verify_scan_dashboard.py
-backend/classify_check.py
+
 backend/set_market_day_guard.py
 backend/intraday_evaluator.py
 backend/run_intraday_evaluation.py
@@ -76,7 +74,7 @@ backend/frontend/styles.css
 backend/test_signalix_contracts.py
 backend/test_dashboard_route_separation.py
 backend/test_mvp_snapshot.py
-backend/test_mvp_projection.py
+
 backend/test_mvp_artifact_contract.py
 backend/test_artifact_writer.py
 backend/test_signal_core.py

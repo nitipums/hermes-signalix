@@ -5,7 +5,7 @@ import subprocess
 
 import pytest
 
-import shadow_trend_map as subject
+import trend_map as subject
 
 
 def bars(count=45, *, invalid=False):
@@ -145,7 +145,7 @@ def test_report_uses_canonical_production_read_only_envelope():
             return [("2026-09-11",)], ["max_date"]
         def load_daily_pit(self, conn, symbol, as_of):
             return bars(75), as_of
-    report = subject.build_shadow_report(Adapter(), object())
+    report = subject.build_trend_map_report(Adapter(), object())
     assert report["status"] == subject.PRODUCTION_READ_ONLY
     assert report["research_only"] is False
     assert report["actionability"] == "NONE"
@@ -362,13 +362,13 @@ def test_api_route_serializes_compact_public_projection(monkeypatch):
     row["provenance"] = {"source": "price_data", "timeframe": "1D",
                          "latest_returned_date": "2026-09-11",
                          "selected_daily_lineage": []}
-    monkeypatch.setattr(subject, "build_shadow_report", lambda: {
+    monkeypatch.setattr(subject, "build_trend_map_report", lambda: {
         "status": subject.PRODUCTION_READ_ONLY, "research_only": False,
         "actionability": "NONE", "rows": [row],
     })
 
     handler = Handler()
-    assert subject.handle_shadow_trend_map_api("/api/trend-map", handler)
+    assert subject.handle_trend_map_api("/api/trend-map", handler)
     payload = json.loads(bytes(handler.body))
     public_row = payload["rows"][0]
     assert public_row["main_trend"]["main_trend_display"] == row["main_trend"]["main_trend_display"]
@@ -388,7 +388,7 @@ def test_report_preserves_canonical_universe_and_as_of():
             return [("2026-09-11",)], ["max_date"]
         def load_daily_pit(self, conn, symbol, as_of):
             return (bars(75) if symbol == "AAA" else []), as_of
-    report = subject.build_shadow_report(Adapter(), object())
+    report = subject.build_trend_map_report(Adapter(), object())
     assert report["as_of"] == "2026-09-11"
     assert [row["symbol"] for row in report["rows"]] == ["AAA", "BBB"]
     assert report["universe"]["scope"] == "marginable_long"
@@ -422,7 +422,7 @@ def test_report_keeps_every_declared_symbol_and_all_data_quality_reasons():
                 return bars(2), as_of
             return [], None
 
-    report = subject.build_shadow_report(Adapter(), object())
+    report = subject.build_trend_map_report(Adapter(), object())
     assert set(report["status_by_symbol"]) == {"AVAILABLE", "NO_DATA", "INVALID", "SHORT"}
     assert report["summary"] == {"DATA_BLOCKED": 3, "AVAILABLE": 1}
     assert report["data_quality_summary"]["AVAILABLE"] == 1
@@ -432,7 +432,7 @@ def test_report_keeps_every_declared_symbol_and_all_data_quality_reasons():
 
 
 def test_template_has_main_trend_accordion_filter_drawer_chart_and_shadow_markers():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     combined = html + shared.read_text()
     for marker in ("<table", "<th>Price</th>", "<th>Change</th>", "<th>% Change</th>", "<th>Main Trend</th>", "quoteValue", "quoteChangePct", "change_amount", "change_pct", "Search symbol", "id=\"main-trend\"", "All Main Trends", "Main Trend 1", "Main Trend 2", "Main Trend 3", "Main Trend 4", "mainTrendGroups", "class=\"trend-section\"", "class=\"trend-toggle\"", "aria-expanded=\"false\"", "data-trend-section", "window.SignalixSharedDrawer.openSharedDrawer({", "lane:trend", "trend:trend", "source:\"trend-map\"", "actionability:\"NONE\"", "renderedRows", "/api/trend-map", "/api/chart-db/", 'data-timeframe="1D"', "Chart loading…", "Chart data unavailable", "DATA_BLOCKED", "drawChart", "chartRequestSeq", "mainTrendValue", "row.main_trend", "evidence.evidence_quality", "main_trend_display", "1++", "1+", "1", "2", "3", "3-", "3--", "4", "shadowMainTrendDisplay", "shadowMainTrend", "Main Trend ", "shadow ? shadowMainTrend", "[1,2,3,4].includes", 'return "Not verified"', 'id=\"theme-toggle\"', "signalix-theme", "theme-light", "localStorage", "event.target.closest"):
@@ -450,7 +450,7 @@ def test_template_has_main_trend_accordion_filter_drawer_chart_and_shadow_marker
 
 
 def test_template_has_accessible_cross_page_navigation_with_trend_map_active():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    html = Path(__file__).with_name("trend_map_template.html").read_text(encoding="utf-8")
     assert '<nav class="page-nav" aria-label="Primary navigation">' in html
     assert '<a class="page-nav__link page-nav__link--active" href="/trend-map" aria-current="page">Trend Map</a>' in html
     assert '<a class="page-nav__link" href="/market-breadth">Market Breadth</a>' in html
@@ -459,7 +459,7 @@ def test_template_has_accessible_cross_page_navigation_with_trend_map_active():
 
 
 def test_trend_map_accordion_is_closed_single_open_and_defers_symbol_rows_until_open():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     assert "Main Trend shows the Daily direction. Open a group to see its evidence." in html
     assert 'aria-expanded="false"' in html
     assert 'aria-label="Open evidence"' in html
@@ -475,7 +475,7 @@ def test_trend_map_accordion_is_closed_single_open_and_defers_symbol_rows_until_
 
 
 def test_trend_map_first_screen_uses_plain_language_and_keeps_raw_audit_details_lower_down():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     assert 'Data date <strong id="as-of">' in html
     assert 'Status <strong id="freshness">' in html
     assert 'Scope <strong id="scope">Thai listed universe</strong>' in html
@@ -496,7 +496,7 @@ def test_trend_map_first_screen_uses_plain_language_and_keeps_raw_audit_details_
 
 
 def test_trend_map_theme_defaults_dark_persists_and_exposes_light_mode():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     assert 'var initialTheme="dark"' in html
     assert 'localStorage.getItem("signalix-theme")' in html
     assert 'localStorage.setItem("signalix-theme",light?"light":"dark")' in html
@@ -510,7 +510,7 @@ def test_trend_map_theme_defaults_dark_persists_and_exposes_light_mode():
 
 
 def test_trend_map_lazy_drawer_is_single_flight_and_opens_after_script_load():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text(encoding="utf-8")
+    html = Path(__file__).with_name("trend_map_template.html").read_text(encoding="utf-8")
     assert '<script src="/shared-drawer.js"></script>' not in html
     inline = html.split("<script>", 1)[1].split("</script>", 1)[0]
     harness = r'''
@@ -638,7 +638,7 @@ setImmediate(function () {
 
 
 def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_contract():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     normalized = html.lower()
     for removed in ("permanent public read-only research surface", "no authentication required", "research only", "no financial calculations"):
         assert removed not in normalized
@@ -649,7 +649,7 @@ def test_shadow_page_removes_public_research_copy_but_keeps_read_only_source_con
 
 
 def test_shadow_table_contract_sorts_quotes_and_navigates_filtered_rendered_rows():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     assert "group[1].sort" in html
     assert "return bv-av||String(a.symbol).localeCompare(String(b.symbol))" in html
     assert 'typeof value==="number"&&Number.isFinite(value)' in html
@@ -666,7 +666,7 @@ def test_shadow_table_contract_sorts_quotes_and_navigates_filtered_rendered_rows
 
 
 def test_shadow_table_orders_display_suffixes_before_quote_and_symbol_ties():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     inline = html.split("<script>", 1)[1].split("</script>", 1)[0]
     harness = r'''
 const elements = {};
@@ -710,7 +710,7 @@ setImmediate(function () {
 
 
 def test_shadow_drawer_removes_wave_evidence_and_chart_prose_but_preserves_markers_and_identity():
-    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    template = Path(__file__).with_name("trend_map_template.html").read_text()
     shared = (Path(__file__).parent / "frontend" / "shared-drawer.js").read_text()
     assert 'dom.drawer.classList.toggle("drawer--shadow", shadow)' in shared
     assert 'if (waveSummary) waveSummary.hidden = shadow' in shared
@@ -723,7 +723,7 @@ def test_shadow_drawer_removes_wave_evidence_and_chart_prose_but_preserves_marke
 
 
 def test_shadow_adapter_uses_shared_drawer_and_suppresses_action_setup_semantics():
-    template = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    template = Path(__file__).with_name("trend_map_template.html").read_text()
     shared = Path(__file__).with_name("frontend") / "shared-drawer.js"
     combined = template + shared.read_text()
     assert 'source:"trend-map"' in combined
@@ -753,7 +753,7 @@ def test_shadow_shared_drawer_owns_ohlcv_table_overflow_without_page_overflow():
 
 
 def test_template_has_mobile_safe_accordion_strategy():
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     assert ".accordion" in html
     assert "min-width:0" in html
     assert "table-layout:fixed" in html
@@ -769,7 +769,7 @@ def test_template_has_mobile_safe_accordion_strategy():
 
 def test_shadow_accordion_renders_inside_390px_viewport_with_helper_metadata_and_rows_contained():
     playwright = pytest.importorskip("playwright.sync_api")
-    html = Path(__file__).with_name("shadow_trend_map_template.html").read_text()
+    html = Path(__file__).with_name("trend_map_template.html").read_text()
     css = html.split("<style>", 1)[1].split("</style>", 1)[0]
     with playwright.sync_playwright() as p:
         try:
@@ -1090,7 +1090,7 @@ def test_report_uses_one_batch_select_and_preserves_counts():
             return {"AAA": (bars(75), as_of), "BBB": ([], None)}
 
     adapter = Adapter()
-    report = subject.build_shadow_report(adapter, object())
+    report = subject.build_trend_map_report(adapter, object())
     assert adapter.batch_calls == [(["AAA", "BBB"], "2026-09-11")]
     assert report["summary"] == {"DATA_BLOCKED": 1, "AVAILABLE": 1}
     assert report["status_by_symbol"] == {"AAA": "AVAILABLE", "BBB": "DATA_BLOCKED"}
@@ -1108,7 +1108,7 @@ def test_batch_error_is_visible_as_blocked_and_not_verified():
         def load_daily_pit_batch(self, conn, symbols, as_of):
             raise OSError("database unavailable")
 
-    report = subject.build_shadow_report(Adapter(), object())
+    report = subject.build_trend_map_report(Adapter(), object())
     assert report["status"] == "DATA_BLOCKED"
     assert report["status_by_symbol"] == {"AAA": "DATA_BLOCKED", "BBB": "DATA_BLOCKED"}
     assert all(row["provenance"]["availability"] == "NOT_VERIFIED" for row in report["rows"])
@@ -1143,9 +1143,9 @@ def test_default_report_cache_reuses_and_invalidates_on_as_of(monkeypatch):
     monkeypatch.setattr(adapter, "_exec_select", select)
     monkeypatch.setattr(adapter, "load_daily_pit_batch", batch)
 
-    cold = subject.build_shadow_report(source="database")
-    warm = subject.build_shadow_report(source="database")
-    refreshed = subject.build_shadow_report(source="database")
+    cold = subject.build_trend_map_report(source="database")
+    warm = subject.build_trend_map_report(source="database")
+    refreshed = subject.build_trend_map_report(source="database")
     assert cold["cache"]["status"] == "cold"
     assert warm["cache"]["status"] == "warm"
     assert warm["cache"]["as_of"] == "2026-09-11"
@@ -1180,7 +1180,7 @@ def test_report_builds_with_injected_backend_local_adapter(monkeypatch):
     monkeypatch.setattr(adapter, "resolve_universe", lambda conn, value: (["AAA"], {"universe_filter": value}))
     monkeypatch.setattr(adapter, "_exec_select", lambda conn, sql, params=None: ([("2026-09-11",)], ["max_date"]))
     monkeypatch.setattr(adapter, "load_daily_pit", lambda conn, symbol, as_of: (bars(75), as_of))
-    report = subject.build_shadow_report(adapter=adapter, conn=object())
+    report = subject.build_trend_map_report(adapter=adapter, conn=object())
     assert report["status_by_symbol"] == {"AAA": "AVAILABLE"}
     assert report["provenance"]["adapter"] == "BackendDailyAdapter"
 
@@ -1200,8 +1200,8 @@ def test_api_route_is_same_origin_read_only_envelope(monkeypatch):
         def write(self, body):
             self.body.extend(body)
     handler = Handler()
-    monkeypatch.setattr(subject, "build_shadow_report", lambda: {"status": subject.PRODUCTION_READ_ONLY, "research_only": False, "actionability": "NONE", "rows": []})
-    assert subject.handle_shadow_trend_map_api("/api/trend-map", handler)
+    monkeypatch.setattr(subject, "build_trend_map_report", lambda: {"status": subject.PRODUCTION_READ_ONLY, "research_only": False, "actionability": "NONE", "rows": []})
+    assert subject.handle_trend_map_api("/api/trend-map", handler)
     assert handler.status == 200
     payload = json.loads(bytes(handler.body))
     assert payload["status"] == subject.PRODUCTION_READ_ONLY

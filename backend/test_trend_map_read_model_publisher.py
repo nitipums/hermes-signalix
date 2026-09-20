@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-import shadow_read_model_publisher as publisher
-import shadow_trend_map as trend_map
+import trend_map_read_model_publisher as publisher
+import trend_map as trend_map
 import update_data
 
 
@@ -26,7 +26,7 @@ class Adapter:
 
 
 def publish(tmp_path):
-    return publisher.publish_shadow_read_model(
+    return publisher.publish_trend_map_read_model(
         adapter=Adapter(), conn=object(), as_of="2026-09-11", root=tmp_path,
         published_at="2026-09-12T01:00:00+00:00")
 
@@ -68,7 +68,7 @@ def test_quote_representation_revision_avoids_legacy_identity_collision(tmp_path
     current_artifact = json.loads(current_artifact_path.read_text())
 
     legacy_artifact = dict(current_artifact)
-    legacy_artifact["schema_version"] = "daily-trend-map-shadow-read-model-v1"
+    legacy_artifact["schema_version"] = "daily-trend-map-trend-map-read-model-v1"
     legacy_artifact["artifact_id"] = (
         f"shadow-trend-map-{legacy_artifact['as_of']}-"
         f"{legacy_artifact['identity']['policy_hash'][:16]}-"
@@ -94,7 +94,7 @@ def test_quote_representation_revision_avoids_legacy_identity_collision(tmp_path
 
 
 def test_publisher_rejects_invalid_quote_envelope_and_basis(tmp_path):
-    original = trend_map.build_shadow_report
+    original = trend_map.build_trend_map_report
 
     def invalid_report(**kwargs):
         report = original(adapter=Adapter(), conn=object(), as_of="2026-09-11", source="publisher")
@@ -104,10 +104,10 @@ def test_publisher_rejects_invalid_quote_envelope_and_basis(tmp_path):
 
     import pytest
     monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(trend_map, "build_shadow_report", invalid_report)
+    monkeypatch.setattr(trend_map, "build_trend_map_report", invalid_report)
     try:
         with pytest.raises(ValueError, match="quote"):
-            publisher.publish_shadow_read_model(root=tmp_path)
+            publisher.publish_trend_map_read_model(root=tmp_path)
     finally:
         monkeypatch.undo()
     assert not (tmp_path / "current.json").exists()
@@ -119,20 +119,20 @@ def test_publisher_rejects_invalid_quote_envelope_and_basis(tmp_path):
     ("actionability", "BUY_NOW"),
 ])
 def test_publisher_rejects_legacy_or_actionable_report_semantics(tmp_path, monkeypatch, field, value):
-    original = trend_map.build_shadow_report
+    original = trend_map.build_trend_map_report
 
     def invalid_report(**kwargs):
         report = original(adapter=Adapter(), conn=object(), as_of="2026-09-11", source="publisher")
         report[field] = value
         return report
 
-    monkeypatch.setattr(trend_map, "build_shadow_report", invalid_report)
+    monkeypatch.setattr(trend_map, "build_trend_map_report", invalid_report)
     with pytest.raises((ValueError, RuntimeError), match="(policy|fully verified)"):
-        publisher.publish_shadow_read_model(root=tmp_path)
+        publisher.publish_trend_map_read_model(root=tmp_path)
 
 
 def test_publisher_rejects_cap_hit_positive_classification(tmp_path, monkeypatch):
-    original = trend_map.build_shadow_report
+    original = trend_map.build_trend_map_report
 
     def unsafe_report(**kwargs):
         report = original(adapter=Adapter(), conn=object(), as_of="2026-09-11", source="publisher")
@@ -144,14 +144,14 @@ def test_publisher_rejects_cap_hit_positive_classification(tmp_path, monkeypatch
         row["quality_established"] = False
         return report
 
-    monkeypatch.setattr(trend_map, "build_shadow_report", unsafe_report)
+    monkeypatch.setattr(trend_map, "build_trend_map_report", unsafe_report)
     with pytest.raises(ValueError, match="cap-hit"):
-        publisher.publish_shadow_read_model(root=tmp_path)
+        publisher.publish_trend_map_read_model(root=tmp_path)
     assert not (tmp_path / "current.json").exists()
 
 
 def test_publisher_allows_cap_hit_available_only_with_established_zero_invalid_quality(tmp_path, monkeypatch):
-    original = trend_map.build_shadow_report
+    original = trend_map.build_trend_map_report
 
     def safe_report(**kwargs):
         report = original(adapter=Adapter(), conn=object(), as_of="2026-09-11", source="publisher")
@@ -161,8 +161,8 @@ def test_publisher_allows_cap_hit_available_only_with_established_zero_invalid_q
                     "invalid_count": 0, "full_history_claim": False})
         return report
 
-    monkeypatch.setattr(trend_map, "build_shadow_report", safe_report)
-    result = publisher.publish_shadow_read_model(root=tmp_path)
+    monkeypatch.setattr(trend_map, "build_trend_map_report", safe_report)
+    result = publisher.publish_trend_map_read_model(root=tmp_path)
     assert result["counts"]["blocked"] == 2
 
 
@@ -172,33 +172,33 @@ def test_existing_version_cannot_be_overwritten_with_different_content(tmp_path)
     original = original_paths[0].read_bytes()
     changed = Adapter()
     changed.load_daily_pit_batch = lambda conn, symbols, as_of: {"AAA": (bars(76), as_of), "BBB": ([], None), "CCC": (bars(2), as_of)}
-    result = publisher.publish_shadow_read_model(adapter=changed, conn=object(), as_of="2026-09-11", root=tmp_path, published_at="2026-09-12T02:00:00+00:00")
+    result = publisher.publish_trend_map_read_model(adapter=changed, conn=object(), as_of="2026-09-11", root=tmp_path, published_at="2026-09-12T02:00:00+00:00")
     assert result["artifact_id"] != json.loads(original_paths[0].read_text())["artifact_id"]
     assert original_paths[0].read_bytes() == original
 
 
 def test_repeated_publish_with_new_measurement_does_not_collide(tmp_path):
     first = publish(tmp_path)
-    second = publisher.publish_shadow_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-11", root=tmp_path,
+    second = publisher.publish_trend_map_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-11", root=tmp_path,
                                                   published_at="2026-09-12T02:00:00+00:00")
     assert first["artifact_id"] != second["artifact_id"]
     assert Path(first["artifact_path"]).read_bytes() != Path(second["artifact_path"]).read_bytes()
-    assert publisher.read_current_shadow_report(tmp_path)["timing"] == second["timing"]
+    assert publisher.read_current_trend_map_report(tmp_path)["timing"] == second["timing"]
 
 
 def test_pointer_readback_missing_corrupt_and_mismatched_are_blocked(tmp_path):
-    missing = publisher.read_current_shadow_report(tmp_path)
+    missing = publisher.read_current_trend_map_report(tmp_path)
     assert missing["status"] == "DATA_BLOCKED" and missing["rows"] == []
     publish(tmp_path)
-    loaded = publisher.read_current_shadow_report(tmp_path)
+    loaded = publisher.read_current_trend_map_report(tmp_path)
     assert loaded["artifact"]["id"] == loaded["artifact_id"]
     (tmp_path / "current.json").write_text("not json")
-    assert publisher.read_current_shadow_report(tmp_path)["verification_status"] == "NOT_VERIFIED"
+    assert publisher.read_current_trend_map_report(tmp_path)["verification_status"] == "NOT_VERIFIED"
     publish(tmp_path)
     pointer = json.loads((tmp_path / "current.json").read_text())
     pointer["policy_hash"] = "stale"
     (tmp_path / "current.json").write_text(json.dumps(pointer))
-    blocked = publisher.read_current_shadow_report(tmp_path)
+    blocked = publisher.read_current_trend_map_report(tmp_path)
     assert blocked["status"] == "DATA_BLOCKED" and blocked["rows"] == []
 
 
@@ -209,7 +209,7 @@ def test_pointer_readback_rejects_persisted_content_and_measurement_tampering(tm
     artifact = json.loads(artifact_path.read_text())
     artifact["rows"][0]["quote"]["price"] += 1
     artifact_path.write_bytes(publisher._json_bytes(artifact))
-    blocked = publisher.read_current_shadow_report(tmp_path)
+    blocked = publisher.read_current_trend_map_report(tmp_path)
     assert blocked["status"] == "DATA_BLOCKED"
     assert blocked["verification_status"] == "NOT_VERIFIED"
     assert blocked["rows"] == []
@@ -220,7 +220,7 @@ def test_pointer_readback_rejects_persisted_content_and_measurement_tampering(tm
     artifact = json.loads(artifact_path.read_text())
     artifact["timing"]["total_ms"] += 1
     artifact_path.write_bytes(publisher._json_bytes(artifact))
-    blocked = publisher.read_current_shadow_report(tmp_path)
+    blocked = publisher.read_current_trend_map_report(tmp_path)
     assert blocked["status"] == "DATA_BLOCKED"
     assert blocked["verification_status"] == "NOT_VERIFIED"
     assert blocked["rows"] == []
@@ -228,10 +228,10 @@ def test_pointer_readback_rejects_persisted_content_and_measurement_tampering(tm
 
 def test_pointer_change_is_observed_without_process_restart(tmp_path):
     first = publish(tmp_path)
-    first_read = publisher.read_current_shadow_report(tmp_path)
-    second = publisher.publish_shadow_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-12", root=tmp_path,
+    first_read = publisher.read_current_trend_map_report(tmp_path)
+    second = publisher.publish_trend_map_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-12", root=tmp_path,
                                                   published_at="2026-09-12T02:00:00+00:00")
-    second_read = publisher.read_current_shadow_report(tmp_path)
+    second_read = publisher.read_current_trend_map_report(tmp_path)
     assert first["artifact_id"] != second["artifact_id"]
     assert first_read["artifact_id"] != second_read["artifact_id"]
     assert second_read["as_of"] == "2026-09-12"
@@ -242,8 +242,8 @@ def test_pointer_change_is_observed_without_process_restart(tmp_path):
 
 def test_stale_artifact_is_not_verified_and_returns_no_rows(tmp_path, monkeypatch):
     publish(tmp_path)
-    monkeypatch.setenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", "0")
-    stale = publisher.read_current_shadow_report(tmp_path)
+    monkeypatch.setenv("SIGNALIX_TREND_MAP_STALE_AFTER_SECONDS", "0")
+    stale = publisher.read_current_trend_map_report(tmp_path)
     assert stale["status"] == "DATA_BLOCKED"
     assert stale["verification_status"] == "NOT_VERIFIED"
     assert stale["rows"] == []
@@ -254,25 +254,25 @@ def test_publisher_reports_timing_metrics(tmp_path):
     result = publish(tmp_path)
     assert set(("db_read_ms", "classify_ms", "serialize_write_ms", "total_ms")) <= set(result["timing"])
     assert result["timing"]["total_ms"] >= 0
-    loaded = publisher.read_current_shadow_report(tmp_path)
+    loaded = publisher.read_current_trend_map_report(tmp_path)
     assert loaded["timing"] == result["timing"]
     assert loaded["read_path"]["latency_ms"] >= 0
 
 
 def test_api_default_path_never_invokes_classifier_or_history(monkeypatch, tmp_path):
     publish(tmp_path)
-    monkeypatch.setenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", str(tmp_path))
+    monkeypatch.setenv("SIGNALIX_TREND_MAP_READ_MODEL_ROOT", str(tmp_path))
     monkeypatch.setattr(trend_map, "classify_daily_trend", lambda *_: (_ for _ in ()).throw(AssertionError("classifier called")))
     monkeypatch.setattr(trend_map.BackendDailyAdapter, "load_daily_pit_batch", lambda *args: (_ for _ in ()).throw(AssertionError("history queried")))
-    result = trend_map.build_shadow_report()
+    result = trend_map.build_trend_map_report()
     assert result["artifact"]["id"]
     assert result["counts"] == {"declared": 3, "evaluated": 3, "returned": 3, "blocked": 2}
 
 
 def test_publisher_rejects_unverified_or_incomplete_build(tmp_path, monkeypatch):
-    monkeypatch.setattr(trend_map, "build_shadow_report", lambda **kwargs: {"status": "DATA_BLOCKED", "verification_status": "NOT_VERIFIED"})
+    monkeypatch.setattr(trend_map, "build_trend_map_report", lambda **kwargs: {"status": "DATA_BLOCKED", "verification_status": "NOT_VERIFIED"})
     try:
-        publisher.publish_shadow_read_model(root=tmp_path)
+        publisher.publish_trend_map_read_model(root=tmp_path)
     except RuntimeError as error:
         assert "fully verified" in str(error)
     else:
@@ -284,8 +284,8 @@ def test_eod_hook_publishes_only_on_successful_scan_path(monkeypatch):
     calls = []
     monkeypatch.setattr(update_data, "publish_canonical_read_model", lambda: calls.append("canonical"))
     monkeypatch.setattr(update_data, "json", json)
-    monkeypatch.setitem(__import__("sys").modules, "shadow_read_model_publisher", type("Publisher", (), {
-        "publish_shadow_read_model": staticmethod(lambda: calls.append("shadow") or {"artifact_id": "v1"}),
+    monkeypatch.setitem(__import__("sys").modules, "trend_map_read_model_publisher", type("Publisher", (), {
+        "publish_trend_map_read_model": staticmethod(lambda: calls.append("shadow") or {"artifact_id": "v1"}),
     }))
 
     class Args:
@@ -302,8 +302,8 @@ def test_eod_hook_publishes_only_on_successful_scan_path(monkeypatch):
 
 def test_eod_shadow_publish_failure_is_structured_and_nonfatal(monkeypatch, capsys):
     monkeypatch.setattr(update_data, "publish_canonical_read_model", lambda: None)
-    monkeypatch.setitem(__import__("sys").modules, "shadow_read_model_publisher", type("Publisher", (), {
-        "publish_shadow_read_model": staticmethod(lambda: (_ for _ in ()).throw(ValueError("bad artifact"))),
+    monkeypatch.setitem(__import__("sys").modules, "trend_map_read_model_publisher", type("Publisher", (), {
+        "publish_trend_map_read_model": staticmethod(lambda: (_ for _ in ()).throw(ValueError("bad artifact"))),
     }))
     update_data.SHADOW_TREND_MAP_PUBLISH_FAILURES = 0
     class Args:
@@ -312,7 +312,7 @@ def test_eod_shadow_publish_failure_is_structured_and_nonfatal(monkeypatch, caps
     assert update_data._finish_successful_run(Args()) == 0
     assert update_data.SHADOW_TREND_MAP_PUBLISH_FAILURES == 1
     event = json.loads(capsys.readouterr().out.split(" ", 1)[1])
-    assert event["event"] == "shadow_trend_map_publish_failure"
+    assert event["event"] == "trend_map_publish_failure"
     assert event["error_type"] == "ValueError"
     assert event["pointer_preserved"] is False
     assert event["pointer_verification"] == "NOT_VERIFIED"
@@ -321,6 +321,6 @@ def test_eod_shadow_publish_failure_is_structured_and_nonfatal(monkeypatch, caps
 def test_publish_failure_sidecar_is_bounded_and_read_only(tmp_path):
     metadata = publisher.record_publish_failure(tmp_path, ValueError("bad artifact"), 2, True, "VERIFIED")
     assert metadata["pointer_preserved"] is True
-    loaded = publisher.read_current_shadow_report(tmp_path)
+    loaded = publisher.read_current_trend_map_report(tmp_path)
     assert loaded["last_failure"]["failure_count"] == 2
     assert loaded["last_failure"]["message"] == "bad artifact"

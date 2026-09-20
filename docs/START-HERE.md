@@ -1,7 +1,7 @@
 # Signalix — Start Here
 
 > **STATUS: CURRENT** · Single entrypoint and routing map only.
-> **Last reconciled:** 2026-09-14 ICT
+> **Last reconciled:** 2026-09-19 ICT
 > Product, contract, runtime, and research truth live in the linked authorities below.
 
 ## Signalix in one minute
@@ -17,14 +17,17 @@ Daily market data
 → Arm chart review
 ```
 
-The former `shadow` naming is retired. The canonical surfaces are:
+The active product surfaces are:
 
 - `/trend-map`
 - `/api/trend-map`
+- `/market-breadth`
+- `/api/market-breadth`
 
-The former `/mvp` and `/api/setup-candidates` setup surfaces are retired from
-active scope. Their source/history is retained for audit and future reference,
-but current work must not route there.
+The former shadow naming is retired for active Trend Map modules and routes.
+`/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`;
+their source/history is retained for audit only. Current work must not route to
+those routes, the old dashboard builder/server, or shadow-named active modules.
 
 Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 
@@ -33,8 +36,8 @@ Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 | If the task is about… | Read first | Read next only if needed |
 |---|---|---|
 | Product direction / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
-| Setup-candidate / Wave contract (only if explicitly resumed) | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests |
-| Private seven-day shadow BUY policy | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `../vault/Decisions.md`, source + tests |
+| Historical setup-candidate / Wave contract (owner resume required) | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests; do not route current work |
+| Historical private seven-day shadow BUY policy (owner resume required) | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `../vault/Decisions.md`, source + tests; do not route current work |
 | Owner decision | `../vault/Decisions.md` | relevant current decision record |
 | Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source |
 | Acceptance / evidence gate | `../vault/Execution-Pipeline.md` | focused acceptance evidence |
@@ -42,7 +45,7 @@ Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 | Manual scanner tuning / threshold change | `scanner-policy-evaluation` + `superpowers/specs/2026-09-13-main-trend-ma-calibration.md` | relevant source + tests + bounded baseline/tuned evidence |
 | Main Trend calculation semantics | `current/2026-09-13-main-trend-calculation-contract.md` | `superpowers/specs/2026-09-13-main-trend-ma-calibration.md`, source/tests |
 | Explicit AutoResearch / deep playbook research | `../vault/Research-Index.md` | `../vault/Research-Playbook-Bible.md`, named project |
-| Current Trend Mapping focus | `../vault/Deployment.md` | `../vault/Execution-Pipeline.md`, shadow API/browser evidence |
+| Current Trend Map / Market Breadth focus | `../vault/Deployment.md` | `../vault/Execution-Pipeline.md`, current API/browser evidence |
 | Vocabulary | `../GLOSSARY.md` | focused contract, if semantics matter |
 | Vault navigation / cleanup | `../vault/INDEX.md`, `../vault/Documentation-Governance.md` | authority matrix |
 
@@ -57,11 +60,16 @@ Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 - Research notes are evidence only and cannot silently change production behavior.
 - Current delivery focus is not automatically product/action authority.
 - Dated handoffs, archive notes, generated HTML/JSON, logs, snapshots, worktrees, and Kanban history are non-authorities unless an authority explicitly points to them as evidence.
+- Generated read-model artifacts are runtime inputs only, not documentation
+  authorities and not a current-plus-N retention contract. Serving uses only
+  the current pointer and validated artifact; Git history is rollback authority.
 
 ## Current baseline pointer
 
 - Release branch: `release/signalix-mvp-stable`
 - Current source/release: verify with `git status`, `git log`, and the live route before making a new claim.
+- **Cleanup integration status — `SOURCE_TEST_PASS / RUNTIME_REVIEW_REQUIRED`:** the owner-approved lean cleanup is staged in the canonical checkout but is not committed or deployed. Focused active-surface tests and isolated port-3011 read-back pass; the repository-wide suite is now `1,061 passed / 13 skipped / 0 failed` (2 warnings, 4 subtests).
+- Retired MVP/setup test suites were removed, obsolete active-surface assertions were aligned to current deterministic contracts, and PostgreSQL-dependent smoke tests skip honestly when the service is unavailable. This is a source/test PASS, not yet a production release PASS.
 - Current runtime/data freshness is not live telemetry in this page. Read `../vault/Deployment.md` and probe the relevant endpoint.
 - Missing, stale, partial, invalid, or empty data must be reported explicitly as `NOT VERIFIED`, not promoted by HTTP 200 alone.
 

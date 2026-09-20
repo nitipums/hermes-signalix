@@ -1,7 +1,15 @@
 # Architecture
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
-> **Reconciled:** 2026-09-13 · Daily Trend Mapping is production-served read-only; setup/Elliott paths are retained trial or deferred research; canonical publisher/read-model/API route is deployed and browser/rollback gates are verified.
+> **Reconciled:** 2026-09-19 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. Setup/Elliott paths are historical/audit only; current pointers and validated read-model artifacts are the only serving inputs, with Git history as rollback authority.
+
+## Current routing boundary
+
+Active routes are `/trend-map`, `/api/trend-map`, `/market-breadth`, and
+`/api/market-breadth`. `/mvp` and `/api/setup-candidates` are `HISTORICAL /
+SUPERSEDED / DROPPED`; do not route current work to them, the old
+dashboard builder/server, or shadow-named active modules. Generated artifacts
+are runtime inputs, not documentation authorities or a retention policy.
 
 ## Production-served Daily Trend Mapping
 
@@ -32,9 +40,10 @@ request path   → pointer validation → symbol/timeframe selection
 
 The request path must not query PostgreSQL, parse raw history, rescan the
 universe, or recompute indicators for a valid artifact. Artifact freshness,
-source/as-of, pointer identity, and fallback provenance are mandatory. This is
-an architectural invariant for Signalix read-only surfaces, not an optional
-latency optimization.
+source/as-of, pointer identity, and fallback provenance are mandatory. Explicit
+DB fallback is permitted only when the validated artifact is unavailable or
+stale, and must be provenance-labelled. This is an architectural invariant for
+Signalix read-only surfaces, not an optional latency optimization.
 
 Trend Mapping is production-served read-only Daily evidence. It does not create
 setup decisions, BUY/alerts, orders, broker actions, or auto-trading. The
@@ -70,7 +79,7 @@ SET Index benchmark context strip from `price_data.symbol='SET'`. SET is
 context only and never changes the breadth denominator. SET50 is explicitly
 out of scope for this slice.
 
-## Retained setup/shadow trial flow — 2026-09-01
+## HISTORICAL / SUPERSEDED / DROPPED — retained setup/shadow trial flow — 2026-09-01
 
 The 2026-09-11 private signal transition adds a read-only local shadow consumer
 after the canonical setup read model:
@@ -100,7 +109,7 @@ marginable_long (237)
 
 The older flow below is retained as compatibility/history; it must not be read as the current decision authority.
 
-## Historical / compatibility data flow
+## HISTORICAL / SUPERSEDED — compatibility data flow
 ```
             ┌─────────────────── EOD INGESTION ───────────────────┐
    Thai EOD │  update_data.py  (local zip → drive → Settrade → yf) │
@@ -134,7 +143,7 @@ The older flow below is retained as compatibility/history; it must not be read a
 | `signalix_postgres` | postgres:16-alpine | 5432 | price archive |
 | `signalix_redis` | redis:7-alpine | 6379 | pub/sub bus |
 | `signalix_backend` | builds `./backend` | 8000 | FastAPI API |
-| `signalix_dashboard` | builds `./backend` | 3001 | MVP-only dashboard server (`mvp_server.py`), same bind-mounted `./backend`; legacy routes return 404 |
+| `signalix_dashboard` | builds `./backend` | 3001 | dashboard service; historical MVP server/routes are not current product routing |
 | `signalix_delivery` | builds `./backend` | — | Redis consumer → Telegram |
 
 Backend and delivery share the **same image** (redis + requests preinstalled).
@@ -147,16 +156,20 @@ logs in the non-TTY container).
 - Body: `{"symbol","source","price", ...}` → stored (dedup by hash) + published.
 
 ## Key files
+
+The compatibility entries named `mvp_*`, `build_dashboard.py`, and related
+legacy helpers below are historical/audit inventory, not current routing
+targets or documentation authorities.
 - `backend/app.py` — FastAPI routes (`/webhook`, `/scan`, `/screen/{sym}`, `/chart/{sym}`, `/health`)
 - `backend/delivery.py` — `push_telegram()` + envelope formatting (shared by batch + consumer)
 - `backend/delivery_consumer.py` — Redis subscriber entrypoint
 - `backend/screening.py` — DB-backed Minervini engine
 - `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion; `intraday_feed_status` tracks per-symbol Settrade 60m availability without changing Daily eligibility
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence
-- Intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
+- HISTORICAL intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
-- `backend/build_dashboard.py` — compatibility snapshot builder; it no longer writes a public dashboard artifact and is not the MVP entrypoint
-- `backend/mvp_server.py` / `mvp_routes.py` — owner-only MVP static server and fail-closed `/api/*` dispatcher; canonical and legacy/audit route handlers are explicit; `/api/setup-candidates` is primary and VCP routes are audit-only
+- `backend/build_dashboard.py` — HISTORICAL compatibility snapshot builder; not a current route or serving input
+- `backend/mvp_server.py` / `mvp_routes.py` — HISTORICAL owner-only MVP server/dispatcher; `/mvp` and `/api/setup-candidates` are not current routes
 - `backend/canonical_setup_projection.py` — deep read-only interface for canonical setup-candidate validation, ordering, filters, pagination, lane counts, freshness, and provenance
 - `backend/mvp_api.py` — candidate builders plus compatibility projections; re-exports the canonical projection interface for existing callers
 - `backend/canonical_freshness_lineage.py` — deep read-only sidecar lineage adapter; compares published intraday fetch time with embedded lineage and preserves Daily/read-model identity
@@ -166,7 +179,7 @@ logs in the non-TTY container).
 - `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
 - `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
-## Retained trial MVP surface contract — 2026-09-01
+## HISTORICAL / SUPERSEDED / DROPPED — retained trial MVP surface contract — 2026-09-01
 
 The retained owner-only trial surface is the Elliott/Trend/Trade-Setup
 decision spine:
@@ -182,7 +195,9 @@ decision spine:
       └─ DATA_BLOCKED
 ```
 
-`/api/setup-candidates` remains the setup-trial API. `/api/vcp-finder` and VCP artifacts remain compatibility/audit paths only. Source T1–T9 is promoted but is not the current delivery focus. Browser scopes are owner-confirmed PASS; complete fresh setup coverage remains separate/not verified. The `marginable_long` scope is 237 eligible symbols; 929 active ORD is explicit audit/rollback coverage. VCP/contraction/breakout-volume remain bonus evidence.
+`/api/setup-candidates` was the setup-trial API. `/api/vcp-finder` and VCP
+artifacts are compatibility/audit paths only. This section is preserved as
+historical evidence and is not current delivery or acceptance authority.
 
 ### Deterministic chart and OHLCV window summary — 2026-09-10
 

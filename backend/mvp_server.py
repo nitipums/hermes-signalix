@@ -13,8 +13,8 @@ import os
 import socketserver
 from urllib.parse import urlsplit
 
-from mvp_routes import handle_mvp_api
-from shadow_trend_map import handle_shadow_trend_map_api
+from mvp_routes import handle_mvp_api, retired_route_payload
+from trend_map import handle_trend_map_api
 from trend_route_api import handle_trend_route_api
 from market_breadth_artifact import handle_market_breadth_api
 
@@ -84,12 +84,12 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
         path = parsed.path
         suffix = ("?" + parsed.query) if parsed.query else ""
         if path == "/trend-map":
-            template_path = os.path.join(_BACKEND_DIR, "shadow_trend_map_template.html")
+            template_path = os.path.join(_BACKEND_DIR, "trend_map_template.html")
             try:
                 with open(template_path, "rb") as template:
                     body = template.read()
             except OSError:
-                self.send_error(404, "shadow trend-map template unavailable")
+                self.send_error(404, "Trend Map template unavailable")
                 return
             self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
@@ -104,22 +104,32 @@ class MVPHandler(http.server.SimpleHTTPRequestHandler):
             self.send_bytes(body, content_type="text/html; charset=utf-8")
             return
         if path.startswith("/api/"):
+            if path in ("/api/setup-candidates", "/api/setup-candidates/"):
+                body = __import__("json").dumps(
+                    retired_route_payload("/api/setup-candidates"), ensure_ascii=False
+                ).encode("utf-8")
+                self.send_bytes(body, content_type="application/json; charset=utf-8", status=410)
+                return
             if handle_trend_route_api(self.path, self):
                 return
             if path == "/api/market-breadth" and handle_market_breadth_api(self.path, self):
                 return
-            if path == "/api/trend-map" and handle_shadow_trend_map_api(self.path, self):
+            if path == "/api/trend-map" and handle_trend_map_api(self.path, self):
                 return
             if handle_mvp_api(self.path, self):
                 return
             self.send_error(404, "MVP API route not found")
             return
         if path == "/dashboard.html":
-            self.send_error(404, "dashboard.html retired; use /mvp")
+            self.send_error(404, "dashboard.html retired; use /trend-map")
             return
         if path in ("/mvp", "/mvp/"):
-            self.path = "/index.html" + suffix
-        elif path in ("/wave-context", "/wave-context/"):
+            body = __import__("json").dumps(
+                retired_route_payload("/mvp"), ensure_ascii=False
+            ).encode("utf-8")
+            self.send_bytes(body, content_type="application/json; charset=utf-8", status=410)
+            return
+        if path in ("/wave-context", "/wave-context/"):
             self.path = "/wave-context.html" + suffix
         elif path in ("/", "/index", "/index.html"):
             self.path = "/index.html" + suffix

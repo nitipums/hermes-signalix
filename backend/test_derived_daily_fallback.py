@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 import mvp_api
 import pytest
-import shadow_trend_map
+import trend_map
 import update_data as subject
 
 
@@ -86,7 +86,7 @@ def test_quote_exposes_derived_lineage_without_calling_it_official():
                "source_last_ts": "2026-09-11T09:00:00Z", "source_bar_count": 8,
                "source_completion_cutoff": "2026-09-11T10:00:00Z",
                "derivation_method": subject.DERIVED_DAILY_METHOD}
-    quote = shadow_trend_map._quote([{"date": "2026-09-11", "close": 123, "source": "derived_daily_price_data",
+    quote = trend_map._quote([{"date": "2026-09-11", "close": 123, "source": "derived_daily_price_data",
                              **{key: value for key, value in lineage.items() if key != "source"}}])
     assert quote["source"] == "derived_daily_price_data"
     assert quote["provisional"] is False
@@ -206,7 +206,7 @@ def test_report_provenance_lists_lineage_for_every_selected_derived_row():
         def load_daily_pit(self, conn, symbol, as_of):
             return derived, as_of
 
-    report = shadow_trend_map.build_shadow_report(Adapter(), object())
+    report = trend_map.build_trend_map_report(Adapter(), object())
     lineage = report["rows"][0]["provenance"]["selected_daily_lineage"]
     assert len(lineage) == 45
     assert [item["source_run_id"] for item in lineage] == [f"run-{index}" for index in range(45)]

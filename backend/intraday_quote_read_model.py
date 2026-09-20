@@ -14,9 +14,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
-from shadow_trend_map import BackendDailyAdapter, UNIVERSE, _finite
+from trend_map import BackendDailyAdapter, UNIVERSE, _finite
 
-ROOT = Path(__file__).resolve().parent / "shadow-read-model" / "intraday-quotes"
+ROOT = Path(__file__).resolve().parent / "trend-map-read-model" / "intraday-quotes"
 CURRENT_NAME = "current.json"
 VERSIONS = "versions"
 SCHEMA_VERSION = "signalix.intraday-quote-read-model.v1"

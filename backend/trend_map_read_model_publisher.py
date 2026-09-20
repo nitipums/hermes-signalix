@@ -14,9 +14,9 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
-import shadow_trend_map as trend_map
+import trend_map as trend_map
 
-DEFAULT_ROOT = Path(__file__).with_name("shadow-read-model")
+DEFAULT_ROOT = Path(__file__).with_name("trend-map-read-model")
 CURRENT_NAME = "current.json"
 ARTIFACT_DIR = "versions"
 SCHEMA_VERSION = "daily-trend-map-shadow-read-model-v2"
@@ -68,8 +68,8 @@ def _write_immutable(path: Path, value: Any) -> None:
 def record_publish_failure(root: str | Path | None, error: Exception, failure_count: int,
                            pointer_preserved: bool, pointer_verification: str) -> dict[str, Any]:
     """Atomically retain only bounded, read-only observability metadata."""
-    root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
-    metadata = {"event": "shadow_trend_map_publish_failure",
+    root_path = Path(root or os.getenv("SIGNALIX_TREND_MAP_READ_MODEL_ROOT", DEFAULT_ROOT))
+    metadata = {"event": "trend_map_publish_failure",
                 "error_type": type(error).__name__, "message": str(error)[:240],
                 "failure_count": int(failure_count), "pointer_preserved": bool(pointer_preserved),
                 "pointer_verification": pointer_verification,
@@ -261,8 +261,8 @@ def _validate_pointer(root: Path, pointer: Mapping[str, Any]) -> dict[str, Any]:
     return artifact
 
 
-def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]:
-    root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
+def read_current_trend_map_report(root: str | Path | None = None) -> dict[str, Any]:
+    root_path = Path(root or os.getenv("SIGNALIX_TREND_MAP_READ_MODEL_ROOT", DEFAULT_ROOT))
     started = time.perf_counter()
     try:
         pointer_path = root_path / CURRENT_NAME
@@ -272,7 +272,7 @@ def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]
         if published_at.tzinfo is None:
             published_at = published_at.replace(tzinfo=dt.timezone.utc)
         age_seconds = max(0.0, (dt.datetime.now(dt.timezone.utc) - published_at).total_seconds())
-        threshold = float(os.getenv("SIGNALIX_SHADOW_STALE_AFTER_SECONDS", DEFAULT_STALE_AFTER_SECONDS))
+        threshold = float(os.getenv("SIGNALIX_TREND_MAP_STALE_AFTER_SECONDS", DEFAULT_STALE_AFTER_SECONDS))
         freshness_status = "STALE" if age_seconds > threshold else "FRESH"
         result = dict(artifact)
         result["artifact"] = {"id": pointer["artifact_id"], "path": str((root_path / pointer["artifact_path"]).resolve()), "published_at": pointer["published_at"]}
@@ -299,11 +299,11 @@ def read_current_shadow_report(root: str | Path | None = None) -> dict[str, Any]
         return blocked | {"artifact": {"id": None, "path": str(root_path / CURRENT_NAME), "published_at": None}, "source": "shadow_read_model_pointer", "last_failure": _read_failure_metadata(root_path), "freshness": {"status": "UNKNOWN", "published_at": None, "age_seconds": None, "stale_after_seconds": DEFAULT_STALE_AFTER_SECONDS}}
 
 
-def publish_shadow_read_model(*, adapter=None, conn=None, as_of=None, root: str | Path | None = None, published_at=None) -> dict[str, Any]:
+def publish_trend_map_read_model(*, adapter=None, conn=None, as_of=None, root: str | Path | None = None, published_at=None) -> dict[str, Any]:
     """Build, validate, and atomically publish one bounded shadow artifact."""
-    root_path = Path(root or os.getenv("SIGNALIX_SHADOW_READ_MODEL_ROOT", DEFAULT_ROOT))
+    root_path = Path(root or os.getenv("SIGNALIX_TREND_MAP_READ_MODEL_ROOT", DEFAULT_ROOT))
     started = time.perf_counter()
-    report = trend_map.build_shadow_report(adapter=adapter, conn=conn, as_of=as_of, source="publisher")
+    report = trend_map.build_trend_map_report(adapter=adapter, conn=conn, as_of=as_of, source="publisher")
     if (report.get("status") != trend_map.PRODUCTION_READ_ONLY
             or report.get("research_only") is not False
             or report.get("actionability") != trend_map.ACTIONABILITY
@@ -338,7 +338,7 @@ def main() -> int:
     parser.add_argument("--root", default=None)
     parser.add_argument("--as-of", default=None)
     args = parser.parse_args()
-    print(json.dumps(publish_shadow_read_model(root=args.root, as_of=args.as_of), sort_keys=True))
+    print(json.dumps(publish_trend_map_read_model(root=args.root, as_of=args.as_of), sort_keys=True))
     return 0
 
 

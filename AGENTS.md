@@ -21,12 +21,13 @@ Verified Market View
 → Arm review and execution decision
 ```
 
-## Current product direction — canonical Trend Mapping line — 2026-09-14
+## Current product direction — canonical read-only surfaces — 2026-09-19
 
-Daily Trend Mapping via `/trend-map` and `/api/trend-map` is the canonical
-Signalix product line. It is public, read-only, deterministic Daily evidence
-with `status=PRODUCTION_READ_ONLY`, `research_only=false`, and
-`actionability=NONE`. The former `shadow` route naming is retired.
+Daily Trend Mapping via `/trend-map` and `/api/trend-map` plus Market Breadth
+via `/market-breadth` and `/api/market-breadth` are the canonical Signalix
+public, read-only, deterministic evidence surfaces. They use
+`status=PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+The former `shadow` route naming is retired for active Trend Map modules.
 
 `/mvp` and `/api/setup-candidates` are retired from active scope. Preserve their
 source/history as historical/audit material only; do not route current work
@@ -95,8 +96,9 @@ Before any task, Codex must:
 
 ## Serving boundary
 
-The canonical served product is `/trend-map` with `/api/trend-map`. The setup/MVP
-routes are retained historical/audit material and are not active product routes.
+The canonical served surfaces are `/trend-map` + `/api/trend-map` and
+`/market-breadth` + `/api/market-breadth`. The setup/MVP routes are retained
+historical/audit material and are not active product routes.
 Do not route work there without a new owner-approved product decision.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **929 active ORD**, **237 eligible**, **692 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.

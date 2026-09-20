@@ -47,7 +47,7 @@ def _serve(retired_dashboard_status=404):
                     body_payload = {**payload, "results": [], "daily_watchlist": payload["daily_watchlist"]}
                 body = json.dumps(body_payload).encode()
                 status, content_type = 200, "application/json"
-            elif self.path == "/mvp":
+            elif self.path == "/trend-map":
                 body = b"<!doctype html><title>Signalix VCP Finder</title>"
                 status, content_type = 200, "text/html"
             elif self.path == "/dashboard.html":
@@ -100,7 +100,7 @@ def test_probe_uses_canonical_vcp_contract_and_writes_nonempty_artifacts(tmp_pat
     assert result.returncode == 0, result.stdout + result.stderr
     assert "READY count: 3" in result.stdout
     assert "evaluated: 4" in result.stdout
-    for name in ("readiness.json", "daily_vcp.json", "vcp.json", "mvp.html", "missing_symbol.json", "probe_report.json"):
+    for name in ("readiness.json", "daily_vcp.json", "vcp.json", "trend-map.html", "missing_symbol.json", "probe_report.json"):
         artifact = tmp_path / name
         assert artifact.is_file()
         assert artifact.stat().st_size > 0

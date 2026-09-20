@@ -74,7 +74,7 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/mvp', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/trend-map', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -56,6 +56,19 @@ LEGACY_ROUTE_DEPRECATION = {
     "message": "Legacy MVP projection is retained for audit/replay only; use /api/setup-candidates.",
 }
 
+RETIRED_ROUTE_RESPONSE = {
+    "status": "retired",
+    "historical": True,
+    "actionability": "NONE",
+    "message": "This historical Signalix setup surface is retired; use the current read-only Trend Map.",
+    "replacement": "/trend-map",
+}
+
+
+def retired_route_payload(route):
+    """Return the small, explicit response used by retired public routes."""
+    return {**RETIRED_ROUTE_RESPONSE, "route": route}
+
 
 def _legacy_response(payload):
     """Mark compatibility output without changing its historical item shape."""
@@ -416,6 +429,9 @@ def _load_shadow_buy_replay():
 
 def _handle_canonical_routes(route, qs, handler) -> bool:
     """Handle canonical setup-candidate and symbol routes."""
+    if route in ("/api/setup-candidates", "/api/setup-candidates/"):
+        json_response(handler, retired_route_payload("/api/setup-candidates"), status=410)
+        return True
     if route in ("/api/shadow-buy-signals", "/api/shadow-buy-signals/"):
         try:
             days = int(qs.get("days", ["7"])[0])

@@ -359,7 +359,12 @@ def test_chart_db_route_view_chart_serves_compact_representation(monkeypatch):
     payload = __import__("json").loads(handler.wfile.body)
     assert handler.status == 200
     assert len(payload["candles"]) == 120
-    assert len(payload["indicators"]["series"]["high"]) == 120
+    series = payload["indicators"]["series"]
+    assert "high" not in series
+    assert "low" not in series
+    assert len(series["ma"]["20"]) == 120
+    assert len(series["macd"]["line"]) == 120
+    assert len(series["rsi"]) == 120
     assert payload["indicators"]["latest"]["window_summary"]
     assert payload["provenance"]["representation"] == "chart_view"
     assert "ma20" not in payload

@@ -1,7 +1,7 @@
 # INDEX — Signalix Project Vault
 
 > **STATUS: CURRENT** · Catalog and routing map for the Level-4 vault.
-> **Last reconciled:** 2026-09-14 ICT
+> **Last reconciled:** 2026-09-19 ICT
 > **Authority:** the linked concern-specific documents, not this catalog.
 
 ## How to use
@@ -30,7 +30,12 @@
 
 - `../docs/superpowers/specs/` — current executable product/API/UI contracts.
 - `../docs/current/2026-09-13-daily-trend-derived-fallback-spec.md` — current bounded Derived Daily fallback contract and Issue #22 implementation authority.
-- Current production-served focus: `/trend-map`, `/api/trend-map` — public read-only Daily Trend Mapping; former shadow naming is retired
+- Current production-served focus: `/trend-map`, `/api/trend-map`,
+  `/market-breadth`, and `/api/market-breadth` — public read-only Daily Trend
+  Map and Market Breadth. Former shadow naming is retired for active modules.
+- `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`;
+  do not route current work to them, the old dashboard builder/server, or
+  shadow-named active modules.
 - `../docs/current/2026-09-17-1015-trend-route-closeout.md` — current Trend Route production evidence handoff; automated refresh wiring and rollback remain explicitly `NOT VERIFIED`
 - `../docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` — owner-approved spec for Daily Main Trend 1–4 multiple-MA calibration.
 - `../docs/current/2026-09-13-main-trend-calculation-contract.md` — exact current Main Trend v6 formulas, predicates, precedence, and verification contract.
@@ -46,6 +51,9 @@ Read a focused file only when the task routing in `../docs/START-HERE.md` requir
 - `archive/`, `Postmortems/`, dated handoffs, replay baselines, and old implementation plans are preserved evidence.
 - `VCP-Finder-MVP.md` and older VCP-first records are compatibility/audit history unless a current authority says otherwise.
 - Generated HTML/JSON, logs, snapshots, worktrees, scratch files, and Kanban history are artifacts or execution evidence, not documentation authorities.
+- Generated read-model artifacts are current runtime inputs only. There is no
+  current-plus-N retention contract: only the current pointer and validated
+  artifacts are serving inputs, and Git history is the rollback authority.
 - Active named-worker state belongs to the `signalix` Kanban board when a bounded run exists; do not mirror live card status here.
 
 ## Maintenance rule

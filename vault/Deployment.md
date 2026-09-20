@@ -1,7 +1,7 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; final stable closeout is recorded in the Git release branch. The automated EOD publication hook and Trend Route rollback drill remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only.
+> **Reconciled:** 2026-09-19 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard builder/server and shadow-named active modules are not current routing targets. Generated artifacts are runtime inputs only; current pointers and validated artifacts serve, and Git history is rollback authority.
 
 ## Dashboard canonical-mount repair — 2026-09-16 20:20 ICT
 
@@ -13,7 +13,7 @@
 - Operational safeguard: production Compose commands must run from `/root/signalix` so the canonical `/root/signalix/backend` bind mount and generated artifacts align. The Wave 1 Market Breadth read-back above verified the served artifact and retains `quality=PARTIAL` for `841/929` observed active-ORD coverage. The Trend Map freshness remediation evidence remains recorded below; no deployment or runtime action is part of this documentation reconciliation.
 ## Trend Map freshness remediation — 2026-09-19
 
-- The canonical pointer had remained on the 2026-09-15 artifact and correctly failed closed at the public API with `DATA_BLOCKED`, `verification_status=NOT_VERIFIED`, and `freshness=STALE` after the 172800-second freshness window. From `/root/signalix`, the SELECT-only publisher `PYTHONPATH=backend python -m shadow_read_model_publisher --root backend/shadow-read-model` generated immutable artifact `shadow-trend-map-quote-envelope-v2-2026-09-18-87dce5718dd0784a-e76ebcbf1637fac9-f34bcb3ad1244662-f3783cb9724c81a5`, `as_of=2026-09-18`, `237/237` declared/evaluated/returned, `blocked=0`, published at `2026-09-19T06:29:46.448688+00:00`. Pointer/artifact validation passed. The dashboard was recreated from `/root/signalix`; readiness returned `{"status":"ok","db":"up","redis":"up"}`. Local and public `/api/trend-map` returned HTTP 200, `PRODUCTION_READ_ONLY`, `VERIFIED`, `FRESH`, `237` rows. Public 390px browser showed `Data date 2026-09-18`, `Status Current`, `Showing 237 of 237`, no overflow, and navigation to `/market-breadth`; no PostgreSQL/Redis write or migration occurred. The immutable version and tracked `current.json` pointer require the remediation commit; generated Market Breadth artifacts remain runtime inputs.
+- The canonical pointer had remained on the 2026-09-15 artifact and correctly failed closed at the public API with `DATA_BLOCKED`, `verification_status=NOT_VERIFIED`, and `freshness=STALE` after the 172800-second freshness window. From `/root/signalix`, the SELECT-only publisher `PYTHONPATH=backend python -m trend_map_read_model_publisher --root backend/trend-map-read-model` generated the immutable artifact (historical artifact identity is preserved below), `as_of=2026-09-18`, `237/237` declared/evaluated/returned, `blocked=0`, published at `2026-09-19T06:29:46.448688+00:00`. Pointer/artifact validation passed. The dashboard was recreated from `/root/signalix`; readiness returned `{"status":"ok","db":"up","redis":"up"}`. Local and public `/api/trend-map` returned HTTP 200, `PRODUCTION_READ_ONLY`, `VERIFIED`, `FRESH`, `237` rows. Public 390px browser showed `Data date 2026-09-18`, `Status Current`, `Showing 237 of 237`, no overflow, and navigation to `/market-breadth`; no PostgreSQL/Redis write or migration occurred. The immutable version and tracked `current.json` pointer require the remediation commit; generated Market Breadth artifacts remain runtime inputs.
 
 ## Trend Route production read-back — 2026-09-17
 
@@ -30,8 +30,8 @@
 ```text
 branch: release/signalix-mvp-stable
 source: /root/signalix
-MVP server: mvp_server.py
-legacy routes: quarantined/404
+Active public surfaces: trend-map and market-breadth
+Retired routes/modules: historical/audit only
 ```
 
 ## Runtime reload read-back — 2026-09-14 11:35 ICT
@@ -74,7 +74,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
   close. `main_trend`, scan status, classifier evidence, and EOD `as_of` remain
   unchanged. Missing, stale, future, malformed, or unusable intraday data falls
   back to the immutable EOD quote with explicit provenance.
-- Source/tests: `PASS` — `pytest -q backend/test_read_model_publisher.py backend/test_shadow_trend_map.py -rA` returned `73 passed, 1 skipped`; compile and `git diff --check` passed.
+- Source/tests: `PASS` — `pytest -q backend/test_trend_map_read_model_publisher.py backend/test_trend_map.py -rA` returned `73 passed, 1 skipped`; compile and `git diff --check` passed.
 - Authorized runtime action: `docker compose restart dashboard`; PostgreSQL and
   Redis were not restarted, migrated, or written.
 - Readiness: `{"status":"ok","db":"up","redis":"up"}`; dashboard health
@@ -94,7 +94,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
   blocked-row filter/reason affordance, stale-drawer invalidation, and mobile
   full-value affordance. Scan/classifier semantics and the immutable artifact
   were unchanged.
-- Source/tests: `pytest -q backend/test_shadow_trend_map.py` returned `51
+- Source/tests: `pytest -q backend/test_trend_map.py` returned `51
   passed`; Trend Map UX contract selection
   `pytest -q backend/test_mvp_frontend_contract.py -k 'trend_map_'` returned
   `5 passed`; JavaScript syntax, Python compile, and `git diff --check` passed.
@@ -197,10 +197,10 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 
 ### Signal Accordion visual redesign — 2026-09-15 21:22 ICT
 
-- Scope: `backend/shadow_trend_map_template.html` plus focused contract coverage; API, immutable read model, classifier semantics, and shared drawer source were unchanged.
+- Implementation scope: `backend/trend_map_template.html` plus focused contract coverage; API, immutable read model, classifier semantics, and shared drawer source were unchanged.
 - UI: production `/trend-map` now groups Main Trend 1–4 and blocked evidence into closed-by-default accordion sections. Per-symbol table rows are created only when a section opens; one section stays open at a time. Search/filter/retry and lazy drawer behavior remain read-only.
 - Branding/theme: Signalix wordmark/mark, editorial hierarchy, semantic trend colors, and persisted dark-default/light theme were added without external assets or additional network requests.
-- Source/test: `pytest -q backend/test_shadow_trend_map.py -rA` returned `58 passed`; Python compile, inline JavaScript syntax, and `git diff --check` passed.
+- Source/test: `pytest -q backend/test_trend_map.py -rA` returned `58 passed`; Python compile, inline JavaScript syntax, and `git diff --check` passed.
 - Served browser: public `http://91.98.72.120:3001/trend-map` rendered the new accordion/theme markers, 237 rows, and FRESH data. At 390px, opening Main Trend 1 rendered 44 rows, opening BJC opened the real drawer/chart, and `scrollWidth=390` / `bodyScrollWidth=390`. Desktop 500px also remained contained.
 - Performance boundary: only the existing `/api/trend-map` request was observed for the page; accordion expansion performs client-side projection only. No database write, migration, restart, commit, or push was performed.
 
@@ -235,7 +235,7 @@ The primary workstream is the production-served, public, read-only Daily Trend M
 - Scope: `backend/frontend/shared-drawer.js` plus `backend/test_mvp_ui_feedback_contract.py`; no data, API, calculation, alert, order, broker, or auto-trading behavior changed.
 - Root cause: drawer navigation retained the first symbol's `chartUrl`, so the header/position advanced while the chart fetched the old symbol; the shared drawer also had no touch gesture handlers.
 - Fix: Trend Map navigation now derives the chart request from the current symbol; the drawer body supports horizontal touch swipe (50px threshold), rejects predominantly vertical movement, and ignores controls/links.
-- Source/tests: the regression test was RED before the fix and GREEN after it. `pytest -q backend/test_mvp_ui_feedback_contract.py backend/test_shadow_trend_map.py -rA` returned `51 passed`; `node --check backend/frontend/shared-drawer.js` and `git diff --check` passed.
+- Source/tests: the regression test was RED before the fix and GREEN after it. `pytest -q backend/test_mvp_ui_feedback_contract.py backend/test_trend_map.py -rA` returned `51 passed`; `node --check backend/frontend/shared-drawer.js` and `git diff --check` passed.
 - Served browser read-back through `http://91.98.72.120:3001/trend-map` at 390px: `TEAM` → `RJH` (`2 of 237`) → `KCG` (`3 of 237`); observed chart requests changed respectively to `/api/chart-db/TEAM?timeframe=1D`, `/api/chart-db/RJH?timeframe=1D`, and `/api/chart-db/KCG?timeframe=1D`. Synthetic touch swipe was also verified.
 - Runtime boundary: no restart, migration, database write, commit, or push was performed. The served JS matched the current dirty worktree; release promotion remains pending scoped closeout.
 
@@ -280,7 +280,9 @@ At that 2026-09-02 baseline, the promoted Elliott/Trend/Trade-Setup spine was th
 
 ### Current Team Facts policy and runtime — 2026-09-10
 
-Owner decision: Team Facts is a public, unauthenticated, read-only facts feed. It does not expose setup, Wave, lane, trigger, risk, target, alert, order, or broker execution semantics. `/api/setup-candidates` remains the separate canonical setup surface.
+Owner decision (historical Team Facts evidence): the feed was public,
+unauthenticated, and facts-only. `/api/setup-candidates` was the separate setup
+surface; it is now `HISTORICAL / SUPERSEDED / DROPPED` and is not current routing.
 
 Historical Team Facts read-back from release `28f7947` (2026-09-10) returned `base_active_ord_count=932`, `eligible_count=237`, `excluded_count=695`; this predates the current symbol-master count (`929/237/692`) and is retained as historical evidence only.
 
@@ -362,13 +364,20 @@ fail-closed SQL guard were deployed and publicly read back. The public
 returned HTTP 200. The verified pointer targeted artifact
 - **Historical artifact identity (superseded; not current pointer):** `shadow-trend-map-quote-envelope-v2-2026-09-11-2851c3f13cbd8e39-e76ebcbf1637fac9-02bd1d0dee037566-0988111049785ae5` with content hash `02bd1d0dee037566` and measurement hash `0988111049785ae5`.
 
-Generated `backend/shadow-read-model/` artifacts are intentionally tracked
-runtime inputs in commit `f18e48f`, not untracked research artifacts.
+Generated `backend/shadow-read-model/` artifacts are historical-named runtime
+inputs in commit `f18e48f`, not documentation authorities. There is no
+current-plus-N retention contract; current pointers and validated artifacts
+serve, with Git history as rollback authority.
 Untracked `research/`, `docs/current/`, and `docs/agents/` remain preserved
 owner/research artifacts outside that commit. The next scheduled EOD freshness
 evidence remains ongoing; no post-commit EOD run is claimed here.
 
-The shadow route remains permanently production-served public read-only Daily evidence. It has no setup, recommendation, alert, order, broker, BUY, or other action semantics; this does not change `/mvp`'s separate owner-only/private signal policy. The unused `map_daily_trend` compatibility alias remains preserved because removing it would require editing outside this bounded file scope; no caller or test currently uses it.
+The historical shadow route was production-served public read-only Daily
+evidence. It had no setup, recommendation, alert, order, broker, BUY, or other
+action semantics; this historical record does not change the current routing.
+The unused `map_daily_trend` compatibility alias remains preserved because
+removing it would require editing outside this bounded file scope; no caller or
+test currently uses it.
 
 ### 2026-09-02 promotion evidence
 

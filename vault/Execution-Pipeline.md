@@ -1,21 +1,24 @@
 # Signalix Execution Pipeline
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: product acceptance sequence and evidence standard`.
-> **Reconciled:** 2026-09-17 ICT · canonical product line is Daily Trend Mapping at `/trend-map` and `/api/trend-map`; Trend Route artifact `trend-route-cc791d2d85645bce9b5347b8` is served at `/api/trend-map/{symbol}/route`; final stable closeout is recorded in the Git release branch. Automated EOD publication wiring and Trend Route rollback remain `NOT VERIFIED`. The former shadow naming is retired. `/mvp` and `/api/setup-candidates` are historical/audit only and retained as historical/audit source. Runtime and commit claims require fresh read-back from the checkout and served route.
+> **Reconciled:** 2026-09-19 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; runtime and commit claims require fresh read-back from the checkout and served route.
 > Markdown owns scope/acceptance; Kanban `signalix` owns active worker execution state and handoffs.
 
 > **Status:** Canonical Markdown pipeline, migrated from the retired Signalix Kanban board on 2026-08-15.
 >
 > Use this document for product scope, acceptance sequence, and evidence policy; use [[Decisions]] for durable choices, focused current specs under `../docs/superpowers/specs/` for contracts, and the Kanban board only for active named-worker state, dependencies, heartbeats, retries, and evidence handoffs. Do not copy live card status into vault notes.
 
-## Current acceptance focus — canonical Trend Mapping
+## Current acceptance focus — canonical Trend Map and Market Breadth
 
-The acceptance target is the public Daily Trend Mapping surface at `/trend-map`
-and `/api/trend-map`. Verify deterministic source, immutable artifact/pointer,
+The acceptance targets are the public Daily Trend Map surfaces at `/trend-map`
+and `/api/trend-map`, plus Market Breadth at `/market-breadth` and
+`/api/market-breadth`. Verify deterministic source, immutable artifact/pointer,
 API schema, freshness/quality distribution, non-actionable boundary, and the
 real desktop/mobile chart journey. The retired `/mvp` and
 `/api/setup-candidates` surfaces are historical/audit only and are not current
-acceptance targets. Latest reload read-back is recorded in `Deployment.md`.
+acceptance targets. Generated artifacts are runtime inputs, not documentation
+authorities or a retention policy; only current pointers and validated
+artifacts serve, with Git history as rollback authority.
 
 ### Trend Route acceptance — 2026-09-17
 
@@ -49,9 +52,9 @@ The overlay must not alter `main_trend`, data-quality/status fields, classifier
 evidence, artifact `as_of`, or the non-actionable boundary.
 
 The intraday display quote should be prebuilt after the committed intraday
-ingestion boundary into a compact validated read model. The public request path
-must read that artifact without PostgreSQL access; stale/missing/invalid
-artifacts fall back to the immutable EOD quote with explicit provenance.
+ingestion boundary into a compact validated read model. The public request path must read that artifact without PostgreSQL access when
+the artifact is valid; stale/missing/invalid artifacts may use the explicitly
+provenance-labelled DB fallback contract with EOD provenance where applicable.
 
 Intraday and EOD publication boundaries must prebuild compact validated chart
 read models for every drawer timeframe: `1D`, `60M`, `1W`, and `1M`. The
@@ -108,9 +111,11 @@ The setup-candidate and `/mvp` path is **DROPPED / PAUSED** by owner decision; i
 
 Browser verdicts are named per journey. They do not promote partial/stale data to full freshness PASS.
 
-## Product contract
+## HISTORICAL / SUPERSEDED — setup-to-decision product contract
 
-**Signalix is a setup-to-decision system for Thai swing traders.** It is not a generic market-information portal or a list of stock tips.
+The former setup-to-decision product contract for Thai swing traders is
+preserved below as historical evidence. It is not the current Trend Map or
+Market Breadth product authority.
 
 ```text
 Verified data → Daily official setup state → trigger / invalidation / proof needed
@@ -144,7 +149,7 @@ The product must let a user answer, quickly and honestly:
 - Intraday service defaults to canonical `marginable_long`, runs 60m fetch/evaluation with `--no-scan`, and retains `active_ord` only as explicit audit/rollback scope. Daily scan remains the after-close operation to avoid overlapping 30-minute rounds.
 - `/api/setup-candidates` overlays the latest completed intraday run while preserving immutable read-model identity and Daily lineage. Current runtime evidence: `237 evaluated`, latest run `fb01ef8fbe70408e82ad3f78b2700fe8`, `full_success`.
 
-## Private actionable-signal transition — 2026-09-11
+## HISTORICAL / SUPERSEDED / DROPPED — private actionable-signal transition — 2026-09-11
 
 - Owner-approved direction: a visible private, market-only `BUY_NOW` paper/shadow
   tab covering the trailing seven calendar days. Portfolio data is not required
@@ -165,7 +170,7 @@ The product must let a user answer, quickly and honestly:
 - Team Facts freshness is authoritative only when derived once per symbol from the response rows, `now`, and explicit Daily/60m thresholds. Item provenance, facts, 60m `daily_baseline`, and list/history run envelopes reuse that result; producer values remain under the explicitly non-authoritative `source_metadata` shape `{scope: "published_read_model_report", authoritative: false, reported: {...}}`, with raw freshness keys available only under `reported`. `overall_status` is `fresh` only for complete fresh coverage, `partial` when valid symbols remain beside stale/missing symbols, `stale` when the requested scope is wholly unusable, and `unknown` when freshness cannot be computed. Daily dates and completed 60m timestamps remain distinct; list `as_of` uses latest completed 60m with Daily fallback, while history uses the requested source timestamp.
 - `/api/chart-db/{symbol}` uses current-session 60m data as a provisional Day/Week aggregate before EOD; `as_of` is the period key and `latest_time` is the actual latest stored candle timestamp. Browser status was verified with `2026-09-02T05:00:00+00:00`.
 
-## Current OHLCV window and Team Facts acceptance — 2026-09-10
+## HISTORICAL / SUPERSEDED — OHLCV window and Team Facts acceptance — 2026-09-10
 
 The deterministic chart contract is served by `GET /api/chart-db/{symbol}?timeframe=1D|1W|60M|1M` under policy `technical-indicators-v2`. It exposes OHLCV candles, MA5/10/20/50/100/200, MACD(12,26,9), Wilder RSI(14), Wilder ATR(14), and `indicators.latest.window_summary` for 5/10/20/50/100/200/260 candles. Each window contains Open, High, Low, Close, total/average volume, Change %, Range %, MA where applicable, availability, and provenance. Daily 260 candles is a separate 52-week trading range, not an MA. Missing or insufficient history is `NOT_VERIFIED`, never inferred.
 
@@ -177,7 +182,7 @@ The release is handed to Arm for manual use. Elliott Wave output remains machine
 
 - Lite preflight is `PASS` for the previously accepted rendered usability journey (desktop/mobile load, tabs/filters, candidate→drawer, chart, TradingView link, and no overflow). The 2026-09-12 owner UI feedback slice intentionally removes the drawer's Wave Evidence toggle/explanation and Evidence Details/provenance section, while retaining source-linked Daily chart markers and the primary Wave summary. The revised desktop/mobile drawer journey is `PASS` by owner confirmation; semantic Wave correctness remains `NOT VERIFIED` until Arm reviews and confirms the interpretation from the chart.
 
-## Current UI decision note — 2026-09-12
+## HISTORICAL / SUPERSEDED — UI decision note — 2026-09-12
 
 - Owner feedback intentionally keeps chart status/timeframe/source diagnostic prose and the drawer's Wave Evidence/Evidence Details sections out of the visible `/mvp` review surface. Deterministic API fields, chart markers, and provenance remain available for audit and machine validation.
 

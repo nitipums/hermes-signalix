@@ -1,8 +1,8 @@
 # Signalix Documentation Governance
 
 > **STATUS: CURRENT** · governance layer
-> **Last reviewed:** 2026-09-13
-> **Current reconciliation:** Daily Trend Mapping via `/trend-map` and `/api/trend-map` is the canonical product line; `/mvp` and `/api/setup-candidates` are historical/audit only. Lite selects direct implementation or workers as appropriate and remains the final gate. Public 390px failure→Retry→recovery browser gate is PASS; evaluator auto-caller and broader acceptance remain separate.
+> **Last reviewed:** 2026-09-19
+> **Current reconciliation:** Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`) are the active public read-only surfaces. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard and shadow-named active modules are not current routing targets. Lite remains the final gate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
 
@@ -79,6 +79,27 @@ Arm chose Markdown `Execution-Pipeline.md` and linked focused plans/specs as the
 5. Never store credentials, tokens, passwords, OAuth data, or `.env` contents.
 6. Treat generated HTML, JSON snapshots, logs, and worktree files as artifacts—not documentation authorities.
 7. Use `Documentation-Cleanup-Review.html` as the visual inventory report; regenerate after each cleanup batch.
+
+## Repository cleanup decision — 2026-09-19
+
+The owner approved removal of unused Elliott prototype assets and inactive
+legacy helper modules after reference checks. Generated read-model artifacts
+are current runtime inputs only, not documentation authorities and not a
+current-plus-N retention contract. Only the current pointer and validated
+artifacts are serving inputs; Git history is rollback authority. Historical
+filenames may retain shadow identity for compatibility/audit evidence, but
+internal active Trend Map naming is normalized to Trend Map.
+
+## Cleanup integration gate — 2026-09-19
+
+The owner-approved lean cleanup is a staged, uncommitted integration candidate
+in the canonical checkout. Focused Trend Map, Market Breadth, read-model,
+retired-route, compile, syntax, and isolated served-route checks pass. After
+removing retired MVP/setup test suites, aligning current deterministic chart and
+Trend classifier fixtures, and making PostgreSQL smoke tests skip honestly when
+the service is unavailable, the full suite is `1,061 passed / 13 skipped /
+0 failed` (2 warnings, 4 subtests). Source/test status is `PASS`; runtime,
+public ingress, deployment, and commit/push remain separate gates.
 
 ## Skill overlap matrix — current consolidated set
 

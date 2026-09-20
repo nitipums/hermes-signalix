@@ -15,12 +15,12 @@ def snapshot(close=110.0, low=109.0, rsi=60.0, *, bars=300, support=100.0,
     highs[-1] = close if high is None else high
     lows = [100.0] * bars
     lows[-1] = low
-    ma_series = {str(period): [100.0] * bars for period in (20, 60, 120, 240)}
+    ma_series = {str(period): [100.0] * bars for period in (20, 50, 100, 200)}
     return {
         "timeframe": "1D", "as_of": "2026-09-11", "provenance": {"source": "test"},
         "series": {"close": closes, "high": highs, "low": lows, "ma": ma_series},
         "latest": {"close": close, "low": low, "high": highs[-1],
-                   "ma": {"20": ma20, "60": ma60, "120": 85.0, "240": 80.0},
+                   "ma": {"20": ma20, "50": ma60, "100": 85.0, "200": 80.0},
                    "rsi": rsi, "macd": {"histogram": 1.0}, "volume": volume,
                    "window_summary": {"20": {"volume_average": 100.0}},
                    "explicit_support": support,
@@ -138,6 +138,7 @@ def test_missing_contradictory_and_fallback_series_data_fail_closed():
     assert result["machine_lane"] in MACHINE_LANES
     contradictory = classify_daily_trend(snapshot(close=105, rsi=40, prior_high=200),
                                           thresholds={"bullish_rsi": 60, "bearish_rsi": 30})
+    assert "rsi_bearish" in contradictory["supporting_evidence"]
     assert contradictory["contradicting_evidence"] == ["rsi_bearish"]
     item = snapshot()
     item["series"]["rsi"] = [60.0] * 300

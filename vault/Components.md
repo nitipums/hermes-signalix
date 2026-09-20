@@ -1,16 +1,17 @@
 # Components
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
-> **Reconciled:** 2026-09-14 · Daily Trend Mapping is the canonical product line; its public routes are `/trend-map` and `/api/trend-map`. The former shadow naming is retired. `/mvp` and setup components are retained historical/audit only; Elliott research is deferred.
+> **Reconciled:** 2026-09-19 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. `/mvp` and setup components are `HISTORICAL / SUPERSEDED / DROPPED`; the former shadow naming is retired for active modules.
 
-Every backend module, what it does, and its hard rules.
+Every current backend component, its responsibility, and its hard rules. Legacy
+components below are retained only as explicitly labelled audit/history.
 
 ## Daily Trend Mapping — current delivery surface
 
 The Trend Mapping surface is the current delivery target. Its publisher builds
-an immutable, versioned Daily read model; the shadow API reads and validates
+an immutable, versioned Daily read model; the Trend Map API reads and validates
 only the current pointer/artifact; the dashboard renders the public read-only
-research table and reuses the shared `/mvp` drawer/chart. It preserves Daily
+research table and reuses the shared chart drawer. It preserves Daily
 as-of, Daily-first quote provenance, data-quality states, and fail-closed
 behavior. It has no setup, BUY, alert, order, broker, or auto-trading meaning.
 
@@ -26,12 +27,20 @@ GET /trend-map
 Public Trend Map request paths consume validated compact artifacts rather than
 querying raw market history. The drawer chart prebuild contract covers `1D`,
 `60M`, `1W`, and `1M`: EOD publication owns `1D/1W/1M`, intraday commit owns
-`60M`, and the request path selects a symbol/timeframe entry. DB fallback is
-explicit and provenance-labelled only when the artifact is unavailable or
-stale. No request-time scan, rescan, indicator rebuild, or PostgreSQL history
-query is permitted for a valid artifact.
+`60M`, and the request path selects a symbol/timeframe entry. Only the current
+pointer and validated artifact are used for the normal path; explicit,
+provenance-labelled DB fallback is permitted only when the artifact is
+unavailable or stale. No request-time scan, rescan, indicator rebuild, or
+PostgreSQL history query is permitted for a valid artifact.
 
-## `actionable_signal_policy.py` — private paper/shadow signals
+## Market Breadth — current delivery surface
+
+Market Breadth is the active aggregate companion surface at
+`/market-breadth` and `/api/market-breadth`. Its deterministic publisher and
+validated current pointer provide read-only breadth evidence. It has no setup,
+signal, alert, order, broker, or auto-trading meaning.
+
+## HISTORICAL / SUPERSEDED / DROPPED — private paper/shadow signal components
 
 Pure deterministic projection over canonical setup-candidate evidence. Its
 Phase 1 market-only seam emits `BUY_NOW`, `BUY_ON_TRIGGER`, `WAIT`, `AVOID`, or
@@ -46,7 +55,7 @@ preserving first/latest timestamps. `mvp_routes.py` exposes it through the
 token-free `GET /api/shadow-buy-signals?days=7`; `/mvp` renders the
 shadow result without changing the canonical setup API.
 
-## `update_data.py` — EOD ingestion
+## `update_data.py` — shared EOD ingestion dependency
 Incremental, idempotent SET EOD updater. Fetches only trade days **strictly
 after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run.
 
@@ -59,7 +68,8 @@ after** `MAX(date)` and inserts with `ON CONFLICT DO NOTHING` → safe to re-run
 > Per Nitipum.s rule: native Thai EOD zip is AUTHORITATIVE; Settrade preferred
 > automated; Drive = owner backup; yfinance = last resort only.
 
-Triggers a scan + dashboard rebuild after loading (when not `--dry-run`).
+Triggers the historical compatibility scan/dashboard rebuild after loading (when
+not `--dry-run`); this is not current Trend Map or Market Breadth routing.
 
 ## `screening.py` — DB-backed Minervini engine (Phase 2)
 Reads `price_data` from Postgres (NOT yfinance). Benchmark for RS Rating = the
@@ -86,7 +96,7 @@ weekday cycle; the scraper is not a signal/price source.
 Original pandas scanner (pre-DB rewrite). Kept for reference; `screening.py` is
 the live engine. Imports `scan_universe` must stay at module top in `app.py`.
 
-## `build_dashboard.py` — compatibility snapshot builder
+## HISTORICAL / SUPERSEDED — `build_dashboard.py` compatibility snapshot builder
 Builds compatibility snapshots/manifest data for the pipeline. The former
 public `dashboard.html` artifact and route are retired; the owner-facing UI is
 served from `/mvp` and charts are fetched through the MVP API.
@@ -99,7 +109,7 @@ intraday-only; Daily/EOD membership and historical data remain intact. Cards
 Cards show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD`
 rather than relabelling an old Daily value as 60m.
 
-## Retained MVP owner-only trial surface
+## HISTORICAL / SUPERSEDED / DROPPED — retained MVP owner-only trial surface
 `mvp_server.py` serves the retained trial `/mvp` from the bind-mounted release tree. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
 `mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
@@ -139,14 +149,21 @@ review surface. Deterministic API fields, source-linked chart markers, and
 provenance remain available for audit; this does not remove the underlying
 contract or data.
 
-## `mvp_server.py` — MVP static server (separate dashboard service)
+## HISTORICAL / SUPERSEDED — `mvp_server.py` MVP static server
 Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
 directory. The former `/dashboard.html` route returns 404. Runtime container is
 `signalix_dashboard`; it is separate from the FastAPI `signalix_backend` service.
 Verify served source and API freshness against the
 latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 
-## `app.py` — FastAPI backend
+## HISTORICAL / COMPATIBILITY — legacy FastAPI, delivery, and portal components
+
+The route/component inventory below is retained for audit and compatibility.
+Current public routing is owned by the Trend Map and Market Breadth surfaces
+above; these legacy `/scan`, `/screen`, signal-delivery, portal, and MVP paths
+are not current product routing.
+
+## `app.py` — legacy FastAPI backend
 Routes:
 - `GET /health` — db+redis ping
 - `POST /webhook` — store + publish (auth-gated, see [[Architecture]])
@@ -170,7 +187,7 @@ OAuth token at runtime from `/root/.hermes/shared/nous_auth.json` (mounted RO in
 the container); never copied to Signalix `.env`. Safe no-op (returns '') if the LLM
 is unavailable. The LLM NEVER computes numbers — only summarizes.
 
-## `portal.html` — User self-service frontend
+## HISTORICAL / SUPERSEDED — `portal.html` User self-service frontend
 Dark-theme, Thai, mobile-first single-page app. Lets a user register by Telegram
 chat id, view/edit their watchlist, see live quota bars (watchlist size + alerts
 today vs tier cap), and view the tier table. Served at `:3001/portal` by
@@ -189,9 +206,11 @@ downgrades a paid user.
 Entrypoint for the `signalix_delivery` container. Subscribes `signals`, calls
 `deliver()` forever. Blocks; systemd-like restart via compose `restart: always`.
 
-## `classify_check.py` — ingest guard
-Dry-run keep/cut rule before re-ingesting: CUT if ticker ends with -O/-F/-M/-P
-or starts with ! or $.
+## Retired ingest guard
+
+`classify_check.py` was removed during the 2026-09-19 repository cleanup. Its
+old dry-run ticker filtering rule is historical evidence only; no current
+Trend Mapping runtime path invokes it.
 
 ## `set_market_day_guard.py` — holiday guard
 Exits non-zero on SET market holidays so systemd `ExecCondition` skips jobs.
