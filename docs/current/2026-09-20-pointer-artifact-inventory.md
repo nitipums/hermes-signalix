@@ -52,3 +52,26 @@ schema-mismatched, or tampered targets. Tests use only temporary fixtures:
 - Browser/runtime/deployment verdict: **SEPARATE / NOT CLAIMED**.
 - This slice grants no cleanup authority; historical filenames and Git rollback
   remain preserved.
+
+## Owner-authorized deletion checkpoint — Ticket #67 prerequisite
+
+Arm authorized deletion of exactly eight unreferenced immutable versions in the
+isolated promotion worktree. No current pointer target was selected or deleted;
+no source, database, service, public route, or stable checkout was changed.
+
+Pre-delete evidence (bytes — SHA-256):
+
+- `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-14-87dce5718dd0784a-e76ebcbf1637fac9-8c236750e06098fe-9bc135a0b63c1de0.json` — 1198344 — `2f02ef90d57d9a740e5e369d2533864ba0aa34a8a461f30b4bc6be692a4225da`
+- `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-1d6e8d1855625d62-d02fa89b7971c506.json` — 1198154 — `473b3171c484cafeec2ddf1cb4b5ccd0d15ce28c562f6150fc201170df8faadd`
+- `backend/trend-map-read-model/versions/shadow-trend-map-quote-envelope-v2-2026-09-15-87dce5718dd0784a-e76ebcbf1637fac9-809b34d8ec7e747c-70480ca340be4e6d86a974b.json` — 1212360 — `e0b20f5dec73c30a5045fd46d0ba6e6b366429bae536367bbbf07000eb964dff`
+- `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-1ad1ff7a355c4b5b8402591851276325-67e7c27582374346e03b95c0.json` — 74876 — `55cdc60215d3708331edadd0677af2d8731f888926b7ab34a6ab25ce86187d85`
+- `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-68824145c5504a14aa01160057c15f2b-742f0b31d1251513d557aaff.json` — 74819 — `0513a6dd92da61bccf436ed7f1d3b795df968ba52e60f30e8a5a978cbc0c3a65`
+- `backend/trend-map-read-model/intraday-quotes/versions/intraday-quotes-dbd4148c11e245a98a428868bf93504b-0a50e3d40be7ebc376c53aea.json` — 74669 — `0597838357ed4101856d52ddf6628e4c3d513dcd33f47756bd465db9881163c7`
+- `backend/read-model/charts/versions/chart-1d-5c072cf2d61552cbffac2f0f.json` — 9347143 — `c2790cce3d60ae424bc27b4fae3745bb759858d7344796d9d0054c1dd44306e`
+- `backend/read-model/charts/versions/chart-60m-26c333c22db4f27bda0521f5.json` — 9105454 — `7355c7bd67aa51d25c2b68451e31cdda2702d28f326d31ac43213264e8070f47`
+
+After deletion, pointer inventory remained VERIFIED for Trend Map,
+intraday, Market Breadth, and chart `1D/60M/1W/1M`. The post-delete focused
+suite returned 134 passed and `git diff --check` passed. Rollback is the
+isolated Git deletion checkpoint; stable checkout deletion and deployment are
+separate promotion actions.
