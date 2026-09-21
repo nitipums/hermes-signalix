@@ -116,10 +116,10 @@ Arm refined Q5–Q9 and approved the next operating boundary: technical reason-f
 
 Arm approved the four review directions: (1) separate true unavailable/stale/invalid data from incomplete 60m setup; (2) target warm API ≤500ms, cold API ≤3s, first meaningful UI ≤2s, with compact list payload and heavy evidence on detail; (3) add chart-linked Daily Elliott markers and “How this wave was identified”; (4) retire legacy in stages: primary migration → audit-only quarantine → deprecation → removal/410 after rollback sign-off.
 
-These decisions authorize contract/design refinement, not implementation or deployment. The review packet is `../docs/archive/reviews/2026-09-01-signalix-independent-review.md`; next step is close the remaining design frontier, then create bounded Kanban cards.
+These decisions authorize contract/design refinement, not implementation or deployment. The historical review packet is recoverable in Git history; next step is close the remaining design frontier, then create bounded Kanban cards.
 
 
-Decision: Do not fix, delete legacy, deploy, or dispatch implementation cards from the review alone. First take the consolidated review `../docs/archive/reviews/2026-09-01-signalix-independent-review.md` to askmatt, then create bounded Kanban cards for reason-level DATA_BLOCKED semantics, cold-path performance, chart-ready Elliott markers, and staged legacy quarantine.
+Decision: Do not fix, delete legacy, deploy, or dispatch implementation cards from the review alone. First use the consolidated historical review from Git history with askmatt, then create bounded Kanban cards for reason-level DATA_BLOCKED semantics, cold-path performance, chart-ready Elliott markers, and staged legacy quarantine.
 
 Evidence: Lite, Ploy, and Codex independently reviewed the same release. All four owner concerns are `REVISE`; runtime transport is PASS but served semantics and public browser acceptance are not closed. Ploy aggregated all 237 rows: 227 DATA_BLOCKED, 10 AVOID, zero positive review/forming/candidate/wait lanes.
 
