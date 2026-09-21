@@ -37,16 +37,17 @@ It returns 410 for the two retired setup routes and deterministic 404 for every
 unsupported or malformed route. It has no broad historical dispatcher import.
 
 The active drawer reaches `trend_route_api.py` and the chart-only
-`active_chart_routes.py` → `active_chart_adapter.py` seam. The latter may call
-the neutral OHLCV/indicator functions in historically named
-`mvp_chart_db.py` only when a validated chart artifact is unavailable. The
-active call disables historical Wave enrichment, and no setup/VCP/shadow or
-private-decision builder is imported. `mvp_chart_db.py`,
-`canonical-client.js`, and `shared-drawer.js` remain **KEEP compatibility**:
-the first still has historical callers, while the two served assets still
-contain shared legacy exports/branches even though the Trend Map journey does
-not invoke them. Extracting or pruning those branches is an
-**OWNER-DECISION** for a later bounded wave with browser evidence.
+`active_chart_routes.py` → `active_chart_adapter.py` seam. When a validated
+chart artifact is unavailable, the route calls `active_chart_data.py`, a
+narrow SELECT-only OHLCV/indicator fallback with the same `1D`, `60M`, `1W`,
+and `1M` contract and explicit `DB_FALLBACK` provenance. This active import
+and request path never loads `mvp_chart_db.py`, Wave evidence, setup/VCP, or
+shadow/private-decision modules. `mvp_chart_db.py` is **KEEP-HISTORICAL** for
+its retained callers/tests. `canonical-client.js` and `shared-drawer.js`
+remain **KEEP compatibility** because the served assets still contain shared
+legacy exports/branches even though the Trend Map journey does not invoke
+them. Pruning those branches is an **OWNER-DECISION** for a later bounded wave
+with browser evidence.
 
 ### Read-model rule
 
@@ -144,8 +145,10 @@ Explorer Stage/Search filters reload immediately; there is no Apply step.
 `canonical_freshness_lineage.py` owns the read-only intraday sidecar merge and timestamp comparison. The route retains a thin compatibility wrapper so existing tests/callers remain stable; it does not acquire/query PostgreSQL. Daily/read-model identity remains unchanged while intraday run metadata is overlaid only when the sidecar is valid and newer.
 `canonical_chart_read.py` owns the shared SELECT-only chart row retrieval and
 aggregation rules. `chart_rows.py` is a compatibility adapter for that seam;
-`mvp_chart_db.py` and `app.py` retain their existing public imports. The chart
-layer serves real timeframe contracts: `1D` Daily with a current-session
+`mvp_chart_db.py` and `app.py` retain their existing public imports as
+**KEEP-HISTORICAL** compatibility. The active request path instead uses
+`active_chart_data.py`; neither module imports the other. The chart layer
+serves real timeframe contracts: `1D` Daily with a current-session
 provisional 60m replacement when available, `1W`/`1M` aggregate those Day bars,
 and `60M` stored intraday bars. The frontend renders candlestick OHLC, volume,
 MA, and RSI; timeframe/layer controls and indicator values sit below the chart

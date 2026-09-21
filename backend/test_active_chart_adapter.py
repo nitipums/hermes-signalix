@@ -1,5 +1,7 @@
 import json
+from datetime import datetime
 
+import active_chart_data
 import active_chart_adapter as adapter
 import active_chart_routes
 import mvp_routes
@@ -203,7 +205,7 @@ def test_active_dispatch_returns_unavailable_state_for_known_empty_fallback(monk
     monkeypatch.setattr("chart_read_model.read_current", lambda *args, **kwargs: None)
     monkeypatch.setattr(active_chart_routes, "_load_active_trend_item",
                         lambda symbol: {"symbol": symbol})
-    monkeypatch.setattr("mvp_chart_db.project_chart_db_response",
+    monkeypatch.setattr("active_chart_data.project_active_chart_data",
                         lambda *args, **kwargs: None)
     handler = _Handler()
     assert active_chart_routes.handle_active_chart_api(
@@ -216,6 +218,53 @@ def test_active_dispatch_returns_unavailable_state_for_known_empty_fallback(monk
     assert result["provenance"]["chart_read_model"] == "DB_FALLBACK"
     assert "audit_only" not in result
     assert "deprecation" not in result
+
+
+def test_active_db_fallback_is_select_only_and_projects_neutral_chart_payload(monkeypatch):
+    class Cursor:
+        def __init__(self):
+            self.queries = []
+            self.responses = [[
+                (datetime(2026, 9, 19), 9, 11, 8, 10, 1_000, False,
+                 "price_data"),
+            ], []]
+
+        def execute(self, query, params):
+            self.queries.append(query)
+
+        def fetchall(self):
+            return self.responses.pop(0)
+
+        def close(self):
+            pass
+
+    class Connection:
+        def __init__(self):
+            self.cursor_value = Cursor()
+
+        def cursor(self):
+            return self.cursor_value
+
+    connection = Connection()
+    monkeypatch.setattr(active_chart_data, "_get_db_connection",
+                        lambda: connection)
+    monkeypatch.setattr(active_chart_data, "_release_db_connection",
+                        lambda value: None)
+
+    projected = active_chart_data.project_active_chart_data("aaa", "1D")
+    result = active_chart_data.compact_active_chart_data(projected)
+
+    assert result["symbol"] == "AAA"
+    assert result["timeframe"] == "1D"
+    assert result["candles"][0]["close"] == 10.0
+    assert result["indicators"]["timeframe"] == "1D"
+    assert result["provenance"]["representation"] == "chart_view"
+    assert all("INSERT" not in query.upper()
+               and "UPDATE" not in query.upper()
+               and "DELETE" not in query.upper()
+               for query in connection.cursor_value.queries)
+    assert all(key not in result for key in
+               ("wave_evidence", "setup", "vcp", "signal"))
 
 
 def test_active_detail_dispatch_is_facts_only_without_legacy_markers(monkeypatch):
