@@ -25,6 +25,15 @@ are linked evidence only: source/tests, artifact, runtime/API, freshness,
 browser, deployment, and rollback verdicts remain independent, and no runtime
 or deployment action was taken by this reconciliation.
 
+## Active transport retirement wave — 2026-09-21 14:29 ICT
+
+- Owner-authorized Sol/Ponytail bounded wave merged as PR #80, remote stable SHA `2239c17a0ae903e3cab96404e904ecfdaac7d741`.
+- Compose dashboard command now runs `active_transport.py`, not `mvp_server.py`; the active transport route table owns the four current routes and explicit retired/unknown behavior. The dashboard bind mount is `/root/signalix/backend -> /app`.
+- Source/import smoke confirmed the active entrypoint does not load `mvp_routes`, `mvp_api`, VCP, shadow/private decision modules, or Wave chart evidence. The active chart route retains only the documented neutral `mvp_chart_db.py` compatibility fallback with historical enrichment disabled.
+- Public read-back after recreate: active pages/APIs returned HTTP 200; `/mvp` and `/api/setup-candidates` returned HTTP 410; `/api/vcp-finder` and `/api/shadow-buy-signals` returned HTTP 404. Backend readiness returned `{"status":"ok","db":"up","redis":"up"}`.
+- Public browser: Trend Map loaded its explicit `DATA_BLOCKED` state because the Daily artifact remains stale; Market Breadth rendered at 390px with no horizontal overflow and `PARTIAL` coverage. This is a served-contract/runtime PASS with Daily freshness REVISE, not a full product PASS.
+- Historical-family source deletion was not performed in this wave. Direct callers/references remain and are classified OWNER-DECISION; deletion requires later compatibility/reference-repair waves.
+
 ## Final source/release closeout — 2026-09-20
 
 - Canonical checkout: `/root/signalix`, `release/signalix-mvp-stable`.
