@@ -55,18 +55,21 @@ def handle_active_chart_api(path: str, handler) -> bool:
         _send_json(handler, {"error": "symbol required"}, status=400)
         return True
     try:
+        from active_chart_data import (
+            compact_active_chart_data,
+            project_active_chart_data,
+        )
         from chart_read_model import read_current
-        from mvp_chart_db import compact_chart_db_response, project_chart_db_response
 
         status, payload = chart_response(
             symbol,
             query.get("timeframe", ["1D"])[0],
             read_prebuilt=read_current,
             load_canonical_item=_load_active_trend_item,
-            project_db=lambda requested_symbol, **kwargs: project_chart_db_response(
-                requested_symbol, include_historical_evidence=False, **kwargs
+            project_db=lambda requested_symbol, **kwargs: project_active_chart_data(
+                requested_symbol, timeframe=kwargs["timeframe"]
             ),
-            compact=compact_chart_db_response,
+            compact=compact_active_chart_data,
         )
     except InvalidActiveChartRequest:
         status, payload = 400, {

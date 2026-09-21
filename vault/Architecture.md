@@ -23,12 +23,12 @@ The Trend Map drawer additionally reaches two narrowly scoped read-only
 compatibility APIs: `/api/trend-map/{symbol}/route` and
 `/api/chart-db/{symbol}?timeframe=...&view=chart`. They are not additional
 top-level product surfaces. The chart route is owned by
-`active_chart_routes.py` and `active_chart_adapter.py`; it prefers validated
-chart artifacts and retains a SELECT-only DB fallback through
-`mvp_chart_db.py`. That compatibility module remains **KEEP** until its neutral
-OHLCV/indicator implementation is renamed or extracted. The active call sets
-`include_historical_evidence=false`, so Wave enrichment is neither imported
-nor built on the active request path.
+`active_chart_routes.py`, `active_chart_adapter.py`, and
+`active_chart_data.py`; it prefers validated chart artifacts and uses the
+narrow active module for its SELECT-only OHLCV/indicator DB fallback. The
+active import and request path never loads `mvp_chart_db.py`, Wave evidence,
+setup/VCP, or shadow/private modules. `mvp_chart_db.py` remains
+**KEEP-HISTORICAL** for its retained historical callers and tests only.
 
 The current architecture is:
 
@@ -186,7 +186,7 @@ targets or documentation authorities.
 - HISTORICAL intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
 - `backend/build_dashboard.py` — HISTORICAL compatibility snapshot builder; not a current route or serving input
-- `backend/active_transport.py` / `active_chart_routes.py` — canonical active-only transport and the bounded chart compatibility route
+- `backend/active_transport.py` / `active_chart_routes.py` / `active_chart_data.py` — canonical active-only transport plus the bounded chart route and neutral SELECT-only fallback
 - `backend/mvp_server.py` / `mvp_routes.py` — HISTORICAL owner-only MVP server/dispatcher; not imported or executed by the current Compose dashboard command
 - `backend/canonical_setup_projection.py` — deep read-only interface for canonical setup-candidate validation, ordering, filters, pagination, lane counts, freshness, and provenance
 - `backend/mvp_api.py` — candidate builders plus compatibility projections; re-exports the canonical projection interface for existing callers
@@ -194,7 +194,7 @@ targets or documentation authorities.
 - `backend/mvp_routes.py` — canonical/legacy dispatcher plus compatibility wrapper for freshness overlay
 - `backend/read_model_publisher.py` — validates/publishes canonical read-model and intraday sidecar
 - `backend/canonical_chart_read.py` — deep read-only chart row retrieval/aggregation seam for SQL shape, provisional current-session data, chronological conversion inputs, labels, and timestamp metadata
-- `backend/mvp_chart_db.py` — SELECT-only chart response adapter for `1D`/`1W`/`60M`/`1M` OHLCV + indicators
+- `backend/mvp_chart_db.py` — **KEEP-HISTORICAL** chart response adapter for retained historical callers/tests; never loaded by the active chart route
 - `backend/app.py` — FastAPI routes, chart response adapter, and chart aggregation consumers
 
 ## HISTORICAL / SUPERSEDED / DROPPED — retained trial MVP surface contract — 2026-09-01

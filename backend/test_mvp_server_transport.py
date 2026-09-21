@@ -193,11 +193,13 @@ def test_active_entrypoint_import_does_not_load_historical_dispatchers():
     assert json.loads(result.stdout) == []
 
 
-def test_active_chart_request_does_not_load_historical_decision_modules():
+def test_active_chart_request_does_not_load_historical_chart_or_decision_modules():
     code = """
 import json, sys
-import active_chart_routes, chart_read_model
-chart_read_model.read_current = lambda symbol, timeframe: {
+import active_chart_data, active_chart_routes, chart_read_model
+chart_read_model.read_current = lambda symbol, timeframe: None
+active_chart_routes._load_active_trend_item = lambda symbol: {'symbol': symbol}
+active_chart_data.project_active_chart_data = lambda symbol, timeframe: {
     'symbol': symbol, 'timeframe': timeframe,
     'candles': [{'date': '2026-09-19', 'close': 10}],
     'provenance': {'source': 'test'},
@@ -207,9 +209,13 @@ class Handler:
         self.body = body
 active_chart_routes.handle_active_chart_api(
     '/api/chart-db/AAA?timeframe=1D&view=chart', Handler())
-print(json.dumps(sorted(set(sys.modules) & {
-    'mvp_routes', 'mvp_api', 'vcp_finder', 'actionable_signal_policy',
-    'shadow_signal_replay', 'chart_wave_evidence'})))
+blocked_prefixes = (
+    'mvp_', 'chart_wave_evidence', 'vcp', 'shadow_',
+    'actionable_signal_policy', 'unified_vcp', 'signal_core',
+)
+print(json.dumps(sorted(
+    module for module in sys.modules if module.startswith(blocked_prefixes)
+)))
 """
     result = subprocess.run(
         [sys.executable, "-c", code],
