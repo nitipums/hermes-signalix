@@ -1,7 +1,16 @@
 # Deployment
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
-> **Reconciled:** 2026-09-19 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard builder/server and shadow-named active modules are not current routing targets. Generated artifacts are runtime inputs only; current pointers and validated artifacts serve, and Git history is rollback authority.
+> **Reconciled:** 2026-09-21 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard builder/server and shadow-named active modules are not current routing targets. Generated artifacts are runtime inputs only; current pointers and validated artifacts serve, and Git history is rollback authority.
+
+## Full Compose recreate and current read-back — 2026-09-21 13:55 ICT
+
+- Owner-authorized action: from canonical `/root/signalix`, `docker compose up -d --force-recreate` recreated PostgreSQL, Redis, backend, and dashboard. No migration or explicit database write was run; persistent volumes were retained.
+- Read-back: all four Compose services healthy; backend readiness `{"status":"ok","db":"up","redis":"up"}`. Dashboard bind mount is `/root/signalix/backend -> /app`.
+- Intraday timer/service remained enabled and successful through `12:00` ICT. Canonical intraday quote artifact was generated at `2026-09-21T05:00:41.833758+00:00` (`12:00:41` ICT), 237 quotes, latest completed 60m bars through `2026-09-21T05:00:00+00:00` UTC.
+- Public API read-back after recreate: `/api/market-breadth` HTTP 200, `PRODUCTION_READ_ONLY`, `PARTIAL`, `929 declared / 841 observed / 88 blocked`; retired `/mvp` and `/api/setup-candidates` HTTP 410. `/api/trend-map` correctly failed closed at the review time because its Daily artifact was stale: `as_of=2026-09-18`, publication `2026-09-19T06:29:46.448688+00:00`, age beyond the 172800-second freshness window, `DATA_BLOCKED`/`verification_status=NOT_VERIFIED`.
+- Intraday public overlay was read from `intraday_price_data` for 237/237 rows after the canonical mount repair; this is separate from the stale Daily Trend Map classification artifact. Public browser page loaded; full 390px/failure-state acceptance was not rerun in this recreate closeout.
+- Runtime/source evidence is current for this read-back, but data freshness remains **REVISE** until a fresh Daily publication makes `/api/trend-map` current again. Generated intraday pointer/version files are runtime inputs and remain untracked/dirty by design; they were not staged.
 
 ## Current active-only deployment boundary — 2026-09-20
 
