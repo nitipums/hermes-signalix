@@ -34,6 +34,13 @@ or deployment action was taken by this reconciliation.
 - Public browser: Trend Map loaded its explicit `DATA_BLOCKED` state because the Daily artifact remains stale; Market Breadth rendered at 390px with no horizontal overflow and `PARTIAL` coverage. This is a served-contract/runtime PASS with Daily freshness REVISE, not a full product PASS.
 - Historical-family source deletion was not performed in this wave. Direct callers/references remain and are classified OWNER-DECISION; deletion requires later compatibility/reference-repair waves.
 
+## Neutral active chart seam — 2026-09-21 14:45 ICT
+
+- Owner-authorized Sol/Ponytail wave merged as PR #81, remote stable SHA `e140d9b7a91f3fd16e714e14c76fd5fba7ddd644`.
+- Active chart route now uses `active_chart_data.py` for the neutral SELECT-only OHLCV/indicator fallback; it no longer imports `mvp_chart_db.py`, Wave evidence, VCP, setup, shadow, or private-decision modules.
+- `mvp_chart_db.py` remains `KEEP-HISTORICAL` because `mvp_routes.py`, `chart_read_model.py`, and historical tests still reference it. No deletion was authorized by this wave.
+- Dashboard was recreated from `/root/signalix`; active pages/APIs returned HTTP 200, retired routes returned 410/404, readiness remained healthy, and public Market Breadth 390px rendered with `scrollWidth=390`/`clientWidth=390`. Trend Map Daily freshness remains a separate `REVISE/DATA_BLOCKED` gate until fresh EOD publication.
+
 ## Final source/release closeout — 2026-09-20
 
 - Canonical checkout: `/root/signalix`, `release/signalix-mvp-stable`.
