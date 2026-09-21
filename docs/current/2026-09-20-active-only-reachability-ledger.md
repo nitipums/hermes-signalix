@@ -83,7 +83,7 @@ evidence, not a new deletion instruction for this ticket.
 | `docs/current/2026-09-20-pointer-artifact-inventory.md` | Current pointer/artifact evidence note; useful for identity and rollback context, but dated and not fresh served evidence. | KEEP |
 | `docs/current/2026-09-20-active-cleanup-review.md` | Current cleanup review; source/release closeout only, with runtime/API/browser/deployment still separate. | KEEP |
 | `vault/Product-Strategy-Market-to-Action.md`, `vault/Execution-Pipeline.md`, `vault/Architecture.md`, `vault/Components.md`, `vault/Deployment.md`, `vault/Documentation-Governance.md`, `vault/INDEX.md` | Current authority and routing documents read for scope, acceptance, component, deployment, and document status. | KEEP |
-| Historical `docs/archive/`, `vault/archive/`, old superpowers specs/plans, and setup/actionable-signal source families | HISTORICAL / DEFERRED references. They contain compatibility and recovery context but are not active route evidence. No consolidation, deletion, or move is authorized. | OWNER-DECISION |
+| Removed archive paths, old superpowers specs/plans, and setup/actionable-signal source families | HISTORICAL / DEFERRED references. Removed documents remain recoverable from Git history and are not active route evidence. | OWNER-DECISION |
 
 ## Compose, service, timer, and operational references
 

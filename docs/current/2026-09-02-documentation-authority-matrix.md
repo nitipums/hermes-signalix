@@ -23,7 +23,7 @@ This matrix makes the minimum reading path explicit. It separates current author
 | Team/Codex workflow | `vault/Team-Operating-Model.md`, `vault/Codex-Standard-Workflow-2026-08-29.md` | AGENTS routing | old roster notes | Keep one worker procedure; historical helpers remain archive |
 | Governance/navigation | `vault/Documentation-Governance.md`, `vault/INDEX.md`, `docs/START-HERE.md` | this matrix, `docs/README.md` | old cleanup reports | Make START-HERE the first read; INDEX remains catalog |
 | Active execution state | Kanban board `signalix` when cards exist | current task handoff | `vault/Roadmap-Kanban.md`, archived cards | Do not mirror live board state into docs; current board was empty at closeout |
-| Historical incidents/replay/migration | `vault/Postmortems/`, `vault/archive/`, `docs/archive/` | dated handoffs | none | Preserve; add replacement/status links, never delete by age |
+| Historical incidents/replay/migration | `vault/Postmortems/`, dated handoffs, Git history | dated handoffs | none | Preserve through explicit history links; never delete by age without owner scope |
 | Runtime/generated data | live DB, read-model, snapshots, served artifacts | tests and run lineage | documentation notes | Never treat generated artifacts as documentation authority |
 
 ## Findings from Wave 0

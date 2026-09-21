@@ -18,7 +18,7 @@ Signalix skills are procedures and routers. Durable product, data, UI, acceptanc
 | Dashboard/card/drawer behavior | `vault/Components.md` plus current focused UI specs | Run UI/API/browser checks; do not own the contract prose |
 | Data freshness, provenance, replay, lineage | `vault/Execution-Pipeline.md`, `vault/Deployment.md`, focused current specs | Run probes and reconcile evidence |
 | Runtime/deployment/timers | `vault/Deployment.md` | Verify served state; never claim deployment from source alone |
-| Historical incidents and milestones | dated handoffs, `Postmortems/`, `docs/archive/` | Read only when the current authority links to the history |
+| Historical incidents and milestones | dated handoffs, `Postmortems/`, Git history | Read only when the current authority links to the history |
 
 ## Active procedural skill set
 

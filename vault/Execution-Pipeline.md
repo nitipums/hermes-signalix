@@ -226,7 +226,7 @@ This closes the previous “DB updated but dashboard stale” gap. Unexpected so
 
 ## Historical team-review inputs — 2026-09-01
 
-`../docs/archive/reviews/2026-09-01-signalix-independent-review.md` is a historical review packet, not a mandatory current preflight. It remains useful evidence for DATA_BLOCKED semantics, latency/pagination, chart markers, and staged legacy quarantine. New work starts from `docs/START-HERE.md`, the relevant current spec/decision, and a fresh source/runtime baseline.
+The historical 2026-09-01 independent review packet is removed from the working tree and remains recoverable in Git history; it is not a mandatory current preflight. New work starts from `docs/START-HERE.md`, the relevant current spec/decision, and a fresh source/runtime baseline.
 
 Only pull one tightly scoped implementation item at a time. Lite is the final evidence gate; worker completion is not final approval. Every active-chain card terminal outcome (`PASS`, `DONE`, `REVISE`, `FAIL`, or `BLOCKED`) requires a delivered report to the owner; `REVISE`/`FAIL` requires bounded remediation or an explicit blocker.
 
