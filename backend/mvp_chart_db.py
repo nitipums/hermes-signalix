@@ -26,14 +26,29 @@ from threading import Lock
 
 from canonical_chart_read import (DEFAULT_CHART_CANDLE_LIMIT, ChartReadResult,
                                   read_chart_result)
-from chart_wave_evidence import (build_legacy_chart_wave_evidence,
-                                 canonical_chart_wave_evidence,
-                                 neutral_chart_wave_evidence)
 from technical_indicators import MA_PERIODS, build_technical_indicators
 
 
 _POOL = None
 _POOL_LOCK = Lock()
+
+
+# Historical callers and tests patch these names directly.  Keep the callable
+# seam while deferring the Wave module import until a historical response
+# explicitly requests that evidence.
+def build_legacy_chart_wave_evidence(*args, **kwargs):
+    from chart_wave_evidence import build_legacy_chart_wave_evidence as build
+    return build(*args, **kwargs)
+
+
+def canonical_chart_wave_evidence(*args, **kwargs):
+    from chart_wave_evidence import canonical_chart_wave_evidence as build
+    return build(*args, **kwargs)
+
+
+def neutral_chart_wave_evidence(*args, **kwargs):
+    from chart_wave_evidence import neutral_chart_wave_evidence as build
+    return build(*args, **kwargs)
 
 
 def _get_db_pool():
@@ -289,7 +304,8 @@ def compact_chart_db_response(payload: Optional[dict], *, limit: int = _CHART_VI
 
 
 def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_item: dict | None = None,
-                              connection: Any | None = None) -> Optional[dict]:
+                              connection: Any | None = None,
+                              include_historical_evidence: bool = True) -> Optional[dict]:
     """Build the GET /api/chart-db/{symbol}?timeframe=... response.
 
     Supported timeframes: 1D, 1W, 60M, 1M. All queries are SELECT-only.
@@ -441,19 +457,7 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
     note = (provisional_note + (", ".join(notes) if notes else
             f"Computed from {chart_source} (SELECT only). All indicators available."))
 
-    wave_evidence = (canonical_chart_wave_evidence(canonical_item)
-                     if timeframe != "60M" else None)
-    if wave_evidence is None:
-        # The primary field is never generated from chart candles. Preserve
-        # the historical projection only as explicitly labelled audit data.
-        wave_evidence = neutral_chart_wave_evidence(timeframe)
-        if timeframe != "60M":
-            wave_evidence["audit_compatibility"] = {
-                "status": "audit_only",
-                "source": "legacy_chart_generated",
-                "wave_evidence": build_legacy_chart_wave_evidence(candles, timeframe, as_of),
-            }
-    return {
+    result = {
         "symbol": symbol.upper(),
         "timeframe": timeframe,
         "candles": candles,
@@ -463,7 +467,6 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
         "ma200": ma200,
         "macd": macd,
         "rsi": rsi,
-        "wave_evidence": wave_evidence,
         "source": chart_source,
         "as_of": as_of,
         "latest_time": latest_time,
@@ -474,3 +477,16 @@ def project_chart_db_response(symbol: str, timeframe: str = "1D", *, canonical_i
             "note": note,
         },
     }
+    if include_historical_evidence:
+        wave_evidence = (canonical_chart_wave_evidence(canonical_item)
+                         if timeframe != "60M" else None)
+        if wave_evidence is None:
+            wave_evidence = neutral_chart_wave_evidence(timeframe)
+            if timeframe != "60M":
+                wave_evidence["audit_compatibility"] = {
+                    "status": "audit_only",
+                    "source": "legacy_chart_generated",
+                    "wave_evidence": build_legacy_chart_wave_evidence(candles, timeframe, as_of),
+                }
+        result["wave_evidence"] = wave_evidence
+    return result

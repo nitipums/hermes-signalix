@@ -1,7 +1,7 @@
 # Architecture
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current system architecture and runtime data flow`.
-> **Reconciled:** 2026-09-19 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. Setup/Elliott paths are historical/audit only; current pointers and validated read-model artifacts are the only serving inputs, with Git history as rollback authority.
+> **Reconciled:** 2026-09-21 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. Setup/Elliott paths are historical/audit only; current pointers and validated read-model artifacts are the only serving inputs, with Git history as rollback authority.
 
 ## Current routing boundary
 
@@ -10,6 +10,25 @@ owns current routing semantics; the [pointer/artifact inventory](../docs/current
 is evidence only. The historical architecture below does not override them.
 
 ## Production-served Daily Trend Mapping
+
+The Compose dashboard command enters through `backend/active_transport.py`.
+Its canonical route table owns exactly the four active page/API routes and the
+three allowlisted static assets used by Trend Map. `/mvp` and
+`/api/setup-candidates` terminate there with explicit 410 responses; all other
+unsupported routes terminate with 404. The active entrypoint does not import
+or fall through to `mvp_server.py`, `mvp_routes.py`, `mvp_api.py`, VCP,
+shadow/private-signal, or historical decision builders.
+
+The Trend Map drawer additionally reaches two narrowly scoped read-only
+compatibility APIs: `/api/trend-map/{symbol}/route` and
+`/api/chart-db/{symbol}?timeframe=...&view=chart`. They are not additional
+top-level product surfaces. The chart route is owned by
+`active_chart_routes.py` and `active_chart_adapter.py`; it prefers validated
+chart artifacts and retains a SELECT-only DB fallback through
+`mvp_chart_db.py`. That compatibility module remains **KEEP** until its neutral
+OHLCV/indicator implementation is renamed or extracted. The active call sets
+`include_historical_evidence=false`, so Wave enrichment is neither imported
+nor built on the active request path.
 
 The current architecture is:
 
@@ -167,7 +186,8 @@ targets or documentation authorities.
 - HISTORICAL intraday E2E contract: fetch → `intraday_price_data` upsert (active feed only) → evaluator → MVP snapshot/projection → served `/mvp` on `:3001`; the former `/dashboard.html` artifact is retired and not a public acceptance surface.
 - `backend/refresh_company_profiles.py` — non-price cached company context; restrict future refreshes to active ORD universe
 - `backend/build_dashboard.py` — HISTORICAL compatibility snapshot builder; not a current route or serving input
-- `backend/mvp_server.py` / `mvp_routes.py` — HISTORICAL owner-only MVP server/dispatcher; `/mvp` and `/api/setup-candidates` are not current routes
+- `backend/active_transport.py` / `active_chart_routes.py` — canonical active-only transport and the bounded chart compatibility route
+- `backend/mvp_server.py` / `mvp_routes.py` — HISTORICAL owner-only MVP server/dispatcher; not imported or executed by the current Compose dashboard command
 - `backend/canonical_setup_projection.py` — deep read-only interface for canonical setup-candidate validation, ordering, filters, pagination, lane counts, freshness, and provenance
 - `backend/mvp_api.py` — candidate builders plus compatibility projections; re-exports the canonical projection interface for existing callers
 - `backend/canonical_freshness_lineage.py` — deep read-only sidecar lineage adapter; compares published intraday fetch time with embedded lineage and preserves Daily/read-model identity

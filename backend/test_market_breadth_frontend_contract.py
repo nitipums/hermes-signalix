@@ -6,12 +6,12 @@ TEMPLATE = Path(__file__).with_name("market_breadth_template.html")
 
 def test_market_breadth_route_and_template_are_separate_from_trend_map():
     html = TEMPLATE.read_text(encoding="utf-8")
-    server = (TEMPLATE.parent / "mvp_server.py").read_text(encoding="utf-8")
+    server = (TEMPLATE.parent / "active_transport.py").read_text(encoding="utf-8")
     assert "/market-breadth" in html
     assert "/api/market-breadth?range=" in html
     assert "Daily Trend Map" not in html
     assert 'href="/trend-map"' in html
-    assert 'template_path = os.path.join(_BACKEND_DIR, "market_breadth_template.html")' in server
+    assert 'os.path.join(_BACKEND_DIR, "market_breadth_template.html")' in server
 
 
 def test_market_breadth_template_has_accessible_cross_page_navigation_with_breadth_active():

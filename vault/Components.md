@@ -1,7 +1,7 @@
 # Components
 
 > **STATUS: CURRENT** · `CANONICAL_FOR: current component responsibilities and hard rules`.
-> **Reconciled:** 2026-09-19 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. `/mvp` and setup components are `HISTORICAL / SUPERSEDED / DROPPED`; the former shadow naming is retired for active modules.
+> **Reconciled:** 2026-09-21 · Daily Trend Mapping and Market Breadth are the active public read-only surfaces. `/mvp` and setup components are `HISTORICAL / SUPERSEDED / DROPPED`; the former shadow naming is retired for active modules.
 
 Every current backend component, its responsibility, and its hard rules. Legacy
 components below are retained only as explicitly labelled audit/history.
@@ -27,6 +27,26 @@ Current route pair:
 GET /api/trend-map
 GET /trend-map
 ```
+
+### Active transport and compatibility boundary
+
+`active_transport.py` is the canonical dashboard process entrypoint. Its route
+table owns only the four active product routes, root/index redirects, the
+Trend Map/Market Breadth templates, and the explicit active static allowlist.
+It returns 410 for the two retired setup routes and deterministic 404 for every
+unsupported or malformed route. It has no broad historical dispatcher import.
+
+The active drawer reaches `trend_route_api.py` and the chart-only
+`active_chart_routes.py` → `active_chart_adapter.py` seam. The latter may call
+the neutral OHLCV/indicator functions in historically named
+`mvp_chart_db.py` only when a validated chart artifact is unavailable. The
+active call disables historical Wave enrichment, and no setup/VCP/shadow or
+private-decision builder is imported. `mvp_chart_db.py`,
+`canonical-client.js`, and `shared-drawer.js` remain **KEEP compatibility**:
+the first still has historical callers, while the two served assets still
+contain shared legacy exports/branches even though the Trend Map journey does
+not invoke them. Extracting or pruning those branches is an
+**OWNER-DECISION** for a later bounded wave with browser evidence.
 
 ### Read-model rule
 
@@ -156,9 +176,10 @@ provenance remain available for audit; this does not remove the underlying
 contract or data.
 
 ## HISTORICAL / SUPERSEDED — `mvp_server.py` MVP static server
-Serves `/mvp` on :3001 from the bind-mounted `/root/signalix/backend/frontend`
-directory. The former `/dashboard.html` route returns 404. Runtime container is
-`signalix_dashboard`; it is separate from the FastAPI `signalix_backend` service.
+Retained as historical source/test evidence but no longer selected by the
+Compose dashboard command. The former `/dashboard.html` route returns 404.
+Runtime container `signalix_dashboard` is separate from the FastAPI
+`signalix_backend` service and now selects `active_transport.py`.
 Verify served source and API freshness against the
 latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 

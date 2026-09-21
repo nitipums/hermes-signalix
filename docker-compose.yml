@@ -65,7 +65,7 @@ services:
     env_file: .env
     environment:
       DASHBOARD_BIND_HOST: 0.0.0.0
-    command: ["python", "-u", "mvp_server.py"]
+    command: ["python", "-u", "active_transport.py"]
     depends_on:
       backend:
         condition: service_healthy

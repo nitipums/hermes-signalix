@@ -1,6 +1,7 @@
 import json
 
 import active_chart_adapter as adapter
+import active_chart_routes
 import mvp_routes
 import pytest
 
@@ -186,7 +187,7 @@ def test_active_dispatch_preserves_query_timeframe_and_has_no_legacy_markers(mon
     monkeypatch.setattr("chart_read_model.read_current",
                         lambda symbol, timeframe: semantic_payload(symbol, timeframe))
     handler = _Handler()
-    assert mvp_routes.handle_mvp_api(
+    assert active_chart_routes.handle_active_chart_api(
         "/api/chart-db/AAA?timeframe=60M&view=chart", handler
     )
     result = json.loads(handler.body)
@@ -200,12 +201,12 @@ def test_active_dispatch_preserves_query_timeframe_and_has_no_legacy_markers(mon
 
 def test_active_dispatch_returns_unavailable_state_for_known_empty_fallback(monkeypatch):
     monkeypatch.setattr("chart_read_model.read_current", lambda *args, **kwargs: None)
-    monkeypatch.setattr(mvp_routes, "_load_active_chart_item",
+    monkeypatch.setattr(active_chart_routes, "_load_active_trend_item",
                         lambda symbol: {"symbol": symbol})
     monkeypatch.setattr("mvp_chart_db.project_chart_db_response",
                         lambda *args, **kwargs: None)
     handler = _Handler()
-    assert mvp_routes.handle_mvp_api(
+    assert active_chart_routes.handle_active_chart_api(
         "/api/chart-db/AAA?timeframe=1D&view=chart", handler
     )
     result = json.loads(handler.body)
