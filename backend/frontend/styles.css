@@ -572,18 +572,6 @@ body {
   .technical-summary { grid-template-columns:1fr; }
 }
 
-.shadow-signal-intro { margin-bottom:14px; }
-.shadow-signal-list { display:grid; gap:10px; }
-.shadow-signal-card { width:100%; max-width:100%; min-width:0; padding:14px; border:1px solid rgba(63,185,80,.45); border-left:4px solid var(--green); border-radius:var(--radius); background:var(--surface); }
-.shadow-signal-card header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-.shadow-signal-card header div { display:flex; flex-direction:column; gap:3px; min-width:0; }
-.shadow-signal-card header strong { font-size:1.15rem; color:var(--text); }
-.shadow-signal-card header span { color:var(--green); font-size:.72rem; font-weight:700; letter-spacing:.05em; }
-.shadow-signal-card__confidence { color:var(--accent); font-size:.74rem; text-align:right; }
-.shadow-signal-card__plan { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; margin:12px 0; }
-.shadow-signal-card__plan span { display:flex; flex-direction:column; gap:2px; min-width:0; color:var(--text-3); font-size:.68rem; }
-.shadow-signal-card__plan b { color:var(--text); font-size:.84rem; overflow-wrap:anywhere; }
-.shadow-signal-card footer { display:flex; flex-wrap:wrap; gap:6px 14px; color:var(--text-3); font-size:.68rem; }
 
 /* ── reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
@@ -656,10 +644,6 @@ body {
   .vcp-card__decision { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; white-space:normal; overflow:hidden; text-overflow:ellipsis; overflow-wrap:anywhere; word-break:normal; line-height:1.25; }
   .vcp-card__evidence { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .vcp-row__details { display:inline-flex; min-height:32px; align-items:center; padding:0 7px; border:1px solid var(--border); border-radius:4px; background:var(--surface-2); color:var(--accent); font:inherit; font-size:.65rem; font-weight:600; cursor:pointer; }
-  .shadow-signal-intro .btn { width:100%; }
-  .shadow-signal-card__plan { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .shadow-signal-card header { flex-direction:column; }
-  .shadow-signal-card__confidence { text-align:left; }
 }
 .vcp-table .vcp-card__tags { flex:1 1 auto; gap:3px; margin:0; min-width:0; overflow:hidden; }
 .vcp-table .vcp-card__tags .tag { padding:1px 4px; font-size:.6rem; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }

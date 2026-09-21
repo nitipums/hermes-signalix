@@ -67,20 +67,12 @@ Market Breadth is the active aggregate companion surface at
 validated current pointer provide read-only breadth evidence. It has no setup,
 signal, alert, order, broker, or auto-trading meaning.
 
-## HISTORICAL / SUPERSEDED / DROPPED — private paper/shadow signal components
+## RETIRED — private signal, delivery, and portfolio components
 
-Pure deterministic projection over canonical setup-candidate evidence. Its
-Phase 1 market-only seam emits `BUY_NOW`, `BUY_ON_TRIGGER`, `WAIT`, `AVOID`, or
-`DATA_BLOCKED` without portfolio input. Evidence score is explicitly not a
-calibrated probability. The module never writes, publishes, sizes, alerts, or
-submits an order. Position-aware states remain isolated for later work.
-
-`shadow_signal_replay.py` rebuilds canonical candidates at each completed
-session boundary in the trailing seven calendar days, projects `BUY_NOW`, and
-deduplicates repeated observations of the same unchanged setup plan while
-preserving first/latest timestamps. `mvp_routes.py` exposes it through the
-token-free `GET /api/shadow-buy-signals?days=7`; `/mvp` renders the
-shadow result without changing the canonical setup API.
+Cleanup Wave B deleted the private actionable-signal policy/replay and tests,
+the MVP shadow route/tab, the portfolio module/routes/tests, and the delivery
+consumer/formatter. Git history is rollback authority. Retained lifecycle
+routes use `owner_auth.py` for fail-closed owner credential checks.
 
 ## `update_data.py` — shared EOD ingestion dependency
 Incremental, idempotent SET EOD updater. Fetches only trade days **strictly
@@ -186,11 +178,11 @@ Runtime container `signalix_dashboard` is separate from the FastAPI
 Verify served source and API freshness against the
 latest `intraday_ingestion_runs.fetch_completed_at`, not only HTTP 200.
 
-## HISTORICAL / COMPATIBILITY — legacy FastAPI, delivery, and portal components
+## HISTORICAL / COMPATIBILITY — legacy FastAPI and portal components
 
 The route/component inventory below is retained for audit and compatibility.
 Current public routing is owned by the Trend Map and Market Breadth surfaces
-above; these legacy `/scan`, `/screen`, signal-delivery, portal, and MVP paths
+above; these legacy `/scan`, `/screen`, portal, and MVP paths
 are not current product routing.
 
 ## `app.py` — legacy FastAPI backend
@@ -200,15 +192,7 @@ Routes:
 - `GET /signals` — list stored signals
 - `GET /screen/{symbol}` — run pipeline for one symbol, publish
 - `GET /chart/{symbol}?timeframe=` — backend bounded OHLCV (`1W/1D/60M/1M`); MVP uses the separate `/api/chart-db/{symbol}` contract, and 15m is retired
-- `POST /scan` — scan universe, publish candidates, rebuild dashboard, push summary
-
-Imports `push_telegram` + `DASHBOARD_PUBLIC_URL` from `delivery.py`.
-
-## `delivery.py` — push + formatting (shared)
-`push_telegram(text)`, `format_signal(envelope)` (Thai alert), `deliver(envelope)`,
-`run_consumer()`. Used by BOTH `app.py` (batch summary) and `delivery_consumer.py`
-(realtime). **Telegram-only** as of 2026-08-12 (LINE removed). Plain-text sends
-(Markdown parse caused Telegram 400).
+- `POST /scan` — scan universe, publish candidates, and rebuild the compatibility dashboard; no alert delivery occurs
 
 ## `llm.py` — Phase 3 LLM summarization
 `summarize_signal(result)` calls the Nous portal (`inference-api.nousresearch.com/v1`,
@@ -231,10 +215,6 @@ DB helpers for subscribers: `init_user_schema()`, `upsert_user(chat_id, tier)`,
 the free cap are rejected (HTTP 400) at `/watch`; watch-ALL always allowed.
 `_ensure_user()` (no tier reset) is used by set_watch so editing a watchlist never
 downgrades a paid user.
-
-## `delivery_consumer.py` — Redis subscriber
-Entrypoint for the `signalix_delivery` container. Subscribes `signals`, calls
-`deliver()` forever. Blocks; systemd-like restart via compose `restart: always`.
 
 ## Retired ingest guard
 

@@ -91,7 +91,7 @@ Before any task, Codex must:
 | Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + `docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
 | Current Trend Mapping API and UI | `/trend-map`, `/api/trend-map` | source + focused tests |
 | Retained setup/API contract (historical only) | `/mvp`, `/api/setup-candidates` | inspect only for audit/future reactivation |
-| Private market-buy shadow policy and 7-day UI (historical/deferred; reactivation-only) | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Focused design/spec + product strategy/acceptance authorities only after a new owner reactivation decision |
+| Retired private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` + Git history | New focused design/spec + product strategy/acceptance authorities only after a new owner decision |
 | Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
 | Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |
 | Current architecture/component behavior | `vault/Architecture.md`, `vault/Components.md` | The relevant architecture/component note |
@@ -116,7 +116,7 @@ Do not route work there without a new owner-approved product decision.
 - Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
 - Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **929 active ORD**, **237 eligible**, **692 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
 - `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.
-- Private paper/shadow actionable signals are `HISTORICAL / DEFERRED` and OFF.
+- Private paper/shadow actionable signals, portfolio APIs, and delivery consumers are retired and absent from source after cleanup Wave B.
   Alerts, broker execution, and auto-trading are also outside the active line;
   do not resume any of them without a new owner decision.
 

@@ -45,7 +45,7 @@ Alerts, broker execution, and auto-trading: `OFF / OUT OF ACTIVE SCOPE`.
 |---|---|---|
 | Product direction / non-goals | `../vault/Product-Strategy-Market-to-Action.md` | `../vault/Decisions.md` |
 | Historical setup-candidate / Wave contract (owner resume required) | `superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md` | source + focused tests; do not route current work |
-| Historical private seven-day shadow BUY policy (owner resume required) | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | `../vault/Decisions.md`, source + tests; do not route current work |
+| Retired private seven-day shadow BUY policy (new implementation decision required) | `superpowers/specs/2026-09-11-private-actionable-signal-design.md` | Git history; implementation was deleted in cleanup Wave B |
 | Owner decision | `../vault/Decisions.md` | relevant current decision record |
 | Architecture / component boundary | `../vault/Architecture.md` | `../vault/Components.md`, source |
 | Acceptance / evidence gate | `../vault/Execution-Pipeline.md` | focused acceptance evidence |

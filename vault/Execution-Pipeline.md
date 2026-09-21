@@ -162,6 +162,10 @@ The product must let a user answer, quickly and honestly:
 
 ## HISTORICAL / SUPERSEDED / DROPPED — private actionable-signal transition — 2026-09-11
 
+> **RETIRED 2026-09-21:** Cleanup Wave B deleted this policy, replay, route,
+> UI, portfolio, and delivery implementation. Git history is rollback authority;
+> the bullets below are decision history only, not source inventory.
+
 - Owner-approved direction: a visible private, market-only `BUY_NOW` paper/shadow
   tab covering the trailing seven calendar days. Portfolio data is not required
   for market discovery; position-aware hold/sell logic is later work.

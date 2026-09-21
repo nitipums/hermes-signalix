@@ -96,23 +96,13 @@ SET Index benchmark context strip from `price_data.symbol='SET'`. SET is
 context only and never changes the breadth denominator. SET50 is explicitly
 out of scope for this slice.
 
-## HISTORICAL / SUPERSEDED / DROPPED — retained setup/shadow trial flow — 2026-09-01
+## RETIRED — private signal, delivery, and portfolio families — 2026-09-21
 
-The 2026-09-11 private signal transition adds a read-only local shadow consumer
-after the canonical setup read model:
-
-```text
-trailing 7 calendar days of Daily + completed 60m market data
-→ point-in-time canonical setup rebuild (no lookahead)
-→ actionable_signal_policy.py market-buy projection
-→ /api/shadow-buy-signals?days=7
-→ /mvp Shadow Buy Signals · 7D tab
-→ Arm review and manual execution decision
-```
-
-This additive path does not require portfolio data, publish to Redis, send
-alerts, write signal state, or submit broker orders. The canonical
-`/api/setup-candidates` contract remains unchanged during shadow validation.
+Cleanup Wave B deleted the private actionable-signal projection and MVP
+route/UI, the portfolio API/storage module, and the alert delivery consumer.
+Git history is rollback authority. `/api/shadow-buy-signals` is unsupported
+(404), and no Compose alerts profile remains. Retained lifecycle compatibility
+uses the small fail-closed `owner_auth.py` seam without portfolio storage.
 
 ```text
 marginable_long (237)
@@ -144,14 +134,7 @@ The older flow below is retained as compatibility/history; it must not be read a
                    │ publish (screen envelope)  │ write scan_results.json
                    ▼                            ▼
               Redis channel              build_dashboard.py
-                 'signals'                    │
-                   │ subscribe                ▼
-   ┌─────────── DELIVERY (signalix_delivery) ─┐   dashboard_server.py
-   │  delivery_consumer.py → push_telegram()  │   (static, :3001)
-   │  (app.py /scan also pushes batch summary)│
-   └───────────────────┬──────────────────────┘
-                        ▼
-                  Telegram chat (7295704669)
+                 'signals'              (compatibility artifact only)
 ```
 
 ## Containers (docker-compose)
@@ -161,11 +144,6 @@ The older flow below is retained as compatibility/history; it must not be read a
 | `signalix_redis` | redis:7-alpine | 6379 | pub/sub bus |
 | `signalix_backend` | builds `./backend` | 8000 | FastAPI API |
 | `signalix_dashboard` | builds `./backend` | 3001 | dashboard service; historical MVP server/routes are not current product routing |
-| `signalix_delivery` | builds `./backend` | — | Redis consumer → Telegram |
-
-Backend and delivery share the **same image** (redis + requests preinstalled).
-Delivery runs `python -u delivery_consumer.py` (the `-u` avoids block-buffered
-logs in the non-TTY container).
 
 ## Webhook contract
 `POST /webhook` (backend, :8000)
@@ -178,8 +156,7 @@ The compatibility entries named `mvp_*`, `build_dashboard.py`, and related
 legacy helpers below are historical/audit inventory, not current routing
 targets or documentation authorities.
 - `backend/app.py` — FastAPI routes (`/webhook`, `/scan`, `/screen/{sym}`, `/chart/{sym}`, `/health`)
-- `backend/delivery.py` — `push_telegram()` + envelope formatting (shared by batch + consumer)
-- `backend/delivery_consumer.py` — Redis subscriber entrypoint
+- `backend/owner_auth.py` — minimal fail-closed owner credential seam retained by lifecycle compatibility routes
 - `backend/screening.py` — DB-backed Minervini engine
 - `backend/update_data.py` — Daily ingestion plus full active-ORD intraday 60m ingestion; `intraday_feed_status` tracks per-symbol Settrade 60m availability without changing Daily eligibility
 - `backend/intraday_evaluator.py` / `run_intraday_evaluation.py` — 60m action overlay and transition persistence

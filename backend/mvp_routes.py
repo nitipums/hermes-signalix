@@ -35,11 +35,6 @@ _setup_candidates_pg_pool_lock = threading.Lock()
 _SETUP_CANDIDATES_PG_POOL_MIN = 1
 _SETUP_CANDIDATES_PG_POOL_MAX = 4
 _CANONICAL_UNIVERSE = "marginable_long"
-_SHADOW_REPLAY_CACHE_TTL_SECONDS = 300.0
-_shadow_replay_cache = None
-_shadow_replay_cache_lock = threading.Lock()
-
-
 class SetupCandidatesBuilderContractError(RuntimeError):
     """The canonical builder returned something other than (items, metadata)."""
 
@@ -410,40 +405,10 @@ def _not_found(handler, symbol):
     json_response(handler, {"error": "symbol not found", "symbol": symbol}, status=404)
 
 
-def _load_shadow_buy_replay():
-    """Build and briefly cache the bounded read-only seven-day replay."""
-    global _shadow_replay_cache
-    now = time.monotonic()
-    with _shadow_replay_cache_lock:
-        if _shadow_replay_cache and _shadow_replay_cache[0] > now:
-            return _shadow_replay_cache[1]
-        from shadow_signal_replay import build_shadow_buy_replay
-        pg, release = _acquire_setup_candidates_pg()
-        try:
-            result = build_shadow_buy_replay(pg)
-        finally:
-            release()
-        _shadow_replay_cache = (time.monotonic() + _SHADOW_REPLAY_CACHE_TTL_SECONDS, result)
-        return result
-
-
 def _handle_canonical_routes(route, qs, handler) -> bool:
     """Handle canonical setup-candidate and symbol routes."""
     if route in ("/api/setup-candidates", "/api/setup-candidates/"):
         json_response(handler, retired_route_payload("/api/setup-candidates"), status=410)
-        return True
-    if route in ("/api/shadow-buy-signals", "/api/shadow-buy-signals/"):
-        try:
-            days = int(qs.get("days", ["7"])[0])
-        except (TypeError, ValueError):
-            days = 0
-        if days != 7:
-            json_response(handler, {"error": "invalid_request", "reason": "only_7_days_supported"}, status=400)
-            return True
-        try:
-            json_response(handler, _load_shadow_buy_replay())
-        except Exception:
-            json_response(handler, {"error": "shadow_buy_signals_unavailable"}, status=503)
         return True
     team_history_prefix = "/api/team/setup-candidates/"
     if route.startswith(team_history_prefix) and route.endswith("/history"):
