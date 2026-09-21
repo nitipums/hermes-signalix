@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -28,7 +29,7 @@ class Adapter:
 def publish(tmp_path):
     return publisher.publish_trend_map_read_model(
         adapter=Adapter(), conn=object(), as_of="2026-09-11", root=tmp_path,
-        published_at="2026-09-12T01:00:00+00:00")
+        published_at=datetime.now(timezone.utc).isoformat())
 
 
 def test_publisher_writes_version_pointer_and_full_counts(tmp_path):
@@ -180,10 +181,12 @@ def test_existing_version_cannot_be_overwritten_with_different_content(tmp_path)
 def test_repeated_publish_with_new_measurement_does_not_collide(tmp_path):
     first = publish(tmp_path)
     second = publisher.publish_trend_map_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-11", root=tmp_path,
-                                                  published_at="2026-09-12T02:00:00+00:00")
+                                                  published_at=datetime.now(timezone.utc).isoformat())
     assert first["artifact_id"] != second["artifact_id"]
     assert Path(first["artifact_path"]).read_bytes() != Path(second["artifact_path"]).read_bytes()
-    assert publisher.read_current_trend_map_report(tmp_path)["timing"] == second["timing"]
+    loaded = publisher.read_current_trend_map_report(tmp_path)
+    assert loaded["artifact"]["id"] == second["artifact_id"]
+    assert loaded["timing"] == second["timing"]
 
 
 def test_pointer_readback_missing_corrupt_and_mismatched_are_blocked(tmp_path):
@@ -191,7 +194,7 @@ def test_pointer_readback_missing_corrupt_and_mismatched_are_blocked(tmp_path):
     assert missing["status"] == "DATA_BLOCKED" and missing["rows"] == []
     publish(tmp_path)
     loaded = publisher.read_current_trend_map_report(tmp_path)
-    assert loaded["artifact"]["id"] == loaded["artifact_id"]
+    assert loaded["artifact"]["id"] == loaded["read_path"]["artifact_id"]
     (tmp_path / "current.json").write_text("not json")
     assert publisher.read_current_trend_map_report(tmp_path)["verification_status"] == "NOT_VERIFIED"
     publish(tmp_path)
@@ -230,10 +233,10 @@ def test_pointer_change_is_observed_without_process_restart(tmp_path):
     first = publish(tmp_path)
     first_read = publisher.read_current_trend_map_report(tmp_path)
     second = publisher.publish_trend_map_read_model(adapter=Adapter(), conn=object(), as_of="2026-09-12", root=tmp_path,
-                                                  published_at="2026-09-12T02:00:00+00:00")
+                                                  published_at=datetime.now(timezone.utc).isoformat())
     second_read = publisher.read_current_trend_map_report(tmp_path)
     assert first["artifact_id"] != second["artifact_id"]
-    assert first_read["artifact_id"] != second_read["artifact_id"]
+    assert first_read["artifact"]["id"] != second_read["read_path"]["artifact_id"]
     assert second_read["as_of"] == "2026-09-12"
     assert all(isinstance(second_read["timing"][key], (int, float))
                for key in ("db_read_ms", "classify_ms", "serialize_write_ms", "total_ms"))
