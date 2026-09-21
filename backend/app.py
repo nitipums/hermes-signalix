@@ -232,9 +232,6 @@ def tiers():
     }
 
 
-# Deferred Portfolio/owner routes are isolated from the MVP app core.
-from portfolio_routes import create_portfolio_router
-app.include_router(create_portfolio_router(get_pg))
 from lifecycle_routes import create_lifecycle_router
 app.include_router(create_lifecycle_router(get_pg))
 
@@ -364,13 +361,11 @@ def get_instrument(symbol: str):
         pg.close()
 
 
-# ---------- Phase 3 delivery (shared with the real-time consumer) ----------
+# ---------- Historical scanner compatibility ----------
 from screening import analyze_symbol_db, analyze_symbol_db_ranked, scan_universe, group_scan_results, load_symbol_intraday  # noqa: E402
 from provenance_contract import screen_price_provenance  # noqa: E402
 from scan_history import persist_daily_scan_snapshot, active_breakout_events, persist_breakout_lifecycle, breakout_event_lifecycle, reconcile_intraday_events_at_eod  # noqa: E402
-# All senders + formatters live in delivery.py so the batch scan (here) and the
-# standalone Redis consumer format + push identically.
-from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
+DASHBOARD_PUBLIC_URL = os.getenv("DASHBOARD_PUBLIC_URL", "")
 
 # Webhook shared-secret gate. When set, /webhook requires it (header
 # X-Webhook-Secret or ?secret=). Leave empty to accept any POST — NOT
@@ -378,8 +373,8 @@ from delivery import push_telegram, DASHBOARD_PUBLIC_URL  # noqa: E402
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 
 
-def build_and_push_summary(cands, near, scan_time, scanned, run_id=None):
-    """Build the dashboard HTML, then push a summary + link to Telegram."""
+def build_dashboard_summary(cands, near, scan_time, scanned, run_id=None):
+    """Build the compatibility dashboard without alert or delivery side effects."""
     # build dashboard (runs build_dashboard.build in-process)
     try:
         import build_dashboard
@@ -389,26 +384,7 @@ def build_and_push_summary(cands, near, scan_time, scanned, run_id=None):
         print(f"  ! dashboard build failed: {repr(e)[:120]}")
         vcp_n = sum(1 for c in cands if c.get("vcp", {}).get("is_vcp"))
     url = DASHBOARD_PUBLIC_URL.rstrip("/") + "/trend-map" if DASHBOARD_PUBLIC_URL else ""
-    top = sorted(cands, key=lambda c: c["trend_template"]["rs_rating"], reverse=True)[:8]
-    lines = [f"📊 *Signalix Scan* — {scan_time[:19].replace('T',' ')} UTC",
-             f"✅ ผ่าน Trend Template 8/8: *{len(cands)}* หุ้น  |  🔺 VCP: *{vcp_n}*  |  Near-miss 6/8: {len(near)}",
-             "",
-             "*Top RS (ใกล้ buy-zone Fib 0.5/0.618):*"]
-    for c in top:
-        tt = c["trend_template"]
-        vcp = " 🔺VCP" if c.get("vcp", {}).get("is_vcp") else ""
-        bz = c.get("buy_zone") or {}
-        buys = ""
-        if bz.get("buy_zones"):
-            buys = " | buy-zone " + "/".join(f"{k}={v}" for k, v in bz.get("buy_zones", {}).items())
-        lines.append(f"  • {c['symbol']}  RS {tt['rs_rating']:.0f}  ปิด {c['close']}{vcp}{buys}")
-    if url:
-        lines.append("")
-        lines.append(f"📈 Dashboard: {url}")
-    else:
-        lines.append("")
-        lines.append("⚠️ ตั้ง DASHBOARD_PUBLIC_URL ใน .env เพื่อแนบลิงก์")
-    push_telegram("\n".join(lines))
+    print(f"Compatibility dashboard built: candidates={len(cands)} near={len(near)} vcp={vcp_n}")
     return url
 
 def _write_scan_json(cands, near, groups=None):
@@ -1200,7 +1176,7 @@ def run_scan(
     url = None
     if push:
         from datetime import datetime as _dt
-        url = build_and_push_summary(cands, near, _dt.utcnow().isoformat(), scanned, run_id=snapshot["run_id"])
+        url = build_dashboard_summary(cands, near, _dt.utcnow().isoformat(), scanned, run_id=snapshot["run_id"])
     else:
         try:
             import build_dashboard

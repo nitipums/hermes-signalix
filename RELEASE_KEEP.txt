@@ -12,11 +12,8 @@ backend/mvp_chart_db.py
 backend/legacy_routes.py
 backend/legacy_server.py
 backend/deferred_runtime.py
-backend/portfolio_routes.py
-backend/portfolio.py
+backend/owner_auth.py
 backend/users.py
-backend/delivery.py
-backend/delivery_consumer.py
 backend/llm.py
 backend/provenance_contract.py
 backend/source_freshness.py

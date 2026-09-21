@@ -49,7 +49,7 @@ artifact receives `DELETE`, `MOVE-OUT`, or `CONSOLIDATE` here.
 | Source family | Repository evidence | Disposition | Boundary / contradiction |
 |---|---|---|---|
 | Compose `postgres`, `redis`, `backend`, `dashboard` | `docker-compose.yml`; dependency healthchecks, host-only backend port, dashboard port `3001`, and `./backend:/app` bind mounts | **KEEP** | Serving/dependency owner only. No publisher timer is declared. Compose/container running state is **NOT VERIFIED**. |
-| Compose `delivery` profile `alerts` | `docker-compose.yml`; `delivery_consumer.py`, Redis subscription, Telegram/LINE fan-out, read-only Nous token mount, profile disabled unless selected | **OWNER-DECISION** | Historical/deferred delivery family. Do not enable, start, or route active read-only evidence through it. Installed/profile-selected/current state is **NOT VERIFIED**. |
+| Compose delivery/alerts | Removed in cleanup Wave B; Git history is rollback authority | **DELETE** | No active or retained compatibility caller required the disabled profile or consumer. Runtime removal/read-back remains **NOT VERIFIED** until Lite deploys. |
 | EOD publisher path | `backend/update_data.service` → `update_data.py --source settrade --scan`; #74 records Trend Map, chart `1D/1W/1M`, and related read-model hooks at the EOD boundary | **KEEP** | Source-defined scheduled publisher owner for active artifacts, subject to the unresolved `ExecStartPost=.../verify_mvp_only.py` contradiction below. |
 | Intraday publisher path | `backend/signalix-intraday.service` → `update_data.py --intraday-only ... --intraday-universe marginable_long --intraday-interval 60m --no-scan`; `signalix-intraday.timer` | **KEEP** | Source-defined owner for the active display-only 60M/intraday publication path. `ExecStopPost` is a separate evaluation family and is not active-route ownership. |
 | Intraday watchdog | `signalix-intraday-watchdog.timer` → `intraday_healthcheck.py`, with a Bangkok session guard | **KEEP** | Observability/freshness owner only; it must not publish signals or change actionability. Installed/current state is **NOT VERIFIED**. |
@@ -140,8 +140,8 @@ this issue:
 4. The tier3 monitor and intraday timer both invoke `update_data.py` with
    different modes. The source does not prove whether both are installed or
    whether their outputs are compatible with the active artifact contract.
-5. The Compose alerts profile and delivery consumer are operationally present
-   in source but are outside the active no-actionability boundary.
+5. Resolved by cleanup Wave B: the Compose alerts profile and delivery consumer
+   are absent from source. Runtime removal remains **NOT VERIFIED**.
 
 ## Exact read-only evidence commands
 
@@ -162,7 +162,7 @@ sed -n '1,180p' backend/signalix-intraday-watchdog.timer
 for f in backend/*.service backend/*.timer backend/*.service.d/*.conf; do
   rg -n '^(Description|After|Requires|ExecCondition|ExecStart|ExecStartPost|ExecStopPost|OnCalendar|Unit=|WantedBy|Environment(File)?|WorkingDirectory|Type=)' "$f"
 done
-rg -n -C 3 'def (run|publish|main)|intraday-only|no-scan|publish_(trend|market|chart|intraday)|read_model|delivery|signals|shadow|setup' backend/update_data.py backend/mvp_server.py backend/*publisher.py backend/delivery.py backend/delivery_consumer.py
+rg -n -C 3 'def (run|publish|main)|intraday-only|no-scan|publish_(trend|market|chart|intraday)|read_model|signals|setup' backend/update_data.py backend/mvp_server.py backend/*publisher.py
 ```
 
 Results: checkout was clean before this file, `HEAD` was

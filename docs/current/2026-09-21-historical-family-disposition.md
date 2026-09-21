@@ -111,51 +111,41 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 - **Disposition:** **OWNER-DECISION**. Keep available for audit; do not run,
   promote, or remove it under Issue #76.
 
-### 4. Shadow/private-signal/actionable signal
+### 4. Shadow/private-signal/actionable signal — owner disposition applied
 
-- **Current route reachability:** Source-visible in `shadow_signal_replay.py`,
-  `actionable_signal_policy.py`, `action_queue.py`, private-signal specs, and
-  historical UI/detail paths. The active Trend Map envelope explicitly sets
-  `actionability=NONE`; no private signal or shadow-service runtime/API
-  reachability was checked.
-- **Publisher/test/operational references:** Actionable-signal and shadow
-  replay tests, private signal design, delivery/Redis references, and old
-  `BUY_NOW`/paper/shadow material. #75 identifies the delivery profile as
-  source-present but deferred; installed/profile-selected state is unknown.
+- **Current route reachability:** None in source after cleanup Wave B. The
+  active Trend Map envelope remains `actionability=NONE`; runtime/API removal
+  is not verified in the worktree.
+- **Publisher/test/operational references:** The implementation and focused
+  tests were deleted. The private-signal design and old `BUY_NOW`/paper/shadow
+  prose remain historical decision evidence only.
 - **Authority role:** Historical/deferred policy and audit material only.
   Current Product Strategy and the active-only freeze explicitly turn this
   family off and require a new owner decision before resumption.
 - **Rollback/audit value:** High for policy/version, replay, and safety-boundary
   history; it demonstrates why active pages must not serialize action fields.
 - **Contradictions:** Old private-signal specs and Product Strategy sections
-  describe a future/previous shadow product; source names and tests can look
-  active; any `BUY_NOW`, alert, or execution semantics would contradict the
-  current envelope.
-- **Disposition:** **OWNER-DECISION**. No signal publication, re-enable, or
-  cleanup is authorized.
+  describe a previous shadow product; they do not imply source reachability.
+- **Disposition:** **DELETE**, applied in cleanup Wave B. Policy/replay source,
+  tests, and the MVP route/UI were removed; Git history is rollback authority.
 
-### 5. Delivery/alerts/broker/portfolio
+### 5. Delivery/alerts/broker/portfolio — owner disposition applied
 
-- **Current route reachability:** Source/configuration reachability exists in
-  `delivery.py`, `delivery_consumer.py`, `portfolio.py`, portfolio routes,
-  `docker-compose.yml`'s disabled/profiled `delivery` service, and Wayfinder
-  future tickets. No active route reaches this family under the current
-  contract, and no runtime/profile or broker reachability was verified.
-- **Publisher/test/operational references:** Delivery, signal, portfolio,
-  broker-adapter, risk, and portfolio tests; Redis `signals` subscription;
-  Compose profile and historical alert/action docs. These references do not
-  establish an installed consumer, credentials, broker session, or order path.
+- **Current route reachability:** None in source after cleanup Wave B. Runtime
+  removal and installed Compose state are not verified in the worktree.
+- **Publisher/test/operational references:** Portfolio and delivery source and
+  focused tests were deleted. Historical alert/action and future Wayfinder
+  prose remains decision evidence only.
 - **Authority role:** Future/deferred planning and safety/audit boundary;
   alerts, broker execution, and auto-trading remain OFF and separately gated.
 - **Rollback/audit value:** High for proving no-actionability boundaries,
   simulated-vs-real separation, idempotency/risk requirements, and historical
   recovery planning.
-- **Contradictions:** Compose makes delivery operationally present in source
-  while the active product forbids alerts/orders; Product Strategy describes
-  future proposal/execution phases; “active” names in old evaluator paths do
-  not promote this family.
-- **Disposition:** **OWNER-DECISION**. Do not enable, connect, publish, or
-  clean up this family in this record.
+- **Contradictions:** Product Strategy and Wayfinder may describe future
+  proposal/execution phases; they do not restore the deleted implementation.
+- **Disposition:** **DELETE**, applied in cleanup Wave B. The portfolio
+  module/routes/tests, delivery source, and disabled Compose alerts profile
+  were removed. Runtime removal is not verified in the worktree.
 
 ### 6. Lifecycle/Team Facts
 

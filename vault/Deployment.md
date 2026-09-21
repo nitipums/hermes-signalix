@@ -3,6 +3,12 @@
 > **STATUS: CURRENT** · `CANONICAL_FOR: deployment/runbook/timer ownership`.
 > **Reconciled:** 2026-09-21 ICT · active public read-only surfaces are Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`). The former shadow naming is retired for active modules. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard builder/server and shadow-named active modules are not current routing targets. Generated artifacts are runtime inputs only; current pointers and validated artifacts serve, and Git history is rollback authority.
 
+Cleanup Wave B removed the disabled Compose `alerts`/`delivery` profile and
+the private-signal, alert-delivery, and portfolio source families. Compose now
+owns only PostgreSQL, Redis, backend readiness/compatibility API, and the active
+dashboard. No deployment, restart, installed-state check, API read-back, or
+browser verification was performed in the cleanup worktree.
+
 ## Full Compose recreate and current read-back — 2026-09-21 13:55 ICT
 
 - Owner-authorized action: from canonical `/root/signalix`, `docker compose up -d --force-recreate` recreated PostgreSQL, Redis, backend, and dashboard. No migration or explicit database write was run; persistent volumes were retained.
@@ -610,7 +616,7 @@ Daily coverage.
 - Automatic trading/broker execution: `PENDING / FUTURE FEATURE`, OFF and not authorized.
 - Evaluator auto-caller: `PENDING / OWNER DECISION`; if approved later, it will append lifecycle evaluation evidence only, not submit orders.
 
-The paused delivery container, Telegram credentials, and alert source are retained for reversible rollback. No secrets are stored in this note.
+The delivery container and alert source are deleted; Git history is rollback authority.
 
 ### Quote-complete read-model republish (after promotion)
 
@@ -648,9 +654,7 @@ after the restart; a successful restart alone is not acceptance evidence.
 | `POSTGRES_*` | DB credentials (values kept in host/service environment; never store here) |
 | `REDIS_URL` | `redis://redis:6379/0` (docker net name) |
 | `REDIS_CHANNEL` | `signals` |
-| `TELEGRAM_BOT_TOKEN` | from `/root/.hermes/.env` (reuse, don't regenerate) |
-| `TELEGRAM_CHAT_ID` | `7295704669` |
-| `DASHBOARD_PUBLIC_URL` | public base for alert links |
+| `DASHBOARD_PUBLIC_URL` | optional base for compatibility dashboard links |
 | `WEBHOOK_SECRET` | shared secret for `/webhook` (agent-generated) |
 | `LLM_API_URL` / `LLM_API_KEY` | Phase 3 (currently empty) |
 | `SETTRADE_*` | Settrade Open API creds (in `settradeupdated.env`) |
@@ -675,21 +679,6 @@ after the restart; a successful restart alone is not acceptance evidence.
 - Shared drawer OHLCV table overflow fix (2026-09-12): the seven-column `OHLCV Window Summary` is now inside `.rolling-high-low__table-wrap`, which owns horizontal scrolling while the inner table keeps a readable minimum width; page-level horizontal overflow remains hidden. `/mvp` and shadow usage and product semantics are unchanged. Deployed and browser-verified at 390px: `innerWidth=390`, `bodyScrollWidth=390`, drawer visible, wrapper `clientWidth=348`, `scrollWidth=980`, `overflow-x=auto`.
 - Closeout release (2026-09-12): commits `f18e48f` and `15701ef` are pushed to `release/signalix-mvp-stable`; remote SHA is `15701effad9d6549687740bf65af422a909d38af`. Dashboard was recreated from the release source and is healthy; public `/trend-map`, `/api/trend-map`, and `/mvp` read-back passed. Browser verification at 390px confirmed drawer/chart, bounded OHLCV scrolling, and MA control computed height `44px`; error→Retry→recovery returned 237 rows. The next scheduled EOD freshness/read-back after this release remains `NOT VERIFIED` and is not claimed here.
 - Worktree note: generated `backend/shadow-read-model/` artifacts are intentionally tracked runtime inputs in commit `f18e48f`, not untracked research artifacts. Untracked `research/`, `docs/current/`, and `docs/agents/` QA/session notes remain preserved owner/research artifacts outside that commit and must not be cleaned or treated as deployment evidence.
-- `signalix_delivery` was briefly a host unit; **superseded** by the docker `delivery` service.
-
-## Verify realtime push
-```bash
-docker exec -t signalix_redis redis-cli pubsub numsub signals   # >=1
-docker exec -t signalix_delivery python -c "import os;print(bool(os.getenv('TELEGRAM_BOT_TOKEN')))"
-# live send test:
-docker exec -t signalix_delivery python -c "import os,requests;r=requests.post(f'https://api.telegram.org/bot{os.getenv(\"TELEGRAM_BOT_TOKEN\")}/sendMessage',json={'chat_id':os.getenv('TELEGRAM_CHAT_ID'),'text':'test'},timeout=10);print(r.status_code,r.json().get('ok'))"
-```
-
 ## Pitfalls
-- **Host consumer fails** (no `redis` in host venv; `redis://redis` unresolvable off docker net).
-- **Block-buffered logs** — use `python -u` in the delivery command.
 - **Intraday evaluator import** — do not execute `backend/run_intraday_evaluation.py` as a standalone script; `intraday_evaluator.py` uses package-relative imports. Use the module form from `/root/signalix`.
-- **LINE** — `notify-api.line.me` is DNS-blocked on this VPS; dropped per user.
 - Plain `restart` leaves stale env/code running — always `force-recreate`.
-
-See skill `signalix-delivery-ops` for the ops playbook.

@@ -20,11 +20,11 @@ def _owner(identity: str | None, token: str | None) -> str:
     """Return the owner identity only after the existing token binding passes.
 
     Lifecycle routes have no independent gateway-verification middleware in
-    this application.  Reuse the portfolio owner seam: the token proves the
+    this application.  Reuse the shared owner seam: the token proves the
     caller has the configured owner credential and the identity must equal the
     server-bound owner identity.  Missing configuration therefore fails closed.
     """
-    from portfolio import require_owner_identity
+    from owner_auth import require_owner_identity
 
     if not isinstance(identity, str) or not identity.strip() or len(identity) > 256:
         raise HTTPException(status_code=401, detail="missing or invalid owner identity")
