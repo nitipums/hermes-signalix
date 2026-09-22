@@ -65,10 +65,9 @@ backend/signalix-profile-refresh.service
 backend/signalix-profile-refresh.timer
 backend/signalix-settrade-master.service
 backend/signalix-settrade-master.timer
-backend/frontend/index.html
-backend/frontend/app.js
 backend/frontend/styles.css
-backend/test_signalix_contracts.py
+backend/frontend/canonical-client.js
+backend/frontend/shared-drawer.js
 backend/test_dashboard_route_separation.py
 backend/test_mvp_snapshot.py
 

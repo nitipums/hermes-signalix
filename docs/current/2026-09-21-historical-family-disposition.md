@@ -24,10 +24,10 @@ private signals, alerts, broker execution, and auto-trading are
 review, not permission to resume or remove a family.
 
 The family disposition vocabulary is **KEEP**, **CONSOLIDATE**, **DELETE**,
-**MOVE-OUT**, and **OWNER-DECISION**. Because the evidence gaps below prevent
-safe inference about reachability, rollback, or reference completeness, every
-historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
-`CONSOLIDATE` action is selected in this record.
+**MOVE-OUT**, and **OWNER-DECISION**. The original Issue #76 review assigned
+**OWNER-DECISION** because its evidence did not authorize cleanup. Subsequent
+owner-approved Waves B/C1/C2/C3a/C3b are reconciled in the family sections
+below; no broader deletion, move, or consolidation is inferred from them.
 
 ## Cross-family verdicts
 
@@ -42,16 +42,31 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 
 ### 1. MVP/setup and setup candidate
 
-- **Current route reachability:** Source-visible through historical
-  `backend/mvp_server.py`/`backend/mvp_routes.py`, `/mvp`, and
-  `/api/setup-candidates`; `backend/test_legacy_routes.py` verifies explicit
-  retirement behavior. It is not an active route. The active dispatcher still
-  imports compatibility `mvp_routes`, so source reachability is not zero.
+> **Wave C3b owner disposition applied 2026-09-22:** **MOVE-OUT** removed the
+> caller-free duplicate `backend/mvp_server.py`, the isolated historical
+> `backend/frontend/{index.html,app.js,request_cache.js}` cluster, its two
+> request-cache tests, the stale `backend/test_signalix_contracts.py` live
+> script, and `scripts/browser_failure_retry_harness.sh`. Git history is the
+> recovery authority. `test_mvp_ui_feedback_contract.py` was narrowed to its
+> still-active shared-drawer assertions rather than deleted.
+>
+> The active transport retains explicit 410 responses for `/mvp` and
+> `/api/setup-candidates`. Compatibility and publisher callers require
+> `mvp_api.py`, `mvp_routes.py`, `mvp_snapshot.py`, `mvp_chart.py`,
+> `mvp_chart_db.py`, `chart_read_model.py`, `setup_candidate_contract.py`,
+> `setup_state.py`, lifecycle/Team Facts, and chart Wave evidence to remain
+> **OWNER-DECISION**. C3b does not refactor those seams.
+
+- **Current route reachability:** `backend/active_transport.py` owns the four
+  active routes and explicit retired-route responses without importing the
+  historical MVP dispatcher. `backend/test_mvp_server_transport.py` verifies
+  the 410 boundary. Retained `mvp_routes.py` still has compatibility and shared
+  helper callers, but it is not the active transport.
 - **Publisher/test/operational references:** `mvp_api.py`, `mvp_snapshot.py`,
   `setup_candidate_contract.py`, `read_model_publisher.py`,
-  `verify_mvp_only.py`, setup/MVP tests, `update_data.service`'s
-  `ExecStartPost`, and `scripts/browser_failure_retry_harness.sh`. #75 records the `verify_mvp_only.py` post-step
-  as a contradiction, not as active ownership.
+  `verify_mvp_only.py`, setup/MVP tests, and `update_data.service`'s
+  `ExecStartPost`. #75 records the `verify_mvp_only.py` post-step as a
+  contradiction, not as active ownership.
 - **Authority role:** Historical setup/API contract and audit evidence only;
   the active-only freeze, Product Strategy, Execution Pipeline, and #72–#75
   route records supersede it for current product scope.
@@ -61,8 +76,58 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
   setup/VCP paths; the EOD unit names a retired verification command; old
   Product Strategy sections describe `/mvp` as a former product while its
   current header marks it deferred. Runtime reachability is unknown.
-- **Disposition:** **OWNER-DECISION**. Do not delete, move, consolidate,
-  start, or route active evidence through this family.
+- **Disposition:** **MOVE-OUT** for the exact caller-free C3b manifest;
+  **OWNER-DECISION / RETAINED** for the compatibility/publisher seams above.
+  Do not start or route active evidence through the retained historical family.
+
+#### Wave C3b exact caller and disposition manifest
+
+| Path/family | Direct/dynamic caller evidence before removal | Result |
+|---|---|---|
+| `backend/mvp_server.py` | No Python import, Compose command, service, timer, publisher, readiness, or active test caller; Compose runs `active_transport.py`. Current docs were the only non-historical references. | MOVE-OUT |
+| `backend/frontend/index.html`, `app.js`, `request_cache.js` | The three files called only one another and the dedicated historical UI/cache tests; `active_transport.py` allowlists only `styles.css`, `canonical-client.js`, and `shared-drawer.js`. | MOVE-OUT |
+| `backend/test_request_cache_behavior.{py,js}` | Python wrapper invoked only the paired Node test; no retained suite imports either file. | MOVE-OUT |
+| `backend/test_signalix_contracts.py` | No caller; its live script expected the retired `/mvp` surface and old VCP markers. Focused snapshot and retirement behavior remain covered elsewhere. | MOVE-OUT |
+| `scripts/browser_failure_retry_harness.sh` | No caller; targeted `/mvp` and `/api/setup-candidates`, which now return 410. | MOVE-OUT |
+| `backend/test_mvp_ui_feedback_contract.py` | Mixed file: old frontend assertions were caller-free, but shared-drawer assertions protect the active Trend Map drawer. | KEEP, narrow old-only assertions |
+| `backend/test_vcp_finder_db.py` | The file protects `vcp_finder_db.py`, which remains called by `update_data.py`; one isolated inventory test read `frontend/app.js` only to assert retired MVP VCP rendering. | KEEP, remove that old-only test |
+| `backend/mvp_chart.py` | Dynamically imported by `mvp_routes.py` for retained `/api/chart/{symbol}` audit compatibility; explicitly exercised by `test_legacy_routes.py`. | OWNER-DECISION / KEEP |
+| `backend/chart_read_model.py` | Called by `active_chart_routes.py`, `active_transport.py` startup warming, `artifact_pointer_inventory.py`, `update_data.py` publication, and retained compatibility/tests. | KEEP |
+| Protected MVP/setup family | `mvp_api.py` is called by `update_data.py`, `mvp_routes.py`, and `vcp_finder_db.py`; `mvp_routes.py` supplies SELECT-only DSN helpers to Trend Map/Market Breadth publisher plus compatibility routes; `mvp_snapshot.py` is called by the compatibility builder/dispatcher; `mvp_chart_db.py` is called by chart publication/tests; setup contracts/state have current builder/screening callers. | OWNER-DECISION / KEEP |
+| Lifecycle/Team Facts/chart Wave evidence | Caller evidence is recorded in C3a/C2 below; no C3b caller was removed from these chains. | OWNER-DECISION / KEEP |
+
+The deleted manifest contained **8 tracked files / 2,234 LOC** before C3b and
+**0 files / 0 LOC** afterward. Narrowing the two retained mixed tests removed
+another **77 net test LOC**. Repository-wide tracked file/LOC totals are
+recorded in the final C3b verification block after documentation sync.
+
+#### Wave C3b source verification and evidence boundary
+
+- **Checkout:** clean start at `c0be6c1502a6ed404393896b87230060185317d1`
+  on `codex/sol-wave-c-source-retirement`; no commit, push, deployment,
+  restart, database, timer, pointer, artifact, or browser operation.
+- **Tracked inventory:** before C3b, **328 files / 76,075 LOC**. After the
+  final source and current-ledger sync, **320 files / 73,848 LOC**. The net
+  repository delta is **8 files / 2,227 LOC removed**, including the three
+  updated evidence documents.
+- **Focused active/compatibility gate:** 277 tests collected; **276 passed,
+  1 skipped** across active transport/chart, artifact/pointer, Trend Map,
+  Market Breadth, intraday, retirement/legacy, and retained drawer coverage.
+- **All retained backend tests:** 994 tests collected; **982 passed,
+  12 skipped**. The first run identified the old-only VCP/frontend inventory
+  assertion; the post-removal rerun exited 0. The only warnings were the two
+  existing FastAPI `on_event` deprecations.
+- **Syntax/whitespace:** `compileall` used an external `/tmp` bytecode root;
+  `node --check` passed for both retained JavaScript assets; `git diff --check`
+  passed.
+- **Residual scan:** no remaining source/config/service/timer/publisher caller
+  names a deleted file. `test_mvp_server_transport.py` intentionally retains
+  `/frontend/app.js` and `/request_cache.js` as 404 rejection inputs. Current
+  evidence docs name deleted paths only in the MOVE-OUT manifest; historical
+  docs and root audit manifests are intentionally untouched.
+- **Runtime/deployment:** **NOT VERIFIED**. Source/tests do not establish the
+  served container, public API, freshness, browser, installed timer, or
+  deployment state.
 
 ### 2. Elliott/Wave
 
@@ -221,27 +286,29 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 
 ### 7. Prototypes and old frontend
 
-- **Current route reachability:** Historical frontend files include
-  `backend/frontend/index.html`, `app.js`, `wave-context.*`, legacy client
-  exports, and prototype/research paths. The active Trend Map template
-  allowlists `styles.css`, `canonical-client.js`, and `shared-drawer.js`; the
-  shared drawer has an active read-only path and legacy branches. Active page
-  source reachability is verified by #73; browser reachability is not.
-- **Publisher/test/operational references:** Frontend contract/UI tests,
-  `test_dashboard_*`, `test_wave_context_frontend_contract.py`, request-cache
-  tests, `test_legacy_routes.py`, old browser harnesses, and active template
-  tests. No browser journey or asset-load probe was run in #72–#75.
+- **Current route reachability:** Wave C2 removed `wave-context.*`; Wave C3b
+  removed the caller-free `backend/frontend/index.html`, `app.js`, and
+  `request_cache.js`. The active Trend Map template allowlists `styles.css`,
+  `canonical-client.js`, and `shared-drawer.js`; the shared drawer has an
+  active read-only path and legacy branches. Active page source reachability
+  is verified; browser reachability is not.
+- **Publisher/test/operational references:** The retained shared-drawer portion
+  of `test_mvp_ui_feedback_contract.py`, `test_dashboard_*` compatibility
+  builder tests, `test_legacy_routes.py`, and active template tests remain.
+  The standalone Wave Context and request-cache tests and old browser harness
+  were removed in C2/C3b. No browser journey or asset-load probe was run here.
 - **Authority role:** The active template/drawer subset supports read-only
   evidence review; prototypes and old dashboard branches are historical or
   compatibility material, not route authority.
 - **Rollback/audit value:** Medium-to-high for UI regression comparison,
   responsive/failure-state evidence, and recovering the active drawer seam.
 - **Contradictions:** `canonical-client.js` still builds/fetches
-  `/api/setup-candidates`; shared drawer retains canonical-MVP detail code;
-  old harnesses target `/mvp`. #73 assigns these unresolved branches to owner
-  review rather than removal.
-- **Disposition:** **OWNER-DECISION**. Protect the active read-only assets and
-  drawer contract; do not remove or consolidate legacy branches here.
+  `/api/setup-candidates`; shared drawer retains canonical-MVP detail code.
+  These unresolved branches remain owner decisions because the same assets
+  have active callers.
+- **Disposition:** **MOVE-OUT** for the isolated old frontend cluster;
+  **OWNER-DECISION / KEEP** for the active read-only assets, shared drawer,
+  legacy branches inside retained assets, and named prototype assets.
 
 ### 8. `docs/archive`, `vault/archive`, old plans/specs/handoffs
 
