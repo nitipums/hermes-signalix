@@ -142,7 +142,7 @@ current pointer, referenced target, and focused tests — **KEEP**.
 | `backend/frontend/canonical-client.js` | Served by the active allowlist and statically loaded by Trend Map, but its exported functions still build/fetch `/api/setup-candidates`; no active Trend Map page call invokes those exports. | **OWNER-DECISION** |
 | `backend/frontend/shared-drawer.js` | Dynamically loaded from Trend Map; active `trend-map` mode requests route history and chart-db data. Canonical-MVP detail merge code remains in the same shared module but is not selected by the active page envelope. | **KEEP** for active drawer; legacy branches **OWNER-DECISION** |
 | `/api/trend-map/{symbol}/route` and `/api/chart-db/{symbol}` | Reachable from active Trend Map row interaction and explicitly allowlisted/retained by the dispatcher; they are compatibility seams outside the four exact closure paths. | **OWNER-DECISION** |
-| `backend/frontend/wave-context.js`, `app.js`, dashboard/template and private signal callers | Source-visible historical/deferred callers, not loaded by the active two-page route chain. | **OWNER-DECISION** |
+| `backend/frontend/app.js`, dashboard/template and private signal callers | Source-visible historical/deferred callers, not loaded by the active two-page route chain. The standalone Wave Context assets were removed by owner-approved Wave C2. | **OWNER-DECISION** |
 | Trend Map replay adapter dynamic import and publisher dynamic import from update path | Source-level research/publish compatibility; no service/timer execution was checked. | **KEEP**; operational reachability **OWNER-DECISION** |
 
 No `CONSOLIDATE`, `DELETE`, or `MOVE-OUT` disposition is authorized by this
