@@ -161,16 +161,47 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 
 ### 6. Lifecycle/Team Facts
 
-- **Current route reachability:** Source/tests exist in `lifecycle_routes.py`,
-  `lifecycle_persistence.py`, `lifecycle_repository.py`, migration `007`,
-  `team_facts_api.py`, and their route tests. Team Facts and lifecycle APIs
-  are not part of the four active routes; current runtime, DB state, and
-  evaluator caller reachability were not checked.
+> **Wave C3a owner disposition review 2026-09-22:** The requested disposition
+> is **DELETE**, but the exact caller scan found current or retained
+> compatibility callers for every candidate source family. C3a therefore
+> deletes **zero files / zero LOC** and records the unresolved seams as
+> **OWNER-DECISION**. No speculative extraction or broad MVP refactor was used
+> to manufacture dead code.
+
+- **Exact source manifest and direct callers:**
+
+  | Candidate | Direct caller / bootstrap evidence | C3a disposition |
+  |---|---|---|
+  | `backend/lifecycle_contract.py` | imported by `lifecycle_persistence.py` | Retain — lifecycle compatibility chain |
+  | `backend/lifecycle_persistence.py` | imported by mounted `lifecycle_routes.py`; opt-in hook in `mvp_api.py` | Retain — route and MVP compatibility callers |
+  | `backend/lifecycle_repository.py` | imported by `lifecycle_routes.py` and lazy read helpers in `lifecycle_persistence.py` | Retain — lifecycle compatibility chain |
+  | `backend/lifecycle_routes.py` | imported and mounted by `app.py` with `app.include_router(...)` | Retain — source-reachable route |
+  | `backend/team_facts_api.py` | active `trend_map.py` imports `_is_completed`; `mvp_routes.py` imports list/history builders | Retain — active helper plus historical compatibility routes |
+  | `backend/setup_state.py` | imported by `app.py` and `screening.py` | Retain — not lifecycle-only |
+  | `backend/migrations/007_lifecycle_persistence.sql` | loaded as `MIGRATION_SQL` by `lifecycle_persistence.py`; executed by `init_lifecycle_schema()` tests | Retain — referenced schema bootstrap |
+  | `backend/owner_auth.py` | imported by retained `lifecycle_routes.py` | Retain — fail-closed route dependency |
+
+- **Dedicated test disposition:** `test_lifecycle_contract.py`,
+  `test_lifecycle_persistence.py`, `test_lifecycle_postgres.py`, and
+  `test_lifecycle_routes.py` directly exercise retained lifecycle modules;
+  `test_team_scan_api.py` directly imports Team Facts and exercises the
+  retained MVP compatibility routes. They are retained. The separately named
+  `test_breakout_lifecycle.py` exercises `scan_history` breakout history, not
+  the candidate lifecycle modules above, and is outside this deletion family.
+- **Before/after tracked source+dedicated-test inventory:** 11 files / 2,527
+  LOC before; 11 files / 2,527 LOC after. Deletion delta: 0 files / 0 LOC.
+  (`setup_state.py` and `owner_auth.py` add 141 retained dependency LOC but are
+  not dedicated lifecycle/Team Facts files.)
+- **Current route reachability:** Team Facts and lifecycle APIs are not among
+  the four active product routes. Nevertheless, lifecycle routes remain
+  mounted in source; Team Facts remains reachable from retained MVP
+  compatibility routes; and active Trend Map shares a completed-bar helper
+  from Team Facts. Runtime/public reachability and DB state were not checked.
 - **Publisher/test/operational references:** Lifecycle contract, PostgreSQL,
-  persistence, route, and deferred-runtime tests; `run_intraday_evaluation`
-  and the opt-in persistence hook; Team Facts API tests and old runtime
-  handoffs. The lifecycle tests record that automatic evaluator persistence is
-  not wired; #75 separately says `ExecStopPost` evaluation is not publication.
+  persistence, route, and deferred-runtime tests; the opt-in persistence hook;
+  Team Facts API tests and retained compatibility route tests. The lifecycle
+  tests record that automatic evaluator persistence is not wired; #75
+  separately says `ExecStopPost` evaluation is not publication.
 - **Authority role:** Historical/audit evidence and pending owner-review
   contract. The active-only freeze gives Team Facts no active route or
   refresh assumption.
@@ -181,8 +212,12 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
   Facts runtime evidence and current counts, while the active freeze marks it
   historical/deferred; lifecycle database schemas exist without proof of live
   use; “active” evaluator wording can be confused with active product scope.
-- **Disposition:** **OWNER-DECISION**. Preserve schemas/tests/history; no DB,
-  route, refresh, or evaluator change is authorized.
+- **Disposition:** Owner requested **DELETE**, but C3a result is
+  **OWNER-DECISION / RETAINED** at the proven caller seams above. Preserve
+  source, schema, tests, and history until a separately authorized route/MVP
+  compatibility decision removes or replaces those callers. No DB, route,
+  refresh, evaluator, publisher, pointer, timer, or runtime change is
+  authorized here.
 
 ### 7. Prototypes and old frontend
 
