@@ -75,7 +75,6 @@ backend/test_mvp_artifact_contract.py
 backend/test_artifact_writer.py
 backend/test_signal_core.py
 backend/test_deferred_runtime.py
-backend/test_portfolio.py
 backend/test_breakout_lifecycle.py
 backend/test_daily_shortlist.py
 backend/test_provenance_contract.py

@@ -117,8 +117,10 @@ the live engine. Imports `scan_universe` must stay at module top in `app.py`.
 
 ## HISTORICAL / SUPERSEDED — `build_dashboard.py` compatibility snapshot builder
 Builds compatibility snapshots/manifest data for the pipeline. The former
-public `dashboard.html` artifact and route are retired; the owner-facing UI is
-served from `/mvp` and charts are fetched through the MVP API.
+public `dashboard.html` artifact and route are retired; the current owner-facing
+read-only UI is served from `/trend-map` and `/market-breadth`. The former `/mvp`
+surface is historical/audit-only and charts are fetched through retained
+compatibility seams.
 
 Intraday-only runs refresh the MVP snapshot from the existing Daily scan after 60m
 upsert/evaluation; they do not rerun Daily classification. The active feed is
@@ -129,7 +131,7 @@ Cards show `60m unavailable · Daily EOD` and keep `decision_source=Daily EOD`
 rather than relabelling an old Daily value as 60m.
 
 ## HISTORICAL / SUPERSEDED / DROPPED — retained MVP owner-only trial surface
-`mvp_server.py` serves the retained trial `/mvp` from the bind-mounted release tree. `mvp_routes.py`
+`active_transport.py` serves the current four-route read-only product from the bind-mounted release tree. The former `mvp_server.py` transport was moved out in Wave C3b. `mvp_routes.py`
 owns the fail-closed `/api/*` boundary and never falls back to legacy snapshots.
 `mvp_api.py` retains the builder and compatibility projections. `canonical_setup_projection.py` owns the deep read-only canonical projection interface: exact-envelope validation, deterministic ordering, presentation filters, pagination, six-lane counts, freshness/provenance metadata, and diagnostics. `mvp_api.py` re-exports the canonical function for compatibility with existing callers. T1–T9 source contracts and release promotion are complete; public 390px failure→Retry→recovery browser acceptance is verified, with evaluator auto-caller separate. Legacy VCP/Stage labels are compatibility/audit only.
 Explorer Stage/Search filters reload immediately; there is no Apply step.
@@ -170,9 +172,9 @@ review surface. Deterministic API fields, source-linked chart markers, and
 provenance remain available for audit; this does not remove the underlying
 contract or data.
 
-## HISTORICAL / SUPERSEDED — `mvp_server.py` MVP static server
-Retained as historical source/test evidence but no longer selected by the
-Compose dashboard command. The former `/dashboard.html` route returns 404.
+## HISTORICAL / SUPERSEDED — former `mvp_server.py` MVP static server
+Moved out of the working tree in Wave C3b; Git history is the recovery authority.
+The former `/dashboard.html` route returns 404.
 Runtime container `signalix_dashboard` is separate from the FastAPI
 `signalix_backend` service and now selects `active_transport.py`.
 Verify served source and API freshness against the

@@ -96,7 +96,7 @@ below; no broader deletion, move, or consolidation is inferred from them.
 | Protected MVP/setup family | `mvp_api.py` is called by `update_data.py`, `mvp_routes.py`, and `vcp_finder_db.py`; `mvp_routes.py` supplies SELECT-only DSN helpers to Trend Map/Market Breadth publisher plus compatibility routes; `mvp_snapshot.py` is called by the compatibility builder/dispatcher; `mvp_chart_db.py` is called by chart publication/tests; setup contracts/state have current builder/screening callers. | OWNER-DECISION / KEEP |
 | Lifecycle/Team Facts/chart Wave evidence | Caller evidence is recorded in C3a/C2 below; no C3b caller was removed from these chains. | OWNER-DECISION / KEEP |
 
-The deleted manifest contained **8 tracked files / 2,234 LOC** before C3b and
+The deleted manifest contained **8 tracked files / 2,331 LOC** before C3b and
 **0 files / 0 LOC** afterward. Narrowing the two retained mixed tests removed
 another **77 net test LOC**. Repository-wide tracked file/LOC totals are
 recorded in the final C3b verification block after documentation sync.

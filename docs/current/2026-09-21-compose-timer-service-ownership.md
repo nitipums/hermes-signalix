@@ -162,7 +162,7 @@ sed -n '1,180p' backend/signalix-intraday-watchdog.timer
 for f in backend/*.service backend/*.timer backend/*.service.d/*.conf; do
   rg -n '^(Description|After|Requires|ExecCondition|ExecStart|ExecStartPost|ExecStopPost|OnCalendar|Unit=|WantedBy|Environment(File)?|WorkingDirectory|Type=)' "$f"
 done
-rg -n -C 3 'def (run|publish|main)|intraday-only|no-scan|publish_(trend|market|chart|intraday)|read_model|signals|setup' backend/update_data.py backend/mvp_server.py backend/*publisher.py
+rg -n -C 3 'def (run|publish|main)|intraday-only|no-scan|publish_(trend|market|chart|intraday)|read_model|signals|setup' backend/update_data.py backend/active_transport.py backend/*publisher.py
 ```
 
 Results: checkout was clean before this file, `HEAD` was
