@@ -16,29 +16,6 @@ def test_legacy_dashboard_snapshot_is_explicitly_retired():
         raise AssertionError("legacy dashboard snapshot unexpectedly remained live")
 
 
-def test_vcp_route_response_is_explicitly_audit_only(monkeypatch):
-    class Conn:
-        def close(self): pass
-
-    monkeypatch.setattr(mvp_routes, "_vcp_pg", lambda: Conn())
-    monkeypatch.setattr(
-        "vcp_finder_db.load_latest_vcp_run",
-        lambda *args, **kwargs: {"results": [{"symbol": "AUDIT"}]},
-    )
-    handler = type("Handler", (), {
-        "wfile": None,
-        "send_response": lambda self, status: setattr(self, "status", status),
-        "send_header": lambda self, *args: None,
-        "end_headers": lambda self: None,
-    })()
-    body = bytearray()
-    handler.wfile = type("Writer", (), {"write": lambda self, data: body.extend(data)})()
-    assert mvp_routes.handle_mvp_api("/api/vcp-finder", handler)
-    payload = json.loads(body)
-    assert payload["audit_only"] is True
-    assert payload["deprecation"] == mvp_routes.VCP_AUDIT_DEPRECATION
-
-
 def test_setup_candidates_is_explicitly_retired_without_fallback(monkeypatch):
     def fail_snapshot():
         raise AssertionError("canonical route called the legacy snapshot")

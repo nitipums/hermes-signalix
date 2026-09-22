@@ -50,8 +50,7 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 - **Publisher/test/operational references:** `mvp_api.py`, `mvp_snapshot.py`,
   `setup_candidate_contract.py`, `read_model_publisher.py`,
   `verify_mvp_only.py`, setup/MVP tests, `update_data.service`'s
-  `ExecStartPost`, `scripts/browser_failure_retry_harness.sh`, and
-  `scripts/probe_shortlist.sh`. #75 records the `verify_mvp_only.py` post-step
+  `ExecStartPost`, and `scripts/browser_failure_retry_harness.sh`. #75 records the `verify_mvp_only.py` post-step
   as a contradiction, not as active ownership.
 - **Authority role:** Historical setup/API contract and audit evidence only;
   the active-only freeze, Product Strategy, Execution Pipeline, and #72–#75
@@ -88,28 +87,25 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 - **Disposition:** **OWNER-DECISION**. Preserve the evidence; no promotion or
   cleanup follows from this record.
 
-### 3. VCP
+### 3. VCP — owner MOVE-OUT disposition partially applied in Wave C1
 
-- **Current route reachability:** Source-visible via `vcp_finder.py`,
-  `unified_vcp_decision.py`, `vcp_decision_policy.py`, `mvp_routes.py`, and
-  `/api/vcp-finder` compatibility handling. It is not one of the four active
-  routes. No current served reachability was verified.
-- **Publisher/test/operational references:** `run_vcp_finder.py`,
-  `run_vcp_replay_1m.py`, `analyze_vcp_shadow_replay.py`, VCP DB/policy tests,
-  `scripts/probe_shortlist.sh`, `update_data.py`/intraday VCP hooks, and VCP
-  replay/decision notes. These are audit/replay references, not active
-  publication proof.
+- **Current route reachability:** `/api/vcp-finder` compatibility handling was
+  removed from `mvp_routes.py`; the active transport already rejected that
+  route. Runtime/public removal remains unverified.
+- **Publisher/test/operational references:** The standalone finder/replay
+  commands, replay analyzer, mixed shortlist probe, and their focused tests
+  were deleted. `update_data.py` still contains an intraday VCP hook and
+  directly imports `vcp_finder_db.py`; C1 did not alter intraday/current
+  publisher code, so the DB adapter and its transitive finder/policy/decision
+  modules and focused tests remain pending a separately authorized removal.
 - **Authority role:** Compatibility, audit, and replay history. `vault/VCP-
   Finder-MVP.md` and related replay records do not override the active-only
   freeze; VCP is not a current candidate gate.
-- **Rollback/audit value:** High for replay baselines, bonus-evidence lineage,
-  policy comparisons, and explaining historical setup outputs.
-- **Contradictions:** “Canonical VCP” and shadow route names remain in scripts,
-  tests, and old docs while current routes prohibit setup/action semantics;
-  the probe script mixes retired VCP/setup requests with a Trend Map probe and
-  writes evidence output.
-- **Disposition:** **OWNER-DECISION**. Keep available for audit; do not run,
-  promote, or remove it under Issue #76.
+- **Rollback/audit value:** Git history is the owner-selected recovery
+  authority for deleted VCP source and tests; decision records remain.
+- **Disposition:** **MOVE-OUT**, owner-approved after Issue #76. Wave C1 is
+  partial because the explicit intraday/current-publisher no-go boundary
+  retains the directly reachable core cluster as **OWNER-DECISION**.
 
 ### 4. Shadow/private-signal/actionable signal — owner disposition applied
 

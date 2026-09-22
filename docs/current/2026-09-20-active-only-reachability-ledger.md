@@ -93,7 +93,7 @@ evidence, not a new deletion instruction for this ticket.
 | `backend/update_data.py` | EOD path publishes Trend Map after successful bounded update; chart EOD hooks publish `1D/1W/1M`; intraday hooks publish quote sidecar and `60M`. Source references do not prove timer installation; operational evidence remains REVISE. | KEEP |
 | `backend/update_data.service`, `backend/update_data.timer` | Host EOD service/timer references the updater and a retired verification command in `ExecStartPost`; installation and current schedule were not inspected. Do not alter in this ticket. | OWNER-DECISION |
 | `backend/signalix-intraday.service`, `backend/signalix-monitor.service`, and corresponding timer files | Operational intraday paths reference `update_data.py`, `marginable_long`, `60m`, and no-scan behavior; active-route publication dependency is source-visible, timer/service reachability is unavailable. No timer changes. | OWNER-DECISION |
-| `scripts/probe_shortlist.sh` | Contains a Trend Map URL probe but also retired VCP/setup probes and writes an output directory. It was not run because it is not a four-route-only, no-side-effect proof; do not treat it as current acceptance. | OWNER-DECISION |
+| `scripts/probe_shortlist.sh` | Deleted in Wave C1 because it mixed retired VCP/setup probes with a Trend Map request and was not current four-route acceptance. Recoverable from Git history. | MOVE-OUT |
 | delivery/alerts services and private signal/action families | Historical/deferred and outside the active envelope. Do not start or re-enable. | OWNER-DECISION |
 
 ## Protected targets and semantics
