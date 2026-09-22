@@ -962,8 +962,8 @@ def dashboard_shortlist_compact(page: int = 1, page_size: int = 20,
 
 @app.get("/dashboard/snapshot")
 def dashboard_snapshot():
-    """Retired legacy contract; the MVP uses /api/vcp-finder instead."""
-    raise HTTPException(status_code=410, detail="legacy dashboard snapshot retired; use /api/vcp-finder")
+    """Retired legacy contract; use the read-only Trend Map instead."""
+    raise HTTPException(status_code=410, detail="legacy dashboard snapshot retired; use /trend-map")
 
 
 @app.get("/watchlists/us-ai-buildout")

@@ -19,13 +19,6 @@ from mvp_snapshot import load_mvp_artifact
 _BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 _MVP_SNAPSHOT_PATH = os.getenv("MVP_SNAPSHOT_PATH", os.path.join(_BACKEND_DIR, "mvp_snapshot.json"))
 
-# Short-lived process-local reuse for the default MVP request. This avoids
-# duplicate latest-run joins during refresh bursts without becoming storage.
-_VCP_WATCHLIST_CACHE_TTL_SECONDS = 2.0
-_VCP_WATCHLIST_CACHE_MAX_ENTRIES = 4
-_vcp_watchlist_cache = {}
-_vcp_watchlist_inflight = {}
-_vcp_watchlist_cache_lock = threading.Lock()
 _SETUP_CANDIDATES_CACHE_TTL_SECONDS = 300.0
 _setup_candidates_cache = None
 _setup_candidates_inflight = None
@@ -37,13 +30,6 @@ _SETUP_CANDIDATES_PG_POOL_MAX = 4
 _CANONICAL_UNIVERSE = "marginable_long"
 class SetupCandidatesBuilderContractError(RuntimeError):
     """The canonical builder returned something other than (items, metadata)."""
-
-VCP_AUDIT_DEPRECATION = {
-    "status": "audit_only",
-    "boundary": "one_day",
-    "window": "one_day",
-    "message": "VCP is retained for audit/rollback only; use /api/setup-candidates for the canonical decision spine.",
-}
 
 LEGACY_ROUTE_DEPRECATION = {
     "status": "audit_only",
@@ -73,13 +59,6 @@ def _legacy_response(payload):
     return payload
 
 
-def clear_vcp_watchlist_cache():
-    """Clear the bounded presentation cache (used by deterministic tests)."""
-    with _vcp_watchlist_cache_lock:
-        _vcp_watchlist_cache.clear()
-        _vcp_watchlist_inflight.clear()
-
-
 def clear_setup_candidates_cache():
     """Clear the bounded setup-candidate cache (used by deterministic tests)."""
     global _setup_candidates_cache
@@ -102,8 +81,8 @@ def _acquire_setup_candidates_pg():
     global _setup_candidates_pg_pool
     # Preserve the simple fake-connection seam used by focused tests and any
     # explicitly replaced factory; production uses the pool below.
-    if _vcp_pg is not _DEFAULT_VCP_PG:
-        connection = _vcp_pg()
+    if _setup_candidates_pg is not _DEFAULT_SETUP_CANDIDATES_PG:
+        connection = _setup_candidates_pg()
         return connection, connection.close
     with _setup_candidates_pg_pool_lock:
         if _setup_candidates_pg_pool is None:
@@ -248,53 +227,7 @@ def _setup_candidates_observed(payload, status, request_started, wait_started):
 
 
 
-def _load_daily_watchlist_cached(loader, params):
-    """Load one daily projection, coalescing concurrent identical requests."""
-    # Loader identity also prevents a replaced implementation from reusing an
-    # old response during tests or a development reload.
-    key = (id(loader), tuple(sorted(params.items())))
-    while True:
-        now = time.monotonic()
-        with _vcp_watchlist_cache_lock:
-            cached = _vcp_watchlist_cache.get(key)
-            if cached and cached[0] > now:
-                return cached[1]
-            if cached:
-                _vcp_watchlist_cache.pop(key, None)
-            waiter = _vcp_watchlist_inflight.get(key)
-            if waiter is None:
-                waiter = threading.Event()
-                _vcp_watchlist_inflight[key] = waiter
-                owner = True
-            else:
-                owner = False
-        if owner:
-            break
-        waiter.wait()
-
-    try:
-        pg = _vcp_pg()
-        try:
-            payload = loader(pg, **params)
-        finally:
-            pg.close()
-        if payload is not None:
-            # Preserve universe/freshness metadata, but never cache the large
-            # full-universe result list for the compact watchlist contract.
-            payload = {**payload, "results": []}
-            with _vcp_watchlist_cache_lock:
-                if len(_vcp_watchlist_cache) >= _VCP_WATCHLIST_CACHE_MAX_ENTRIES:
-                    oldest_key = min(_vcp_watchlist_cache, key=lambda k: _vcp_watchlist_cache[k][0])
-                    _vcp_watchlist_cache.pop(oldest_key, None)
-                _vcp_watchlist_cache[key] = (time.monotonic() + _VCP_WATCHLIST_CACHE_TTL_SECONDS, payload)
-        return payload
-    finally:
-        with _vcp_watchlist_cache_lock:
-            _vcp_watchlist_inflight.pop(key, None)
-            waiter.set()
-
-
-def _vcp_pg():
+def _setup_candidates_pg():
     import psycopg2
     return psycopg2.connect(
         host=os.getenv("POSTGRES_HOST", "127.0.0.1"),
@@ -305,7 +238,7 @@ def _vcp_pg():
     )
 
 
-_DEFAULT_VCP_PG = _vcp_pg
+_DEFAULT_SETUP_CANDIDATES_PG = _setup_candidates_pg
 atexit.register(close_setup_candidates_pg_pool)
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
@@ -545,50 +478,6 @@ def _handle_canonical_routes(route, qs, handler) -> bool:
 
 def _handle_legacy_routes(route, qs, handler) -> bool:
     """Handle legacy and audit-only projection routes."""
-    if route in ("/api/vcp-finder", "/api/vcp-finder/"):
-        interval = (qs.get("interval", ["60m"])[0] or "60m").lower()
-        market = (qs.get("market", ["TH"])[0] or "TH").upper()
-        if interval != "60m" or market != "TH":
-            json_response(handler, {"error": "vcp_finder_60m supports interval=60m and market=TH only"}, status=400)
-            return True
-        daily_watchlist = (qs.get("daily_watchlist", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-        try:
-            from vcp_finder_db import load_latest_vcp_run
-            universe = (qs.get("universe", ["marginable_long"])[0] or "marginable_long").strip().lower()
-            if universe not in {"marginable_long", "active_ord"}:
-                raise ValueError("unknown universe")
-            symbol = (qs.get("symbol", [""])[0] or "").upper() or None
-            state = (qs.get("state", [""])[0] or "").upper() or None
-            limit = int(qs["limit"][0]) if qs.get("limit") else None
-            actionable = (qs.get("actionable", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            focused = (qs.get("focused", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            review = (qs.get("review", ["false"])[0] or "false").lower() in {"1", "true", "yes"}
-            params = {"market": market, "daily_watchlist": daily_watchlist, "state": state,
-                      "symbol": symbol, "limit": limit, "actionable": actionable,
-                      "focused": focused, "review": review, "universe": universe}
-            if daily_watchlist:
-                payload = _load_daily_watchlist_cached(load_latest_vcp_run, params)
-            else:
-                pg = _vcp_pg()
-                try:
-                    payload = load_latest_vcp_run(pg, **params)
-                finally:
-                    pg.close()
-            if payload is None:
-                json_response(handler, {"error": "vcp_finder_unavailable", "reason": "no_usable_run"}, status=503)
-                return True
-            payload = {**payload, "audit_only": True,
-                       "deprecation": dict(VCP_AUDIT_DEPRECATION)}
-            if daily_watchlist:
-                # The watchlist consumes only capped lanes. Preserve full-universe
-                # counts/coverage metadata, but do not serialize audit results.
-                payload = {**payload, "results": []}
-            json_response(handler, payload)
-        except (ValueError, TypeError) as exc:
-            json_response(handler, {"error": "invalid_request"}, status=400)
-        except Exception as exc:
-            json_response(handler, {"error": "vcp_finder_unavailable"}, status=503)
-        return True
     if route.startswith("/api/chart-db/"):
         symbol = route[len("/api/chart-db/"):].strip().rstrip("/")
         if not symbol:
