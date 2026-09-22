@@ -638,6 +638,34 @@ republish did not complete and must not be treated as acceptance evidence.
 `/root/signalix` is the canonical production bind mount. Session closeout 2026-09-02 archived the stale R4/R5 Kanban graph; many historical/feature worktrees remain on disk and must be inspected before removal. `signalix_backend` and `signalix_dashboard` mount `/root/signalix/backend`; no retired path is treated as current source.
 
 
+### Active-only cleanup Waves A-C closeout — 2026-09-22
+
+Source cleanup merged through remote `release/signalix-mvp-stable` SHA
+`90d0d8d942f69e9b2f798f08e7f44f4dffcff895` (PRs #82, #83, #84, #85, #86,
+#87). Wave A removed in-repo archive documents; Wave B removed private,
+delivery, and portfolio families; Wave C removed caller-free VCP replay/CLI
+surfaces, Wave Context/Elliott variants, and the duplicate MVP transport/frontend
+cluster. Lifecycle/Team Facts and MVP/chart/VCP compatibility seams remain
+explicitly retained where callers were proven.
+
+Post-merge `docker compose up -d --force-recreate --remove-orphans` completed
+successfully. Containers `signalix_postgres`, `signalix_redis`,
+`signalix_backend`, and `signalix_dashboard` are healthy/starting with no
+retired delivery container; dashboard command is `python -u active_transport.py`
+and its bind mount is `/root/signalix/backend -> /app`. Readiness returned
+HTTP 200 with `db=up`, `redis=up`.
+
+Public read-back after recreate: `/trend-map`, `/api/trend-map`,
+`/market-breadth`, `/api/market-breadth` HTTP 200; `/mvp` and
+`/api/setup-candidates` HTTP 410; `/api/vcp-finder` and
+`/api/shadow-buy-signals` HTTP 404. Trend Map API was
+`PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`,
+`verification_status=VERIFIED`, `as_of=2026-09-21`, freshness `FRESH`.
+Market Breadth was read-only with `quality=PARTIAL` and `as_of=2026-09-18`.
+Browser public `/trend-map` rendered 237 symbols and current status at 390px
+with `scrollWidth=390`, `clientWidth=390`. This is source/runtime evidence;
+Market Breadth browser readback in this run remains `NOT VERIFIED`.
+
 ## Reload after edits (CRITICAL)
 For this bind-mounted stable worktree, a dashboard-only Python/UI change is
 reloaded with:
