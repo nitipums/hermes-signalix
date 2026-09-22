@@ -1,10 +1,48 @@
 # Signalix Product Strategy — Market View to Action
 
-> **STATUS: CURRENT** · Canonical product direction. `CANONICAL_FOR: thesis, target user, product surfaces, non-goals, roadmap boundary`.
+> **STATUS: CURRENT** · Canonical current product direction. `CANONICAL_FOR: current thesis, target user, active surfaces, non-goals, roadmap boundary`.
+> **Current product line (2026-09-20):** Daily Trend Mapping and Market Breadth are the canonical public read-only deterministic evidence surfaces at `/trend-map`, `/api/trend-map`, `/market-breadth`, and `/api/market-breadth`.
+_Last updated: 2026-09-20; envelope: `PRODUCTION_READ_ONLY`, `research_only=false`, `actionability=NONE`. Arm reviews evidence. No orders, alerts, broker actions, or auto-trading are active._
 
-_Last updated: 2026-08-12; curated from product discussion with Arm._
+> **CURRENT AUTHORITY POINTERS:** See [`active-only contract freeze`](../docs/current/2026-09-20-active-only-contract-freeze.md),
+> [`pointer/artifact inventory`](../docs/current/2026-09-20-pointer-artifact-inventory.md),
+> and [`active cleanup review`](../docs/current/2026-09-20-active-cleanup-review.md).
+
+## Current product focus — 2026-09-20
+
+**Daily Trend Mapping and Market Breadth are the active Signalix product line.**
+They are public, read-only, deterministic, and intended for human
+chart/evidence review. Daily trend evidence is exposed through `/trend-map` and
+`/api/trend-map`; aggregate evidence is exposed through `/market-breadth` and
+`/api/market-breadth`. The response envelope is
+`PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+
+`/mvp`, `/api/setup-candidates`, Team Facts, Elliott/Wave/VCP setup research,
+private signals, alerts, broker actions, and auto-trading are
+`HISTORICAL / DEFERRED`. Their source and evidence remain preserved as
+historical/audit material; none may be resumed without a new owner-approved
+product decision and acceptance gate.
+
+The active surfaces are non-actionable evidence. They must not create setup
+decisions, `BUY_NOW`/`SELL_NOW`, `REVIEW_NOW`, alerts, orders, broker actions,
+portfolio actions, or auto-trading. Arm reviews the evidence and makes the
+final decision.
+
+## HISTORICAL / DEFERRED — retained thesis and planning material
+
+The strategy prose below records the former setup/actionable-signal thesis and
+future planning evidence. It is retained for audit and does not supersede the
+current authority above. Deterministic calculations and human-review
+boundaries remain preserved; resumption requires a new owner decision.
 
 ## Product thesis
+
+Signalix is evolving from setup preparation into Arm's private actionable-signal
+provider. The new market-buy signal layer consumes the existing deterministic
+setup evidence without requiring portfolio data; it does not replace those
+calculations. Phase 1 is a visible token-free seven-day paper/shadow
+replay. See
+`../docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md`.
 
 Signalix should evolve from a technical signal broadcaster into a system that turns a verified market view into an asset-appropriate action:
 
@@ -924,6 +962,8 @@ Dependent Action Queue, Outcome Log, and UI redesign cards MUST remain blocked u
 
 ## 11. 2026-08-23 — Owner-approved Daily Shortlist reset
 
+> **STATUS: SUPERSEDED 2026-08-26** — The historical Daily Shortlist reset remains preserved for audit, but VCP Finder · 60m is now the owner-approved MVP core. See section 12.
+
 Owner approved a product reset to a **Daily Shortlist** as Signalix's default decision surface and retained the existing stage-first dashboard as a secondary **All Stocks Explorer**. The approved design is `docs/superpowers/specs/2026-08-23-daily-shortlist-explorer-design.md`.
 
 - Daily Shortlist serves Thai Daily-chart swing trades held for several days to several weeks.
@@ -934,4 +974,12 @@ Owner approved a product reset to a **Daily Shortlist** as Signalix's default de
 - Strong price/volume moves that fail actionability remain visible in separate context lanes: `RISING MOVERS / WATCH ONLY` for S1/S2 evidence and `CAUTION / DO NOT CHASE` for S3/S4/topping/extended evidence. These lanes never receive shortlist rank or entry permission.
 - Explorer Stage/Search filters apply immediately. Detail charts use real stored-data `1D`, `1W`, and `60M` views; timeframe/layer controls stay below the plot.
 
-Implementation readiness for the owner-only MVP stable candidate is `PASS` at commit `595eb49`: full tests, served API, and desktop/mobile browser evidence are recorded in `vault/Execution-Pipeline.md` and `vault/Postmortems/Chart-and-60m-Stabilization-2026-08-25.md`. Future Action Queue/Outcome Log work remains separately deferred.
+## HISTORICAL / DEFERRED — 2026-09-01 stock-setup replacement
+
+> **STATUS: HISTORICAL / DEFERRED** · This section reconciles the older strategy layers above with the owner-approved release direction.
+
+For Thai stock setup discovery, the evidence surface remains **Daily Trend/Strength + Elliott candidate → 60m Trade Setup**, served by `/api/setup-candidates` and `/mvp`. The 2026-09-11 owner decision adds a separate private seven-day market-buy shadow UI over point-in-time setup evidence; portfolio data is not required for discovery. Its focused authority is `../docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md`. T1–T9 source is promoted; public 390px failure→Retry→recovery acceptance is PASS for the setup surface only. `marginable_long` is 237 eligible symbols, while 931 active ORD is audit/rollback coverage. VCP is bonus/compatibility evidence, not the primary candidate gate. Position-aware sells, alerts, automatic trading, and broker execution remain later separately gated work.
+
+The `/mvp`, `/api/setup-candidates`, and private shadow UI are not current targets; resumption requires a new owner decision.
+
+Sections describing Daily Shortlist, All Stocks Explorer, or VCP-first serving are preserved historical transition context and are superseded where they conflict with this override.

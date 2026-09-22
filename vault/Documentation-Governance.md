@@ -1,9 +1,17 @@
 # Signalix Documentation Governance
 
-> **Status:** CURRENT — governance layer
-> **Last reviewed:** 2026-08-23
+> **STATUS: CURRENT** · governance layer
+> **Last reviewed:** 2026-09-19
+> **Current reconciliation:** Daily Trend Map (`/trend-map`, `/api/trend-map`) and Market Breadth (`/market-breadth`, `/api/market-breadth`) are the active public read-only surfaces. `/mvp` and `/api/setup-candidates` are `HISTORICAL / SUPERSEDED / DROPPED`; old dashboard and shadow-named active modules are not current routing targets. Lite remains the final gate.
 > **Owner:** Nitipum.s / Lite curator
 > **Purpose:** define where current direction, decisions, work state, historical evidence, durable memory, and procedures belong.
+
+## Current active-only reconciliation — 2026-09-20
+
+The [active-only contract freeze](../docs/current/2026-09-20-active-only-contract-freeze.md)
+is the single boundary; the [pointer/artifact inventory](../docs/current/2026-09-20-pointer-artifact-inventory.md)
+is evidence. Governance keeps source/tests, artifact, runtime/API, freshness,
+browser, deployment, and rollback gates separate.
 
 ## Authority rules
 
@@ -15,10 +23,18 @@
 | Current component behavior | `Components.md` | historical implementation notes |
 | Current deployment and operations | `Deployment.md` | stale terminal logs, worker workspaces |
 | Current execution sequence / acceptance | `Execution-Pipeline.md` | archived Kanban cards, old plans |
-| Active work state, owner, dependency, retry, run state | `Execution-Pipeline.md` + focused plans under `/root/signalix/.hermes/plans/` | Kanban board is audit/archive only; do not dispatch from it |
+| Active work state, owner, dependency, retry, run state | Kanban board `signalix` | Do not mirror live card status into vault notes; `Execution-Pipeline.md` owns scope/acceptance, not live worker state |
 | Historical incidents and migration evidence | `Postmortems/` and dated handoffs | current product direction |
 | Durable cross-session invariants | compact MEMORY / `fact_store` | raw sessions, task progress, secrets |
 | Repeatable procedures | one primary Hermes skill per workflow | copied instructions in many notes |
+
+## Handoff naming and timeline convention
+
+- New Signalix handoffs use `YYYY-MM-DD-HHmm-<topic>-handoff.md`.
+- The filename timestamp is always `Asia/Bangkok (ICT)`.
+- If multiple handoffs are created within the same minute, use `YYYY-MM-DD-HHmmss-<topic>-handoff.md`.
+- Every new handoff must include a `## Timeline` section with timestamped events, evidence-backed status changes, and links to the previous/superseding handoff when applicable.
+- Historical handoffs keep their original names for reference integrity; add a timeline and explicit `HISTORICAL`/superseded note rather than silently renaming them.
 
 ## Status vocabulary
 
@@ -31,6 +47,10 @@ Use one of these banners at the top of project notes:
 - `STATUS: REVIEW_REQUIRED` — currentness or ownership is unresolved.
 
 ## Current canonical set
+
+**First read:** `../docs/START-HERE.md`
+
+**Cleanup matrix:** `../docs/current/2026-09-02-documentation-authority-matrix.md`
 
 1. `Product-Strategy-Market-to-Action.md`
 2. `Decisions.md`
@@ -45,6 +65,9 @@ Use one of these banners at the top of project notes:
 11. `INDEX.md`
 12. `Documentation-Governance.md`
 13. `Memory-Cleanup-Candidates.md`
+14. `../docs/current/2026-08-31-elliott-grill-decision-record.md`
+15. `../docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
+16. `../docs/superpowers/specs/2026-08-31-lifecycle-persistence-owner-review-api-design.md` (`LIFECYCLE-T9`)
 
 ## Historical set
 
@@ -52,7 +75,7 @@ Dated handoffs and postmortems remain valuable as evidence.
 
 ## Known conflict — resolved 2026-08-23
 
-Arm chose **Markdown `Execution-Pipeline.md` as the active work source**. Kanban is audit/archive only.
+Arm chose Markdown `Execution-Pipeline.md` and linked focused plans/specs as the product-scope/acceptance authority. Kanban owns active named-worker execution state only when a bounded run exists; the 2026-09-02 board was empty. Live card status must not be copied into vault notes.
 
 ## Cleanup policy
 
@@ -64,22 +87,40 @@ Arm chose **Markdown `Execution-Pipeline.md` as the active work source**. Kanban
 6. Treat generated HTML, JSON snapshots, logs, and worktree files as artifacts—not documentation authorities.
 7. Use `Documentation-Cleanup-Review.html` as the visual inventory report; regenerate after each cleanup batch.
 
-## Skill overlap matrix (2026-08-23)
+## Repository cleanup decision — 2026-09-19
 
-| Domain | Primary skill | Complementary | Superseded |
-|---|---|---|---|
-| Dashboard verification | `signalix-dashboard-verification` | `signalix-dashboard-contracts` (defines contracts) | `signalix-dashboard-review`, `signalix-served-artifact-verification` |
-| Pipeline reliability | `signalix-pipeline-reliability` | `signalix-data-feed-reliability` (feed-specific) | `signalix-pipeline-stability-review` |
-| Fetch monitoring | `signalix-fetch-monitor` | — | — |
-| Canonical run remediation | `signalix-history-lineage` | — | — |
-| Backfill & parity | `signalix-backfill-and-parity` | — | — |
-| Acceptance / QA | `signalix-read-only-acceptance` | `signalix-state-contracts` | `signalix-canonical-acceptance-review`, `signalix-evidence-reconciliation` |
-| Product strategy | `signalix-product-strategy` | — | `signalix-product-strategy-review`, `signalix-product-roadmap` |
-| UI changes | `signalix-dashboard-ui` | `signalix-dashboard-interaction-contracts` | — |
-| Screening | `signalix-screening-layering` | `signalix-screen-vs-db` | — |
-| Ops / delivery | `signalix-ops` | `signalix-delivery-ops` | — |
-| UI recovery | `signalix-ui-implementation-recovery` | — | — |
-| Documentation governance | `signalix-documentation-governance` | — | — |
-| Kanban | — | — | `signalix-kanban-worker-common`, `signalix-kanban-execution-loop`, `signalix-team-operating-playbook` |
+The owner approved removal of unused Elliott prototype assets and inactive
+legacy helper modules after reference checks. Generated read-model artifacts
+are current runtime inputs only, not documentation authorities and not a
+current-plus-N retention contract. Only the current pointer and validated
+artifacts are serving inputs; Git history is rollback authority. Historical
+filenames may retain shadow identity for compatibility/audit evidence, but
+internal active Trend Map naming is normalized to Trend Map.
 
-**Total superseded skills: 12**
+## Cleanup integration gate — 2026-09-19
+
+The owner-approved lean cleanup is a staged, uncommitted integration candidate
+in the canonical checkout. Focused Trend Map, Market Breadth, read-model,
+retired-route, compile, syntax, and isolated served-route checks pass. After
+removing retired MVP/setup test suites, aligning current deterministic chart and
+Trend classifier fixtures, and making PostgreSQL smoke tests skip honestly when
+the service is unavailable, the full suite is `1,061 passed / 13 skipped /
+0 failed` (2 warnings, 4 subtests). Source/test status is `PASS`; runtime,
+public ingress, deployment, and commit/push remain separate gates.
+
+## Skill overlap matrix — current consolidated set
+
+| Domain | Primary skill | Notes |
+|---|---|---|
+| Routing | `signalix-skill-router` | Start here when unsure |
+| Product strategy | `signalix-product-strategy` | Contract remains in canonical vault/specs |
+| Daily Trend Mapping | `signalix-trend-map` | Current public read-only non-actionable focus |
+| Data/lineage/replay | `signalix-data-lineage` | EOD, intraday, freshness, coverage, backfill, replay |
+| Screening/research | `signalix-screening-research` | Deterministic screening plus explicitly scoped research/compatibility |
+| Dashboard/UI/acceptance | `signalix-dashboard-acceptance` | UI, served artifact, API parity, browser acceptance |
+| Runtime/delivery | `signalix-production-ops` | Docker, systemd, delivery, release, recovery |
+| Codex tooling | `signalix-lite-codex-owner-loop` | Lite-owned Codex invocation and final review |
+| Local development | `signalix-local-development-environment` | Safe laptop/runtime separation |
+| Documentation/governance | `signalix-documentation-governance` | Authority and cleanup procedure |
+
+Legacy Signalix procedures remain in the profile archive and are not active routing targets.

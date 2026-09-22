@@ -583,6 +583,10 @@ def persist_daily_scan_snapshot(
         )
         for result, symbol in zip(results, symbols):
             normalized = _normalized_fields(result)
+            # A no-data/error observation has no source bar, so it cannot have
+            # an analytical market date.  Keep the snapshot row addressable at
+            # the run's official scan boundary without fabricating bar data.
+            analysis_date = normalized["last_market_date"] or date_value
             cur.execute(
                 """INSERT INTO daily_scan_observations
                    (id, run_id, symbol, classification, classification_reason,
@@ -605,7 +609,7 @@ def persist_daily_scan_snapshot(
                     conditions_met, scan_group, metrics)
                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (str(uuid.uuid4()), run_id, str(result.get("market") or "TH"), symbol,
-                 normalized["last_market_date"], result.get("close"), metrics.get("volume"),
+                 analysis_date, result.get("close"), metrics.get("volume"),
                  metrics.get("ma20"), metrics.get("ma50", ma.get("ma50")),
                  metrics.get("ma150", ma.get("ma150")), metrics.get("ma200", ma.get("ma200")),
                  metrics.get("max_20d"), metrics.get("min_20d"),

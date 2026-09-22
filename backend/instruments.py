@@ -59,6 +59,17 @@ INSTRUMENT_TAXONOMY_FIELDS = (
     "currency", "timezone", "session", "source", "freshness",
 )
 
+_CANONICAL_VALUES = {
+    "instrument_type": {"ORD"},
+    "status": {"active"},
+    "venue": THAI_VENUES,
+    "asset_class": {THAI_ASSET_CLASS},
+    "currency": {THAI_CURRENCY},
+    "timezone": {THAI_TIMEZONE},
+    "session": {THAI_SESSION},
+    "freshness": {"fresh", "stale", "unknown"},
+}
+
 
 def get_pg():
     return psycopg2.connect(**PG_DSN)
@@ -102,6 +113,58 @@ def active_ord_symbols(pg) -> list[str]:
     """The bounded active-ORD universe, directly from the authority master."""
     records = instrument_master(pg)
     return [r["symbol"] for r in records]
+
+
+def validate_instrument_record(record: dict) -> dict:
+    """Validate one authoritative active-ORD record without changing it.
+
+    The validator only reports observed data. Missing values are not replaced
+    with market defaults, and invalid values are kept visible separately from
+    missing values. The contract is intentionally pure so it can be used by
+    API serializers, tests, and offline quality checks alike.
+    """
+    missing_fields = []
+    invalid_fields = []
+    for field in INSTRUMENT_TAXONOMY_FIELDS:
+        value = record.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            missing_fields.append(field)
+            continue
+        if field == "symbol":
+            if not isinstance(value, str) or value != value.strip() or value != value.upper():
+                invalid_fields.append(field)
+        elif field == "source":
+            if not isinstance(value, str) or not value.strip():
+                invalid_fields.append(field)
+        elif value not in _CANONICAL_VALUES[field]:
+            invalid_fields.append(field)
+    if invalid_fields:
+        status = "invalid"
+    elif missing_fields:
+        status = "incomplete"
+    else:
+        status = "complete"
+    return {
+        "status": status,
+        "missing_fields": missing_fields,
+        "invalid_fields": invalid_fields,
+    }
+
+
+def instrument_quality_summary(records: list[dict]) -> dict:
+    """Return deterministic completeness counts for the supplied records."""
+    qualities = [validate_instrument_record(record) for record in records]
+    complete = sum(q["status"] == "complete" for q in qualities)
+    incomplete = sum(q["status"] == "incomplete" for q in qualities)
+    invalid = sum(q["status"] == "invalid" for q in qualities)
+    evaluated = len(records)
+    return {
+        "evaluated_count": evaluated,
+        "complete_count": complete,
+        "incomplete_count": incomplete,
+        "invalid_count": invalid,
+        "completeness_pct": round(complete / evaluated * 100, 1) if evaluated else 0.0,
+    }
 
 
 def instrument_identity(pg, symbol: str) -> dict | None:
@@ -157,7 +220,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
     sector or industry. If `symbols` is omitted, defaults to the active ORD
     universe (capped by `limit`) so the caller cannot accidentally fan out.
 
-    Returns: {symbol: {company_name, sector, industry, business_summary,
+    Returns: {symbol: {company_name, sector, industry, market_cap, business_summary,
                        source, fetched_at, missing}} where `missing` is True
     when NO profile row exists for an active-ORD symbol.
     """
@@ -178,7 +241,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                       sm.venue, sm.asset_class, sm.currency,
                       sm.timezone, sm.session, sm.source AS inst_source,
                       sm.status,
-                      cp.company_name, cp.sector, cp.industry,
+                      cp.company_name, cp.sector, cp.industry, cp.market_cap,
                       cp.business_summary, cp.source AS prof_source,
                       cp.fetched_at
                FROM symbol_master sm
@@ -189,10 +252,10 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                ORDER BY sm.symbol""", (symbols,))
         for row in cur.fetchall():
             (symbol, venue, asset_class, currency, tz, session, inst_source,
-             status, name, sector, industry, summary, prof_source,
+             status, name, sector, industry, market_cap, summary, prof_source,
              fetched_at) = row
             prof_rank = _source_rank(prof_source)
-            has_profile = any(v is not None for v in (name, sector, industry, summary))
+            has_profile = any(v is not None for v in (name, sector, industry, market_cap, summary))
             out[symbol] = {
                 "symbol": symbol,
                 "venue": venue,
@@ -205,6 +268,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                 "company_name": name,
                 "sector": sector,
                 "industry": industry,
+                "market_cap": market_cap,
                 "business_summary": summary,
                 "profile_source": prof_source,
                 "profile_fetched_at": fetched_at.isoformat() if hasattr(fetched_at, "isoformat") else (str(fetched_at) if fetched_at else None),
@@ -221,6 +285,7 @@ def profile_taxonomy(pg, symbols: list[str] | None = None,
                     "currency": None, "timezone": None, "session": None,
                     "source": None, "status": "absent",
                     "company_name": None, "sector": None, "industry": None,
+                    "market_cap": None,
                     "business_summary": None, "profile_source": None,
                     "profile_fetched_at": None, "profile_rank": len(SOURCE_PRIORITY),
                     "missing": True,

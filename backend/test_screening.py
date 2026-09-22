@@ -5,6 +5,7 @@ Run from host (with POSTGRES_HOST=127.0.0.1) or inside the backend container:
         /root/.venv_img/bin/python test_screening.py
 """
 import os
+import socket
 import sys
 
 # When run from host, point at the mapped port.
@@ -18,6 +19,17 @@ from screening import analyze_symbol_db, scan_universe, load_symbol, load_market
 
 
 pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def _require_postgres():
+    host = os.getenv("POSTGRES_HOST", "127.0.0.1")
+    port = int(os.getenv("POSTGRES_PORT", "5432"))
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return
+    except OSError:
+        pytest.skip(f"PostgreSQL unavailable at {host}:{port}")
 
 
 def test_load_symbol():

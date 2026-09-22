@@ -1,0 +1,258 @@
+# AGENTS.md — Signalix collaboration contract
+
+> **STATUS: CURRENT** · Owner-aligned working instructions for Lite and Codex.
+> **Last reconciled:** 2026-09-20
+> **Authority:** current active-only direction is Daily Trend Mapping + Market Breadth; acceptance/evidence rules remain in `vault/Execution-Pipeline.md`.
+
+> **CURRENT AUTHORITY — 2026-09-20:** The active public product is deterministic,
+> read-only Daily Trend Mapping and Market Breadth at `/trend-map`,
+> `/api/trend-map`, `/market-breadth`, and `/api/market-breadth`. The envelope is
+> `PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+> Arm reviews evidence; there are no orders, alerts, broker actions, or
+> auto-trading. `/mvp`, `/api/setup-candidates`, Team Facts, Elliott/Wave/VCP
+> setup work, and private signals are `HISTORICAL / DEFERRED` and require a new
+> owner decision before resumption. See [`active-only contract freeze`](docs/current/2026-09-20-active-only-contract-freeze.md),
+> [`pointer/artifact inventory`](docs/current/2026-09-20-pointer-artifact-inventory.md),
+> and [`active cleanup review`](docs/current/2026-09-20-active-cleanup-review.md).
+
+## Product identity
+
+**HISTORICAL / DEFERRED:** Signalix's former private setup-to-decision and
+actionable-signal identity, including paper/shadow `BUY_NOW` signals, is
+preserved below for audit only. It is not the current product authority.
+
+The former product flow (historical/deferred) was:
+
+```text
+Verified Market View
+→ Trend / Strength / 52W-ATH context
+→ Daily Elliott candidate (Wave 1 / Wave 2 / Early Wave 3)
+→ 60m confirmation and entry timing
+→ Trigger + invalidation + Fib target + R:R
+→ VCP as bonus evidence
+→ Private actionable signal policy (paper/shadow)
+→ Arm review and execution decision
+```
+
+## Current product direction — canonical read-only surfaces — 2026-09-19
+
+Daily Trend Mapping via `/trend-map` and `/api/trend-map` plus Market Breadth
+via `/market-breadth` and `/api/market-breadth` are the canonical Signalix
+public, read-only, deterministic evidence surfaces. They use
+`status=PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+The former `shadow` route naming is retired for active Trend Map modules.
+
+`/mvp` and `/api/setup-candidates` are retired from active scope. Preserve their
+source/history as historical/audit material only; do not route current work
+there. Elliott/Wave setup research, private signals, alerts, broker execution,
+and auto-trading are outside the active line.
+
+## HISTORICAL / DEFERRED — clean replacement history
+
+The historical setup-to-decision spine remains preserved for audit and future
+reference. It is not the current delivery or product authority.
+### Decision and state boundaries
+
+Structural `wave.state` uses only:
+
+```text
+WAVE_1_ADVANCE | WAVE_2_FORMING | WAVE_2_NEAR_COMPLETION
+EARLY_WAVE_3 | WAVE_3_CONTINUATION | WAVE_4_CORRECTION
+WAVE_5_ADVANCE | UNKNOWN
+```
+
+- `INVALIDATED` and `EXTENDED` belong to the setup/risk layer, not the Elliott state. Setup status is `FORMING`, `PRE_TRIGGER`, `TESTED_TRIGGER`, `TRIGGERED`, `EXTENDED`, `INVALIDATED`, `EXPIRED`, or `DATA_BLOCKED`.
+
+User-facing decision lanes are:
+
+```text
+REVIEW_NOW | SETUP_FORMING | DAILY_CANDIDATE | WAIT | AVOID | DATA_BLOCKED
+```
+
+- Historical setup/API spine is retained for audit only; current product delivery and acceptance are the canonical Trend Mapping routes `/trend-map` and `/api/trend-map`.
+
+## How to use this file
+
+`AGENTS.md` is the **entrypoint, routing map, and safety contract** for coding agents. It is not a second product specification. Durable product/architecture/operations details belong in the canonical documents below.
+
+Before any task, Codex must:
+
+1. Read this file.
+2. Classify the task by concern and read the smallest relevant authority from the routing table.
+3. Check the authority document's status/date and inspect the real source/tests/runtime relevant to the task.
+4. If two current sources conflict, stop before editing and report the conflict, affected files, and which owner decision is needed. Do not resolve semantic conflicts from memory or by choosing the newest filename.
+5. In the handoff, name the authority documents read and state whether the change requires a documentation sync.
+
+### Authority routing table
+
+| Task concern | Read first | Update when the contract changes |
+|---|---|---|
+| Current product direction, user, active surfaces, non-goals, roadmap | `vault/Product-Strategy-Market-to-Action.md` + `docs/current/2026-09-20-active-only-contract-freeze.md` | Product strategy + active-only freeze + focused design/spec |
+| Manual scanner tuning and threshold calibration | `scanner-policy-evaluation` + `docs/superpowers/specs/2026-09-13-main-trend-ma-calibration.md` + relevant source/tests | Focused tuning brief/evidence; update owning contract only if the policy changes |
+| Current Trend Mapping API and UI | `/trend-map`, `/api/trend-map` | source + focused tests |
+| Retained setup/API contract (historical only) | `/mvp`, `/api/setup-candidates` | inspect only for audit/future reactivation |
+| Retired private market-buy shadow policy and 7-day UI | `docs/superpowers/specs/2026-09-11-private-actionable-signal-design.md` + Git history | New focused design/spec + product strategy/acceptance authorities only after a new owner decision |
+| Current product acceptance sequence and evidence | `vault/Execution-Pipeline.md` | Execution pipeline |
+| Vault authority/index and note status | `vault/INDEX.md`, `vault/Documentation-Governance.md` | Index/status banners when notes are added, moved, superseded, or archived |
+| Current architecture/component behavior | `vault/Architecture.md`, `vault/Components.md` | The relevant architecture/component note |
+| Deployment, timers, served runtime, ingress | `vault/Deployment.md` | Deployment/runbook note with real verification evidence |
+| VCP compatibility, audit, replay, marginable-long evidence | `vault/VCP-Finder-MVP.md`, `vault/2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md` | Focused VCP/replay/closeout note; do not silently rewrite the new product contract |
+| Codex roles, provider, model, invocation | `vault/Codex-Standard-Workflow-2026-08-29.md` | Codex workflow note and this file only when the worker contract changes |
+
+### Documentation sync protocol
+
+- **Code behavior change:** update the owning source-of-truth document in the same bounded task when the documented contract is now different; do not update unrelated notes or generated artifacts.
+- **Product decision change:** update the focused design/decision authority first, then update this file only with a concise routing rule or invariant. Do not copy the whole decision into `AGENTS.md`.
+- **Runtime/deployment change:** update the deployment authority with command, timestamp/as-of, environment, and evidence; never claim served state from source changes alone.
+- **Legacy migration:** preserve historical/audit evidence and mark old routes/notes as compatibility, superseded, or historical. Never make two documents appear equally authoritative.
+- **Before handoff:** run a reference scan for the old contract/labels, inspect the complete diff, and list any intentionally untouched documents plus unresolved conflicts.
+
+## Serving boundary
+
+The canonical served surfaces are `/trend-map` + `/api/trend-map` and
+`/market-breadth` + `/api/market-breadth`. The setup/MVP routes are retained
+historical/audit material and are not active product routes.
+Do not route work there without a new owner-approved product decision.
+- Retain and reuse validated Thai ORD universe, Daily/60m ingestion, freshness/provenance, MA/RS/52W/ATH, Fib/risk/target math, sector data, VCP evidence, and append-only lifecycle foundations.
+- Current operational research scope is `marginable_long` = active Thai ORD ∩ owner-supplied marginable list ∩ `can_buy=true`; current validated counts are **929 active ORD**, **237 eligible**, **692 excluded**. Preserve explicit `active_ord` audit/rollback mode. Do not silently generalize replay evidence to excluded symbols.
+- `EVENT_WATCH` is an uncapped discovery/watch-only lane when used by the compatibility transition surface. Incomplete volume is evidence/warning, not a discovery blocker. `REVIEW_NOW` is the only reviewable setup lane in that contract; event evidence alone cannot create a private actionable signal.
+- Private paper/shadow actionable signals, portfolio APIs, and delivery consumers are retired and absent from source after cleanup Wave B.
+  Alerts, broker execution, and auto-trading are also outside the active line;
+  do not resume any of them without a new owner decision.
+
+## Agent roles
+
+- **Arm** — owner and decision maker; approves product scope and production-impacting side effects.
+- **Lite** — orchestrator and final quality gate. Lite selects direct implementation, Codex, Ploy, or another worker based on task risk and bounded scope; worker output never replaces Lite's independent acceptance decision.
+
+Khim and Nida are historical references, not default active Signalix team members.
+
+## Working-tree and safety rules
+
+1. Before work, run `git status --short --branch` and inspect the relevant diff.
+2. Existing uncommitted changes are owner-owned. Do not reset, stash, checkout, rebase, clean, delete, overwrite, format, regenerate, or normalize unrelated work.
+3. Never run multiple coding agents concurrently against the same worktree. Use a dedicated worktree when isolation is required.
+4. Do not commit, push, deploy, restart services, migrate, write databases, or alter production data unless the task explicitly includes that side effect.
+5. Work only in the named files/behavior. Avoid broad refactors and unrelated formatting.
+6. Never read, print, modify, or commit `.env*`, credentials, tokens, private keys, production dumps, or other secrets. Do not put secrets in prompts or output files.
+7. Preserve identifiers, API fields, database keys, timestamps, and literal values exactly unless the task explicitly changes the contract.
+8. Treat Docker files, live containers, volumes, sockets, and databases as runtime state; inspect read-only evidence first.
+
+## Codex runtime contract
+
+Use the ChatGPT subscription credentials explicitly and pin the model every time:
+
+```bash
+cd /root/signalix
+HOME=/root/.hermes/profiles/lite/home \
+CODEX_HOME=/root/.codex \
+codex exec --ephemeral -m gpt-5.6-luna -s read-only \
+  "<bounded review brief; do not edit, commit, reset, stash, or read secrets>"
+```
+
+For an explicitly approved bounded implementation, use `-s workspace-write` instead of `read-only`. Always:
+
+- run from `/root/signalix` or a disposable Git worktree, never `/root`;
+- preserve the active Hermes `HOME` and set only `CODEX_HOME=/root/.codex`;
+- capture `git status --short --branch` before starting;
+- state exact files, tests, acceptance criteria, and no-go areas in the brief;
+- run a small non-destructive inference probe before a substantial run when the lane has not been checked;
+- prohibit reset/stash/checkout/rebase/commit/push/deploy/restart/database writes unless explicitly in scope;
+- never use `--dangerously-bypass-approvals-and-sandbox`;
+- do not assume Hermes memory, skills, or fact stores are available—provide only curated task context;
+- do not run Codex concurrently with another coding agent in this worktree.
+
+Codex may report a missing `bubblewrap` binary while using its bundled fallback; verify behavior rather than treating that warning as a model failure. Free disk space must be checked before large runs.
+
+## Implementation workflow
+
+1. Read the smallest relevant source, schema, tests, and canonical docs before proposing a change.
+2. State root cause, exact files in scope, no-go areas, and verification plan.
+3. For behavior changes, add/update the smallest behavior-focused test first and prove the intended failure when practical.
+4. Implement the smallest compatible change. Keep canonical fields separate from legacy/audit aliases.
+5. Run focused tests, relevant broader tests, syntax/type checks, and `git diff --check`.
+6. Inspect the complete filesystem diff; Codex's prose, diff proposal, or green self-reported test is not proof.
+7. For runtime work, distinguish source, container, database, served artifact, and public ingress. A build or local API response does not prove deployment.
+8. Report exact commands/results, warnings, untested paths, and `PASS` / `FAIL` / `REVISE` / `NOT VERIFIED` honestly.
+
+### Strict Matt Pocock delivery loop
+
+Every Signalix development slice follows one bounded, traceable path:
+
+```text
+issue/spec
+→ exact files/tests/endpoints/no-go brief
+→ isolated branch/worktree
+→ test-first where practical
+→ smallest implementation
+→ focused + relevant full tests
+→ Standards + Spec review
+→ runtime/API/data/browser verification
+→ owning-doc sync
+→ scoped commit/PR
+→ exact closeout with remote SHA and dirty-file report
+```
+
+- One issue has one authority and one bounded concern; split code/tests, deployment, and browser/runtime work when side effects differ.
+- No drive-by cleanup, broad refactor, generated-artifact churn, or unrelated formatting; every changed line must trace to the issue/spec.
+- Codex is the bounded implementation/review tool; Lite independently verifies source, tests, runtime, data, browser, and acceptance.
+- A clean implementation is not a clean repository: preserve owner-owned dirty files, stage only scoped paths, and report untouched/untracked artifacts explicitly.
+- Do not close an issue from a green test or worker report alone. Missing runtime, freshness, browser, rollback, or remote evidence is `NOT VERIFIED`.
+
+## Acceptance gates owned by Lite
+
+- **Contract:** verify the active read-only Trend Map and Market Breadth contracts, including `PRODUCTION_READ_ONLY`, `research_only=false`, and `actionability=NONE`.
+- **Data:** verify freshness, timezone, provenance, lineage, missing-data handling, and no-lookahead boundaries for the active Trend Map and Market Breadth evidence.
+- **Backend/API:** verify the served endpoint and response contract, not only source/tests. Check `/api/trend-map` and `/api/market-breadth`.
+- **UI:** verify public URL/IP first at desktop and 390px mobile. Exercise the active read-only Trend Map/Market Breadth chart journey, readability/layout metrics, and at least one API/error or empty/data-blocked path. Source/CSS/tests alone are not visual acceptance.
+- **Decision safety:** no LLM-generated authoritative calculations, setup labels, or executable orders; no automatic BUY.
+- **Final verdict:** missing runtime, freshness, browser, or failure-state evidence is `NOT VERIFIED`, never silently PASS.
+
+## Handoff format
+
+Every Codex/Lite handoff must include:
+
+- **Scope** — files and behavior touched
+- **Root cause / rationale**
+- **Changes**
+- **Verification** — exact commands and real result summary
+- **Runtime/deployment** — served/public status and what was not deployed
+- **Git state** — branch, intended diff, remaining pre-existing changes
+- **Status** — `PASS`, `FAIL`, `REVISE`, or `NOT VERIFIED` with evidence
+
+Lite delivers the final acceptance decision to Arm.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `nitipums/hermes-signalix`.
+See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`.
+See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo using `GLOSSARY.md` and `docs/adr/`.
+See `docs/agents/domain.md`.
+
+## Canonical references
+
+Read only the smallest relevant set, in this order:
+
+- HISTORICAL / DEFERRED — former product direction and clean-replacement design
+  (reactivation-only):
+  `docs/superpowers/specs/2026-08-30-elliott-trend-trade-setup-design.md`
+- Product scope and acceptance/evidence policy:
+  `vault/Execution-Pipeline.md`
+- Vault authority map:
+  `vault/INDEX.md`
+- Current VCP compatibility/audit contract:
+  `vault/VCP-Finder-MVP.md`
+- Current marginable-long serving/replay evidence:
+  `vault/2026-08-30-Signalix-V2-Marginable-Serving-Closeout.md`
+- Codex team/runtime workflow:
+  `vault/Codex-Standard-Workflow-2026-08-29.md`

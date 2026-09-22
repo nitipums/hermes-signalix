@@ -46,7 +46,8 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      # Host-only analytical API; the public dashboard reaches it over Compose.
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./backend:/app
     healthcheck:
@@ -62,7 +63,9 @@ services:
     container_name: signalix_dashboard
     restart: unless-stopped
     env_file: .env
-    command: ["python", "-u", "mvp_server.py"]
+    environment:
+      DASHBOARD_BIND_HOST: 0.0.0.0
+    command: ["python", "-u", "active_transport.py"]
     depends_on:
       backend:
         condition: service_healthy
@@ -71,43 +74,10 @@ services:
     volumes:
       - ./backend:/app
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/mvp', timeout=3)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/trend-map', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3
-
-  # Real-time delivery consumer: subscribes to the Redis `signals` channel
-  # and fans out every envelope to Telegram + LINE. Shares the backend image
-  # (redis + requests already installed) and runs in the same docker network,
-  # so REDIS_URL=redis://redis:6379 resolves natively — no host hacks.
-  delivery:
-    build: ./backend
-    container_name: signalix_delivery
-    restart: unless-stopped
-    env_file: .env
-    command: ["python", "-u", "delivery_consumer.py"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      # Phase 3 LLM: which Nous-hosted model to use for the Thai summary.
-      # Default is a free, non-reasoning, Thai-capable model. `tencent/hy3:free`
-      # also works but spends its budget on CoT, so content can be truncated.
-      SIGNALIX_LLM_MODEL: ${SIGNALIX_LLM_MODEL:-upstage/solar-pro4:free}
-      # Token file is mounted read-only at /app/nous_auth.json (see volumes).
-      NOUS_AUTH_JSON: /app/nous_auth.json
-    volumes:
-      - ./backend:/app
-      # Read-only mount of the Hermes Nous OAuth token (llm.py reads it at runtime;
-      # we deliberately do NOT copy the secret into Signalix .env).
-      - /root/.hermes/shared/nous_auth.json:/app/nous_auth.json:ro
-    healthcheck:
-      test: ["CMD", "python", "-c", "import os,redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
 
 volumes:
   pgdata:
