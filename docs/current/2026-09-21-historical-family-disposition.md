@@ -66,15 +66,31 @@ historical family receives **OWNER-DECISION**. No `DELETE`, `MOVE-OUT`, or
 
 ### 2. Elliott/Wave
 
+> **Wave C2 owner disposition applied 2026-09-22:** **MOVE-OUT** removed the
+> caller-free standalone variants `backend/elliott_variant_B.py` and
+> `backend/elliott_variant_C.py`, `scripts/wave3_production_replay.py`, the
+> retired standalone `backend/frontend/wave-context.{html,css,js}` surface and
+> its dedicated test, and the isolated `prototypes/wave-context-groups/`
+> research/replay family. Git history is the recovery authority.
+>
+> The active chart chain still calls `backend/chart_wave_evidence.py` from
+> `backend/mvp_chart_db.py`; that module imports
+> `backend/elliott_structure_engine.py`, which imports
+> `backend/wave3_candidate_engine.py`. Those three modules, their focused tests
+> and Elliott fixtures are therefore retained as **OWNER-DECISION** without
+> publisher refactoring. `prototypes/elliott-state-replay/replay_lab.py` is
+> also retained because the current Elliott decision record explicitly names
+> it as a prototype asset. C2 does not change lifecycle, MVP/setup, VCP core,
+> publishers, routes, schema, runtime, timers, or generated artifacts.
+
 - **Current route reachability:** Source/test reachability exists through
-  `elliott_structure_engine.py`, `elliott_variant_*.py`,
-  `wave3_candidate_engine.py`, `trade_setup_engine.py`, `mvp_api.py`,
+  `elliott_structure_engine.py`, `wave3_candidate_engine.py`,
+  `trade_setup_engine.py`, `mvp_api.py`,
   `trend_route_api.py`, and the historical setup/detail branches. The active
   Trend Map row/drawer contract explicitly suppresses Wave/setup semantics.
   No served or browser reachability was verified.
-- **Publisher/test/operational references:** Wave fixtures and replay scripts;
+- **Publisher/test/operational references:** Retained Wave fixtures and replay evidence;
   `test_elliott_*`, `test_wave3_candidate_engine.py`, `test_trade_setup_engine.py`,
-  `test_wave_context_frontend_contract.py`, `scripts/wave3_production_replay.py`,
   historical intraday evaluation hooks, and Wave research/spec/handoff notes.
 - **Authority role:** Historical/deferred research and former setup decision
   evidence. `docs/current/2026-08-31-elliott-grill-decision-record.md` records
