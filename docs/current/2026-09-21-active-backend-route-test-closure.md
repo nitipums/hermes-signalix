@@ -25,6 +25,12 @@ with supporting context from `docs/current/2026-09-20-pointer-artifact-inventory
 architecture, components, execution-pipeline, product-strategy, deployment,
 governance, and index notes. Those documents remain unchanged.
 
+> **Wave C3b reconciliation — 2026-09-22:** `active_transport.py` is now the
+> sole dashboard transport. The caller-free duplicate `mvp_server.py` and
+> isolated historical `/mvp` frontend/test/harness cluster were moved out.
+> The explicit retired-route 410 behavior and active chart/drawer seams remain
+> protected and tested. The original #73 runtime/browser verdict is unchanged.
+
 ## Separate verdicts
 
 | Verdict | Result | Evidence boundary |
@@ -38,14 +44,14 @@ governance, and index notes. Those documents remain unchanged.
 
 ### `/trend-map`
 
-- **Dispatch/handler:** `backend/mvp_server.py:MVPHandler.do_GET` has an
+- **Dispatch/handler:** `backend/active_transport.py:ActiveTransportHandler.do_GET` has an
   exact `/trend-map` branch and reads `backend/trend_map_template.html`.
   Missing template handling is deterministic `404`. The handler statically
-  imports `trend_map`, `trend_route_api`, and `market_breadth_artifact`, plus
-  the historical compatibility module `mvp_routes`.
+  imports `active_chart_routes`, `trend_map`, `trend_route_api`, and
+  `market_breadth_artifact`; it does not import historical MVP dispatch.
 - **Static assets:** the template references `/styles.css` and
   `/canonical-client.js`; it dynamically loads `/shared-drawer.js` only when
-  a symbol row is opened. `MVPHandler` serves these three assets through its
+  a symbol row is opened. `ActiveTransportHandler` serves these three assets through its
   explicit allowlist; unknown assets are `404`.
 - **Frontend request:** inline page code requests `/api/trend-map` with
   `cache=no-store`, requires the read-only envelope, `verification_status=VERIFIED`,
@@ -64,7 +70,7 @@ governance, and index notes. Those documents remain unchanged.
   intraday quote readers through the Trend Map implementation/publisher seam;
   source reachability does not prove a running process reached them.
 
-**Disposition by family/path:** `backend/mvp_server.py`,
+**Disposition by family/path:** `backend/active_transport.py`,
 `backend/trend_map.py`, `backend/trend_map_template.html`, and the three
 allowlisted active assets — **KEEP**. Active Trend Map row/drawer route and
 chart compatibility handlers — **KEEP** pending a separate owner review;
@@ -74,7 +80,7 @@ closure routes. The unused legacy API exports in `backend/frontend/canonical-cli
 
 ### `/api/trend-map`
 
-- **Dispatch/handler:** exact dispatch from `MVPHandler.do_GET` to
+- **Dispatch/handler:** exact dispatch from `ActiveTransportHandler.do_GET` to
   `trend_map.handle_trend_map_api`; query variants still match by parsed path.
 - **Read model:** the Trend Map publisher/readback seam validates the current
   pointer and relative immutable target; the handler does not authorize a
@@ -94,7 +100,7 @@ owner decision, not a cleanup inference.
 
 ### `/market-breadth`
 
-- **Dispatch/handler:** exact `MVPHandler.do_GET` branch reads
+- **Dispatch/handler:** exact `ActiveTransportHandler.do_GET` branch reads
   `backend/market_breadth_template.html`; missing template is `404`.
 - **Static/frontend behavior:** page navigation links to `/trend-map`; inline
   page logic fetches `/api/market-breadth?range=` for `20`, `60`, `260`, or
@@ -117,7 +123,7 @@ Market Breadth template — **KEEP**. Inline aggregate chart rendering —
 
 ### `/api/market-breadth`
 
-- **Dispatch/handler:** exact dispatch from `MVPHandler.do_GET` to
+- **Dispatch/handler:** exact dispatch from `ActiveTransportHandler.do_GET` to
   `handle_market_breadth_api`; the handler preserves the query string for
   range validation.
 - **Response contract:** validated prebuilt ranges are projected with the
@@ -138,20 +144,20 @@ current pointer, referenced target, and focused tests — **KEEP**.
 
 | Path/family | Evidence | Disposition |
 |---|---|---|
-| `backend/mvp_server.py` imports `mvp_routes`, `trend_map`, `trend_route_api`, `market_breadth_artifact` | One dispatcher owns active routes, retained Trend Map drawer route, retained chart/detail shapes, and retired compatibility responses. | **KEEP** |
+| `backend/active_transport.py` imports `active_chart_routes`, `trend_map`, `trend_route_api`, `market_breadth_artifact` | The isolated dispatcher owns active routes, the retained read-only chart route, and explicit retired compatibility responses without importing MVP/setup dispatch. | **KEEP** |
 | `backend/frontend/canonical-client.js` | Served by the active allowlist and statically loaded by Trend Map, but its exported functions still build/fetch `/api/setup-candidates`; no active Trend Map page call invokes those exports. | **OWNER-DECISION** |
 | `backend/frontend/shared-drawer.js` | Dynamically loaded from Trend Map; active `trend-map` mode requests route history and chart-db data. Canonical-MVP detail merge code remains in the same shared module but is not selected by the active page envelope. | **KEEP** for active drawer; legacy branches **OWNER-DECISION** |
 | `/api/trend-map/{symbol}/route` and `/api/chart-db/{symbol}` | Reachable from active Trend Map row interaction and explicitly allowlisted/retained by the dispatcher; they are compatibility seams outside the four exact closure paths. | **OWNER-DECISION** |
-| `backend/frontend/app.js`, dashboard/template and private signal callers | Source-visible historical/deferred callers, not loaded by the active two-page route chain. The standalone Wave Context assets were removed by owner-approved Wave C2. | **OWNER-DECISION** |
+| `backend/frontend/index.html`, `app.js`, `request_cache.js` | Removed by owner-approved Wave C3b with their isolated tests/harness; no current transport, publisher, timer, active asset, or retained compatibility caller remained. | **MOVE-OUT** |
 | Trend Map replay adapter dynamic import and publisher dynamic import from update path | Source-level research/publish compatibility; no service/timer execution was checked. | **KEEP**; operational reachability **OWNER-DECISION** |
 
-No `CONSOLIDATE`, `DELETE`, or `MOVE-OUT` disposition is authorized by this
-record. Those labels remain available only for a future owner-approved bounded
-decision with a complete reference scan.
+Wave C3b applies the later owner-approved MOVE-OUT only to the exact caller-free
+manifest in the current historical-family disposition. No broader
+`CONSOLIDATE`, `DELETE`, or compatibility refactor is authorized here.
 
 ## Retirement and fallthrough behavior
 
-`MVPHandler` has explicit behavior and focused tests for the boundary:
+`ActiveTransportHandler` has explicit behavior and focused tests for the boundary:
 
 - `/mvp` and `/api/setup-candidates` return `410` with a retired payload;
 - `/wave-context` and `/dashboard.html` return `404`;
@@ -185,14 +191,14 @@ started.
 
 ### Historical-only or supporting tests
 
-`backend/test_signalix_contracts.py` is a live-service contract script for
-the old `:8000`/`:3001/mvp` surfaces and was not included in the green active
-suite. It contains historical/deferred assertions and must not be treated as
-active-route closure evidence. `test_mvp_ui_feedback_contract.py`,
-`test_wave_context_frontend_contract.py`, `test_team_scan_api.py`, VCP/setup,
-private-signal, dashboard, and lifecycle test families remain audit/supporting
-coverage unless a future owner decision reactivates their surface. Their
-existence is not a deletion instruction.
+Wave C3b removed `backend/test_signalix_contracts.py`, the stale live-service
+contract script for the old `:8000`/`:3001/mvp` surfaces. The mixed
+`test_mvp_ui_feedback_contract.py` remains after its old frontend assertions
+were removed because it still protects the active shared drawer.
+`test_team_scan_api.py`, retained VCP/setup, dashboard, and lifecycle test
+families remain audit/supporting coverage because their source still has
+publisher, compatibility, or protected dependency callers. Their existence is
+not a product reactivation instruction.
 
 A separate focused run including `backend/test_trend_map_read_model_publisher.py`
 collected **160 tests** and returned **5 failed, 154 passed, 1 skipped**.
@@ -262,7 +268,7 @@ git log -1 --format='%H%n%cI%n%s'
 date --iso-8601=seconds
 rg --files docs/current vault | rg '2026-09-20|2026-09-21|Execution-Pipeline|Product-Strategy|Architecture|Components|INDEX' | sort | head -80
 rg -n "trend-map|market-breadth|setup-candidates|/mvp|410|404|styles\.css|canonical-client|shared-drawer|fetch\(|import_module|importlib" backend --glob '*.py' --glob '*.html' --glob '*.js' --glob '*.css' | head -260
-sed -n '1,220p' backend/mvp_server.py
+sed -n '1,220p' backend/active_transport.py
 sed -n '1,130p' backend/trend_map.py
 sed -n '950,1040p' backend/trend_map.py
 sed -n '1,330p' backend/market_breadth_artifact.py

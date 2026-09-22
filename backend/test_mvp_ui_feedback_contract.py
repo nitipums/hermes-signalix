@@ -1,4 +1,4 @@
-"""Focused contracts for the bounded canonical /mvp UI feedback pass."""
+"""Focused contracts for the retained shared read-only chart drawer."""
 from pathlib import Path
 import json
 import subprocess
@@ -38,10 +38,8 @@ def run(functions, expression):
     return json.loads(result.stdout)
 
 
-def test_canonical_surface_removes_research_copy_and_drawer_sections():
-    html = (ROOT / "index.html").read_text()
+def test_shared_drawer_removes_research_sections_and_keeps_active_timeframes():
     shared = (ROOT / "shared-drawer.js").read_text()
-    assert "Marginable long universe · Daily trend/wave" not in html
     for label in ("drawer-chart-status", "drawer-chart-context", "chart-wave-evidence",
                   "chart-wave-explanation", "Evidence details and provenance",
                   "drawer-evidence-details"):
@@ -49,51 +47,8 @@ def test_canonical_surface_removes_research_copy_and_drawer_sections():
     assert 'data-timeframe="1D"' in shared and 'data-timeframe="60M"' in shared
 
 
-def test_advanced_filters_are_collapsed_and_live_refresh_is_explicitly_opt_in():
-    html = (ROOT / "index.html").read_text()
-    js = (ROOT / "app.js").read_text()
-    advanced = html[html.index('id="daily-setup-advanced"'):html.index('</details>', html.index('id="daily-setup-advanced"'))]
-    assert '<details id="daily-setup-advanced"' in html
-    assert "<summary>Advanced filters</summary>" in advanced
-    for control in ("daily-filter-marginable", "daily-filter-trade-value", "daily-filter-price",
-                    "daily-vcp-decision-state", "daily-vcp-decision", "daily-vcp-quality"):
-        assert f'id="{control}"' in advanced
-    assert 'id="daily-setup-live-refresh"' in advanced
-    assert "Live refresh (opt in)" in advanced
-    assert 'liveRefreshTimer = liveRefreshEnabled ? setTimeout' in js
-    assert "!dailySetupHasActiveBoundary()" in js
-    assert "setInterval(function()" not in js
-
-
-def test_canonical_setup_path_guards_legacy_controls_and_keeps_server_filters():
-    js = (ROOT / "app.js").read_text()
-    assert 'dom.dailySetupSector && dom.dailySetupSector.value.trim()' in js
-    assert 'dom.dailySetupLane && dom.dailySetupLane.value !== "ALL"' in js
-    assert 'dom.dailyFilterMarginable && dom.dailyFilterMarginable.checked' in js
-    assert 'if (dom.dailyVcpType && !vcpTypeMatches' in js
-    assert 'if (dom.dailySetupPrev)' in js and 'if (dom.dailySetupNext)' in js
-
-
-def test_sort_is_quote_change_descending_then_symbol_and_identity_deduplicates():
-    app = (ROOT / "app.js").read_text()
-    stable = extract(app, "stableSetupCandidateOrder")
-    identity = extract(app, "identityName")
-    items = [
-        {"symbol": "ZZZ", "name": "ZZZ", "quote": {"change_pct": 2}},
-        {"symbol": "AAA", "name": "Alpha", "quote": {"change_pct": 2}},
-        {"symbol": "MID", "name": "MID", "quote": {"change_pct": 8}},
-        {"symbol": "NIL", "name": "NIL", "quote": {}},
-    ]
-    assert run([stable], "stableSetupCandidateOrder(" + json.dumps(items) + ").map(function(i){return i.symbol;})") == ["MID", "AAA", "ZZZ", "NIL"]
-    assert run([identity], "[identityName({symbol:'AAA',name:'AAA'}), identityName({symbol:'AAA',name:'Alpha'})]") == ["", "Alpha"]
-
-
-def test_navigation_uses_rendered_collection_and_reconciles_page_changes():
-    app = (ROOT / "app.js").read_text()
+def test_navigation_reconciles_the_active_drawer_collection():
     shared = (ROOT / "shared-drawer.js").read_text()
-    assert "items: navSymbols.map(function(navSymbol)" in app
-    assert "drawerItems.find(function(candidate)" in app
-    assert "updateNavigation(drawerSymbols, drawerItems)" in app
     assert "function updateSharedDrawerNavigation(symbols, items)" in shared
     assert "drawerIndex = drawerSymbols.indexOf(currentSymbol)" in shared
 

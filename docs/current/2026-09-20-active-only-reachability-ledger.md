@@ -22,11 +22,20 @@ this ledger. The dated inventory and cleanup review are evidence notes, not
 fresh runtime proof. Historical material remains audit/recovery material and is
 not promoted by this ledger.
 
+> **Wave C3b reconciliation — 2026-09-22:** The current Compose dashboard
+> entrypoint is `backend/active_transport.py`. Owner-approved MOVE-OUT removed
+> the caller-free duplicate `backend/mvp_server.py` and the isolated historical
+> `/mvp` frontend/test/harness cluster. The explicit `/mvp` and
+> `/api/setup-candidates` 410 responses remain in `active_transport.py` and are
+> covered by `test_mvp_server_transport.py`. Retained chart/detail and
+> setup/publisher compatibility seams remain owner decisions; no runtime,
+> pointer, timer, publisher, or browser operation was performed.
+
 ## Verdicts are separate
 
 | Verdict | Result | Basis and limit |
 |---|---|---|
-| SOURCE | **VERIFIED** | Checkout source, imports, dispatch, templates, publishers, operational references, and focused test names were inspected. No source was edited. |
+| SOURCE | **VERIFIED** | Checkout source, imports, dispatch, templates, publishers, operational references, and focused test names were inspected; Wave C3b applies only the caller-free source manifest recorded below. |
 | RUNTIME/API | **NOT VERIFIED / OWNER-DECISION** | No server, Compose stack, public ingress, database, timer, or service read-back was run in this ticket. Old notes and issue comments are not fresh served-route evidence. |
 | DATA/POINTER | **REVISE** | Current Trend Map, intraday, and Market Breadth pointers and their targets exist in this checkout and were read-only inspected; the ignored chart current pointers/targets are absent from this checkout. The pointer inventory records earlier validation, but cannot substitute for current checkout/runtime proof. |
 | BROWSER/UI | **NOT VERIFIED** | No desktop, 390px mobile, browser asset, chart-drawer, empty/error, or public URL probe was performed. |
@@ -35,15 +44,16 @@ not promoted by this ledger.
 
 | Route | Static dispatch / handler | Frontend or static request | Read model / safety seam | Focused evidence |
 |---|---|---|---|---|
-| `/trend-map` | `backend/mvp_server.py:MVPHandler.do_GET` reads `backend/trend_map_template.html` | Template links to `/market-breadth`; includes `/styles.css`, `/canonical-client.js`, `/shared-drawer.js`; template requests `/api/trend-map` | `backend/trend_map.py:handle_trend_map_api` builds a compact public report and returns a visible `DATA_BLOCKED` envelope on exception; published source dynamically imports `read_current_trend_map_report` and overlays the intraday quote read model | `backend/test_mvp_server_transport.py`, `backend/test_trend_map.py`, `backend/test_active_chart_adapter.py` |
-| `/api/trend-map` | Exact path dispatch in `backend/mvp_server.py` to `handle_trend_map_api` | Requested by `backend/trend_map_template.html`; drawer requests are separate retained APIs and are not one of the four ledger routes | `backend/trend_map_read_model_publisher.py` validates `current.json` plus its relative immutable artifact; `backend/intraday_quote_read_model.py` is a display-only sidecar; no request-path rescan/rebuild is intended | `backend/test_trend_map.py`, `backend/test_mvp_server_transport.py`, `backend/test_trend_map_read_model_publisher.py`, `backend/test_intraday_quote_read_model.py`, `backend/test_artifact_pointer_inventory.py` |
-| `/market-breadth` | Exact path dispatch in `backend/mvp_server.py` reads `backend/market_breadth_template.html` | Template links back to `/trend-map` and dynamically fetches `/api/market-breadth?range=` for `20`, `60`, `260`, or `all` | `backend/market_breadth_artifact.py:load_market_breadth_artifact` reads and hash-validates `current.json` plus `versions/market-breadth-<hash>.json`; template blocks stale/unavailable data and exposes Retry | `backend/test_mvp_server_transport.py`, `backend/test_market_breadth_frontend_contract.py`, `backend/test_market_breadth_artifact.py` |
-| `/api/market-breadth` | Exact path dispatch in `backend/mvp_server.py` to `handle_market_breadth_api` | Requested by `backend/market_breadth_template.html`; invalid ranges fail closed before loader use | `market_breadth_response` selects a prebuilt range from the validated immutable artifact; failures return `DATA_BLOCKED`/503; response preserves read-only envelope, provenance, quality, freshness, and active-ORD identity | `backend/test_market_breadth_artifact.py`, `backend/test_market_breadth_publisher.py`, `backend/test_mvp_server_transport.py`, `backend/test_artifact_pointer_inventory.py` |
+| `/trend-map` | `backend/active_transport.py:ActiveTransportHandler.do_GET` reads `backend/trend_map_template.html` | Template links to `/market-breadth`; includes `/styles.css`, `/canonical-client.js`, `/shared-drawer.js`; template requests `/api/trend-map` | `backend/trend_map.py:handle_trend_map_api` builds a compact public report and returns a visible `DATA_BLOCKED` envelope on exception; published source dynamically imports `read_current_trend_map_report` and overlays the intraday quote read model | `backend/test_mvp_server_transport.py`, `backend/test_trend_map.py`, `backend/test_active_chart_adapter.py` |
+| `/api/trend-map` | Exact path dispatch in `backend/active_transport.py` to `handle_trend_map_api` | Requested by `backend/trend_map_template.html`; drawer requests are separate retained APIs and are not one of the four ledger routes | `backend/trend_map_read_model_publisher.py` validates `current.json` plus its relative immutable artifact; `backend/intraday_quote_read_model.py` is a display-only sidecar; no request-path rescan/rebuild is intended | `backend/test_trend_map.py`, `backend/test_mvp_server_transport.py`, `backend/test_trend_map_read_model_publisher.py`, `backend/test_intraday_quote_read_model.py`, `backend/test_artifact_pointer_inventory.py` |
+| `/market-breadth` | Exact path dispatch in `backend/active_transport.py` reads `backend/market_breadth_template.html` | Template links back to `/trend-map` and dynamically fetches `/api/market-breadth?range=` for `20`, `60`, `260`, or `all` | `backend/market_breadth_artifact.py:load_market_breadth_artifact` reads and hash-validates `current.json` plus `versions/market-breadth-<hash>.json`; template blocks stale/unavailable data and exposes Retry | `backend/test_mvp_server_transport.py`, `backend/test_market_breadth_frontend_contract.py`, `backend/test_market_breadth_artifact.py` |
+| `/api/market-breadth` | Exact path dispatch in `backend/active_transport.py` to `handle_market_breadth_api` | Requested by `backend/market_breadth_template.html`; invalid ranges fail closed before loader use | `market_breadth_response` selects a prebuilt range from the validated immutable artifact; failures return `DATA_BLOCKED`/503; response preserves read-only envelope, provenance, quality, freshness, and active-ORD identity | `backend/test_market_breadth_artifact.py`, `backend/test_market_breadth_publisher.py`, `backend/test_mvp_server_transport.py`, `backend/test_artifact_pointer_inventory.py` |
 
 ### Static imports and dynamic loads
 
-The dispatch module statically imports `trend_map`, `trend_route_api`, and
-`market_breadth_artifact`, plus compatibility `mvp_routes`. `trend_map.py`
+The dispatch module statically imports `active_chart_routes`, `trend_map`,
+`trend_route_api`, and `market_breadth_artifact`; it does not import the
+historical MVP dispatcher. `trend_map.py`
 dynamically imports the Trend Map read-model reader and intraday quote reader
 when the published/read-model path is selected. `update_data.py` dynamically
 imports the Trend Map publisher in the EOD completion path. These dynamic loads
@@ -51,7 +61,7 @@ are source reachability only; they do not prove an installed service or served
 process reached them.
 
 The Trend Map template uses the active static assets registered in
-`mvp_server.py`: `styles.css`, `canonical-client.js`, and `shared-drawer.js`.
+`active_transport.py`: `styles.css`, `canonical-client.js`, and `shared-drawer.js`.
 The Market Breadth template has its page logic inline. Asset existence and
 browser loading were not probed here.
 
@@ -89,7 +99,7 @@ evidence, not a new deletion instruction for this ticket.
 
 | Family/path | Evidence and classification | Disposition |
 |---|---|---|
-| `docker-compose.yml` `dashboard` service | Runs `python -u mvp_server.py`, exposes port `3001`, bind-mounts `./backend`, and healthchecks `/trend-map`. This is configuration reachability, not a live service read-back. | KEEP |
+| `docker-compose.yml` `dashboard` service | Runs `python -u active_transport.py`, exposes port `3001`, bind-mounts `./backend`, and healthchecks `/trend-map`. This is configuration reachability, not a live service read-back. | KEEP |
 | `backend/update_data.py` | EOD path publishes Trend Map after successful bounded update; chart EOD hooks publish `1D/1W/1M`; intraday hooks publish quote sidecar and `60M`. Source references do not prove timer installation; operational evidence remains REVISE. | KEEP |
 | `backend/update_data.service`, `backend/update_data.timer` | Host EOD service/timer references the updater and a retired verification command in `ExecStartPost`; installation and current schedule were not inspected. Do not alter in this ticket. | OWNER-DECISION |
 | `backend/signalix-intraday.service`, `backend/signalix-monitor.service`, and corresponding timer files | Operational intraday paths reference `update_data.py`, `marginable_long`, `60m`, and no-scan behavior; active-route publication dependency is source-visible, timer/service reachability is unavailable. No timer changes. | OWNER-DECISION |
@@ -140,12 +150,12 @@ Protect all of the following from cleanup or contract drift:
 | Ignored/generated chart artifacts absent from checkout |  |  |  |  | ✓ |
 | Compose/services/timers/operational scripts | ✓ |  |  |  | ✓ |
 | Current authority and evidence notes | ✓ |  |  |  |  |
-| Historical/deferred setup and action families |  |  |  |  | ✓ |
+| Caller-free historical MVP/setup frontend and server family |  |  |  | ✓ |  |
+| Retained setup/chart/publisher compatibility seams |  |  |  |  | ✓ |
 
-`CONSOLIDATE`, `DELETE`, and `MOVE-OUT` are intentionally unused as
-authorized actions here. No deletion or move is approved by this ledger; any
-future use of those dispositions requires a separate owner-approved bounded
-ticket and reference scan.
+Wave C3b applies the separately owner-approved MOVE-OUT only to its exact
+caller-free manifest. No broader deletion, consolidation, or compatibility
+refactor is authorized by this ledger.
 
 ## Read-only commands and results
 
@@ -163,7 +173,7 @@ rg --files docs/current vault; rg -n ... active route/publisher/pointer/service 
 
 sed/read-only inspection of the active freeze, pointer inventory, cleanup review,
 Product Strategy, Execution Pipeline, Architecture, Components, Deployment,
-Documentation Governance, mvp_server.py, route/artifact modules, templates,
+Documentation Governance, active_transport.py, route/artifact modules, templates,
 tests, Compose, services, and timers
 → source/document evidence recorded above; no runtime operation
 
@@ -176,8 +186,9 @@ python - <<'PY' ... read current.json, resolve referenced target, print status/a
 
 No database writes, server starts, HTTP requests, public probes, browser
 automation, Compose commands, systemctl/timer commands, artifact generation,
-pointer writes, deletion, move, cleanup, commit, push, deploy, restart, or
-migration was performed.
+pointer writes, commit, push, deploy, restart, or migration was performed.
+Wave C3b's exact source deletions are the separately authorized exception to
+the original read-only ledger boundary.
 
 ## Handoff boundary
 
